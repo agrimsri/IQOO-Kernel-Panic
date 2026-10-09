@@ -41,7 +41,6 @@ import com.dpdpxray.app.ai.DiagnosticRow
 import com.dpdpxray.app.ai.LlmOutcome
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.ai.ModelFiles
-import com.dpdpxray.app.voice.ApiEnv
 import com.dpdpxray.app.ui.CameraCheckState
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.CodeBlock
@@ -230,13 +229,6 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit) {
             Note(
                 "TraceVeil uploads nothing. Its only network use is relaying the audited app's own DNS lookups during an audit. " +
                     "Reports, screenshots and AI analysis stay on this phone until you export them.",
-            )
-            val ctx = LocalContext.current
-            val cloudVoice = remember { ApiEnv.load(ctx).useApi }
-            if (cloudVoice) Note(
-                "Exception for this demo build: the cloud voice is switched on, so Voice Copilot sends each spoken answer's text to Sarvam AI to make speech. " +
-                    "Speech recognition and answers still stay on this phone.",
-                Film.high,
             )
             SectionTitle("Not legal advice")
             Note("Results are an automated technical assessment with citations to the DPDP Act 2023 and DPDP Rules 2025.")

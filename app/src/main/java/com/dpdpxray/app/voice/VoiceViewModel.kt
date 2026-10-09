@@ -35,22 +35,20 @@ data class VoiceUiState(
     val speakAnswers: Boolean = true,
     val speaking: Boolean = false,
     val voiceNote: String? = null,
-    val cloudVoice: Boolean = false,
 )
 
 /** State for [VoiceCopilotScreen]. Reads one saved audit; answers come from [GroundedAnswerer], never from a model. */
 class VoiceViewModel(app: Application) : AndroidViewModel(app) {
     private val graph = app.graph
     private val recognizer = OnDeviceRecognizer(app)
-    private val apiConfig = ApiEnv.load(app)
     private var evidence: AuditEvidence? = null
     private var installed: List<String>? = null
     private var permissionDenied = false
 
-    private val _state = MutableStateFlow(VoiceUiState(cloudVoice = apiConfig.useApi))
+    private val _state = MutableStateFlow(VoiceUiState())
     val state: StateFlow<VoiceUiState> = _state.asStateFlow()
 
-    private val voice: AnswerVoice = AnswerVoice(app, apiConfig) { onVoiceState(it) }
+    private val voice: SpeechOutput = AnswerVoice(app) { s -> _state.update { s.applyTo(it) } }
 
     fun load(auditId: String) {
         if (evidence != null) return
@@ -163,14 +161,6 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
     private fun cancelListening() {
         recognizer.release()
         _state.update { it.copy(listening = false) }
-    }
-
-    private fun onVoiceState(s: VoiceOutputState) = _state.update {
-        when (s) {
-            VoiceOutputState.Idle -> it.copy(speaking = false)
-            is VoiceOutputState.Speaking -> it.copy(speaking = true)
-            is VoiceOutputState.Note -> it.copy(speaking = false, voiceNote = s.message)
-        }
     }
 
     override fun onCleared() {
