@@ -107,4 +107,26 @@ class NetworkProofTest {
         val ok = NetworkProofText.lines(proofs[0]).joinToString("\n")
         assertTrue(ok, ok.contains("3,120 bytes") && ok.contains("40 datagrams") && ok.contains("± "))
     }
+
+    @Test
+    fun `measured results carry the coverage caveat in full`() {
+        listOf(session(), session(txEnd = 99_000), session(txEnd = 10_100)).forEach { sc ->
+            val text = NetworkProofText.lines(NetworkProofCalculator.compute(listOf(sc))).joinToString("\n")
+            assertTrue(text, text.contains("may also include other TraceVeil traffic"))
+            assertTrue(text, text.contains("TraceVeil's own writes into the tunnel"))
+            assertTrue(text, text.contains("has not been measured"))
+            assertTrue(text, text.contains("an estimate, not proof"))
+            assertTrue(text, Regex("(does|do) not show that data was sent anywhere").containsMatchIn(text))
+            assertTrue(text, text.contains("does not prove the absence of uploads"))
+        }
+    }
+
+    @Test
+    fun `no wording ties leftover bytes to theft or leaks`() {
+        val bad = Regex("exfiltrat|stolen|steal|leak|malicious|spying|secretly|proves? (that )?(data|nothing)", RegexOption.IGNORE_CASE)
+        listOf(session(), session(txEnd = 99_000), session(txEnd = 10_100), session(txEnd = null)).forEach { sc ->
+            val text = NetworkProofText.lines(NetworkProofCalculator.compute(listOf(sc))).joinToString("\n")
+            assertFalse(text, bad.containsMatchIn(text))
+        }
+    }
 }

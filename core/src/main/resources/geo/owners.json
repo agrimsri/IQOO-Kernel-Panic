@@ -1,0 +1,66 @@
+[
+  {
+    "entity": "Google Analytics for Firebase",
+    "location": {
+      "country": "US", "basis": "STATED_ADDRESS", "kind": "COMPANY_DOCUMENT", "asOf": "2026-10-10",
+      "source": "https://policies.google.com/terms",
+      "quote": "Google LLC organized under the laws of the State of Delaware, USA, and operating under the laws of the USA 1600 Amphitheatre Parkway Mountain View, California 94043 USA"
+    },
+    "incorporation": {
+      "country": "US", "kind": "COMPANY_DOCUMENT", "asOf": "2026-10-10",
+      "source": "https://policies.google.com/terms",
+      "quote": "Google LLC organized under the laws of the State of Delaware, USA"
+    },
+    "note": "From Google's general Terms of Service (\"Service provider\"). The product-specific terms for this service were not read and may name another Google entity for some customers."
+  },
+  {
+    "entity": "Google Ads / AdMob",
+    "location": {
+      "country": "US", "basis": "STATED_ADDRESS", "kind": "COMPANY_DOCUMENT", "asOf": "2026-10-10",
+      "source": "https://policies.google.com/terms",
+      "quote": "Google LLC organized under the laws of the State of Delaware, USA, and operating under the laws of the USA 1600 Amphitheatre Parkway Mountain View, California 94043 USA"
+    },
+    "incorporation": {
+      "country": "US", "kind": "COMPANY_DOCUMENT", "asOf": "2026-10-10",
+      "source": "https://policies.google.com/terms",
+      "quote": "Google LLC organized under the laws of the State of Delaware, USA"
+    },
+    "note": "From Google's general Terms of Service (\"Service provider\"). The product-specific terms for this service were not read and may name another Google entity for some customers."
+  },
+  {
+    "entity": "Firebase Crashlytics",
+    "location": {
+      "country": "US", "basis": "STATED_ADDRESS", "kind": "COMPANY_DOCUMENT", "asOf": "2026-10-10",
+      "source": "https://policies.google.com/terms",
+      "quote": "Google LLC organized under the laws of the State of Delaware, USA, and operating under the laws of the USA 1600 Amphitheatre Parkway Mountain View, California 94043 USA"
+    },
+    "incorporation": {
+      "country": "US", "kind": "COMPANY_DOCUMENT", "asOf": "2026-10-10",
+      "source": "https://policies.google.com/terms",
+      "quote": "Google LLC organized under the laws of the State of Delaware, USA"
+    },
+    "note": "From Google's general Terms of Service (\"Service provider\"). The product-specific terms for this service were not read and may name another Google entity for some customers."
+  },
+  {
+    "entity": "Meta (Facebook SDK)",
+    "location": {
+      "country": "US", "basis": "STATED_ADDRESS", "kind": "COMPANY_DOCUMENT", "asOf": "2026-10-10",
+      "source": "https://developers.facebook.com/terms/",
+      "quote": "Meta Platforms, Inc., 1 Meta Way, Menlo Park, CA 94205, USA"
+    },
+    "note": "The address Meta gives for itself as a party in its Platform Terms (data-transfer clause), reproduced as printed there. Its place of incorporation is not stated in that document."
+  },
+  {
+    "entity": "AppsFlyer",
+    "location": {
+      "country": "IL", "basis": "STATED_ADDRESS", "kind": "COMPANY_DOCUMENT", "asOf": "2026-10-10",
+      "source": "https://www.appsflyer.com/legal/terms-of-use/",
+      "quote": "you are contracting with AppsFlyer Ltd., located at 14 Maskit St. Herzliya, Israel"
+    },
+    "note": "AppsFlyer's terms name three contracting entities by customer country: AppsFlyer Inc. in San Francisco for customers in the United States or Canada, AppsFlyer UK Ltd. in London for the United Kingdom, France and several other countries, and AppsFlyer Ltd. in Herzliya, Israel for every other country. Which one applies to a given app developer is not known to this audit. Its place of incorporation is not stated in that document."
+  },
+  {
+    "entity": "CleverTap",
+    "note": "CleverTap's privacy policy lists three contracting and data-controlling entities (WizRocket Inc. in the United States, CleverTap Private Limited in India, CleverTap Pte. Ltd. in Singapore) and names no headquarters, so none is recorded."
+  }
+]
