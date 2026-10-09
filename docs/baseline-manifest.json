@@ -1,0 +1,525 @@
+{
+  "sourceProject": "dpdp-xray",
+  "destinationProject": "TraceVeil",
+  "sourceRevision": "d901807d84bc93de8e11cf6d59179ec16a1e67e7",
+  "sourcePredatesFinale": true,
+  "importedOn": "2026-10-09",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "sourceSha256": "a71f406c5e749ab574b4cb41106c8ebce6d6439adff839968292a46751d58334",
+      "traceveilSha256": "a71f406c5e749ab574b4cb41106c8ebce6d6439adff839968292a46751d58334",
+      "modified": false
+    },
+    {
+      "path": ".gitignore",
+      "sourceSha256": "e8204a4ec8c9cb73b4e3192a2fcdc6465f53b39ad08c6c51701268dacf64bc1a",
+      "traceveilSha256": "6306a260bbc4c5a37f90368bf376860bc815c74b7f8d2ece363639670ce08e85",
+      "modified": true
+    },
+    {
+      "path": "app/build.gradle.kts",
+      "sourceSha256": "6dada38fce89172a3233c73352adeec03bc7d090687fadf853ecf159b3dc98d5",
+      "traceveilSha256": "6dada38fce89172a3233c73352adeec03bc7d090687fadf853ecf159b3dc98d5",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/AndroidManifest.xml",
+      "sourceSha256": "53ff6f9895cc8ee4092be86643332b19540d0e18c29bb8e9a03e8f7e8d52853d",
+      "traceveilSha256": "b4da034386374da484e17586d6bf5d595059d486f74ca71d7eb7802736b72cca",
+      "modified": true
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/ai/AiServices.kt",
+      "sourceSha256": "c4a5318c204adb8b1422e9e4bab3a1c0b31fe8fe59e0f6f21247d0b96b79553f",
+      "traceveilSha256": "c4a5318c204adb8b1422e9e4bab3a1c0b31fe8fe59e0f6f21247d0b96b79553f",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/ai/LlmEngine.kt",
+      "sourceSha256": "dfefb88fe2c539ccff968d00b20ff325876ffc944ff4455173e74be77ac66c54",
+      "traceveilSha256": "dfefb88fe2c539ccff968d00b20ff325876ffc944ff4455173e74be77ac66c54",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/ai/ModelFiles.kt",
+      "sourceSha256": "e295b8fbc432b1741612c0043389507a992a079d5430aa21c8d8da6d7a22cbc7",
+      "traceveilSha256": "e295b8fbc432b1741612c0043389507a992a079d5430aa21c8d8da6d7a22cbc7",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/audit/AuditOrchestrator.kt",
+      "sourceSha256": "dd661e56e6e0ad5f6d729aa89d9b0a895ecc2079bae4703aa17c64613e91bb4a",
+      "traceveilSha256": "4c96fb3138eaa57197637d951b7d760e91fbde865d97fc2261cf37b75009a4f0",
+      "modified": true
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/capture/CaptureBus.kt",
+      "sourceSha256": "522d991c9516aef1fb8abc4e4295d61f070f54322d86ca937fbdd0b2f4e174a3",
+      "traceveilSha256": "522d991c9516aef1fb8abc4e4295d61f070f54322d86ca937fbdd0b2f4e174a3",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/capture/DnsForwarder.kt",
+      "sourceSha256": "2b6ae72df3fea23a015313edbe02351a8e87aa2d6b46267a41c48feb2227c81f",
+      "traceveilSha256": "2b6ae72df3fea23a015313edbe02351a8e87aa2d6b46267a41c48feb2227c81f",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/capture/XrayVpnService.kt",
+      "sourceSha256": "43691654bac3b551a1559196878d63d8afe5d03d78fe77c5bec83cee1149d050",
+      "traceveilSha256": "4e0a3d4535251d1259ffec013af59c22465b185f3fe12cdfc6d261b9084a1692",
+      "modified": true
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/consent/ConsentAccessibilityService.kt",
+      "sourceSha256": "a002112aaa121d0d61e797f048709d37f725925dbaefa6d4bc629f4d23b1b684",
+      "traceveilSha256": "7caba20d1c9c9c7ab57389add4a2445185ab139363235793c693d66ff7b939c5",
+      "modified": true
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/consent/ConsentBus.kt",
+      "sourceSha256": "a5b4ba8aa674637ddc30e39ed8e4738046e49f77b87ce3bb7a3f2f93c0d457e6",
+      "traceveilSha256": "a5b4ba8aa674637ddc30e39ed8e4738046e49f77b87ce3bb7a3f2f93c0d457e6",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/consent/NodeMapper.kt",
+      "sourceSha256": "53f16fa1941998a93a5b45501230c1fc63262c615a9b6201b77a66ee53e54125",
+      "traceveilSha256": "53f16fa1941998a93a5b45501230c1fc63262c615a9b6201b77a66ee53e54125",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/control/DeviceChecks.kt",
+      "sourceSha256": "7b332bf7aa284b7502d274a2349821f176bd66f44a7ecc37714c2352b79c472f",
+      "traceveilSha256": "7b332bf7aa284b7502d274a2349821f176bd66f44a7ecc37714c2352b79c472f",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/control/ShizukuBridge.kt",
+      "sourceSha256": "a50846f3dddb5be6086192f9ccf7615c7a8d0b4b7d90a8c859d2f111d2c8e980",
+      "traceveilSha256": "a50846f3dddb5be6086192f9ccf7615c7a8d0b4b7d90a8c859d2f111d2c8e980",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/data/AuditRepository.kt",
+      "sourceSha256": "245cf143520bdf369227ba7333021a28aaf6cc6664b75001072fa68d9f5584c1",
+      "traceveilSha256": "245cf143520bdf369227ba7333021a28aaf6cc6664b75001072fa68d9f5584c1",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/data/SampleAudit.kt",
+      "sourceSha256": "70ce22a7ce8806c30b6587005bb6b7881283b56f4e81998fbb228beef91c20b6",
+      "traceveilSha256": "70ce22a7ce8806c30b6587005bb6b7881283b56f4e81998fbb228beef91c20b6",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/data/SettingsStore.kt",
+      "sourceSha256": "5445f95a29f39742c7b36aa7e7a3233454339832f75ab56422b0a47997f473ae",
+      "traceveilSha256": "5445f95a29f39742c7b36aa7e7a3233454339832f75ab56422b0a47997f473ae",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/MainActivity.kt",
+      "sourceSha256": "51ceb7d6176419ec434e2fed79aae752b885bc37b1c3136f22d0fcafa78487aa",
+      "traceveilSha256": "51ceb7d6176419ec434e2fed79aae752b885bc37b1c3136f22d0fcafa78487aa",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/report/Exporters.kt",
+      "sourceSha256": "2d84c5a7ae2b0b74896a7056e0b9da738b3f4d7718fb27702d2e8b4f706e1c71",
+      "traceveilSha256": "17bb958935c46ab7f2151d6ff9f0a29ed75e72a16ec5e69ec645ce4c9bccca82",
+      "modified": true
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/ui/components/Components.kt",
+      "sourceSha256": "74db7d56c061f7ea8b2906bce1676e1615375a92cf328e9925ed990a9cd2388e",
+      "traceveilSha256": "74db7d56c061f7ea8b2906bce1676e1615375a92cf328e9925ed990a9cd2388e",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/ui/screens/AppPickerScreen.kt",
+      "sourceSha256": "1129cbe3d429eb13c0117fb39879f7c120d8f62b568822fe229c6891125ee654",
+      "traceveilSha256": "1129cbe3d429eb13c0117fb39879f7c120d8f62b568822fe229c6891125ee654",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/ui/screens/HomeScreen.kt",
+      "sourceSha256": "21ebffb12d5d6a9015dae6883b57e470af39d00daefdf062cdd78e0a5c7526ef",
+      "traceveilSha256": "c5330ded6b82473ed7a4797ff36df655898ea1b2b4bb3d2df7d62675a754ceb1",
+      "modified": true
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/ui/screens/LiveAuditScreen.kt",
+      "sourceSha256": "7f8f9d344d23ebc762cb31d4814b4329f781aa31d00baea78769b36a27a9aaee",
+      "traceveilSha256": "7f8f9d344d23ebc762cb31d4814b4329f781aa31d00baea78769b36a27a9aaee",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/ui/screens/ResultScreens.kt",
+      "sourceSha256": "1eabed6907d78c3a82ae2df4ad0e86a3635b0875d34426a28c9e46103f68dc45",
+      "traceveilSha256": "6dda41359d4d993bde3ccd3e3a6c3ce9476c0826c12f38f9313b3322d6c4379d",
+      "modified": true
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/ui/screens/ToolScreens.kt",
+      "sourceSha256": "29b44f0d616a9d0b92b8158825ce8266fecb9fbee70629dec6a8d93d7a9cb6da",
+      "traceveilSha256": "1a4721149a372dc1fa25f286a9e72eb3339e8b91a650ab8a72097fc48cef9962",
+      "modified": true
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/ui/theme/Theme.kt",
+      "sourceSha256": "b98f90ffbbd613c5a3b8d13a494e660b6c719f74f7708a87152d0144f54c418b",
+      "traceveilSha256": "b98f90ffbbd613c5a3b8d13a494e660b6c719f74f7708a87152d0144f54c418b",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/ui/XrayViewModel.kt",
+      "sourceSha256": "3729d556e60dee4a32359a3a2ba8c683deee4cae3facd1c11d320b2244a40b05",
+      "traceveilSha256": "78f7f0ea58733905ae2b6dbfd57992367d2530e72afb3e20c4fdb6b296dba352",
+      "modified": true
+    },
+    {
+      "path": "app/src/main/java/com/dpdpxray/app/XrayApp.kt",
+      "sourceSha256": "f44080d13e464293842c8d3df8f0f1fab041d1ebdf6c463680f066e23fc1772f",
+      "traceveilSha256": "f44080d13e464293842c8d3df8f0f1fab041d1ebdf6c463680f066e23fc1772f",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_launcher_fg.xml",
+      "sourceSha256": "4268f38b15bc471d2325ef82043da36f6e2c2bd9247bfdd2d118cbbb1512a4b5",
+      "traceveilSha256": "4268f38b15bc471d2325ef82043da36f6e2c2bd9247bfdd2d118cbbb1512a4b5",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/res/font/archivo.ttf",
+      "sourceSha256": "0e094a7d3c7c4c25cf1310c4b30014f1dae9332220b1c2c88f4fa996f0b05053",
+      "traceveilSha256": "0e094a7d3c7c4c25cf1310c4b30014f1dae9332220b1c2c88f4fa996f0b05053",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/res/mipmap-anydpi/ic_launcher.xml",
+      "sourceSha256": "0be9637197516a1d0deb6bcf65a43702bc49b56b426f27e5932f3197bb824278",
+      "traceveilSha256": "0be9637197516a1d0deb6bcf65a43702bc49b56b426f27e5932f3197bb824278",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/res/values/colors.xml",
+      "sourceSha256": "3f0e9339fe9341a465f1241a0c76f9aec89eb776b56f65ced874eef2b6b051bb",
+      "traceveilSha256": "3f0e9339fe9341a465f1241a0c76f9aec89eb776b56f65ced874eef2b6b051bb",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/res/values/strings.xml",
+      "sourceSha256": "445cf6254a8c9bb48359f85c1957951b4a60acbbc593e4ef41a3ffb935ef744c",
+      "traceveilSha256": "24cf8238c6be3cade02ab60e13e50ae9e2adef946b39f1bb69c41add3ddaf94f",
+      "modified": true
+    },
+    {
+      "path": "app/src/main/res/values/themes.xml",
+      "sourceSha256": "8a0952e14f73f716066ad94ee359c69cf1102c87619270facf0cf72262ffb3be",
+      "traceveilSha256": "8a0952e14f73f716066ad94ee359c69cf1102c87619270facf0cf72262ffb3be",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/res/xml/consent_accessibility.xml",
+      "sourceSha256": "4eef2697aabc5723bece372048efee30bcb1cefc70de01ddc492496086267480",
+      "traceveilSha256": "4eef2697aabc5723bece372048efee30bcb1cefc70de01ddc492496086267480",
+      "modified": false
+    },
+    {
+      "path": "app/src/main/res/xml/file_paths.xml",
+      "sourceSha256": "54690b16b6c8782236b34e57ad01e99e29c8367bb6af91e941078bde520c0b0a",
+      "traceveilSha256": "54690b16b6c8782236b34e57ad01e99e29c8367bb6af91e941078bde520c0b0a",
+      "modified": false
+    },
+    {
+      "path": "build.gradle.kts",
+      "sourceSha256": "f9b08caface858c0af42bcb4acc0c62894c6ef2d8029b97671cacfddf91586e1",
+      "traceveilSha256": "f9b08caface858c0af42bcb4acc0c62894c6ef2d8029b97671cacfddf91586e1",
+      "modified": false
+    },
+    {
+      "path": "core/build.gradle.kts",
+      "sourceSha256": "561d09b22f9af9979b2df4cdbf64680e229611d05998e1c3eb8e6433dc8bdbe7",
+      "traceveilSha256": "561d09b22f9af9979b2df4cdbf64680e229611d05998e1c3eb8e6433dc8bdbe7",
+      "modified": false
+    },
+    {
+      "path": "core/src/main/kotlin/com/dpdpxray/core/audit/PhaseAssigner.kt",
+      "sourceSha256": "85026d41a19d65667b20f87a307f0537703b2c536017e18741540dc36b0179f6",
+      "traceveilSha256": "85026d41a19d65667b20f87a307f0537703b2c536017e18741540dc36b0179f6",
+      "modified": false
+    },
+    {
+      "path": "core/src/main/kotlin/com/dpdpxray/core/consent/ConsentLexicon.kt",
+      "sourceSha256": "532abdb5ed6f0cd6760d2917e97d670f3e8e823be704f027ff8755c07ac24f35",
+      "traceveilSha256": "532abdb5ed6f0cd6760d2917e97d670f3e8e823be704f027ff8755c07ac24f35",
+      "modified": false
+    },
+    {
+      "path": "core/src/main/kotlin/com/dpdpxray/core/dns/DnsPacketCodec.kt",
+      "sourceSha256": "c210afc9bfcf4badd64f96bb2999f460cdf7a34fd1efa8034ab05861c50fb049",
+      "traceveilSha256": "c210afc9bfcf4badd64f96bb2999f460cdf7a34fd1efa8034ab05861c50fb049",
+      "modified": false
+    },
+    {
+      "path": "core/src/main/kotlin/com/dpdpxray/core/dpdp/Dpdp.kt",
+      "sourceSha256": "ca3d09d93110bbd66f17a5ecb20f0a3fb1ea82c6980d009332899c0b4180780e",
+      "traceveilSha256": "ca3d09d93110bbd66f17a5ecb20f0a3fb1ea82c6980d009332899c0b4180780e",
+      "modified": false
+    },
+    {
+      "path": "core/src/main/kotlin/com/dpdpxray/core/fixes/FixCatalog.kt",
+      "sourceSha256": "1d312a98259444bb9524ab181d32fa5485a10c7406800f453783813eb8bb2175",
+      "traceveilSha256": "1d312a98259444bb9524ab181d32fa5485a10c7406800f453783813eb8bb2175",
+      "modified": false
+    },
+    {
+      "path": "core/src/main/kotlin/com/dpdpxray/core/model/Model.kt",
+      "sourceSha256": "f4631e2268f60c0efab7aeba5f716fd86dd8b85963627ad1fce1f50680b49194",
+      "traceveilSha256": "f4631e2268f60c0efab7aeba5f716fd86dd8b85963627ad1fce1f50680b49194",
+      "modified": false
+    },
+    {
+      "path": "core/src/main/kotlin/com/dpdpxray/core/report/Reports.kt",
+      "sourceSha256": "cca75863252da6b857466d3a9d040d191cf2434a21dd3476e7a8b1626f3f065f",
+      "traceveilSha256": "10e8a648d1f1434a6b1bd2e149973a5da1bd05e5272664aa21373f62409937c7",
+      "modified": true
+    },
+    {
+      "path": "core/src/main/kotlin/com/dpdpxray/core/rules/RulesEngine.kt",
+      "sourceSha256": "88538abfc07a7a9ac2d56f3101cb9718005a3ec733479016b79a0ad72a29be1b",
+      "traceveilSha256": "88538abfc07a7a9ac2d56f3101cb9718005a3ec733479016b79a0ad72a29be1b",
+      "modified": false
+    },
+    {
+      "path": "core/src/main/kotlin/com/dpdpxray/core/screen/ScreenAuditing.kt",
+      "sourceSha256": "3a00242ec75b5b8e465ef1a5cce68212ae9d72db994a1271e1b40275d0acbab3",
+      "traceveilSha256": "3a00242ec75b5b8e465ef1a5cce68212ae9d72db994a1271e1b40275d0acbab3",
+      "modified": false
+    },
+    {
+      "path": "core/src/main/kotlin/com/dpdpxray/core/trackers/TrackerCatalog.kt",
+      "sourceSha256": "1a2aed5a32a0dc184df690be06053041a7f28ee746ff004cc2e36ff866ef51a8",
+      "traceveilSha256": "1a2aed5a32a0dc184df690be06053041a7f28ee746ff004cc2e36ff866ef51a8",
+      "modified": false
+    },
+    {
+      "path": "core/src/main/resources/dpdp/passages.json",
+      "sourceSha256": "e4a37f4383a70640f8c9bcdc3d24a6623e53066a0739ca400b4f88cc849f971c",
+      "traceveilSha256": "e4a37f4383a70640f8c9bcdc3d24a6623e53066a0739ca400b4f88cc849f971c",
+      "modified": false
+    },
+    {
+      "path": "core/src/main/resources/fixes/fix_templates.json",
+      "sourceSha256": "b96951071884c4299df8329a057bcb581c49ec08906345c2146559a37d6d5ca6",
+      "traceveilSha256": "b96951071884c4299df8329a057bcb581c49ec08906345c2146559a37d6d5ca6",
+      "modified": false
+    },
+    {
+      "path": "core/src/main/resources/trackers/trackers.json",
+      "sourceSha256": "d27881ce86cabb70508004bc03b14903618bbd72657c1533133189677175aabc",
+      "traceveilSha256": "d27881ce86cabb70508004bc03b14903618bbd72657c1533133189677175aabc",
+      "modified": false
+    },
+    {
+      "path": "core/src/test/kotlin/com/dpdpxray/core/audit/PhaseAssignerTest.kt",
+      "sourceSha256": "c5d1c7f34cb79dc223f25a600e306ab32c43d733c486a73ff782ffe786cb7739",
+      "traceveilSha256": "c5d1c7f34cb79dc223f25a600e306ab32c43d733c486a73ff782ffe786cb7739",
+      "modified": false
+    },
+    {
+      "path": "core/src/test/kotlin/com/dpdpxray/core/consent/ConsentLexiconTest.kt",
+      "sourceSha256": "ca09c4fd8e6e5601f73007e3bc50f1b2865753ece1c3ee234c0f6397bf43a6b0",
+      "traceveilSha256": "ca09c4fd8e6e5601f73007e3bc50f1b2865753ece1c3ee234c0f6397bf43a6b0",
+      "modified": false
+    },
+    {
+      "path": "core/src/test/kotlin/com/dpdpxray/core/dns/DnsPacketCodecTest.kt",
+      "sourceSha256": "21c5fbcd9af14baeee03bbfac5202f9e1137d559f8d65f9849ad24897f8c21af",
+      "traceveilSha256": "21c5fbcd9af14baeee03bbfac5202f9e1137d559f8d65f9849ad24897f8c21af",
+      "modified": false
+    },
+    {
+      "path": "core/src/test/kotlin/com/dpdpxray/core/dns/TestPackets.kt",
+      "sourceSha256": "a0060b5c7889abfbe1c0ac9385ad66e538d857d2925019469446a654dd8cafce",
+      "traceveilSha256": "a0060b5c7889abfbe1c0ac9385ad66e538d857d2925019469446a654dd8cafce",
+      "modified": false
+    },
+    {
+      "path": "core/src/test/kotlin/com/dpdpxray/core/report/FixesCitationsReportTest.kt",
+      "sourceSha256": "bc3526a29342e3288d0f062209a3ffb6f4eec3c5de27381d438d91e713e4453b",
+      "traceveilSha256": "bc3526a29342e3288d0f062209a3ffb6f4eec3c5de27381d438d91e713e4453b",
+      "modified": false
+    },
+    {
+      "path": "core/src/test/kotlin/com/dpdpxray/core/rules/RulesEngineTest.kt",
+      "sourceSha256": "6ea2dc2623871c51d891695fa6111fafd6c3c9c5f768cabe9123ff642e6636aa",
+      "traceveilSha256": "6ea2dc2623871c51d891695fa6111fafd6c3c9c5f768cabe9123ff642e6636aa",
+      "modified": false
+    },
+    {
+      "path": "core/src/test/kotlin/com/dpdpxray/core/screen/Fixtures.kt",
+      "sourceSha256": "e46ad50859a0cc6fdec54dde34567da956190cdc3b06acaa2e4affc79a740c7a",
+      "traceveilSha256": "e46ad50859a0cc6fdec54dde34567da956190cdc3b06acaa2e4affc79a740c7a",
+      "modified": false
+    },
+    {
+      "path": "core/src/test/kotlin/com/dpdpxray/core/screen/ScreenAuditTest.kt",
+      "sourceSha256": "6c2322b0622a7f5107172ad6dfa4461d2112894ffe289794980b2c8bb08540c3",
+      "traceveilSha256": "6c2322b0622a7f5107172ad6dfa4461d2112894ffe289794980b2c8bb08540c3",
+      "modified": false
+    },
+    {
+      "path": "core/src/test/kotlin/com/dpdpxray/core/trackers/TrackerCatalogTest.kt",
+      "sourceSha256": "374dde22b1aff6277ca2cd258dbccbc05229f6d411026fcaa71e2bac6cacf2c0",
+      "traceveilSha256": "374dde22b1aff6277ca2cd258dbccbc05229f6d411026fcaa71e2bac6cacf2c0",
+      "modified": false
+    },
+    {
+      "path": "docs/screenshots/finding.png",
+      "sourceSha256": "938c16142e96d979a2ee33d66a68ea4f9c7ddde84306bb6ecc1a75716c821241",
+      "traceveilSha256": "938c16142e96d979a2ee33d66a68ea4f9c7ddde84306bb6ecc1a75716c821241",
+      "modified": false
+    },
+    {
+      "path": "docs/screenshots/fixed-result.png",
+      "sourceSha256": "6490e1ffce8fa2f992020eacaa64e9d5ac75434fe4d66fea98e8c687bc15fb86",
+      "traceveilSha256": "6490e1ffce8fa2f992020eacaa64e9d5ac75434fe4d66fea98e8c687bc15fb86",
+      "modified": false
+    },
+    {
+      "path": "docs/screenshots/fixes.png",
+      "sourceSha256": "05595661c3705195a302e6ef5c61f16a61eb65d95d249946b43fb634a98e6f24",
+      "traceveilSha256": "05595661c3705195a302e6ef5c61f16a61eb65d95d249946b43fb634a98e6f24",
+      "modified": false
+    },
+    {
+      "path": "docs/screenshots/home.png",
+      "sourceSha256": "254e18fda7d68fe8a43a39fda98d50cc932fe901462f68a7655737d997727db0",
+      "traceveilSha256": "254e18fda7d68fe8a43a39fda98d50cc932fe901462f68a7655737d997727db0",
+      "modified": false
+    },
+    {
+      "path": "docs/screenshots/leakyshop-consent.png",
+      "sourceSha256": "7820e6e0627706544cf4e31278e16d17a6a91c8846332d56fb143833fab00772",
+      "traceveilSha256": "7820e6e0627706544cf4e31278e16d17a6a91c8846332d56fb143833fab00772",
+      "modified": false
+    },
+    {
+      "path": "docs/screenshots/leakyshop-fixed-consent.png",
+      "sourceSha256": "fe0e00a62aa43f8850d74c734779fa10f028e780296638164c528c77d57b7a37",
+      "traceveilSha256": "fe0e00a62aa43f8850d74c734779fa10f028e780296638164c528c77d57b7a37",
+      "modified": false
+    },
+    {
+      "path": "docs/screenshots/pdf.png",
+      "sourceSha256": "c23d02d1968fba21c34fdc88d6d910ca5310241ae6602dac6c1f1d40537f3a7e",
+      "traceveilSha256": "c23d02d1968fba21c34fdc88d6d910ca5310241ae6602dac6c1f1d40537f3a7e",
+      "modified": false
+    },
+    {
+      "path": "docs/screenshots/picker.png",
+      "sourceSha256": "2b871e7a470cebc6e8a8f6665d5881808c7c34cd7c0e553728d67ebffee58376",
+      "traceveilSha256": "2b871e7a470cebc6e8a8f6665d5881808c7c34cd7c0e553728d67ebffee58376",
+      "modified": false
+    },
+    {
+      "path": "docs/screenshots/report.png",
+      "sourceSha256": "464bffabf20403cafad656614e2fcf01adf80e2dbc6583d82e26c69b911ac0bf",
+      "traceveilSha256": "464bffabf20403cafad656614e2fcf01adf80e2dbc6583d82e26c69b911ac0bf",
+      "modified": false
+    },
+    {
+      "path": "docs/screenshots/results.png",
+      "sourceSha256": "77d9b1b0ba9f1d5360585acce26f67676935ad808a69fbc3b4eb77d3912a642f",
+      "traceveilSha256": "77d9b1b0ba9f1d5360585acce26f67676935ad808a69fbc3b4eb77d3912a642f",
+      "modified": false
+    },
+    {
+      "path": "docs/screenshots/setup.png",
+      "sourceSha256": "2477b1639f17a92a4ceead817c2e88dfb673e0e06748737172a24de055c8ce64",
+      "traceveilSha256": "2477b1639f17a92a4ceead817c2e88dfb673e0e06748737172a24de055c8ce64",
+      "modified": false
+    },
+    {
+      "path": "docs/screenshots/timeline-reject.png",
+      "sourceSha256": "d0177cacaa32e4d79ba8e07332d384cd88d0cc8b0d071c4e4877ac76c7100e2e",
+      "traceveilSha256": "d0177cacaa32e4d79ba8e07332d384cd88d0cc8b0d071c4e4877ac76c7100e2e",
+      "modified": false
+    },
+    {
+      "path": "gradle/libs.versions.toml",
+      "sourceSha256": "74deeb0a6a3e7d42e15222d72d329e16c28a9056887697c0211faa9264669277",
+      "traceveilSha256": "74deeb0a6a3e7d42e15222d72d329e16c28a9056887697c0211faa9264669277",
+      "modified": false
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.jar",
+      "sourceSha256": "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7",
+      "traceveilSha256": "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7",
+      "modified": false
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.properties",
+      "sourceSha256": "e420abb9e085750537eb128c2a70ef40cc86ceed4e3445429f095a4eee7b124e",
+      "traceveilSha256": "e420abb9e085750537eb128c2a70ef40cc86ceed4e3445429f095a4eee7b124e",
+      "modified": false
+    },
+    {
+      "path": "gradle.properties",
+      "sourceSha256": "c9fbe56dadae0160f80026786527d7f49d39e9c6d87ee291bcad07ffd0752dbd",
+      "traceveilSha256": "c9fbe56dadae0160f80026786527d7f49d39e9c6d87ee291bcad07ffd0752dbd",
+      "modified": false
+    },
+    {
+      "path": "gradlew",
+      "sourceSha256": "a5a5c199ba02189ae8c46a334223371a20599d9c298ef65e7540ede4a3f72d59",
+      "traceveilSha256": "a5a5c199ba02189ae8c46a334223371a20599d9c298ef65e7540ede4a3f72d59",
+      "modified": false
+    },
+    {
+      "path": "gradlew.bat",
+      "sourceSha256": "d539676c48b596afda64c963ec8f7ee56c7b3fe7e3b81d1dbe2d1a1e3dd9e9f8",
+      "traceveilSha256": "d539676c48b596afda64c963ec8f7ee56c7b3fe7e3b81d1dbe2d1a1e3dd9e9f8",
+      "modified": false
+    },
+    {
+      "path": "leakyshop/build.gradle.kts",
+      "sourceSha256": "5b9a2962b46a8f30f6218b49784f8ef2ab1f7dd9d71aebb87a91cbcdafec39fc",
+      "traceveilSha256": "5b9a2962b46a8f30f6218b49784f8ef2ab1f7dd9d71aebb87a91cbcdafec39fc",
+      "modified": false
+    },
+    {
+      "path": "leakyshop/src/main/AndroidManifest.xml",
+      "sourceSha256": "a63f03d5cc3ada9b9dcf8df2d5920aea42fbe61337b67d63600c5a95139f1b36",
+      "traceveilSha256": "a63f03d5cc3ada9b9dcf8df2d5920aea42fbe61337b67d63600c5a95139f1b36",
+      "modified": false
+    },
+    {
+      "path": "leakyshop/src/main/java/com/leakyshop/demo/Shop.kt",
+      "sourceSha256": "84f4bf060c8988c8a16c351238d46753105691cb713e99d9c78bbfe0ec175282",
+      "traceveilSha256": "58a22d65b8e7a6793f5af4b8d898be120155492cbaef295464a0c1caf0bf717f",
+      "modified": true
+    },
+    {
+      "path": "LICENSE",
+      "sourceSha256": "26245eca577c5453721d492865481e5d93157bb5b10b0152eb13256855e612b5",
+      "traceveilSha256": "26245eca577c5453721d492865481e5d93157bb5b10b0152eb13256855e612b5",
+      "modified": false
+    },
+    {
+      "path": "README.md",
+      "sourceSha256": "b6a06e4bb7c4db4582d66f5ad186ab1bafa25dde348bec30737445d60ab4c689",
+      "traceveilSha256": "ca39a3f6d9f3a3c32b6827ea51b6d68f4262c35969295f0844c002e7d3c7b07b",
+      "modified": true
+    },
+    {
+      "path": "settings.gradle.kts",
+      "sourceSha256": "67b296b80feba10d1bead7d74e110b4cfc31334db9e8566a03ee01b3e4e0e1e4",
+      "traceveilSha256": "b43c3022db711daf487a9e39cf27da956ccbe2467a5b65148d49d2998c65a7a0",
+      "modified": true
+    }
+  ]
+}
