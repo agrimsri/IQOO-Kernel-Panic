@@ -29,13 +29,17 @@ data class CaptureHealth(
     val dnsResponsesRelayed: Long? = null,
     /** Queries for which every resolver failed, so the app received SERVFAIL. */
     val dnsRelayFailures: Long? = null,
-    /** Resolver replies whose answer records could not be fully read; the reply was still relayed unchanged. */
+    /**
+     * Resolver replies whose answer records could not be fully read (status PARTIAL, MISMATCHED or MALFORMED); the
+     * reply was still relayed unchanged. Included in [dnsResponsesRelayed].
+     */
     val malformedResponses: Long? = null,
-    /** Events kept in the session buffer. */
+    /** Events kept in the session buffer. [eventsRecorded] + [eventsDropped] = [dnsQueriesParsed]. */
     val eventsRecorded: Long? = null,
-    /** Events lost because the buffer was full ([eventBufferCapacity]). */
+    /** Events lost because the buffer was full ([eventBufferCapacity]); the newest are dropped, the earliest kept. */
     val eventsDropped: Long? = null,
     val eventBufferCapacity: Int? = null,
+    /** Earliest and latest lookup, including dropped ones. null while measured but no lookup was seen. */
     val firstLookupNanos: Long? = null,
     val lastLookupNanos: Long? = null,
     /** DNS message bytes TraceVeil sent to upstream resolvers, counting every attempt including fallback retries. */
