@@ -1,10 +1,12 @@
 package com.dpdpxray.core.dns
 
+import com.dpdpxray.core.model.AnswerStatus
 import com.dpdpxray.core.model.NetEvent
 
 /** What a resolver reply said about one query. Only [attributable] results may be attached to that query's event. */
 data class DnsAnswer(
-    val status: Status,
+    /** Never [AnswerStatus.NO_REPLY]: that is decided by the relay when no reply arrives at all. */
+    val status: AnswerStatus,
     /** Lowercased question name of the reply, once it has been read. */
     val questionName: String? = null,
     val questionType: Int? = null,
@@ -14,21 +16,7 @@ data class DnsAnswer(
     /** A/AAAA addresses owned by the final name of the chain, in answer order. */
     val answerIps: List<String> = emptyList(),
 ) {
-    enum class Status {
-        /** Every answer record was read and the chain resolved. */
-        COMPLETE,
-
-        /** Matches the query, but truncated, capped, looping or partly unreadable: only what was verified is kept. */
-        PARTIAL,
-
-        /** Readable, but not a reply to this query (id, question or QR bit differ): nothing is attributed. */
-        MISMATCHED,
-
-        /** Header or question unreadable: nothing is attributed. */
-        MALFORMED,
-    }
-
-    val attributable: Boolean get() = status == Status.COMPLETE || status == Status.PARTIAL
+    val attributable: Boolean get() = status == AnswerStatus.COMPLETE || status == AnswerStatus.PARTIAL
 }
 
 /**
@@ -49,16 +37,16 @@ object DnsAnswers {
 
     /** [query] is the DNS message the app sent (the UDP payload), used to check the reply really answers it. */
     fun parse(response: ByteArray, query: ByteArray): DnsAnswer {
-        val (expectedName, expectedType) = DnsPacketCodec.parseQuestion(query) ?: return DnsAnswer(DnsAnswer.Status.MISMATCHED)
+        val (expectedName, expectedType) = DnsPacketCodec.parseQuestion(query) ?: return DnsAnswer(AnswerStatus.MISMATCHED)
         val r = response
-        if (r.size < 12) return DnsAnswer(DnsAnswer.Status.MALFORMED)
+        if (r.size < 12) return DnsAnswer(AnswerStatus.MALFORMED)
         val flags = u16(r, 2)
-        if (flags and 0x8000 == 0 || u16(r, 0) != u16(query, 0) || u16(r, 4) != 1) return DnsAnswer(DnsAnswer.Status.MISMATCHED)
-        val question = readName(r, 12) ?: return DnsAnswer(DnsAnswer.Status.MALFORMED)
-        if (question.end + 4 > r.size) return DnsAnswer(DnsAnswer.Status.MALFORMED)
+        if (flags and 0x8000 == 0 || u16(r, 0) != u16(query, 0) || u16(r, 4) != 1) return DnsAnswer(AnswerStatus.MISMATCHED)
+        val question = readName(r, 12) ?: return DnsAnswer(AnswerStatus.MALFORMED)
+        if (question.end + 4 > r.size) return DnsAnswer(AnswerStatus.MALFORMED)
         val questionType = u16(r, question.end)
         if (question.name != expectedName || questionType != expectedType) {
-            return DnsAnswer(DnsAnswer.Status.MISMATCHED, question.name, questionType)
+            return DnsAnswer(AnswerStatus.MISMATCHED, question.name, questionType)
         }
         val rcode = flags and 0x000f
         var partial = flags and 0x0200 != 0 // TC: the resolver cut the reply short
@@ -101,7 +89,7 @@ object DnsAnswers {
         if (ips.size > MAX_IPS) partial = true
 
         return DnsAnswer(
-            status = if (partial) DnsAnswer.Status.PARTIAL else DnsAnswer.Status.COMPLETE,
+            status = if (partial) AnswerStatus.PARTIAL else AnswerStatus.COMPLETE,
             questionName = question.name,
             questionType = questionType,
             rcode = rcode,
@@ -174,7 +162,13 @@ object DnsAnswers {
     private fun u16(b: ByteArray, i: Int) = (u8(b, i) shl 8) or u8(b, i + 1)
 }
 
-/** Attaches a verified answer to the event for the same question; anything unverified leaves the event unchanged. */
-fun NetEvent.withAnswer(answer: DnsAnswer): NetEvent =
-    if (!answer.attributable || answer.questionName != hostname.lowercase().trimEnd('.')) this
-    else copy(cnameChain = answer.cnameChain, answerIps = answer.answerIps)
+/**
+ * Records the reply's outcome on the event for the same question. The status is always kept; the chain, addresses
+ * and rcode only when the reply verifiably answers this event's question. A valid reply for another name counts as
+ * [AnswerStatus.MISMATCHED] for this event.
+ */
+fun NetEvent.withAnswer(answer: DnsAnswer): NetEvent = when {
+    !answer.attributable -> copy(answerStatus = answer.status, rcode = null)
+    answer.questionName != hostname.lowercase().trimEnd('.') -> copy(answerStatus = AnswerStatus.MISMATCHED, rcode = null)
+    else -> copy(answerStatus = answer.status, rcode = answer.rcode, cnameChain = answer.cnameChain, answerIps = answer.answerIps)
+}

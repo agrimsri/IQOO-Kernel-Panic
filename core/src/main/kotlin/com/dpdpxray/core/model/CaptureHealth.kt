@@ -29,13 +29,17 @@ data class CaptureHealth(
     val dnsResponsesRelayed: Long? = null,
     /** Queries for which every resolver failed, so the app received SERVFAIL. */
     val dnsRelayFailures: Long? = null,
-    /** Resolver replies whose answer records could not be fully read; the reply was still relayed unchanged. */
+    /**
+     * Resolver replies whose answer records could not be fully read (status PARTIAL, MISMATCHED or MALFORMED); the
+     * reply was still relayed unchanged. Included in [dnsResponsesRelayed].
+     */
     val malformedResponses: Long? = null,
-    /** Events kept in the session buffer. */
+    /** Events kept in the session buffer. [eventsRecorded] + [eventsDropped] = [dnsQueriesParsed]. */
     val eventsRecorded: Long? = null,
-    /** Events lost because the buffer was full ([eventBufferCapacity]). */
+    /** Events lost because the buffer was full ([eventBufferCapacity]); the newest are dropped, the earliest kept. */
     val eventsDropped: Long? = null,
     val eventBufferCapacity: Int? = null,
+    /** Earliest and latest lookup, including dropped ones. null while measured but no lookup was seen. */
     val firstLookupNanos: Long? = null,
     val lastLookupNanos: Long? = null,
     /** DNS message bytes TraceVeil sent to upstream resolvers, counting every attempt including fallback retries. */
@@ -47,6 +51,13 @@ data class CaptureHealth(
     val dnsUpstreamDatagramsReceived: Long? = null,
     /** Why a counter is missing or uncertain, e.g. "VPN revoked mid-capture; counters cover 0–12 s". */
     val notes: List<String> = emptyList(),
+    /**
+     * Part of [malformedPackets]: DNS sent where the relay cannot read it (port 853 DNS over TLS/QUIC, or TCP port
+     * 53). Lookups sent this way are not in the evidence; usually Private DNS. null = not broken down (older build).
+     */
+    val hiddenDnsPackets: Long? = null,
+    /** Part of [malformedPackets]: packets that are not DNS at all, e.g. IPv6 control traffic. null = not broken down. */
+    val nonDnsPackets: Long? = null,
 ) {
     companion object {
         const val SCHEMA_VERSION = 1
