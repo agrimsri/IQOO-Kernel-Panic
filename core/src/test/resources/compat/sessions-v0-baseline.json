@@ -1,0 +1,112 @@
+[
+    {
+        "id": "audit-legacy-1",
+        "targetPackage": "com.leakyshop.demo",
+        "targetLabel": "LeakyShop",
+        "plan": "REJECT",
+        "childFacing": false,
+        "startedAtNanos": 0,
+        "endedAtNanos": 30000000000,
+        "startedAtEpochMs": 1791570081266,
+        "netEvents": [
+            {
+                "tNanos": 1000000000,
+                "hostname": "app-measurement.com",
+                "queryType": 1,
+                "entity": "Google Firebase Analytics",
+                "category": "ANALYTICS",
+                "phase": "BEFORE_CONSENT",
+                "viaPackage": null
+            },
+            {
+                "tNanos": 6000000000,
+                "hostname": "graph.facebook.com",
+                "queryType": 28,
+                "entity": "Facebook",
+                "category": "SOCIAL",
+                "phase": "AFTER_REJECT",
+                "viaPackage": "com.google.android.gms"
+            },
+            {
+                "tNanos": 9000000000,
+                "hostname": "api.leakyshop.example",
+                "queryType": 1,
+                "entity": null,
+                "category": "UNKNOWN",
+                "phase": "NO_CONSENT_SEEN",
+                "viaPackage": null
+            }
+        ],
+        "consentEvents": [
+            {
+                "tNanos": 2000000000,
+                "kind": "SCREEN_APPEARED",
+                "nodeText": null,
+                "screenshotPath": null,
+                "tree": {
+                    "className": "android.widget.FrameLayout",
+                    "text": null,
+                    "contentDescription": null,
+                    "isCheckable": false,
+                    "isChecked": false,
+                    "isClickable": false,
+                    "bounds": null,
+                    "children": [
+                        {
+                            "className": "android.widget.Button",
+                            "text": "Reject",
+                            "contentDescription": null,
+                            "isCheckable": false,
+                            "isChecked": false,
+                            "isClickable": true,
+                            "bounds": {
+                                "left": 0,
+                                "top": 0,
+                                "right": 10,
+                                "bottom": 10
+                            },
+                            "children": []
+                        }
+                    ]
+                }
+            },
+            {
+                "tNanos": 5000000000,
+                "kind": "REJECT",
+                "nodeText": "Reject",
+                "screenshotPath": null,
+                "tree": null
+            }
+        ],
+        "screenAudit": {
+            "isConsentScreen": true,
+            "preTicked": true,
+            "rejectOption": "HIDDEN",
+            "purposesCount": null,
+            "separateChoices": null,
+            "itemisedData": null,
+            "purposeStated": null,
+            "withdrawalInfo": null,
+            "languageOptions": [
+                "English"
+            ],
+            "childAudienceSignals": null,
+            "darkPatterns": [],
+            "summary": "",
+            "confidence": 1.0,
+            "source": "DETERMINISTIC",
+            "observedFields": [
+                "preTicked"
+            ],
+            "conflicts": [],
+            "modelId": null,
+            "latencyMs": null
+        },
+        "deviceModel": "vivo I2501",
+        "androidVersion": "16",
+        "privateDnsActive": false,
+        "notes": [
+            "baseline fixture"
+        ]
+    }
+]
