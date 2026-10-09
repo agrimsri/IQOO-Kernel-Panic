@@ -1,5 +1,7 @@
 # TraceVeil team branch workflow
 
+Current development: follow [the 10 October teammate handoff](TEAM_HANDOFF.md) and [implementation milestones](planning/IMPLEMENTATION_MILESTONES.md). The full 15-import baseline is integrated on remote `main` at `7b153de`; the historical import snapshot below is retained for provenance, not current setup instructions. New branches are `agrim/evidence-engine`, `yashvi/phone-experience`, and `nitya/integration`. Do not repeat imports or start from the incomplete six-commit branch.
+
 Repository: https://github.com/agrimsri/IQOO-Kernel-Panic.git. Agrim reviews the baseline branch and merges it into `main`. After that merge, each teammate creates their own development branch from the same integrated `main`.
 
 ## Baseline and authorship

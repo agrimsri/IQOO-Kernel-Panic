@@ -1,5 +1,46 @@
 # TraceVeil baseline verification
 
+## Current handoff verification on 10 October 2026
+
+This section supersedes the older incomplete-import snapshot below. Remote `main` was checked and fetched at `7b153dea7dd82547a16ed9790260d3570c57af20`. The linked `traceveil-verification` worktree contains that full application plus documentation changes. `git diff origin/main -- app core leakyshop` is empty: the handoff does not change product behavior or include the unfinished Safety Coach tests.
+
+Fresh command in that worktree, using JDK 17.0.20.1, Android SDK platform 37/build-tools 36.0.0 and the existing populated dependency cache:
+
+```text
+gradlew.bat --offline :core:test :app:assembleDebug :leakyshop:assembleLeakyDebug :leakyshop:assembleFixedDebug --rerun-tasks --console=plain
+
+BUILD SUCCESSFUL in 42s
+121 actionable tasks: 121 executed
+Core tests: 7 suites, 65 tests; failures: 0; errors: 0; skipped: 0
+```
+
+All three debug APKs were rebuilt. No new product APK was installed during this documentation-only handoff. Existing accessibility deprecation/safe-call and native symbol-stripping warnings remain; they do not fail the build. No Android unit/instrumentation suite exists in this baseline; core success does not establish full device acceptance.
+
+### Phone evidence and its limits
+
+Device: Nitya's iQOO 15, reporting vivo I2501, Android 16, SM8850. The explicit ADB device remained connected. Private DNS was `off`; Google remained the default assistant; TraceVeil and HackTracker accessibility services both remained enabled.
+
+Earlier real full-audit records at the same product revision were re-read directly from TraceVeil's private saved metadata:
+
+| Audit | Target | Sample | Plans | Result |
+| --- | --- | --- | --- | --- |
+| `audit-1791570081266` | `com.leakyshop.demo` | false | SILENT, REJECT, ACCEPT | 21 / AT_RISK, 5 findings: C2/C1/C3/C4/C10 |
+| `audit-1791570260617` | `com.leakyshop.demo.fixed` | false | SILENT, REJECT, ACCEPT | 100 / READY, 0 findings in the captured evidence |
+
+These are persisted earlier runs, not newly repeated audits or results on Agrim's/Yashvi's devices. They observed capture, consent, controlled fresh-state resets, deterministic screen analysis and report flow. Both demo package IDs differ. Scores summarize captured evidence; they are not legal certificates or fraud-prevention guarantees.
+
+Earlier test evidence also records cancellation/capture cleanup, saved-history persistence, Markdown/PDF export, and GPU loading/benchmark. The tested PDF had three readable pages and a heading separated from its body across a page break. The share chooser opened and Copy was exercised, but actual Office Kit clipboard synchronization and laptop file delivery were not confirmed.
+
+**Known AI failure:** the loaded GPU model returned no explanation text twice in English and once in Hindi. All six full-audit screen reviews used deterministic fallback. Root cause remains unestablished; Yashvi owns diagnosis in the active plan. GPU load was approximately 5.5 seconds; an earlier real benchmark reported 40.1 writing tokens/second, 1287 reading tokens/second and 0.22-second first token. These are single-device observations, not fresh benchmark averages or a guarantee on another phone.
+
+Camera Check opened but camera analysis has not passed. Voice recognition/TTS, CNAME capture, confidence health metrics, maps and Network Proof are not implemented or device-verified in this checkpoint. Embedding retrieval used the BM25 fallback; no compatible NPU inference was tested. The Safety Coach design is deferred and its incomplete test drafts remain outside Git.
+
+Existing Quick/Full audits may clear target data whenever Shizuku is authorized, even if automated tapping is disabled. Use controlled demos or explicitly authorized developer-owned targets only. Do not test a personal app until a non-destructive mode exists. Do not force-stop TraceVeil: this OEM previously disabled its accessibility watcher after a force-stop and the user had to re-enable it.
+
+Each teammate must separately build/install, grant permissions, authorize Shizuku, install optional models and confirm Office Kit behavior on their own phone. See [the handoff checklist](TEAM_HANDOFF.md).
+
+## Historical import verification on 9 October 2026
+
 Verified on 9 October 2026 from the clean `kernel-panic` directory.
 
 ```text
