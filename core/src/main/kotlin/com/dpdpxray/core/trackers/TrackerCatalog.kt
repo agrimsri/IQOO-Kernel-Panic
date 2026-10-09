@@ -13,7 +13,19 @@ data class TrackerEntry(
     val sdkKey: String? = null,
     /** Per vendor documentation, the SDK reads a device/advertising identifier when it initialises. */
     val collectsAdIdAtInit: Boolean = false,
-)
+    /** Where a cited source places the company; see [CompanyCountry.basis]. null = not established. */
+    val location: CompanyCountry? = null,
+    /** Where a cited source says the company is incorporated. null = not established. */
+    val incorporation: CompanyCountry? = null,
+    /** Caveats, or why nothing could be established (e.g. several contracting entities). */
+    val note: String? = null,
+) {
+    /** Headquarters country, only when a cited source describes the place as headquarters; never a registration. */
+    val hqCountry: String? get() = location?.takeIf { it.basis == CompanyBasis.HEADQUARTERS }?.country
+
+    /** The source for [hqCountry]; null exactly when [hqCountry] is. */
+    val hqSource: String? get() = location?.takeIf { it.basis == CompanyBasis.HEADQUARTERS }?.source
+}
 
 data class TrackerInfo(
     val entity: String?,
@@ -41,20 +53,25 @@ class TrackerCatalog(
     fun classify(hostname: String, cnameChain: List<String> = emptyList()): TrackerInfo {
         val host = normalise(hostname)
         val hostFirstParty = isFirstParty(host)
-        if (!hostFirstParty) entryFor(host)?.let { return info(it) }
+        if (!hostFirstParty) entryForHost(host)?.let { return info(it) }
         // Checked before the first-party shortcut: a first-party name can be an alias for a tracker.
         cnameChain.asSequence().map(::normalise).filter { it != host && !isFirstParty(it) }
-            .firstNotNullOfOrNull { alias -> entryFor(alias)?.let { info(it, alias) } }
+            .firstNotNullOfOrNull { alias -> entryForHost(alias)?.let { info(it, alias) } }
             ?.let { return it }
         return TrackerInfo(null, if (hostFirstParty) Category.FIRST_PARTY else Category.UNKNOWN)
     }
 
     private fun normalise(name: String) = name.lowercase().trimEnd('.')
     private fun isFirstParty(host: String) = suffixes(host).any { it in firstParty }
-    private fun entryFor(host: String) = suffixes(host).firstNotNullOfOrNull { byDomain[it] }
+    private fun entryForHost(host: String) = suffixes(host).firstNotNullOfOrNull { byDomain[it] }
     private fun info(e: TrackerEntry, via: String? = null) = TrackerInfo(e.entity, e.category, e.sdkKey, e.collectsAdIdAtInit, via)
 
     fun sdkKeyFor(entity: String): String? = entries.firstOrNull { it.entity == entity }?.sdkKey
+
+    /** The catalogue entry for an entity name as stored on events and findings, including its company facts. */
+    fun entryFor(entity: String): TrackerEntry? = entries.firstOrNull { it.entity == entity }
+
+    fun entries(): List<TrackerEntry> = entries
 
     fun withFirstParty(domains: Set<String>): TrackerCatalog =
         TrackerCatalog(entries, firstParty + domains.map { it.lowercase().trimEnd('.') })
@@ -73,7 +90,9 @@ class TrackerCatalog(
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
 
-        fun fromJson(text: String): TrackerCatalog = TrackerCatalog(json.decodeFromString<List<TrackerEntry>>(text))
+        /** Fails with [IllegalArgumentException] if any company fact lacks its citation or basis. */
+        fun fromJson(text: String): TrackerCatalog =
+            TrackerCatalog(json.decodeFromString<List<TrackerEntry>>(text).onEach(CompanyFactRules::check))
 
         fun loadDefault(): TrackerCatalog {
             val text = TrackerCatalog::class.java.getResourceAsStream("/trackers/trackers.json")
