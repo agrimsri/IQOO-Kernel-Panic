@@ -1,6 +1,6 @@
 # TraceVeil Safety Coach design
 
-Status: Proposed design for user review. Product implementation and implementation planning have not started.
+Status: Deferred after the team's 10 October implementation milestones and teammate-first handoff. This is a design reference, not implemented functionality. No Safety Coach product code is included. See [current ownership and handoff](../../TEAM_HANDOFF.md) before resuming it.
 
 ## Purpose and agreed constraints
 

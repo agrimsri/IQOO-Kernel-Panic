@@ -6,6 +6,10 @@ This repository starts from the existing DPDP X-Ray baseline, developed before t
 
 Screenshots below show the original baseline and may display its former product name.
 
+Current team setup and work split: [teammate handoff](docs/TEAM_HANDOFF.md), [active milestones](docs/planning/IMPLEMENTATION_MILESTONES.md), and [device verification](docs/VERIFICATION.md). Agrim starts the evidence contracts; Yashvi starts Voice Copilot; Nitya integrates their tested components. The handoff documents known AI failures and unfinished features.
+
+**Testing safety:** the existing Quick/Full audit may reset the selected app's data when Shizuku is authorized, even with automated tapping off. Use controlled demo or explicitly authorized developer-owned test apps only. Consumer-safe observation, comprehensive fraud protection and wake-word support are not implemented. DNS observations and scores are not payload evidence or legal certification.
+
 **An on-device privacy auditor for Android apps, built around India's Digital Personal Data Protection (DPDP) Act 2023.**
 
 Point TraceVeil at any app installed on your phone. It shows you:
