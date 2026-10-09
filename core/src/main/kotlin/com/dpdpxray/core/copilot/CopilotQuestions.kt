@@ -7,7 +7,10 @@ enum class CopilotIntent { CHILDREN, AFTER_REJECT, BEFORE_CONSENT, WITHDRAWAL, L
 
 data class CopilotQuestion(val intent: CopilotIntent, val en: String, val hi: String)
 
-/** Tappable chips plus a whole-word keyword matcher for spoken or typed questions (English and Hindi). */
+/**
+ * Tappable chips plus a whole-word keyword matcher for spoken or typed questions in English, Hindi, and Hindi in Latin
+ * script (what an English recognizer returns for a Hindi question).
+ */
 object CopilotQuestions {
     val chips = listOf(
         CopilotQuestion(CopilotIntent.CHILDREN, "Is this app safe for children?", "क्या यह ऐप बच्चों के लिए सुरक्षित है?"),
@@ -24,11 +27,11 @@ object CopilotQuestions {
 
     // Checked in this order: the more specific intents win when a question mentions several topics.
     private val keywords: List<Pair<CopilotIntent, Set<String>>> = listOf(
-        CopilotIntent.CHILDREN to setOf("child", "children", "kid", "kids", "minor", "minors", "teen", "teens", "बच्चे", "बच्चों", "बच्चा", "बालक"),
-        CopilotIntent.AFTER_REJECT to setOf("reject", "rejected", "rejecting", "refuse", "refused", "refusing", "declined", "deny", "denied", "मना", "अस्वीकार"),
-        CopilotIntent.BEFORE_CONSENT to setOf("before", "पहले"),
-        CopilotIntent.WITHDRAWAL to setOf("withdraw", "withdrawal", "withdrawing", "revoke", "वापस"),
-        CopilotIntent.LANGUAGE to setOf("language", "languages", "hindi", "हिंदी", "हिन्दी", "भाषा"),
+        CopilotIntent.CHILDREN to setOf("child", "children", "kid", "kids", "minor", "minors", "teen", "teens", "बच्चे", "बच्चों", "बच्चा", "बालक", "bachche", "bachchon", "bacchon", "bachon", "bachcha", "baccha"),
+        CopilotIntent.AFTER_REJECT to setOf("reject", "rejected", "rejecting", "refuse", "refused", "refusing", "declined", "deny", "denied", "मना", "अस्वीकार", "mana", "inkaar", "inkar"),
+        CopilotIntent.BEFORE_CONSENT to setOf("before", "पहले", "pehle", "pahle"),
+        CopilotIntent.WITHDRAWAL to setOf("withdraw", "withdrawal", "withdrawing", "revoke", "वापस", "wapas", "vapas"),
+        CopilotIntent.LANGUAGE to setOf("language", "languages", "hindi", "हिंदी", "हिन्दी", "भाषा", "bhasha"),
         CopilotIntent.CONSENT_SCREEN to setOf("screen", "checkbox", "ticked", "button", "स्क्रीन"),
         CopilotIntent.SCORE to setOf("score", "rating", "grade", "स्कोर"),
         CopilotIntent.TRACKERS to setOf("tracker", "trackers", "tracking", "companies", "ट्रैकर", "ट्रैकरों"),

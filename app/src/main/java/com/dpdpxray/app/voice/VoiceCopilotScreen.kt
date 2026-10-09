@@ -127,7 +127,7 @@ fun VoiceCopilotScreen(auditId: String, onBack: () -> Unit, vm: VoiceViewModel =
             if (s.speaking) SecondaryAction("Stop speaking", { vm.stopSpeaking() }, Modifier.fillMaxWidth().padding(top = 8.dp))
             s.voiceNote?.let { Note(it, Film.high) }
 
-            Note("Answers use only this audit's findings and at most three passages of the DPDP Act and Rules. Not legal advice.")
+            Note("Answers use only this audit's findings and at most three passages of the DPDP Act and Rules, so they work without the AI model. Not legal advice.")
             Spacer(Modifier.height(32.dp))
         }
     }

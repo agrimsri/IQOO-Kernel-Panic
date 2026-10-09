@@ -20,6 +20,13 @@ class CopilotQuestionsTest {
     }
 
     @Test
+    fun `matches romanised Hindi from an English recognizer`() {
+        assertEquals(CopilotIntent.CHILDREN, CopilotQuestions.match("kya ye bachchon ke liye safe hai"))
+        assertEquals(CopilotIntent.AFTER_REJECT, CopilotQuestions.match("mana karne ke baad kya hua"))
+        assertEquals(CopilotIntent.BEFORE_CONSENT, CopilotQuestions.match("sahmati se pehle kaun se tracker chale"))
+    }
+
+    @Test
     fun `whole words only`() {
         assertNull(CopilotQuestions.match("scoreboard of the cricket match"))
         assertNull(CopilotQuestions.match("what is the weather"))
