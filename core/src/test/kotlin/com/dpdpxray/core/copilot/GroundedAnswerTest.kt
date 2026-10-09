@@ -123,6 +123,17 @@ class GroundedAnswerTest {
     }
 
     @Test
+    fun `each chip reaches its own intent and gives a distinct grounded reply`() {
+        CopilotLanguage.entries.forEach { language ->
+            val answers = CopilotQuestions.chips.map { q ->
+                val text = if (language == CopilotLanguage.EN) q.en else q.hi
+                answerer.answer(text, leaky, language).also { assertEquals(q.intent, it.intent) }
+            }
+            assertEquals(8, answers.map { it.text }.toSet().size)
+        }
+    }
+
+    @Test
     fun `citations come only from the top three retrieved passages`() {
         val fixed = Passage("s6(1)", "x", "x", "x")
         val onlyOne = PassageRetriever { _, k -> listOf(ScoredPassage(fixed, 1.0)).take(k) }
