@@ -342,8 +342,11 @@ adb push gemma-4-E2B-it.litertlm /sdcard/Android/data/com.dpdpxray.app/files/mod
 
 - **Code:** [MIT License](LICENSE) © 2026 Nitya Prakash Pandey.
 - **Archivo font:** SIL Open Font License 1.1 (Omnibus-Type).
-- **LiteRT-LM** and the **Shizuku API**: Apache License 2.0.
+- **LiteRT-LM:** Apache License 2.0.
+- **Shizuku API/provider 13.1.5:** MIT License (separate from the Shizuku app).
 - **Gemma models:** Gemma Terms of Use (not bundled).
 - **DPDP Act 2023 and DPDP Rules 2025:** text from Government of India publications.
+
+See the [attribution register](ATTRIBUTIONS.md) for licence evidence and remaining release checks, and [repository checks](docs/REPOSITORY_CHECKS.md) for CI and the read-only commit-date checker.
 
 > TraceVeil is a technical assessment tool. Its findings are not legal advice.
