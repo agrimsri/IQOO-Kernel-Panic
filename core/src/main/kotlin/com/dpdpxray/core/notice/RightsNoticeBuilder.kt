@@ -122,7 +122,9 @@ class RightsNoticeBuilder(
         val about = listOfNotNull(c.entity, c.disguisedVia?.let { "alias observed for $it" })
         val name = c.hostname + (if (about.isEmpty()) "" else " (${about.joinToString(", ")})") +
             (c.viaPackage?.let { ", looked up by $it" }.orEmpty())
-        val delay = String.format(Locale.US, "%.1f s after I declined", c.firstDelayNanos / 1e9)
+        // "0.0 s" would read as "at the same moment"; these lookups did come after the Reject.
+        val delay = if (c.firstDelayNanos < 100_000_000) "under 0.1 s after I declined"
+        else String.format(Locale.US, "%.1f s after I declined", c.firstDelayNanos / 1e9)
         return "- $name: " + if (c.lookups == 1) delay else "${c.lookups} lookups, the first $delay"
     }
 
