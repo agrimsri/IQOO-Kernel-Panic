@@ -26,7 +26,6 @@ import com.dpdpxray.app.ui.AuditRoutes
 import com.dpdpxray.app.voice.VoiceCopilotScreen
 import com.dpdpxray.app.ui.screens.AiLabScreen
 import com.dpdpxray.app.ui.screens.AppPickerScreen
-import com.dpdpxray.app.ui.screens.CameraCheckScreen
 import com.dpdpxray.app.ui.screens.FindingDetailScreen
 import com.dpdpxray.app.ui.screens.FixesScreen
 import com.dpdpxray.app.ui.screens.HomeScreen
@@ -71,7 +70,6 @@ class MainActivity : ComponentActivity() {
                                 onAudit = { nav.navigate("pick") },
                                 onOpen = { nav.navigate("results/$it") },
                                 onLab = { nav.navigate("lab") },
-                                onCamera = { nav.navigate("camera") },
                                 onSettings = { nav.navigate("settings") },
                                 onVoice = { nav.navigate(AuditRoutes.voice(it)) },
                             )
@@ -104,7 +102,6 @@ class MainActivity : ComponentActivity() {
                             VoiceCopilotScreen(e.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() })
                         }
                         composable("lab") { AiLabScreen(vm, onBack = { nav.popBackStack() }) }
-                        composable("camera") { CameraCheckScreen(vm, onBack = { nav.popBackStack() }) }
                         composable("settings") { SettingsScreen(vm, onBack = { nav.popBackStack() }) }
                     }
                 }

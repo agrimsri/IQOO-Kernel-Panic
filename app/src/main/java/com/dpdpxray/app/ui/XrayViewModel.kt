@@ -1,6 +1,7 @@
 package com.dpdpxray.app.ui
 
 import android.app.Application
+import android.content.Intent
 import android.graphics.Bitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,6 +18,8 @@ import com.dpdpxray.app.control.Preflight
 import com.dpdpxray.app.control.ShizukuBridge
 import com.dpdpxray.app.data.AuditBundle
 import com.dpdpxray.app.data.AuditMeta
+import com.dpdpxray.app.data.AuditComparison
+import com.dpdpxray.app.data.AuditComparisonResult
 import com.dpdpxray.app.data.SampleAudit
 import com.dpdpxray.app.graph
 import com.dpdpxray.app.report.ExportManager
@@ -26,9 +29,11 @@ import com.dpdpxray.core.audit.PhaseAssigner
 import com.dpdpxray.core.dpdp.Passage
 import com.dpdpxray.core.fixes.FixTemplate
 import com.dpdpxray.core.model.AuditSession
+import com.dpdpxray.core.model.CheckId
 import com.dpdpxray.core.model.Finding
 import com.dpdpxray.core.model.NetEvent
 import com.dpdpxray.core.model.ScreenAudit
+import com.dpdpxray.core.notice.RightsNotice
 import com.dpdpxray.core.report.MarkdownReport
 import com.dpdpxray.core.rules.RulesEngine
 import kotlinx.coroutines.Dispatchers
@@ -131,6 +136,12 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
 
     fun fixesFor(bundle: AuditBundle): List<FixTemplate> = graph.fixCatalog.fixesFor(bundle.result, graph.catalog())
 
+    suspend fun previousComparison(bundle: AuditBundle): AuditComparisonResult {
+        val previousId = AuditComparison.previousId(bundle.meta, audits.value)
+        val previous = previousId?.let { graph.repository.load(it) }
+        return AuditComparison.compare(bundle, previous)
+    }
+
     private val citationCache = java.util.concurrent.ConcurrentHashMap<String, List<Passage>>()
 
     /** Legal citations may run the on-device embedding model, so never call this on the main thread. */
@@ -139,10 +150,26 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Network events of a session, classified and placed before/after the consent choice, for the timeline. */
     fun timeline(session: AuditSession): List<NetEvent> {
-        val catalog = graph.catalog()
-        return PhaseAssigner.assign(session.netEvents, session.consentEvents).map { e ->
-            if (e.entity != null) e else catalog.classify(e.hostname).let { e.copy(entity = it.entity, category = it.category) }
+        return EvidenceUi(graph.catalog(), graph.corpus).timeline(session)
+    }
+
+    fun classify(event: NetEvent): NetEvent = EvidenceUi(graph.catalog(), graph.corpus).classify(event)
+
+    fun findingAliases(finding: Finding, bundle: AuditBundle): List<String> =
+        EvidenceUi(graph.catalog(), graph.corpus).aliasesFor(finding, bundle.sessions)
+
+    fun rightsNotice(bundle: AuditBundle, check: CheckId): RightsNotice? =
+        EvidenceUi(graph.catalog(), graph.corpus).notice(check, bundle.result, bundle.sessions)
+
+    /** Opens Android's chooser only after the user reviews the draft; never sends directly. */
+    fun shareNotice(notice: RightsNotice) {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "TraceVeil observations for ${notice.appLabel}")
+            putExtra(Intent.EXTRA_TEXT, notice.text)
         }
+        runCatching { ctx.startActivity(Intent.createChooser(send, "Share reviewed notice").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .onFailure { _toast.value = "No sharing app is available. You can copy the draft instead." }
     }
 
     fun explain(finding: Finding, hindi: Boolean) = viewModelScope.launch {

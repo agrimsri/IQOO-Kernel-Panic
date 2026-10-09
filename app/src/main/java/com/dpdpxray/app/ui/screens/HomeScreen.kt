@@ -52,7 +52,6 @@ fun HomeScreen(
     onAudit: () -> Unit,
     onOpen: (String) -> Unit,
     onLab: () -> Unit,
-    onCamera: () -> Unit,
     onSettings: () -> Unit,
     onVoice: (String) -> Unit,
 ) {
@@ -117,7 +116,6 @@ fun HomeScreen(
         if (!pf.canAudit) Note("Allow the VPN and turn on the consent watcher to run a live audit.", Film.warn)
         Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             SecondaryAction("Open sample audit", { vm.openSample(onOpen) }, Modifier.weight(1f))
-            SecondaryAction("Camera check", onCamera, Modifier.weight(1f))
         }
         TextButton(onClick = { showSampleFixtures = true }) { Text("More sample evidence", color = Film.scan) }
         audits.firstOrNull()?.let { latest ->
