@@ -52,6 +52,25 @@ class CommitTimesTest(unittest.TestCase):
             env=self.env, capture_output=True, text=True, timeout=30,
         )
 
+    def raw_commit(self, author_date, committer_date):
+        parent = self.commit()
+        tree = self.git("rev-parse", "HEAD^{tree}")
+        payload = (
+            f"tree {tree}\nparent {parent}\n"
+            f"author Synthetic fixture <fixture@example.invalid> {author_date}\n"
+            f"committer Synthetic fixture <fixture@example.invalid> {committer_date}\n"
+            "\nSynthetic malformed-metadata fixture\n"
+        )
+        result = subprocess.run(
+            ["git", "hash-object", "--literally", "-t", "commit", "-w", "--stdin"],
+            input=payload.encode("utf-8"), cwd=self.repo, env=self.env,
+            capture_output=True, timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8"))
+        sha = result.stdout.decode("ascii").strip()
+        self.git("update-ref", "refs/heads/main", sha)
+        return sha
+
     def test_accepts_exact_cutoff_and_later_history(self):
         self.commit()
         self.commit(LATER, LATER)
@@ -149,6 +168,24 @@ class CommitTimesTest(unittest.TestCase):
         result = self.check("HEAD", "main")
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("Usage:", result.stderr)
+
+    def test_rejects_malformed_author_timestamp_metadata(self):
+        for date in ("garbage +0000", "", "-1 +0000", "999999999999999999999999 +0000"):
+            with self.subTest(date=date):
+                sha = self.raw_commit(date, "1791552600 +0530")
+                result = self.check()
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(sha, result.stderr)
+                self.assertNotIn("PASS:", result.stdout)
+
+    def test_rejects_malformed_committer_timestamp_metadata(self):
+        for date in ("garbage +0000", "", "-1 +0000", "999999999999999999999999 +0000"):
+            with self.subTest(date=date):
+                sha = self.raw_commit("1791552600 +0530", date)
+                result = self.check()
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(sha, result.stderr)
+                self.assertNotIn("PASS:", result.stdout)
 
 
 if __name__ == "__main__":

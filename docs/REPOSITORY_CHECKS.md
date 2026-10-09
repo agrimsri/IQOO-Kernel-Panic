@@ -10,7 +10,7 @@ The checker returns:
 
 - `0`: all reachable commit dates pass.
 - `1`: at least one author/committer date precedes the cutoff; offending hashes and dates are reported.
-- `2`: history cannot be checked, including shallow clones, missing/invalid revisions or usage errors.
+- `2`: history cannot be checked, including shallow clones, missing/invalid revisions, malformed/uncomparable timestamps or usage errors.
 
 It reads metadata only. It never edits dates, identities, commits, branches or remotes. A passing result does **not** establish originality, phone-authored work, schedule compliance or eligibility of the imported pre-event baseline. Never amend or rebase published history to hide a failure; ask the team to resolve the provenance/rules question.
 
@@ -31,7 +31,7 @@ python -m unittest discover -s tools/tests -v
 & $env:TRACEVEIL_BASH tools/check-commit-times.sh
 ```
 
-The test suite creates disposable repositories with explicitly labelled synthetic commits. Those dates never apply to the team's repository. It tests the exact cutoff, both timestamp fields, early ancestors, merged and unreachable branches, explicit revisions, invalid options, extra arguments, non-repositories and shallow history. No network access or extra Python package is required for the tests.
+The test suite creates disposable repositories with explicitly labelled synthetic commits. Those dates never apply to the team's repository. It tests the exact cutoff, both timestamp fields, early ancestors, merged and unreachable branches, explicit revisions, invalid options, extra arguments, non-repositories and shallow history. Damaged raw commit objects test absent, nonnumeric, negative and oversized date metadata in both fields; the checker must return an error without printing PASS. No network access or extra Python package is required for the tests.
 
 ## Core and APK checks
 

@@ -1,5 +1,21 @@
 # TraceVeil baseline verification
 
+## N2 repository checks on 10 October 2026
+
+Branch `nitya/repo-readiness` starts at the integrated `main` merge `1154a9b`. N2 changes repository tooling and documentation only: `app/`, `core/` and `leakyshop/` contents remain identical to that revision. No APK was installed, no audit was rerun, and no phone permission or setting changed during N2.
+
+Fresh local verification in the linked Windows worktree:
+
+- Full `--rerun-tasks` command listed below: **BUILD SUCCESSFUL in 41s**, all **121 tasks executed**, all three debug APKs assembled.
+- Core XML results: **7 suites, 65 tests, 0 failures, 0 errors, 0 skipped**. After the review fix, a separate fresh `:core:test --rerun-tasks` run also passed in 17s.
+- `python -m unittest discover -s tools/tests -v`: **15 tests passed**, including eight malformed raw-metadata subcases. The eight subcases reproduced a false PASS before the fail-closed fix; the complete suite passed afterward.
+- The real reachable history passes the read-only date check. Both author and committer dates are checked, including merged ancestry. This is not evidence that the imported baseline was written during the event.
+- Git records `gradlew` and the checker as **100755**. Existing CRLF/binary attributes were preserved; new script/test/workflow patterns use LF. Workflow YAML parses with the intended triggers and read-only permissions.
+
+An independent read-only whole-branch review found one Important malformed-timestamp false-pass defect. Its regression tests failed first, the checker was corrected, and the checker/core suites passed. No Critical or Minor findings were reported. Existing accessibility deprecation and native symbol-stripping build warnings remain unchanged.
+
+Hosted GitHub Actions has **not been verified**. Local YAML parsing and Windows builds do not establish a green Linux-hosted run. N2's organiser reuse clarification and complete release-notice checks also remain pending; see [repository checks](REPOSITORY_CHECKS.md), [attributions](../ATTRIBUTIONS.md) and [provenance](../PROVENANCE.md).
+
 ## Current handoff verification on 10 October 2026
 
 This section supersedes the older incomplete-import snapshot below. Remote `main` was checked and fetched at `7b153dea7dd82547a16ed9790260d3570c57af20`. The linked `traceveil-verification` worktree contains that full application plus documentation changes. `git diff origin/main -- app core leakyshop` is empty: the handoff does not change product behavior or include the unfinished Safety Coach tests.
