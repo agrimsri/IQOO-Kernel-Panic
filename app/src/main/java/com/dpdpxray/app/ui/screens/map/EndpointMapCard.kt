@@ -44,6 +44,8 @@ import com.dpdpxray.core.geo.MapMode
 import com.dpdpxray.core.geo.MapPresenter
 import com.dpdpxray.core.geo.MapRow
 import com.dpdpxray.core.geo.OwnerRegistry
+import com.dpdpxray.core.geo.LegalContext
+import com.dpdpxray.app.ui.EndpointMapIntegration
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.trackers.TrackerCatalog
 import kotlinx.coroutines.Dispatchers
@@ -65,15 +67,16 @@ fun EndpointMapCard(
     catalog: TrackerCatalog,
     modifier: Modifier = Modifier,
     owners: OwnerRegistry = remember { runCatching { OwnerRegistry.loadDefault() }.getOrDefault(OwnerRegistry.EMPTY) },
+    legal: LegalContext = EndpointMapIntegration.legalContext(),
 ) {
     val ctx = LocalContext.current
     val geo by produceState<GeoSource?>(null) { value = GeoTableLoader.load(ctx) }
-    val model by produceState<EndpointMapModel?>(null, sessions, geo) {
+    val model by produceState<EndpointMapModel?>(null, sessions, geo, catalog) {
         value = geo?.let { g -> withContext(Dispatchers.Default) { EndpointGeoAggregator.build(sessions, catalog, g) } }
     }
     var mode by rememberSaveable { mutableStateOf(MapMode.SOURCE_DNS) }
     val m = model
-    EndpointMapCardContent(m, owners, mode, { mode = it }, GeoTableLoader.pushCommand(ctx), modifier)
+    EndpointMapCardContent(m, owners, mode, { mode = it }, GeoTableLoader.pushCommand(ctx), modifier, legal)
 }
 
 /** Stateless body, so the layout is the same for any model. */
@@ -85,6 +88,7 @@ fun EndpointMapCardContent(
     onMode: (MapMode) -> Unit,
     pushCommand: String,
     modifier: Modifier = Modifier,
+    legal: LegalContext = EndpointMapIntegration.legalContext(),
 ) {
     val shape = RoundedCornerShape(12.dp)
     Column(modifier.fillMaxWidth().clip(shape).background(Film.raised).border(1.dp, Film.line, shape)) {
@@ -97,7 +101,7 @@ fun EndpointMapCardContent(
                 Text("Placing lookups…", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
                 return@Column
             }
-            val view = remember(model, owners, mode) { MapPresenter.view(model, owners, mode) }
+            val view = remember(model, owners, mode, legal) { MapPresenter.view(model, owners, mode, legal) }
             Text(view.explanation, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
 
             val highlighted = remember(model, owners, mode) { MapPresenter.highlight(model, owners, mode) }
@@ -107,6 +111,7 @@ fun EndpointMapCardContent(
             if (highlighted.isNotEmpty()) {
                 val fill = if (mode == MapMode.SOURCE_DNS) c(MapColors.LOCATED) else c(MapColors.HEADQUARTERS)
                 WorldMapCanvas(highlighted - uncertain, uncertain, fill)
+                Text(EndpointMapIntegration.OUTLINE_CREDIT, style = MaterialTheme.typography.labelSmall, color = Film.boneDim)
             }
             if (mode == MapMode.SOURCE_DNS && model.source !is GeoSource.Loaded) {
                 Text("To place addresses in countries, copy your own GeoLite2-Country.mmdb to the phone:", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)

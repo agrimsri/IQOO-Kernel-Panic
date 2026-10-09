@@ -41,7 +41,6 @@ import com.dpdpxray.app.ai.DiagnosticRow
 import com.dpdpxray.app.ai.LlmOutcome
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.ai.ModelFiles
-import com.dpdpxray.app.ui.screens.map.EndpointMapCard
 import com.dpdpxray.app.ui.CameraCheckState
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.CodeBlock
@@ -127,22 +126,6 @@ fun AiLabScreen(vm: XrayViewModel, onBack: () -> Unit) {
 
             SectionTitle("Legal search")
             Note(if (vm.graph.semanticSearch) "Semantic search with the on-device embedding model is active." else "Keyword search (BM25) over the DPDP Act and Rules. Add an EmbeddingGemma model to the folder for semantic search.")
-
-            SectionTitle("Endpoint map")
-            // Stopgap home so the card can be seen without touching the shared screens; it moves to Results when mounted there.
-            val audits by vm.audits.collectAsState()
-            val recent = audits.filter { !it.sample }.sortedByDescending { it.createdAtMs }.take(4)
-            var chosenId by remember { mutableStateOf<String?>(null) }
-            val shownId = chosenId?.takeIf { id -> recent.any { it.id == id } } ?: recent.firstOrNull()?.id
-            var shownBundle by remember(shownId) { mutableStateOf<com.dpdpxray.app.data.AuditBundle?>(null) }
-            LaunchedEffect(shownId) { shownBundle = shownId?.let { vm.graph.repository.load(it) } }
-            if (recent.size > 1) Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                recent.forEach { m ->
-                    SecondaryAction("${m.targetLabel} · ${m.score ?: "–"}", { chosenId = m.id }, Modifier.weight(1f), enabled = m.id != shownId)
-                }
-            }
-            shownBundle?.let { EndpointMapCard(it.sessions, vm.graph.catalog(), Modifier.padding(top = 8.dp)) }
-                ?: Note("Run an audit to see where its lookups were answered.")
 
             SectionTitle("Install models")
             Note("Copy model files into this folder from your laptop. No root needed.")

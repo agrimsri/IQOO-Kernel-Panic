@@ -38,3 +38,14 @@ CI uses the existing JDK 17 toolchain requirement with Eclipse Temurin. JDK dist
 Before adding a library, dataset, model or service, send Nitya its name, exact version/revision, original source URL, complete licence URL, required notices, redistribution conditions and intended use. Nitya records the reviewed decision here before integration. A link or a project's general licence alone does not clear a third-party asset inside that project.
 
 TrackerControl, PCAPdroid and Exodus references are idea/research inputs only. No competitor source, map asset, GeoLite database or tracker feed is added by N2. The offline geography decision and any opt-in online service remain separate team decisions.
+
+## Y3 integration decision — 10 October 2026
+
+| Material | Source / terms | Integration handling |
+| --- | --- | --- |
+| Optional GeoLite2 Country data | [MaxMind EULA](https://www.maxmind.com/en/geolite/eula); details and inspected-file fingerprint in [Yashvi's attribution notes](docs/ATTRIBUTION.md) | No database committed, bundled, downloaded or redistributed by this integration. User-supplied licensed copies only; missing data remains unknown. Preserve MaxMind attribution, date and update duties. |
+| Existing `geo/world.svg` | [amCharts SVG directory](https://www.amcharts.com/svg-maps/) and [GeoMap](https://github.com/takuseno/GeoMap); [CC BY-NC 4.0 legal code](https://creativecommons.org/licenses/by-nc/4.0/legalcode.en) | amCharts identifies its SVG maps as non-commercial. Geometry stays unchanged; visible credits name both sources, licence and styling change. Not cleared for commercial use or an assumed prize-competition exemption; reassess that scope before broader distribution. |
+| MaxMind format specification | [Primary specification](https://maxmind.github.io/MaxMind-DB/) | Yashvi wrote the reader; no added reader library or competitor implementation. |
+| Company facts / statutory context | A5's cited `trackers.json`; [official Act](https://www.indiacode.nic.in/bitstream/123456789/22037/2/a2023-22.pdf) and [commencement notification](https://upload.indiacode.nic.in/showfile?actid=AC_CEN_45_0_00003_2023-22_1763464807080&filename=c56ceae6c383460ca69577428d36828b.pdf&type=hindinotification) | Mount with the catalogue's single sourced owner mapping. DPDP context is jurisdiction-specific readiness, with commencement/exception warnings; no new corpus citation ID or applicability verdict. |
+
+This records the restricted prototype integration, not blanket release clearance. No MaxMind account or terms were accepted on anyone else's behalf. Earlier N2 statements above describe that checkpoint, not the subsequently merged Y3 asset.

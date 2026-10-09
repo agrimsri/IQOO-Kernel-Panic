@@ -1,5 +1,23 @@
 # TraceVeil baseline verification
 
+## Latest local integration checkpoint — 10 October 2026
+
+The sections below retain their historical test results. Current local work additionally includes voice-pack recovery, alias/notice UI, same-package comparison, Agrim-report reliability fixes and the published Y3/A5 components. `origin/main` at `ebdafae` and `origin/yashvi/phone-experience` at `5679a5a` merged cleanly into `nitya/evidence-integration` as `83db945` and `55cac49`. Bug fixes are saved at `14a0d2a`; the subsequent map mount is separately identifiable.
+
+Fresh full offline rerun: **BUILD SUCCESSFUL in 53s**, 128 tasks executed; **296 core + 148 app JVM = 444 tests**, zero failures/errors/skips. All three debug APKs rebuilt. Current APK SHA-256:
+
+```text
+9ca7215e934bbf627607eb84c976a99c421039ffacedbf557d69c63d688203d4
+```
+
+These tests cover data/logic contracts, not Compose rendering or OEM behavior. The previous pre-map build passed 326 tests; the new owner/legal adapter's four tests failed at runtime before implementation and now pass. Existing 21/100 demo score regressions remain unchanged. Final independent review and its findings are recorded in the next checkpoint when available.
+
+**Device status:** current ADB inventory is empty. This APK has not been installed or live-accepted on Nitya's iQOO. The user reports that the previous build's chips answer and speak, but its mic reports a missing language pack; those are user observations, not agent-verified acceptance of this build. No microphone grant, cloud fallback, personal-app reset or default-assistant change was performed. Physically reconnect and unlock the phone before live testing.
+
+**Honest remaining work:** repeated consent detection on the device (Agrim requests ten full leaky runs), visible Home refresh after install, microphone permission/download/recheck, human speech/TTS check, 0/1/20-country rendering, actual IP-country data licensing/provisioning if wanted, network accounting and report export. Agrim's JDK-kit scripts are missing, so its extraction integrity patch cannot yet be applied. Camera entry/route are gone; unreachable old helpers remain for Yashvi to delete.
+
+Read [bug-fix handoff](BUG_FIX_HANDOFF.md) and the [Round 1 brief](MENTOR_ROUND_1.md) before demoing. Publication does not certify these unperformed device checks.
+
 ## N5/N6 local integration checks on 10 October 2026
 
 Branch `nitya/evidence-integration` combines published `main` at `07a7eb9` and Agrim's A4 branch, initially through `b547a1d` (`0a7c31d`) and then `e2b5946` (`56af781`). The latter brings measurement-before-state publication, unparsed-packet classification and immediate-after-Reject notice wording fixes. Nitya's changes wire Y1 Voice Copilot, Y2 Network Proof and A4 saved capture health/confidence. Shared core, capture, voice, AI, Network Proof and demo implementation files have not been manually changed by this integration.

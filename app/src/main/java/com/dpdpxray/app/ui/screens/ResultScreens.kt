@@ -43,6 +43,8 @@ import com.dpdpxray.app.data.AuditNetworkReadings
 import com.dpdpxray.app.data.AuditComparisonResult
 import com.dpdpxray.app.netproof.NetworkProofCard
 import com.dpdpxray.app.ui.XrayViewModel
+import com.dpdpxray.app.ui.EndpointMapIntegration
+import com.dpdpxray.app.ui.screens.map.EndpointMapCard
 import com.dpdpxray.app.ui.components.CodeBlock
 import com.dpdpxray.app.ui.components.ConsentLine
 import com.dpdpxray.app.ui.components.Note
@@ -108,6 +110,12 @@ fun ResultsScreen(vm: XrayViewModel, id: String, onBack: () -> Unit, onFinding: 
                 if (b.meta.sample) Note("Synthetic sample: capture confidence was not measured.", Film.warn)
                 else Note(ConfidenceGrader.gradeAudit(b.sessions).summary)
                 NetworkProofCard(AuditNetworkReadings.proof(b.sessions, b.networkReadings))
+
+                SectionTitle("Endpoint evidence")
+                if (b.meta.sample) Note("Synthetic sample: example IPs do not establish real locations.", Film.warn)
+                val mapCatalog = remember(vm) { vm.graph.catalog() }
+                val mapOwners = remember(mapCatalog) { EndpointMapIntegration.owners(mapCatalog) }
+                EndpointMapCard(b.sessions, mapCatalog, owners = mapOwners)
 
                 SectionTitle("Before / after")
                 val comparison by produceState<AuditComparisonResult?>(null, b.meta.id) { value = vm.previousComparison(b) }
