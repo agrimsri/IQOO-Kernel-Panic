@@ -93,9 +93,13 @@ class XrayVpnService : VpnService() {
                 break
             }
             if (n <= 0) continue
-            val query = DnsPacketCodec.parse(buffer, n) ?: continue
-            val event = NetEvent(tNanos = SystemClock.elapsedRealtimeNanos(), hostname = query.hostname, queryType = query.queryType)
-            CaptureBus.record(event)
+            val query = DnsPacketCodec.parse(buffer, n)
+            if (query == null) {
+                CaptureBus.malformedPacket()
+                continue
+            }
+            // The ticket ties the reply to this session: after a reset, a late reply is ignored.
+            val ticket = CaptureBus.record(NetEvent(tNanos = SystemClock.elapsedRealtimeNanos(), hostname = query.hostname, queryType = query.queryType))
             s.launch {
                 val reply = forwarder.resolve(query.dnsPayload)
                 val answer = reply?.let { DnsPacketCodec.zeroTtls(it) } ?: DnsPacketCodec.servFail(query.dnsPayload)
@@ -104,7 +108,8 @@ class XrayVpnService : VpnService() {
                     runCatching { output.write(packet) }
                 }
                 // After the app has its answer, so reading the records never delays the lookup.
-                if (reply != null) CaptureBus.attachAnswer(event, DnsAnswers.parse(reply, query.dnsPayload))
+                if (reply != null) CaptureBus.replyReceived(ticket, DnsAnswers.parse(reply, query.dnsPayload))
+                else CaptureBus.relayFailed(ticket)
             }
         }
     }
