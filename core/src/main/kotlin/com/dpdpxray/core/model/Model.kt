@@ -66,6 +66,10 @@ data class NetEvent(
     val answerIps: List<String> = emptyList(),
     /** Catalogue tracker domain reached through an observed alias, when that alias decided the classification. */
     val disguisedVia: String? = null,
+    /** Outcome of the resolver reply for this lookup. null = not recorded, never a measured outcome. */
+    val answerStatus: AnswerStatus? = null,
+    /** DNS RCODE of a matching reply (0 = no error, 3 = NXDOMAIN). null when no matching reply was read. */
+    val rcode: Int? = null,
 )
 
 @Serializable

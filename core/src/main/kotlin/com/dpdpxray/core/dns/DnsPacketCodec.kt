@@ -13,13 +13,27 @@ class DnsQueryPacket(
     val queryType: Int,
 )
 
+/** Why a tunnel packet was not a readable DNS question. */
+enum class UnparsedPacket {
+    /** DNS the relay cannot read: TCP or UDP port 853 (DNS over TLS/QUIC) or TCP port 53. Lookups may be hidden. */
+    HIDDEN_DNS,
+
+    /** A UDP port 53 packet that is not a readable DNS question. */
+    MALFORMED_DNS,
+
+    /** Anything else, e.g. IPv6 neighbour discovery or multicast listener reports. */
+    NOT_DNS,
+}
+
 /**
  * Minimal, allocation-light parser/builder for the only traffic our VPN routes into the tun:
  * UDP DNS queries to the fake resolver address. Anything else is rejected with null.
  */
 object DnsPacketCodec {
     private const val PROTO_UDP = 17
+    private const val PROTO_TCP = 6
     private const val DNS_PORT = 53
+    private const val DOT_PORT = 853
     private const val MAX_POINTER_JUMPS = 16
     private const val MAX_NAME_LENGTH = 255
 
@@ -29,6 +43,27 @@ object DnsPacketCodec {
             4 -> parseV4(packet, length)
             6 -> parseV6(packet, length)
             else -> null
+        }
+    }
+
+    /**
+     * Classifies a tunnel packet that [parse] rejected, from its IP and transport headers only. IPv6 extension headers
+     * are not followed, so such packets count as [UnparsedPacket.NOT_DNS].
+     */
+    fun classifyUnparsed(packet: ByteArray, length: Int = packet.size): UnparsedPacket {
+        if (length < 1 || length > packet.size) return UnparsedPacket.NOT_DNS
+        val (protocol, transport) = when ((packet[0].toInt() and 0xf0) shr 4) {
+            4 -> if (length < 20) return UnparsedPacket.NOT_DNS else u8(packet, 9) to (packet[0].toInt() and 0x0f) * 4
+            6 -> if (length < 40) return UnparsedPacket.NOT_DNS else u8(packet, 6) to 40
+            else -> return UnparsedPacket.NOT_DNS
+        }
+        if ((protocol != PROTO_UDP && protocol != PROTO_TCP) || length < transport + 4) return UnparsedPacket.NOT_DNS
+        val port = u16(packet, transport + 2)
+        return when {
+            port == DOT_PORT -> UnparsedPacket.HIDDEN_DNS
+            port == DNS_PORT && protocol == PROTO_TCP -> UnparsedPacket.HIDDEN_DNS
+            port == DNS_PORT -> UnparsedPacket.MALFORMED_DNS
+            else -> UnparsedPacket.NOT_DNS
         }
     }
 
