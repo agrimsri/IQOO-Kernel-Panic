@@ -70,7 +70,8 @@ class RightsNoticeBuilder(
 
     /** Same classification the rules engine applies: a stored entity wins, otherwise the catalogue decides. */
     private fun classified(e: NetEvent): NetEvent =
-        if (e.entity != null) e else catalog.classify(e.hostname).let { e.copy(entity = it.entity, category = it.category) }
+        if (e.entity != null) e else catalog.classify(e.hostname, e.cnameChain)
+            .let { e.copy(entity = it.entity, category = it.category, disguisedVia = e.disguisedVia ?: it.disguisedVia) }
 
     private fun text(app: AuditSession, choices: List<DeclinedChoice>): String = buildString {
         val label = app.targetLabel

@@ -160,6 +160,16 @@ class RightsNoticeBuilderTest {
     }
 
     @Test
+    fun `an alias in the answer chain is classified and mentioned`() {
+        val s = sampleReject.copy(
+            netEvents = listOf(
+                NetEvent(9 * S, "metrics.leakyshop.example", cnameChain = listOf("metrics.leakyshop.example", "t.appsflyersdk.com")),
+            ),
+        )
+        assertTrue(notice(s)!!.text.contains("- metrics.leakyshop.example (AppsFlyer, alias observed for t.appsflyersdk.com): 0.7 s after I declined"))
+    }
+
+    @Test
     fun `an observed alias is mentioned`() {
         val s = sampleReject.copy(
             netEvents = listOf(NetEvent(9 * S, "metrics.leakyshop.example", entity = "AppsFlyer",
