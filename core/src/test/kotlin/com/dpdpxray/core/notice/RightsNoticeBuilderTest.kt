@@ -160,6 +160,15 @@ class RightsNoticeBuilderTest {
     }
 
     @Test
+    fun `lookups within 100 ms of the reject say under 0_1 s rather than 0_0 s`() {
+        // Seen on the phone: SDKs re-query within milliseconds of "Reject all".
+        val s = sampleReject.copy(netEvents = listOf(NetEvent((8.3 * S).toLong() + 30_000_000, "app-measurement.com")))
+        val text = notice(s)!!.text
+        assertTrue(text, text.contains("- app-measurement.com (Google Analytics for Firebase): under 0.1 s after I declined"))
+        assertFalse(text.contains("0.0 s"))
+    }
+
+    @Test
     fun `an alias in the answer chain is classified and mentioned`() {
         val s = sampleReject.copy(
             netEvents = listOf(
