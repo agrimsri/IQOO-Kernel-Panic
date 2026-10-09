@@ -68,6 +68,48 @@ object TestPackets {
         return out.toByteArray()
     }
 
+    /** A resource record for [reply]. [owner] null = compression pointer to the question name at offset 12. */
+    class Rr(val owner: String?, val type: Int, val rdata: ByteArray)
+
+    fun a(owner: String?, ip: String) = Rr(owner, 1, ip.split('.').map { it.toInt().toByte() }.toByteArray())
+    fun aaaa(owner: String?, vararg groups: Int) = Rr(owner, 28, ByteArray(16).also { b ->
+        groups.forEachIndexed { i, g -> b[2 * i] = (g shr 8).toByte(); b[2 * i + 1] = g.toByte() }
+    })
+    fun cname(owner: String?, target: String) = Rr(owner, 5, name(target))
+
+    /** Uncompressed wire-format name. */
+    fun name(host: String): ByteArray {
+        val out = ByteArrayOutputStream()
+        for (label in host.split('.')) {
+            out.write(label.length)
+            out.write(label.toByteArray(Charsets.US_ASCII))
+        }
+        out.write(0)
+        return out.toByteArray()
+    }
+
+    /** A reply echoing [query]'s id and question, with the given sections, built without the code under test. */
+    fun reply(
+        query: ByteArray,
+        answers: List<Rr>,
+        authority: List<Rr> = emptyList(),
+        additional: List<Rr> = emptyList(),
+        flags: Int = 0x8180,
+        id: Int? = null,
+    ): ByteArray {
+        val out = ByteArrayOutputStream()
+        if (id == null) out.write(query, 0, 2) else out.write16(id)
+        out.write16(flags)
+        out.write16(1); out.write16(answers.size); out.write16(authority.size); out.write16(additional.size)
+        out.write(query, 12, query.size - 12)
+        for (rr in answers + authority + additional) {
+            if (rr.owner == null) out.write16(0xC00C) else out.write(name(rr.owner))
+            out.write16(rr.type); out.write16(1); out.write32(300)
+            out.write16(rr.rdata.size); out.write(rr.rdata)
+        }
+        return out.toByteArray()
+    }
+
     /** TTL of every resource record after the question section, in order. */
     fun recordTtls(dns: ByteArray): List<Long> {
         var pos = 12
