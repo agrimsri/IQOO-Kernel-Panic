@@ -1,5 +1,7 @@
 package com.dpdpxray.app.capture
 
+import com.dpdpxray.core.dns.DnsAnswer
+import com.dpdpxray.core.dns.withAnswer
 import com.dpdpxray.core.model.NetEvent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,5 +33,15 @@ object CaptureBus {
 
     fun record(event: NetEvent) {
         _events.update { it + event }
+    }
+
+    /** Adds the resolver's verified answer to [event], the instance passed to [record]. No-op after a reset. */
+    fun attachAnswer(event: NetEvent, answer: DnsAnswer) {
+        val annotated = event.withAnswer(answer)
+        if (annotated === event) return
+        _events.update { list ->
+            val i = list.indexOfLast { it === event }
+            if (i < 0) list else list.toMutableList().also { it[i] = annotated }
+        }
     }
 }
