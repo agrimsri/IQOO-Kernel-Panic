@@ -83,6 +83,36 @@ class DemoScoreRegressionTest {
         )
     }
 
+    /**
+     * Shaped like the recorded iQOO full audits (audit-1791570081266: 21 / At risk with C2, C1, C3, C4, C10;
+     * audit-1791570260617: 100 / DPDP-ready): only the tree-observed screen fields are known. Test data, not a replay.
+     */
+    private val deviceScreen = ScreenAudit(
+        isConsentScreen = true, preTicked = true, rejectOption = RejectOption.HIDDEN,
+        source = AuditSource.DETERMINISTIC, observedFields = setOf("preTicked", "rejectOption"),
+    )
+    private val deviceLeaky = leaky.map { it.copy(screenAudit = deviceScreen) }
+    private val deviceFixed = deviceLeaky.map { s ->
+        s.copy(
+            targetPackage = "com.leakyshop.demo.fixed",
+            screenAudit = deviceScreen.copy(preTicked = false, rejectOption = RejectOption.VISIBLE),
+            netEvents = listOf(net(0.4, "api.leakyshop.example"), net(9.0, "api.leakyshop.example")),
+        )
+    }
+
+    @Test
+    fun `device-shaped leaky audit scores 21 with the recorded findings`() {
+        assertEquals(
+            Triple(21, ScoreBand.AT_RISK, setOf(CheckId.C1, CheckId.C2, CheckId.C3, CheckId.C4, CheckId.C10)),
+            summary(engine.evaluate(deviceLeaky)),
+        )
+    }
+
+    @Test
+    fun `device-shaped fixed audit scores 100`() {
+        assertEquals(Triple(100, ScoreBand.READY, emptySet<CheckId>()), summary(engine.evaluate(deviceFixed)))
+    }
+
     @Test
     fun `fixed counterpart keeps 100 with no findings`() {
         assertEquals(Triple(100, ScoreBand.READY, emptySet<CheckId>()), summary(engine.evaluate(fixed)))

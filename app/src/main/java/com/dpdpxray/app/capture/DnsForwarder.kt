@@ -21,9 +21,12 @@ class DnsForwarder(private val context: Context, private val protect: (DatagramS
                     protect(socket)
                     socket.soTimeout = TIMEOUT_MS
                     socket.send(DatagramPacket(query, query.size, server, 53))
+                    // Counted once the datagram is handed to the network, so timed-out attempts and retries count.
+                    CaptureBus.upstreamSent(query.size)
                     val buf = ByteArray(4096)
                     val reply = DatagramPacket(buf, buf.size)
                     socket.receive(reply)
+                    CaptureBus.upstreamReceived(reply.length)
                     return buf.copyOf(reply.length)
                 }
             } catch (_: SocketTimeoutException) {
