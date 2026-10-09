@@ -11,9 +11,12 @@ data class IpCountry(val located: String?, val registered: String?)
 class IpCountryLookup(private val reader: MmdbReader) {
     val buildEpochSeconds: Long? get() = reader.buildEpochSeconds
 
-    /** Null when [ip] is not a literal address, is not in the database, or the record has no valid country code. */
+    /**
+     * Null when [ip] is not a literal address, is a private or reserved address, is not in the database, or the record
+     * has no valid country code.
+     */
     fun lookup(ip: String): IpCountry? {
-        val bytes = IpLiteral.parse(ip) ?: return null
+        val bytes = IpLiteral.parse(ip)?.takeUnless { IpLiteral.isReserved(it) } ?: return null
         val record = try { reader.find(bytes) } catch (_: MmdbFormatException) { null } ?: return null
         val located = iso(record["country"])
         val registered = iso(record["registered_country"])
@@ -30,6 +33,37 @@ object IpLiteral {
         ':' in text -> v6(text)
         '.' in text -> v4(text)
         else -> null
+    }
+
+    /**
+     * True for addresses that have no public location: private, loopback, link-local, carrier-grade NAT, multicast,
+     * documentation and other special-purpose ranges (IANA special-purpose registries, RFC 6890). IPv4-mapped and NAT64
+     * IPv6 addresses are judged by the IPv4 address inside. A DNS answer in these ranges is often a block or a sinkhole.
+     */
+    fun isReserved(address: ByteArray): Boolean = when (address.size) {
+        4 -> reserved4(address)
+        16 -> reserved6(address)
+        else -> true
+    }
+
+    private fun reserved4(b: ByteArray): Boolean {
+        val a = b[0].toInt() and 0xFF
+        val c = b[1].toInt() and 0xFF
+        val d = b[2].toInt() and 0xFF
+        return a == 0 || a == 10 || a == 127 || a >= 224 ||
+            (a == 100 && c in 64..127) || (a == 169 && c == 254) || (a == 172 && c in 16..31) ||
+            (a == 192 && (c == 168 || (c == 0 && (d == 0 || d == 2)))) ||
+            (a == 198 && (c in 18..19 || (c == 51 && d == 100))) || (a == 203 && c == 0 && d == 113)
+    }
+
+    private fun reserved6(b: ByteArray): Boolean {
+        fun u(i: Int) = b[i].toInt() and 0xFF
+        fun zeros(from: Int, to: Int) = (from until to).all { b[it] == 0.toByte() }
+        if (zeros(0, 10) && u(10) == 0xFF && u(11) == 0xFF) return reserved4(b.copyOfRange(12, 16))                   // ::ffff:a.b.c.d
+        if (u(0) == 0x00 && u(1) == 0x64 && u(2) == 0xFF && u(3) == 0x9B && zeros(4, 12)) return reserved4(b.copyOfRange(12, 16)) // 64:ff9b::/96
+        if (zeros(0, 15) && u(15) <= 1) return true                                                                    // :: and ::1
+        return u(0) == 0xFF || (u(0) and 0xFE) == 0xFC || (u(0) == 0xFE && (u(1) and 0xC0) == 0x80) ||               // ff00::/8, fc00::/7, fe80::/10
+            (u(0) == 0x20 && u(1) == 0x01 && u(2) == 0x0D && u(3) == 0xB8)                                              // 2001:db8::/32
     }
 
     private fun v4(t: String): ByteArray? {
