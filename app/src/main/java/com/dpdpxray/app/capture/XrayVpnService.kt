@@ -9,6 +9,7 @@ import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import com.dpdpxray.core.dns.DnsAnswers
 import com.dpdpxray.core.dns.DnsPacketCodec
 import com.dpdpxray.core.model.NetEvent
 import kotlinx.coroutines.CoroutineScope
@@ -93,14 +94,17 @@ class XrayVpnService : VpnService() {
             }
             if (n <= 0) continue
             val query = DnsPacketCodec.parse(buffer, n) ?: continue
-            CaptureBus.record(NetEvent(tNanos = SystemClock.elapsedRealtimeNanos(), hostname = query.hostname, queryType = query.queryType))
+            val event = NetEvent(tNanos = SystemClock.elapsedRealtimeNanos(), hostname = query.hostname, queryType = query.queryType)
+            CaptureBus.record(event)
             s.launch {
-                val answer = forwarder.resolve(query.dnsPayload)?.let { DnsPacketCodec.zeroTtls(it) }
-                    ?: DnsPacketCodec.servFail(query.dnsPayload)
+                val reply = forwarder.resolve(query.dnsPayload)
+                val answer = reply?.let { DnsPacketCodec.zeroTtls(it) } ?: DnsPacketCodec.servFail(query.dnsPayload)
                 val packet = DnsPacketCodec.buildResponse(query, answer)
                 synchronized(output) {
                     runCatching { output.write(packet) }
                 }
+                // After the app has its answer, so reading the records never delays the lookup.
+                if (reply != null) CaptureBus.attachAnswer(event, DnsAnswers.parse(reply, query.dnsPayload))
             }
         }
     }
