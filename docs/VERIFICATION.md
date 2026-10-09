@@ -1,5 +1,53 @@
 # TraceVeil baseline verification
 
+## N3 sample fixtures on 10 October 2026
+
+Branch `nitya/sample-fixtures` includes the N2 checkpoint and the already-merged A0 model contract through merge `3d8bb34`. Product changes are limited to Nitya-owned sample data, the sample picker, the shared ViewModel's sample entry point and an app-owned report-warning prefix. Core rules, capture, voice and both demo flavours are unchanged from the A0 `main` checkpoint `67a41bc`.
+
+Fresh local verification:
+
+```text
+gradlew.bat --offline :core:test :app:testDebugUnitTest :app:assembleDebug :leakyshop:assembleLeakyDebug :leakyshop:assembleFixedDebug --rerun-tasks --console=plain
+
+BUILD SUCCESSFUL in 54s
+128 actionable tasks: 128 executed
+Core: 8 suites, 71 tests, 0 failures, 0 errors, 0 skipped
+App JVM: 1 suite, 7 tests, 0 failures, 0 errors, 0 skipped
+```
+
+Before committing, the full core/app JVM suites were rerun again with `--rerun-tasks`: **BUILD SUCCESSFUL in 36s**, all **32 tasks executed**. The repository checker suite also passed **15 tests** with Git Bash explicitly selected; the initial Windows default selected the WSL launcher and failed because `/bin/bash` was unavailable, without exercising the checker. Windows command:
+
+```powershell
+$env:TRACEVEIL_BASH='C:\Program Files\Git\bin\bash.exe'
+python -m unittest discover -s tools/tests -v
+```
+
+The fixture tests failed on missing aliases, endpoint addresses and variant identifiers before implementation. A separate report assertion exposed that the core report builder does not render session notes; the app-owned prefix then made that assertion pass. An independent read-only review found no changes required within the fixture scope. It did not perform Android runtime tests; the device checks below were performed separately.
+
+### iQOO 15 sample smoke test
+
+Device `10BFBL24YS001GM` reported model I2501 and an authorized ADB connection. The user confirmed Office Kit access before resuming laptop-side work during the scheduled Red Light window. TraceVeil was updated with `adb install -r`; no app data was cleared, permission granted, setting changed or live audit started.
+
+Installed debug APK SHA-256:
+
+```text
+e0228f4a013fee04135ee382f53e90a1564d15c789d9a2c59d14abbe366c709b
+```
+
+At approximately 03:14-03:20 IST:
+
+- The sample picker rendered both options and the warning that example IPs do not identify real server locations.
+- Alias sample `sample-1791582274163` opened with **Sample data** and score 8. Its saved JSON retained all three plans, 18 events, four aliased events and unknown capture health.
+- Endpoint sample `sample-1791582328055` opened with **Sample data** and score 8. Its saved JSON retained the CNAME chain, documentation IPv4/IPv6 addresses, original consent timing and an empty address list for unknown hosts.
+- The endpoint report saved as `Downloads/TraceVeil/TraceVeil-LeakyShopaliasIPsample.pdf` and `TraceVeil-sample-1791582328055.md`. Both retained the synthetic-evidence and documentation-IP warnings. The PDF contained six pages; all six were rendered locally with the existing PyMuPDF installation and visually inspected. The first-page warnings were readable, with no new clipping or overlap observed. Existing pagination limitations remain: the REJECT timeline heading ends page 5 while its rows start page 6, and some citation attributions cross page breaks.
+- Google remained the assistant, Private DNS remained off, and the TraceVeil and HackTracker accessibility services remained enabled.
+
+Evidence is preserved outside the Git checkout at `D:/Hackathons/IQOO/hackathon-preparation/sample-fixtures/evidence/`. ADB file copying verifies export contents, not Office Kit file delivery or clipboard synchronization.
+
+The attempted share/baseline follow-up encountered the user's Office Kit Remote PC screen instead of TraceVeil. Further phone inputs were stopped; **share-chooser acceptance, sample-picker cancellation and reopening the original sample on the phone remain unverified in this pass**. The original sample is covered by JVM regression tests. No share target was selected by the test.
+
+These checks complete N3's new-fixture decode/render acceptance, not the full application's acceptance. The live 21/100 regression was not repeated. Camera analysis, voice, model-generated answers, alias classification, real DNS answer capture, health counters, maps and Network Proof remain separate integration checks. The report's existing zero-byte sentence is not a measured result and must not be presented as one. See [sample fixture usage](SAMPLE_FIXTURES.md).
+
 ## N2 repository checks on 10 October 2026
 
 Branch `nitya/repo-readiness` starts at the integrated `main` merge `1154a9b`. N2 changes repository tooling and documentation only: `app/`, `core/` and `leakyshop/` contents remain identical to that revision. No APK was installed, no audit was rerun, and no phone permission or setting changed during N2.

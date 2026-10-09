@@ -15,11 +15,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -27,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.control.DeviceChecks
 import com.dpdpxray.app.data.AuditMeta
+import com.dpdpxray.app.data.SampleAudit
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.Note
 import com.dpdpxray.app.ui.components.PrimaryAction
@@ -54,6 +59,7 @@ fun HomeScreen(
     val pf by vm.preflight.collectAsState()
     val audits by vm.audits.collectAsState()
     val llm by vm.llmStatus.collectAsState()
+    var showSampleFixtures by remember { mutableStateOf(false) }
     val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { vm.refreshPreflight() }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
@@ -112,6 +118,7 @@ fun HomeScreen(
             SecondaryAction("Open sample audit", { vm.openSample(onOpen) }, Modifier.weight(1f))
             SecondaryAction("Camera check", onCamera, Modifier.weight(1f))
         }
+        TextButton(onClick = { showSampleFixtures = true }) { Text("More sample evidence", color = Film.scan) }
 
         SectionTitle("Recent audits")
         if (audits.isEmpty()) Note("No audits yet. Run one, or open the sample to see what a report looks like.")
@@ -119,6 +126,24 @@ fun HomeScreen(
             audits.forEach { AuditRow(it) { onOpen(it.id) } }
         }
         Spacer(Modifier.height(32.dp))
+    }
+    if (showSampleFixtures) {
+        AlertDialog(
+            onDismissRequest = { showSampleFixtures = false },
+            title = { Text("Sample evidence") },
+            text = {
+                Column {
+                    Text("Synthetic examples, not a live audit. Example IPs do not identify real server locations.")
+                    SampleAudit.Variant.entries.filter { it != SampleAudit.Variant.BASELINE }.forEach { variant ->
+                        TextButton(onClick = {
+                            showSampleFixtures = false
+                            vm.openSample(variant, onOpen)
+                        }) { Text(variant.label) }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showSampleFixtures = false }) { Text("Cancel") } },
+        )
     }
 }
 

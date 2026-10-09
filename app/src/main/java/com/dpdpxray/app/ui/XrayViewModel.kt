@@ -21,6 +21,7 @@ import com.dpdpxray.app.data.SampleAudit
 import com.dpdpxray.app.graph
 import com.dpdpxray.app.report.ExportManager
 import com.dpdpxray.app.report.PdfExporter
+import com.dpdpxray.app.report.SampleReport
 import com.dpdpxray.core.audit.PhaseAssigner
 import com.dpdpxray.core.dpdp.Passage
 import com.dpdpxray.core.fixes.FixTemplate
@@ -105,13 +106,15 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Builds the sample audit through the same rules/report pipeline as a live one. */
-    fun openSample(onReady: (String) -> Unit) = viewModelScope.launch(Dispatchers.Default) {
+    fun openSample(onReady: (String) -> Unit) = openSample(SampleAudit.Variant.BASELINE, onReady)
+
+    fun openSample(variant: SampleAudit.Variant, onReady: (String) -> Unit) = viewModelScope.launch(Dispatchers.Default) {
         val id = "sample-${System.currentTimeMillis()}"
-        val sessions = SampleAudit.sessions(System.currentTimeMillis())
+        val sessions = SampleAudit.sessions(System.currentTimeMillis(), variant)
         val catalog = graph.catalog()
         val result = RulesEngine(catalog).evaluate(sessions)
         val fixes = graph.fixCatalog.fixesFor(result, catalog)
-        val md = MarkdownReport.build(result, sessions, fixes, graph.citations())
+        val md = SampleReport.annotate(MarkdownReport.build(result, sessions, fixes, graph.citations()), sessions)
         graph.repository.save(
             AuditMeta(id, sessions.first().targetPackage, sessions.first().targetLabel, System.currentTimeMillis(), result.score, result.band,
                 result.findings.size, sessions.map { it.plan.label }, sample = true),
