@@ -60,6 +60,12 @@ data class NetEvent(
     val phase: Phase = Phase.NO_CONSENT_SEEN,
     /** Package that issued the lookup, when it is not the audited app (e.g. Google Play services). */
     val viaPackage: String? = null,
+    /** CNAME aliases observed in the reply, queried name first, in answer order. Empty = none observed or not read. */
+    val cnameChain: List<String> = emptyList(),
+    /** A/AAAA addresses answered for this query, in textual form. Empty = none observed or not read. */
+    val answerIps: List<String> = emptyList(),
+    /** Catalogue tracker domain reached through an observed alias, when that alias decided the classification. */
+    val disguisedVia: String? = null,
 )
 
 @Serializable
@@ -139,6 +145,8 @@ data class AuditSession(
     val androidVersion: String = "",
     val privateDnsActive: Boolean? = null,
     val notes: List<String> = emptyList(),
+    /** Capture completeness for this session. null = not recorded (audits saved before it existed), not "healthy". */
+    val captureHealth: CaptureHealth? = null,
 ) {
     val consentChoice: ConsentEvent?
         get() = consentEvents.firstOrNull { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }
