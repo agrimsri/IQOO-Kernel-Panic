@@ -14,6 +14,8 @@ import com.dpdpxray.app.consent.ConsentBus
 import com.dpdpxray.app.control.DeviceChecks
 import com.dpdpxray.app.control.ShizukuBridge
 import com.dpdpxray.app.data.AuditMeta
+import com.dpdpxray.app.data.SessionNetworkReadings
+import com.dpdpxray.app.netproof.UidTx
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.ConsentEvent
@@ -65,6 +67,10 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
     val progress: StateFlow<AuditProgress> = _progress.asStateFlow()
     private var job: Job? = null
 
+    private val planCapture = PlanCaptureRecorder(UidTx::now, CaptureBus::reset, CaptureBus::snapshot, SystemClock::elapsedRealtimeNanos)
+
+    private data class CapturedPlan(val session: AuditSession, val upload: SessionNetworkReadings)
+
     private data class Timing(val waitConsentMs: Long, val dwellMs: Long, val observeMs: Long, val silentMs: Long)
 
     private fun timing() = if (graph.settings.settings.value.fastDemo) Timing(12_000, 1_500, 8_000, 12_000)
@@ -100,7 +106,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
     private suspend fun run(config: AuditConfig) {
         val auditId = "audit-${System.currentTimeMillis()}"
         val dir = graph.repository.newAuditDir(auditId)
-        val sessions = try {
+        val capturedPlans = try {
             // Capture starts while TraceVeil is still on screen: Android does not let a background app start a
             // foreground service, and the running capture service keeps TraceVeil allowed to work between plans.
             _progress.value = AuditProgress.Running(config, 0, config.plans.first(), "Starting per-app DNS capture")
@@ -115,6 +121,8 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             ConsentBus.disarm()
         }
 
+        val sessions = capturedPlans.map { it.session }
+
         _progress.value = AuditProgress.Running(config, config.plans.lastIndex, config.plans.last(), "Evaluating DPDP checks")
         val catalog = graph.catalog()
         val result = RulesEngine(catalog).evaluate(sessions)
@@ -125,12 +133,12 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             createdAtMs = System.currentTimeMillis(), score = result.score, band = result.band,
             findingCount = result.findings.size, plans = config.plans.map { it.label },
         )
-        graph.repository.save(meta, sessions, result, markdown)
+        graph.repository.save(meta, sessions, result, markdown, capturedPlans.map { it.upload })
         _progress.value = AuditProgress.Done(auditId)
         returnToXray()
     }
 
-    private suspend fun runPlan(config: AuditConfig, plan: AuditPlan, index: Int, auditId: String, dir: File): AuditSession = coroutineScope {
+    private suspend fun runPlan(config: AuditConfig, plan: AuditPlan, index: Int, auditId: String, dir: File): CapturedPlan = coroutineScope {
         val t = timing()
         val pkg = config.targetPackage
         val notes = mutableListOf<String>()
@@ -147,7 +155,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         }
 
         check(CaptureBus.state.value is CaptureState.Running) { (CaptureBus.state.value as? CaptureState.Error)?.message ?: "Capture stopped unexpectedly" }
-        CaptureBus.reset()
+        val captureStart = planCapture.start()
         ConsentBus.arm(pkg, File(dir, "shots"))
         if (!config.autoDrive && plan != AuditPlan.SILENT) {
             ConsentBus.expectedChoice = if (plan == AuditPlan.ACCEPT) ConsentKind.ACCEPT else ConsentKind.REJECT
@@ -191,8 +199,11 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             }
         }
 
-        val tEnd = SystemClock.elapsedRealtimeNanos()
-        val captured = CaptureBus.events.value
+        // One immutable boundary: events and health cannot drift while the remaining model review finishes.
+        val capturedBoundary = planCapture.finish("$auditId-${plan.name}", captureStart)
+        val snapshot = capturedBoundary.snapshot
+        val tEnd = snapshot.health.captureEndedNanos ?: SystemClock.elapsedRealtimeNanos()
+        val captured = snapshot.events
         val consentEvents = ConsentBus.events.value
         ConsentBus.disarm()
         step("Finishing AI review of the consent screen", t0)
@@ -202,7 +213,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         if (!graph.llm.isReady && appeared != null) notes += "On-device AI model not loaded — screen review used the accessibility tree only."
         if (consentEvents.any { it.nodeText?.contains("inferred") == true }) notes += "The consent choice was inferred from the dialog closing (this app does not report taps)."
 
-        AuditSession(
+        val session = AuditSession(
             id = "$auditId-${plan.name}",
             targetPackage = pkg,
             targetLabel = config.targetLabel,
@@ -218,7 +229,9 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             androidVersion = Build.VERSION.RELEASE,
             privateDnsActive = DeviceChecks.privateDnsActive(context),
             notes = notes,
+            captureHealth = snapshot.health,
         )
+        CapturedPlan(session, capturedBoundary.reading)
     }
 
     private suspend fun startCapture(config: AuditConfig) {

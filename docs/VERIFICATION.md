@@ -1,5 +1,48 @@
 # TraceVeil baseline verification
 
+## N5/N6 local integration checks on 10 October 2026
+
+Branch `nitya/evidence-integration` combines published `main` at `07a7eb9` and Agrim's A4 branch, initially through `b547a1d` (`0a7c31d`) and then `e2b5946` (`56af781`). The latter brings measurement-before-state publication, unparsed-packet classification and immediate-after-Reject notice wording fixes. Nitya's changes wire Y1 Voice Copilot, Y2 Network Proof and A4 saved capture health/confidence. Shared core, capture, voice, AI, Network Proof and demo implementation files have not been manually changed by this integration.
+
+The manifest already contained `INTERNET`. It now declares `RECORD_AUDIO` and speech/TTS service visibility. Y1's existing runtime permission launcher is reused; no permission is granted automatically. Results opens `voice/{id}` through **Ask this audit**, and Home provides **Ask latest audit**. Google remains the default assistant; this is not a background wake-word implementation. Online voice and its consent flow are not enabled by this change: the approved Y1 milestone specifies no cloud fallback.
+
+Each plan now records nullable UID transmission readings and an atomic capture snapshot. Snapshot events and health are saved together; readings are persisted in a versioned `network-readings.json` sidecar, keyed by session ID and capture window. Actual UID sampling start/end and the snapshot request time are separately recorded: UID sampling brackets reset/snapshot, but is not atomic with them. Results uses these saved readings, not the phone's counters at viewing time. Missing, unsupported, reset, corrupt, future-schema, duplicate, overlapping or mismatched readings yield **unavailable**. Stopped/gapped or uncertain capture windows are also unavailable. Unsupported packet totals stay unknown even when byte totals are valid. Older audits still load without a sidecar. Negative residuals are not clamped to zero.
+
+Network Proof subtracts Y2's estimated DNS wire bytes, including its 28-byte IPv4/UDP header allowance per datagram. The residual is an estimate, not proof of no uploads: how this phone accounts for tunnel writes and other UID traffic has not been measured. Confidence describes capture coverage, not app safety or legal compliance; synthetic samples explicitly have no measured confidence.
+
+Fresh local verification:
+
+```text
+gradlew.bat --offline :core:test :app:testDebugUnitTest :app:assembleDebug :leakyshop:assembleLeakyDebug :leakyshop:assembleFixedDebug --rerun-tasks --console=plain
+
+BUILD SUCCESSFUL in 48s
+128 actionable tasks: 128 executed
+Core: 21 suites, 187 tests, 0 failures, 0 errors, 0 skipped
+App JVM: 12 suites, 83 tests, 0 failures, 0 errors, 0 skipped
+```
+
+The 15 new tests first ran with six runtime assertion failures for the missing persistence, byte calculation, route and microphone-permission behavior. The complete suites passed after implementation. Tests exercise real JSON round trips, older/corrupt/future sidecars, ID/window pairing, per-plan arithmetic, unsupported/reset counters, unclamped residuals, exact route arguments and the manifest's effect on microphone availability. Existing model, offline voice, DNS, scoring and sample regression suites also passed. These JVM tests do not verify actual speech recognition, audible TTS or OEM TrafficStats accounting.
+
+An independent read-only integration review identified a stopped-window timing defect and unsupported packet normalization. Nine additional regression tests failed at runtime first, including real `CaptureSessions` stop/restart and boundary-send scenarios. The interval fix passed eight; the packet fix resolved the remaining failure. The first full fix-pass build passed **259 tests** in 38s. After incorporating Agrim's three subsequent fixes, the fresh full build above passed **270 tests**. Repository checker tests previously passed **15 tests** in 19.666s, and the read-only author/committer cutoff check passed all 45 reachable commits at `b547a1d`. Metadata checks do not establish originality or event eligibility.
+
+Rebuilt integration APK SHA-256 (not installed):
+
+```text
+c96cce469aae3876ec02fa9f97555f51ab4c858db633cb6edad87a98a4f502b8
+```
+
+**Status:** local implementation and the review fix pass are verified; complete iQOO acceptance and branch publication are pending. The latest 48s-build APK has not been installed. The preceding 38s-build APK (`db97aae40db018bb9c4c3f1058950a8972944ba3e962e5e4afddc58c9863d518`) was installed with `adb install -r`: data was preserved, Home rendered, and **Ask latest audit** opened Voice Copilot on the saved alias/IP sample. The English screen showed **Allow the microphone** and question chips. The Android permission-dialog attempt could not be verified because subsequent ADB shell/UI commands hung; those checks were interrupted. No permission was granted by the agent, and no speech-input/output or fresh live-capture success is claimed.
+
+The last successful read-only settings check confirmed Google as the selected voice-interaction service, Private DNS off and both accessibility services enabled. No cloud voice request, forced setting change or personal-app data reset occurred. The Windows taskbar interruption was separately diagnosed as absent Explorer; starting Explorer restored the visible shell/taskbar and the user confirmed the desktop was usable again. That recovery does not establish the cause of the ADB hang; reconnecting the unlocked phone is pending.
+
+### Y3 handoff boundary
+
+The user supplied `Y3_ENDPOINT_MAP.md`, which describes a local implementation on Yashvi's branch. A fresh GitHub fetch still showed `origin/yashvi/phone-experience` at `39c915a`, without Y3 map files. No placeholder map import or guessed API was added. Yashvi needs to publish source/tests/docs before Nitya mounts the card. The current citation corpus has no Section 3 passage; a legal-context panel must provide an independently verified official source rather than invent a corpus citation.
+
+Before publishing the integration, test Results and Home voice navigation/back, an older audit's unavailable Network Proof, question-chip answers, microphone denial/approval and offline recognition/TTS availability. Then run a controlled demo audit and inspect the saved snapshot/sidecar and displayed measurements. Never clear a personal app's data for this test. See [integration handoff](EVIDENCE_INTEGRATION.md).
+
+This is not completion of all N4/N6 work: rights notices, alias UI and the map card have separate acceptance. Camera Check is unchanged; its removal is a separate approved Nitya/Yashvi dependency. The older report body's zero-byte assertion remains unmeasured and must not be presented as evidence.
+
 ## N3 sample fixtures on 10 October 2026
 
 Branch `nitya/sample-fixtures` includes the N2 checkpoint and the already-merged A0 model contract through merge `3d8bb34`. Product changes are limited to Nitya-owned sample data, the sample picker, the shared ViewModel's sample entry point and an app-owned report-warning prefix. Core rules, capture, voice and both demo flavours are unchanged from the A0 `main` checkpoint `67a41bc`.

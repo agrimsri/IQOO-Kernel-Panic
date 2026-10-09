@@ -38,6 +38,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.data.AuditBundle
+import com.dpdpxray.app.data.AuditNetworkReadings
+import com.dpdpxray.app.netproof.NetworkProofCard
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.CodeBlock
 import com.dpdpxray.app.ui.components.ConsentLine
@@ -57,6 +59,7 @@ import com.dpdpxray.core.model.EvidenceType
 import com.dpdpxray.core.model.Finding
 import com.dpdpxray.core.model.ScoreBand
 import com.dpdpxray.core.model.Severity
+import com.dpdpxray.core.score.ConfidenceGrader
 import java.io.File
 
 @Composable
@@ -68,7 +71,7 @@ private fun WithBundle(vm: XrayViewModel, id: String, content: @Composable (Audi
 }
 
 @Composable
-fun ResultsScreen(vm: XrayViewModel, id: String, onBack: () -> Unit, onFinding: (CheckId) -> Unit, onFixes: () -> Unit, onReport: () -> Unit) {
+fun ResultsScreen(vm: XrayViewModel, id: String, onBack: () -> Unit, onFinding: (CheckId) -> Unit, onFixes: () -> Unit, onReport: () -> Unit, onAsk: () -> Unit) {
     WithBundle(vm, id) { b ->
         val r = b.result
         Column(Modifier.fillMaxSize()) {
@@ -95,6 +98,12 @@ fun ResultsScreen(vm: XrayViewModel, id: String, onBack: () -> Unit, onFinding: 
                     SecondaryAction("How to fix ($fixCount)", onFixes, Modifier.weight(1f), enabled = fixCount > 0)
                     SecondaryAction("Report and export", onReport, Modifier.weight(1f))
                 }
+
+                SecondaryAction("Ask this audit", onAsk, Modifier.fillMaxWidth().padding(top = 10.dp))
+                SectionTitle("Evidence coverage")
+                if (b.meta.sample) Note("Synthetic sample: capture confidence was not measured.", Film.warn)
+                else Note(ConfidenceGrader.gradeAudit(b.sessions).summary)
+                NetworkProofCard(AuditNetworkReadings.proof(b.sessions, b.networkReadings))
 
                 SectionTitle("Findings")
                 if (r.findings.isEmpty()) Note("No consent problems in the captured evidence.", Film.clear)

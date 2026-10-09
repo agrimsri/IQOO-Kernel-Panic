@@ -54,6 +54,7 @@ fun HomeScreen(
     onLab: () -> Unit,
     onCamera: () -> Unit,
     onSettings: () -> Unit,
+    onVoice: (String) -> Unit,
 ) {
     val ctx = LocalContext.current
     val pf by vm.preflight.collectAsState()
@@ -119,6 +120,9 @@ fun HomeScreen(
             SecondaryAction("Camera check", onCamera, Modifier.weight(1f))
         }
         TextButton(onClick = { showSampleFixtures = true }) { Text("More sample evidence", color = Film.scan) }
+        audits.firstOrNull()?.let { latest ->
+            TextButton(onClick = { onVoice(latest.id) }) { Text("Ask latest audit", color = Film.scan) }
+        }
 
         SectionTitle("Recent audits")
         if (audits.isEmpty()) Note("No audits yet. Run one, or open the sample to see what a report looks like.")
