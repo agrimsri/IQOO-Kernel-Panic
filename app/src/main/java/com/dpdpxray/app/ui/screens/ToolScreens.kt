@@ -26,7 +26,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -34,6 +37,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.ai.BackendKind
+import com.dpdpxray.app.ai.DiagnosticRow
+import com.dpdpxray.app.ai.LlmOutcome
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.ai.ModelFiles
 import com.dpdpxray.app.ui.CameraCheckState
@@ -48,6 +53,7 @@ import com.dpdpxray.app.ui.components.TopBar
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.core.model.RejectOption
 import com.dpdpxray.core.model.ScreenAudit
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @Composable
@@ -96,6 +102,27 @@ fun AiLabScreen(vm: XrayViewModel, onBack: () -> Unit) {
             }
             val headroom = vm.thermalHeadroom()
             if (!headroom.isNaN()) Note(String.format(Locale.US, "Thermal headroom: %.2f (1.0 means the phone is about to throttle)", headroom))
+
+            SectionTitle("Answer check")
+            Note("Sends one fixed test prompt (no audit data) under each setting and shows what the model returned, to find why answers come back empty.")
+            val lastProblem by vm.graph.llm.lastProblem.collectAsState()
+            lastProblem?.let { Note("Last problem: $it", Film.high) }
+            val scope = rememberCoroutineScope()
+            var diag by remember { mutableStateOf<List<DiagnosticRow>?>(null) }
+            var diagRunning by remember { mutableStateOf(false) }
+            SecondaryAction(
+                if (diagRunning) "Checking…" else "Run answer check",
+                { scope.launch { diagRunning = true; diag = vm.graph.llm.diagnose(); diagRunning = false } },
+                Modifier.fillMaxWidth().padding(top = 8.dp), enabled = !diagRunning && status is LlmStatus.Ready,
+            )
+            if (status !is LlmStatus.Ready) Note("Load the model first.")
+            diag?.forEach { r ->
+                Spacer(Modifier.height(8.dp))
+                RuleRow(if (r.outcome is LlmOutcome.Text) Film.clear else Film.leak) {
+                    Text(r.label, style = MaterialTheme.typography.titleMedium)
+                    Text("${r.outcome.describe()} · ${r.ms} ms", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                }
+            }
 
             SectionTitle("Legal search")
             Note(if (vm.graph.semanticSearch) "Semantic search with the on-device embedding model is active." else "Keyword search (BM25) over the DPDP Act and Rules. Add an EmbeddingGemma model to the folder for semantic search.")

@@ -49,8 +49,8 @@ class RulesEngine(private val catalog: TrackerCatalog) {
 
     private fun classify(events: List<NetEvent>) = events.map { e ->
         if (e.entity != null) e else {
-            val info = catalog.classify(e.hostname)
-            e.copy(entity = info.entity, category = info.category)
+            val info = catalog.classify(e.hostname, e.cnameChain)
+            e.copy(entity = info.entity, category = info.category, disguisedVia = e.disguisedVia ?: info.disguisedVia)
         }
     }
 
@@ -182,7 +182,7 @@ class RulesEngine(private val catalog: TrackerCatalog) {
 
     private fun c10AdIds(ctx: List<Ctx>): Finding? {
         val hits = ctx.flatMap { c ->
-            c.events.filter { preConsent(it) && catalog.classify(it.hostname).collectsAdIdAtInit }.map { c to it }
+            c.events.filter { preConsent(it) && catalog.classify(it.hostname, it.cnameChain).collectsAdIdAtInit }.map { c to it }
         }
         if (hits.isEmpty()) return null
         val entities = hits.mapNotNull { it.second.entity }.distinct()
@@ -228,7 +228,16 @@ class RulesEngine(private val catalog: TrackerCatalog) {
         }
         val who = e.entity?.let { " ($it)" } ?: ""
         val via = e.viaPackage?.let { " via $it" } ?: ""
-        return "${e.hostname}$who$via — $sinceLaunch s after launch, $rel [${c.session.plan.label}]"
+        return "${e.hostname}$who$via${alias(e)} — $sinceLaunch s after launch, $rel [${c.session.plan.label}]"
+    }
+
+    /** " — alias observed: a → b → tracker" up to the alias that decided the classification, or "" if none did. */
+    private fun alias(e: NetEvent): String {
+        val target = e.disguisedVia ?: return ""
+        val chain = e.cnameChain.map { it.lowercase().trimEnd('.') }
+        val end = chain.indexOf(target)
+        val shown = if (end > 0) chain.take(end + 1) else listOf(e.hostname, target)
+        return " — alias observed: ${shown.joinToString(" → ")}"
     }
 
     private fun secs(nanos: Long) = String.format(Locale.US, "%.1f", nanos / 1e9)

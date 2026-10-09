@@ -3,6 +3,7 @@ package com.dpdpxray.app.ai
 import android.content.Context
 import android.os.PowerManager
 import android.os.SystemClock
+import android.util.Log
 import com.dpdpxray.core.model.ScreenAudit
 import com.dpdpxray.core.screen.ConsentAuditPrompt
 import com.dpdpxray.core.screen.VlmResponseParser
@@ -15,6 +16,7 @@ import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.ResponseFormat
 import com.google.ai.edge.litertlm.SamplerConfig
+import com.google.ai.edge.litertlm.ThinkingConfig
 import com.google.ai.edge.litertlm.benchmark
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -113,34 +115,66 @@ class LlmEngine(private val context: Context) {
                 if (screenshot != null && screenshot.exists()) add(Content.ImageFile(screenshot.absolutePath))
                 add(Content.Text(ConsentAuditPrompt.userMessage(treeText)))
             }
-            val text = runCatching { ask(e, ConsentAuditPrompt.SYSTEM, Contents.of(parts), constrained = true) }
-                .recoverCatching { ask(e, ConsentAuditPrompt.SYSTEM, Contents.of(parts), constrained = false) }
-                .getOrNull() ?: return@withContext null
+            val constrained = llmCatching { ask(e, ConsentAuditPrompt.SYSTEM, Contents.of(parts), AskOptions(constrained = true)) }
+            val outcome = if (constrained is LlmOutcome.Text) constrained
+            else llmCatching { ask(e, ConsentAuditPrompt.SYSTEM, Contents.of(parts), AskOptions()) }.also { record("screen review (constrained: ${constrained.describe()})", it) }
+            val text = outcome.textOrNull ?: return@withContext null
             VlmResponseParser.parse(text)?.copy(modelId = modelName, latencyMs = SystemClock.elapsedRealtime() - start)
+                ?: null.also { Log.w(TAG, "screen review: model reply did not parse as a screen audit (${text.length} chars)") }
         }
     }
 
-    /** Free-text generation (finding explanations, Hindi summaries). */
-    suspend fun generate(system: String, prompt: String): String? = mutex.withLock {
+    /** Free-text generation (finding explanations, Hindi summaries). Null on any failure; see [generateOutcome] for why. */
+    suspend fun generate(system: String, prompt: String): String? = generateOutcome(system, prompt).textOrNull
+
+    /** Like [generate], but says what happened: text, an empty reply, or the exception class and message. */
+    suspend fun generateOutcome(system: String, prompt: String, options: AskOptions = AskOptions()): LlmOutcome = mutex.withLock {
         withContext(Dispatchers.Default) {
-            val e = engine ?: return@withContext null
-            runCatching { ask(e, system, Contents.of(prompt), constrained = false) }.getOrNull()?.trim()
+            val e = engine ?: return@withContext LlmOutcome.NotLoaded
+            llmCatching { ask(e, system, Contents.of(prompt), options) }.also { record("generate", it) }
         }
     }
 
-    private fun ask(e: Engine, system: String, contents: Contents, constrained: Boolean): String {
+    private val _lastProblem = MutableStateFlow<String?>(null)
+    /** The most recent failed or empty model call, for AI lab. Never contains prompt or audit text. */
+    val lastProblem: StateFlow<String?> = _lastProblem.asStateFlow()
+
+    private fun record(what: String, outcome: LlmOutcome) {
+        if (outcome is LlmOutcome.Text) return
+        val line = "$what: ${outcome.describe()}"
+        _lastProblem.value = line
+        Log.w(TAG, line)
+    }
+
+    /**
+     * A fixed prompt run under each configuration that could explain empty answers, so the failing setting is observed
+     * on the phone rather than guessed. Each row records the outcome and the time it took.
+     */
+    suspend fun diagnose(): List<DiagnosticRow> = mutex.withLock {
+        withContext(Dispatchers.Default) {
+            val e = engine ?: return@withContext listOf(DiagnosticRow("Model", LlmOutcome.NotLoaded, 0))
+            DIAGNOSTICS.map { (label, options) ->
+                val start = SystemClock.elapsedRealtime()
+                val outcome = llmCatching { ask(e, DIAG_SYSTEM, Contents.of(DIAG_PROMPT), options) }
+                DiagnosticRow(label, outcome, SystemClock.elapsedRealtime() - start).also { Log.i(TAG, "diagnose $label: ${outcome.describe()} in ${it.ms} ms") }
+            }
+        }
+    }
+
+    private fun ask(e: Engine, system: String, contents: Contents, options: AskOptions): LlmOutcome {
         val config = ConversationConfig(
-            systemInstruction = Contents.of(system),
-            samplerConfig = SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0, seed = 7),
-            enableResponseFormat = constrained,
+            systemInstruction = if (options.systemInstruction) Contents.of(system) else null,
+            samplerConfig = if (options.greedySampler) SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0, seed = 7) else null,
+            enableResponseFormat = options.constrained,
+            thinkingConfig = if (options.thinkingOff) ThinkingConfig(false) else null,
         )
         return e.createConversation(config).use { conv ->
-            val reply: Message = if (constrained) {
+            val reply: Message = if (options.constrained) {
                 conv.sendMessage(contents, responseFormat = ResponseFormat.json(ConsentAuditPrompt.JSON_SCHEMA))
             } else {
                 conv.sendMessage(contents)
             }
-            reply.contents.contents.filterIsInstance<Content.Text>().joinToString("") { it.text }
+            LlmOutcome.fromReply(reply.contents.contents.filterIsInstance<Content.Text>().map { it.text }, reply.channels.keys)
         }
     }
 
@@ -174,4 +208,26 @@ class LlmEngine(private val context: Context) {
     }.getOrDefault(Float.NaN)
 
     private fun thermallyStressed() = thermalHeadroom().let { !it.isNaN() && it >= 0.9f }
+
+    private companion object {
+        const val TAG = "TraceVeilLlm"
+        const val DIAG_SYSTEM = "You are a test harness."
+        const val DIAG_PROMPT = "Reply with the single word OK."
+        val DIAGNOSTICS = listOf(
+            "Current settings" to AskOptions(),
+            "No system instruction" to AskOptions(systemInstruction = false),
+            "Engine default sampler" to AskOptions(greedySampler = false),
+            "Thinking off" to AskOptions(thinkingOff = true),
+        )
+    }
 }
+
+/** Conversation settings for one call. The defaults are the settings the app has always used. */
+data class AskOptions(
+    val systemInstruction: Boolean = true,
+    val greedySampler: Boolean = true,
+    val constrained: Boolean = false,
+    val thinkingOff: Boolean = false,
+)
+
+data class DiagnosticRow(val label: String, val outcome: LlmOutcome, val ms: Long)

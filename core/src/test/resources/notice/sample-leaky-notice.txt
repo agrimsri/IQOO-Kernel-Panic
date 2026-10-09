@@ -1,0 +1,23 @@
+Subject: Please confirm tracker activity after I declined consent in LeakyShop (sample)
+
+To the team responsible for LeakyShop (sample) (com.leakyshop.demo),
+
+On 9 October 2026 at 23:51:29 IST I declined consent in LeakyShop (sample) by choosing "Reject all" (Plan B · Reject).
+After that choice, TraceVeil recorded these tracker lookups on my device:
+- graph.facebook.com (Meta (Facebook SDK)): 1.1 s after I declined
+- app-measurement.com (Google Analytics for Firebase): 2.9 s after I declined
+- launches.appsflyersdk.com (AppsFlyer): 3.7 s after I declined
+
+A DNS lookup is the step before a connection: it shows the device asked where these services are. It does not show what data, if any, was sent, and it is not a legal conclusion.
+
+Please:
+1. Confirm whether the app shared any of my personal data with these services, or processed it for them, after I declined, and for which purpose.
+2. Treat my choice as a refusal of consent. To the extent you hold any consent from me, treat this message as its withdrawal (DPDP Act 2023, Section 6(4)), and stop, and have your Data Processors stop, processing my personal data on the basis of that consent (DPDP Act 2023, Section 6(6)).
+3. Share the notice and the consent record you rely on for this processing (DPDP Act 2023, Section 6(10)).
+4. Tell me the link or other means to withdraw consent, exercise my rights and make a complaint to the Data Protection Board (DPDP Rules 2025, Rule 3(c)).
+
+Please check these observations against your own records and tell me if any detail is wrong.
+
+Regards,
+[Your name]
+[Your contact details]
