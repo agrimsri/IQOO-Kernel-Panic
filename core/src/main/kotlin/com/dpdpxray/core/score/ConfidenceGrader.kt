@@ -32,7 +32,7 @@ object ConfidenceGrader {
     /** A shorter capture window: at most Medium. */
     const val MIN_WINDOW_NANOS = 10_000_000_000L
 
-    /** Tunnel packets that were not readable DNS questions, as a share of all tunnel packets. */
+    /** Unreadable plain-DNS packets (all unparsed packets for builds without the breakdown), as a share of DNS packets. */
     const val MALFORMED_PACKETS_MEDIUM_PERCENT = 2
     const val MALFORMED_PACKETS_LOW_PERCENT = 20
 
@@ -79,10 +79,13 @@ object ConfidenceGrader {
                 cap(level, "$dropped lookups were dropped because the event buffer was full")
             }
             val parsed = health.dnsQueriesParsed
-            val malformed = health.malformedPackets
+            val malformed = unreadableDns(health)
             if (parsed != null && malformed != null && malformed > 0) {
                 ratioCap(malformed, parsed + malformed, MALFORMED_PACKETS_MEDIUM_PERCENT, MALFORMED_PACKETS_LOW_PERCENT)
-                    ?.let { cap(it, "$malformed of ${parsed + malformed} tunnel packets were not readable DNS questions") }
+                    ?.let { cap(it, "$malformed of ${parsed + malformed} packets were not readable DNS questions") }
+            }
+            health.hiddenDnsPackets?.takeIf { it > 0 }?.let { hidden ->
+                cap(ConfidenceLevel.MEDIUM, "$hidden packets used encrypted or TCP DNS, which TraceVeil cannot read; turn Private DNS off and re-run")
             }
             val failures = health.dnsRelayFailures
             if (parsed != null && failures != null && failures > 0) {
@@ -106,7 +109,7 @@ object ConfidenceGrader {
         val level = limits.minOfOrNull { it.first } ?: ConfidenceLevel.HIGH
         val ordered = limits.sortedBy { it.first }.map { it.second }
         if (lookups == 0L) return ConfidenceGrade(level, NO_LOOKUPS, ordered)
-        val count = plural(lookups, "lookup") + when (val m = health?.malformedPackets) {
+        val count = plural(lookups, "lookup") + when (val m = health?.let(::unreadableDns)) {
             null -> ""
             0L -> ", none malformed"
             else -> ", ${plural(m, "malformed packet")}"
@@ -127,6 +130,18 @@ object ConfidenceGrader {
     }
 
     private const val NO_LOOKUPS = "No DNS lookups were captured"
+
+    /**
+     * Unparsed packets that were meant as plain DNS but could not be read. Without the breakdown (older builds) every
+     * unparsed packet counts, as before; non-DNS traffic and hidden DNS are judged separately when it is known.
+     */
+    private fun unreadableDns(h: CaptureHealth): Long? {
+        val total = h.malformedPackets ?: return null
+        if (h.hiddenDnsPackets == null || h.nonDnsPackets == null) return total
+        val parts = h.hiddenDnsPackets + h.nonDnsPackets
+        // Inconsistent counters are not trusted down to a smaller number: fall back to the whole total.
+        return if (parts > total) total else total - parts
+    }
 
     private fun ratioCap(part: Long, total: Long, mediumPercent: Int, lowPercent: Int): ConfidenceLevel? = when {
         total <= 0 -> null

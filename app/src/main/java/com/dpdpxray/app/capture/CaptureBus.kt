@@ -6,6 +6,7 @@ import com.dpdpxray.core.capture.CaptureSessions
 import com.dpdpxray.core.capture.CaptureSnapshot
 import com.dpdpxray.core.capture.LookupTicket
 import com.dpdpxray.core.dns.DnsAnswer
+import com.dpdpxray.core.dns.UnparsedPacket
 import com.dpdpxray.core.model.NetEvent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,17 +48,18 @@ object CaptureBus {
 
     fun setState(s: CaptureState) {
         val wasRunning = _state.value is CaptureState.Running
-        _state.value = s
+        // Measurement changes before observers see the new state, so a reset that reacts to Running is measured.
         when {
             s is CaptureState.Running -> sessions.captureStarted()
             wasRunning && s is CaptureState.Error -> sessions.captureStopped(s.message).also { log("stopped", sessions.snapshot()) }
-            wasRunning -> sessions.captureStopped()
+            wasRunning -> sessions.captureStopped().also { log("stopped", sessions.snapshot()) }
         }
+        _state.value = s
     }
 
     internal fun record(event: NetEvent): LookupTicket = sessions.recordLookup(event)
 
-    internal fun malformedPacket() = sessions.malformedPacket()
+    internal fun malformedPacket(kind: UnparsedPacket) = sessions.malformedPacket(kind)
 
     internal fun replyReceived(ticket: LookupTicket, answer: DnsAnswer) = sessions.replyReceived(ticket, answer)
 
@@ -74,8 +76,11 @@ object CaptureBus {
         Log.i(
             TAG,
             "session ${s.sessionId} $what: lookups=${h.dnsQueriesParsed} kept=${h.eventsRecorded} dropped=${h.eventsDropped} " +
-                "malformedPackets=${h.malformedPackets} replies=${h.dnsResponsesRelayed} unreadReplies=${h.malformedResponses} " +
+                "malformedPackets=${h.malformedPackets} hiddenDns=${h.hiddenDnsPackets} nonDns=${h.nonDnsPackets} " +
+                "replies=${h.dnsResponsesRelayed} unreadReplies=${h.malformedResponses} " +
                 "noReply=${h.dnsRelayFailures} withAddresses=${s.events.count { it.answerIps.isNotEmpty() }} " +
+                "aliased=${s.events.count { it.cnameChain.isNotEmpty() }} " +
+                "status=${s.events.groupingBy { it.answerStatus?.name ?: "null" }.eachCount()} " +
                 "upstreamSent=${h.dnsUpstreamDatagramsSent}/${h.dnsUpstreamPayloadBytesSent}B " +
                 "upstreamReceived=${h.dnsUpstreamDatagramsReceived}/${h.dnsUpstreamPayloadBytesReceived}B " +
                 "windowMs=${(h.captureEndedNanos!! - h.captureStartedNanos!!) / 1_000_000} notes=${h.notes.size}",

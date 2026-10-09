@@ -51,6 +51,13 @@ data class CaptureHealth(
     val dnsUpstreamDatagramsReceived: Long? = null,
     /** Why a counter is missing or uncertain, e.g. "VPN revoked mid-capture; counters cover 0–12 s". */
     val notes: List<String> = emptyList(),
+    /**
+     * Part of [malformedPackets]: DNS sent where the relay cannot read it (port 853 DNS over TLS/QUIC, or TCP port
+     * 53). Lookups sent this way are not in the evidence; usually Private DNS. null = not broken down (older build).
+     */
+    val hiddenDnsPackets: Long? = null,
+    /** Part of [malformedPackets]: packets that are not DNS at all, e.g. IPv6 control traffic. null = not broken down. */
+    val nonDnsPackets: Long? = null,
 ) {
     companion object {
         const val SCHEMA_VERSION = 1

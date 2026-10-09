@@ -2,6 +2,7 @@ package com.dpdpxray.core.capture
 
 import com.dpdpxray.core.dns.DnsAnswers
 import com.dpdpxray.core.dns.TestPackets
+import com.dpdpxray.core.dns.UnparsedPacket
 import com.dpdpxray.core.model.AnswerStatus
 import com.dpdpxray.core.model.NetEvent
 import org.junit.Assert.assertEquals
@@ -51,7 +52,7 @@ class CaptureSessionsTest {
         assertEquals(140 * S, h.captureEndedNanos)
         listOf(h.dnsQueriesParsed, h.malformedPackets, h.dnsResponsesRelayed, h.dnsRelayFailures, h.malformedResponses,
             h.eventsRecorded, h.eventsDropped, h.dnsUpstreamPayloadBytesSent, h.dnsUpstreamDatagramsSent,
-            h.dnsUpstreamPayloadBytesReceived, h.dnsUpstreamDatagramsReceived).forEach { assertEquals(0L, it) }
+            h.dnsUpstreamPayloadBytesReceived, h.dnsUpstreamDatagramsReceived, h.hiddenDnsPackets, h.nonDnsPackets).forEach { assertEquals(0L, it) }
         assertNull("no lookup yet", h.firstLookupNanos)
         assertTrue(h.notes.isEmpty())
     }
@@ -59,13 +60,27 @@ class CaptureSessionsTest {
     @Test
     fun `lookups and malformed packets are counted with first and last lookup times`() {
         val c = sessions().also { it.captureStarted() }
-        c.recordLookup(lookup(110 * S)); c.malformedPacket(); c.recordLookup(lookup(112 * S)); c.recordLookup(lookup(111 * S))
+        c.recordLookup(lookup(110 * S)); c.malformedPacket(UnparsedPacket.MALFORMED_DNS); c.recordLookup(lookup(112 * S)); c.recordLookup(lookup(111 * S))
         val h = c.snapshot().health
         assertEquals(3L, h.dnsQueriesParsed)
         assertEquals(1L, h.malformedPackets)
         assertEquals(3L, h.eventsRecorded)
         assertEquals(110 * S, h.firstLookupNanos)
         assertEquals(112 * S, h.lastLookupNanos)
+    }
+
+    @Test
+    fun `unparsed packets are totalled and broken down by kind`() {
+        val c = sessions()
+        assertNull(c.snapshot().health.hiddenDnsPackets)
+        c.captureStarted()
+        repeat(8) { c.malformedPacket(UnparsedPacket.HIDDEN_DNS) }
+        repeat(7) { c.malformedPacket(UnparsedPacket.NOT_DNS) }
+        c.malformedPacket(UnparsedPacket.MALFORMED_DNS)
+        val h = c.snapshot().health
+        assertEquals("total keeps its meaning", 16L, h.malformedPackets)
+        assertEquals(8L, h.hiddenDnsPackets)
+        assertEquals(7L, h.nonDnsPackets)
     }
 
     @Test

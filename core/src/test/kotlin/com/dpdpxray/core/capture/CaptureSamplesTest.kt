@@ -11,7 +11,10 @@ import org.junit.Test
 
 /** Keeps the shared samples internally consistent and graded as their docs say. */
 class CaptureSamplesTest {
-    private val measured = listOf(CaptureSamples.healthy, CaptureSamples.overflow, CaptureSamples.resolverTrouble, CaptureSamples.interrupted)
+    private val measured = listOf(
+        CaptureSamples.healthy, CaptureSamples.overflow, CaptureSamples.resolverTrouble, CaptureSamples.interrupted,
+        CaptureSamples.privateDnsAutomatic,
+    )
 
     @Test
     fun `measured samples obey the counter identities`() {
@@ -22,6 +25,7 @@ class CaptureSamplesTest {
             assertTrue(h.dnsUpstreamDatagramsSent!! >= h.dnsQueriesParsed!!)
             assertTrue(h.dnsUpstreamDatagramsReceived!! <= h.dnsUpstreamDatagramsSent!!)
             assertTrue(h.eventsRecorded!! <= h.eventBufferCapacity!!)
+            assertTrue((h.hiddenDnsPackets ?: 0) + (h.nonDnsPackets ?: 0) <= h.malformedPackets!!)
         }
     }
 
@@ -34,6 +38,7 @@ class CaptureSamplesTest {
         assertEquals(ConfidenceLevel.LOW, level(CaptureSamples.overflow))
         assertEquals(ConfidenceLevel.MEDIUM, level(CaptureSamples.resolverTrouble))
         assertEquals(ConfidenceLevel.MEDIUM, level(CaptureSamples.interrupted))
+        assertEquals(ConfidenceLevel.MEDIUM, level(CaptureSamples.privateDnsAutomatic))
     }
 
     @Test

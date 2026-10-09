@@ -95,7 +95,7 @@ class XrayVpnService : VpnService() {
             if (n <= 0) continue
             val query = DnsPacketCodec.parse(buffer, n)
             if (query == null) {
-                CaptureBus.malformedPacket()
+                CaptureBus.malformedPacket(DnsPacketCodec.classifyUnparsed(buffer, n))
                 continue
             }
             // The ticket ties the reply to this session: after a reset, a late reply is ignored.
