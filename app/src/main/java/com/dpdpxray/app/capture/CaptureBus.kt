@@ -6,6 +6,7 @@ import com.dpdpxray.core.capture.CaptureSessions
 import com.dpdpxray.core.capture.CaptureSnapshot
 import com.dpdpxray.core.capture.LookupTicket
 import com.dpdpxray.core.dns.DnsAnswer
+import com.dpdpxray.core.dns.UnparsedPacket
 import com.dpdpxray.core.model.NetEvent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -58,7 +59,7 @@ object CaptureBus {
 
     internal fun record(event: NetEvent): LookupTicket = sessions.recordLookup(event)
 
-    internal fun malformedPacket() = sessions.malformedPacket()
+    internal fun malformedPacket(kind: UnparsedPacket) = sessions.malformedPacket(kind)
 
     internal fun replyReceived(ticket: LookupTicket, answer: DnsAnswer) = sessions.replyReceived(ticket, answer)
 
@@ -75,7 +76,8 @@ object CaptureBus {
         Log.i(
             TAG,
             "session ${s.sessionId} $what: lookups=${h.dnsQueriesParsed} kept=${h.eventsRecorded} dropped=${h.eventsDropped} " +
-                "malformedPackets=${h.malformedPackets} replies=${h.dnsResponsesRelayed} unreadReplies=${h.malformedResponses} " +
+                "malformedPackets=${h.malformedPackets} hiddenDns=${h.hiddenDnsPackets} nonDns=${h.nonDnsPackets} " +
+                "replies=${h.dnsResponsesRelayed} unreadReplies=${h.malformedResponses} " +
                 "noReply=${h.dnsRelayFailures} withAddresses=${s.events.count { it.answerIps.isNotEmpty() }} " +
                 "aliased=${s.events.count { it.cnameChain.isNotEmpty() }} " +
                 "status=${s.events.groupingBy { it.answerStatus?.name ?: "null" }.eachCount()} " +

@@ -1,6 +1,7 @@
 package com.dpdpxray.core.capture
 
 import com.dpdpxray.core.dns.DnsAnswer
+import com.dpdpxray.core.dns.UnparsedPacket
 import com.dpdpxray.core.dns.withAnswer
 import com.dpdpxray.core.model.AnswerStatus
 import com.dpdpxray.core.model.CaptureHealth
@@ -76,10 +77,15 @@ class CaptureSessions(
         current.end(clock(), reason)
     }
 
-    /** A tunnel packet that could not be parsed as a DNS question. */
-    fun malformedPacket() = synchronized(lock) {
+    /** A tunnel packet that was not a readable DNS question, classified by `DnsPacketCodec.classifyUnparsed`. */
+    fun malformedPacket(kind: UnparsedPacket) = synchronized(lock) {
         current.ensureMeasuring(clock())
         current.malformedPackets++
+        when (kind) {
+            UnparsedPacket.HIDDEN_DNS -> current.hiddenDnsPackets++
+            UnparsedPacket.NOT_DNS -> current.nonDnsPackets++
+            UnparsedPacket.MALFORMED_DNS -> Unit
+        }
     }
 
     /** Records a parsed lookup in the current session; the ticket says whether its event was kept. */
@@ -164,6 +170,8 @@ internal class CaptureSession(val id: Long, private val capacity: Int) {
 
     var queriesParsed = 0L
     var malformedPackets = 0L
+    var hiddenDnsPackets = 0L
+    var nonDnsPackets = 0L
     var responsesRelayed = 0L
     var relayFailures = 0L
     var malformedResponses = 0L
@@ -234,6 +242,8 @@ internal class CaptureSession(val id: Long, private val capacity: Int) {
             dnsUpstreamPayloadBytesReceived = upstreamBytesReceived,
             dnsUpstreamDatagramsReceived = upstreamDatagramsReceived,
             notes = notes.toList(),
+            hiddenDnsPackets = hiddenDnsPackets,
+            nonDnsPackets = nonDnsPackets,
         )
     }
 

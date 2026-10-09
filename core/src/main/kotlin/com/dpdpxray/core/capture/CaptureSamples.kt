@@ -53,6 +53,20 @@ object CaptureSamples {
         ),
     )
 
+    /**
+     * Shaped like a Quick audit with Private DNS on Automatic: every UDP lookup captured, but DNS-over-TLS attempts
+     * and IPv6 control packets also reached the tunnel. Medium, with "turn Private DNS off".
+     */
+    val privateDnsAutomatic = CaptureHealth(
+        captureStartedNanos = 0, captureEndedNanos = 18_500_000_000,
+        dnsQueriesParsed = 7, malformedPackets = 13, dnsResponsesRelayed = 7, dnsRelayFailures = 0, malformedResponses = 0,
+        eventsRecorded = 7, eventsDropped = 0, eventBufferCapacity = 5_000,
+        firstLookupNanos = 100_000_000, lastLookupNanos = 3_500_000_000,
+        dnsUpstreamPayloadBytesSent = 291, dnsUpstreamDatagramsSent = 7,
+        dnsUpstreamPayloadBytesReceived = 582, dnsUpstreamDatagramsReceived = 7,
+        hiddenDnsPackets = 8, nonDnsPackets = 5,
+    )
+
     /** One event per reply outcome, plus a pending one (status not recorded). Only the first may be mapped. */
     val answerOutcomes: List<NetEvent> = listOf(
         NetEvent(1 * S, "metrics.shop.test", cnameChain = listOf("metrics.shop.test", "t.tracker.example"),

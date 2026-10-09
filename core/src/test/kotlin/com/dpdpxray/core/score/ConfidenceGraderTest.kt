@@ -90,6 +90,40 @@ class ConfidenceGraderTest {
     }
 
     @Test
+    fun `non-DNS tunnel traffic does not lower confidence`() {
+        val g = ConfidenceGrader.grade(healthy(98).copy(malformedPackets = 40, nonDnsPackets = 40, hiddenDnsPackets = 0), events(98))
+        assertEquals(HIGH, g.level)
+        assertEquals("98 lookups, none malformed", g.detail)
+    }
+
+    @Test
+    fun `malformed share counts only unreadable DNS once the breakdown is known`() {
+        // 3 unreadable DNS of 101 packets (98 + 3) exceeds 2 %; the 40 non-DNS packets are left out.
+        assertEquals(MEDIUM, level(healthy(98).copy(malformedPackets = 43, nonDnsPackets = 40, hiddenDnsPackets = 0)))
+        assertEquals(HIGH, level(healthy(98).copy(malformedPackets = 42, nonDnsPackets = 40, hiddenDnsPackets = 0)))
+    }
+
+    @Test
+    fun `encrypted or TCP DNS attempts cap at Medium with a fix`() {
+        // The observed phone shape: Private DNS on Automatic, 8 DNS-over-TLS SYNs, 5 IPv6 control packets.
+        val h = healthy(100).copy(malformedPackets = 13, hiddenDnsPackets = 8, nonDnsPackets = 5)
+        val g = ConfidenceGrader.grade(h, events(100))
+        assertEquals(MEDIUM, g.level)
+        assertEquals(
+            "8 packets used encrypted or TCP DNS, which TraceVeil cannot read; turn Private DNS off and re-run",
+            g.reasons.first(),
+        )
+        assertEquals(HIGH, level(h.copy(malformedPackets = 5, hiddenDnsPackets = 0)))
+    }
+
+    @Test
+    fun `an inconsistent breakdown is not trusted down to zero`() {
+        // Parts larger than the total: judge the whole total as unreadable, as older builds did.
+        val g = ConfidenceGrader.grade(healthy(80).copy(malformedPackets = 21, hiddenDnsPackets = 0, nonDnsPackets = 50), events(80))
+        assertEquals(LOW, g.level)
+    }
+
+    @Test
     fun `relay failure share thresholds`() {
         assertEquals(HIGH, level(healthy().copy(dnsRelayFailures = 5)))
         assertEquals(MEDIUM, level(healthy().copy(dnsRelayFailures = 6)))
