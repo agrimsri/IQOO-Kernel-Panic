@@ -129,7 +129,7 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onPermissionResult(granted: Boolean) {
         permissionDenied = !granted
-        recomputeMic()
+        refreshMic()
     }
 
     private fun recomputeMic() {

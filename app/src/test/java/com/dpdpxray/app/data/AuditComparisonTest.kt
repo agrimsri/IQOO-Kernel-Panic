@@ -64,4 +64,13 @@ class AuditComparisonTest {
     @Test fun `a missing saved audit stays unavailable`() {
         assertTrue(AuditComparison.compare(bundle("now", 2000), null) is AuditComparisonResult.Unavailable)
     }
+
+    @Test fun `missed choice cannot masquerade as score improvement`() {
+        val now = bundle("now", 2000, 51).let { b -> b.copy(sessions = b.sessions.map {
+            if (it.plan == AuditPlan.REJECT) it.copy(consentEvents = emptyList()) else it
+        }) }
+        val result = AuditComparison.compare(now, bundle("old", 1000))
+        assertTrue(result is AuditComparisonResult.Unavailable)
+        assertTrue((result as AuditComparisonResult.Unavailable).reason.contains("choice"))
+    }
 }

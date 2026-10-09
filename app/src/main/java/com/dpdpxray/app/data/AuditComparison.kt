@@ -2,6 +2,7 @@ package com.dpdpxray.app.data
 
 import com.dpdpxray.core.model.CheckId
 import com.dpdpxray.core.model.ScoreBand
+import com.dpdpxray.app.audit.AuditPlanCoverage
 
 sealed interface AuditComparisonResult {
     data class Available(val previousId: String, val previousTimeMs: Long, val scoreDelta: Int, val noLongerRecorded: Set<CheckId>, val newlyRecorded: Set<CheckId>) : AuditComparisonResult
@@ -23,6 +24,8 @@ internal object AuditComparison {
             return unavailable("Different packages or sample/live modes cannot be compared automatically.")
         if (old.meta.plans.isEmpty() || old.meta.plans.toSet() != current.meta.plans.toSet())
             return unavailable("The audit plans changed. Run the same plans before comparing scores.")
+        if (AuditPlanCoverage.gaps(old.sessions).isNotEmpty() || AuditPlanCoverage.gaps(current.sessions).isNotEmpty())
+            return unavailable("An intended consent choice was not completed. Repeat the same plans before comparing scores.")
         val before = old.result.score
         val after = current.result.score
         if (before == null || after == null || before !in 0..100 || after !in 0..100 ||

@@ -27,6 +27,8 @@ class ConsentAccessibilityService : AccessibilityService() {
     private val io = Executors.newSingleThreadExecutor()
     private val check = Runnable { checkScreen() }
     private var consentVisible = false
+    private var visibleGeneration = -1L
+    private var pendingScreenGeneration: Long? = null
 
     override fun onServiceConnected() {
         instance = this
@@ -77,11 +79,24 @@ class ConsentAccessibilityService : AccessibilityService() {
     }
 
     private fun checkScreen() {
+        val generation = ConsentBus.generation
+        if (visibleGeneration != generation) {
+            visibleGeneration = generation
+            consentVisible = false
+            pendingScreenGeneration = null
+        }
         val tree = NodeMapper.map(targetRoot()) ?: return
+        ConsentBus.markTargetSeen()
         val isConsent = ConsentLexicon.isConsentScreen(tree.flatten().map { it.label })
         if (isConsent && !ConsentBus.screenSeen) recordScreen(tree)
         if (consentVisible && !isConsent) onConsentGone()
         consentVisible = isConsent
+    }
+
+    /** Bounded orchestrator polling complements event debounce; callers use the main dispatcher. */
+    fun probeNow() {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        checkScreen()
     }
 
     /** Manual mode on toolkits that don't report taps: the dialog went away, so the user made the choice we asked for. */
@@ -92,15 +107,22 @@ class ConsentAccessibilityService : AccessibilityService() {
     }
 
     private fun recordScreen(tree: UiNode) {
+        val generation = ConsentBus.generation
+        if (pendingScreenGeneration == generation || ConsentBus.screenSeen) return
+        pendingScreenGeneration = generation
         val t = SystemClock.elapsedRealtimeNanos()
         val dir = ConsentBus.shotDir
         if (dir == null) {
-            ConsentBus.emit(ConsentEvent(t, ConsentKind.SCREEN_APPEARED, tree = tree))
+            ConsentBus.emitForSession(generation, ConsentEvent(t, ConsentKind.SCREEN_APPEARED, tree = tree))
+            pendingScreenGeneration = null
             return
         }
-        val file = File(dir, "consent_${t}.png")
+        val file = File(dir, "consent_${t}.jpg")
         capture(file) { ok ->
-            ConsentBus.emit(ConsentEvent(t, ConsentKind.SCREEN_APPEARED, screenshotPath = file.absolutePath.takeIf { ok }, tree = tree))
+            main.post {
+                ConsentBus.emitForSession(generation, ConsentEvent(t, ConsentKind.SCREEN_APPEARED, screenshotPath = file.absolutePath.takeIf { ok }, tree = tree))
+                if (pendingScreenGeneration == generation) pendingScreenGeneration = null
+            }
         }
     }
 
@@ -136,13 +158,13 @@ class ConsentAccessibilityService : AccessibilityService() {
 
     /** "Mark consent now": snapshot the audited app's window (not TraceVeil's own screen). */
     suspend fun markNow(): Boolean {
+        val generation = ConsentBus.generation
         val tree = NodeMapper.map(targetRoot()) ?: return false
         val t = SystemClock.elapsedRealtimeNanos()
         val dir = ConsentBus.shotDir ?: return false
         val file = File(dir, "manual_${t}.jpg")
         val ok = suspendCancellableCoroutine { cont -> capture(file) { cont.resume(it) } }
-        ConsentBus.emit(ConsentEvent(t, ConsentKind.MANUAL_MARK, screenshotPath = file.absolutePath.takeIf { ok }, tree = tree))
-        return true
+        return ConsentBus.emitForSession(generation, ConsentEvent(t, ConsentKind.MANUAL_MARK, screenshotPath = file.absolutePath.takeIf { ok }, tree = tree))
     }
 
     /**

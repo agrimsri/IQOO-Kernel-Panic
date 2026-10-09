@@ -29,6 +29,7 @@ class OnDeviceRecognizer(private val context: Context) {
 
     private var recognizer: SpeechRecognizer? = null
     private var packs: SpeechPacks? = null
+    private val supportGate = VoiceAnswerGate()
 
     fun choice(language: CopilotLanguage): SpeechPackChoice =
         SpeechPackPolicy.choose(language, packs, Locale.getDefault().toLanguageTag())
@@ -42,8 +43,11 @@ class OnDeviceRecognizer(private val context: Context) {
     }
 
     fun checkLanguageSupport(language: CopilotLanguage, onResult: (SpeechPacks?) -> Unit) {
+        val request = supportGate.begin()
+        packs = null
         if (Build.VERSION.SDK_INT < 33 || !onDeviceAvailable) return onResult(null)
         checkSupport33(language) { result ->
+            if (!supportGate.isCurrent(request)) return@checkSupport33
             packs = result
             onResult(result)
         }
@@ -98,6 +102,7 @@ class OnDeviceRecognizer(private val context: Context) {
     }
 
     fun release() {
+        supportGate.invalidate()
         runCatching { recognizer?.cancel() }
         runCatching { recognizer?.destroy() }
         recognizer = null

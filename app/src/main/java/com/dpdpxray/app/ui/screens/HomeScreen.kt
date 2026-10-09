@@ -1,6 +1,10 @@
 package com.dpdpxray.app.ui.screens
 
 import android.net.VpnService
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +23,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +67,14 @@ fun HomeScreen(
     val llm by vm.llmStatus.collectAsState()
     var showSampleFixtures by remember { mutableStateOf(false) }
     val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { vm.refreshPreflight() }
+    LaunchedEffect(vm) { vm.refreshPreflight() }
+    DisposableEffect(ctx, vm) {
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) { vm.refreshPreflight() }
+        }
+        ctx.contentResolver.registerContentObserver(Settings.Secure.getUriFor(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES), false, observer)
+        onDispose { ctx.contentResolver.unregisterContentObserver(observer) }
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 28.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -69,7 +83,7 @@ fun HomeScreen(
             TextButton(onClick = onSettings) { Text("Settings", color = Film.boneDim) }
         }
         Text(
-            "Find out what an app sends to trackers before people agree, and how to fix it. Everything runs on this phone.",
+            "Observe an app's DNS lookups around consent choices, understand the evidence, and find practical fixes. Analysis runs on this phone.",
             style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 6.dp),
         )
 
@@ -112,7 +126,7 @@ fun HomeScreen(
         }
 
         Spacer(Modifier.height(24.dp))
-        PrimaryAction("Audit an app", onAudit, enabled = pf.canAudit)
+        PrimaryAction("Audit an app", { if (vm.prepareAudit()) onAudit() })
         if (!pf.canAudit) Note("Allow the VPN and turn on the consent watcher to run a live audit.", Film.warn)
         Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             SecondaryAction("Open sample audit", { vm.openSample(onOpen) }, Modifier.weight(1f))

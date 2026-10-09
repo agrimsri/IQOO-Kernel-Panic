@@ -23,6 +23,7 @@ import com.dpdpxray.app.data.AuditComparisonResult
 import com.dpdpxray.app.data.SampleAudit
 import com.dpdpxray.app.graph
 import com.dpdpxray.app.report.ExportManager
+import com.dpdpxray.app.report.EvidenceReport
 import com.dpdpxray.app.report.PdfExporter
 import com.dpdpxray.app.report.SampleReport
 import com.dpdpxray.core.audit.PhaseAssigner
@@ -95,13 +96,24 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    fun prepareAudit(): Boolean {
+        refreshPreflight()
+        val problem = AuditStartReadiness.problem(_preflight.value)
+        if (problem != null) _toast.value = problem
+        return problem == null
+    }
+
     fun requestShizuku() = ShizukuBridge.requestPermission()
 
     fun loadApps() = viewModelScope.launch {
         _apps.value = withContext(Dispatchers.IO) { DeviceChecks.launchableApps(ctx) }
     }
 
-    fun startAudit(config: AuditConfig) = graph.orchestrator.start(config)
+    fun startAudit(config: AuditConfig): Boolean {
+        if (!prepareAudit()) return false
+        graph.orchestrator.start(config)
+        return true
+    }
     fun cancelAudit() = graph.orchestrator.cancel()
     fun acknowledgeProgress() = graph.orchestrator.acknowledge()
 
@@ -119,7 +131,7 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         val catalog = graph.catalog()
         val result = RulesEngine(catalog).evaluate(sessions)
         val fixes = graph.fixCatalog.fixesFor(result, catalog)
-        val md = SampleReport.annotate(MarkdownReport.build(result, sessions, fixes, graph.citations()), sessions)
+        val md = EvidenceReport.annotate(SampleReport.annotate(MarkdownReport.build(result, sessions, fixes, graph.citations()), sessions), sessions)
         graph.repository.save(
             AuditMeta(id, sessions.first().targetPackage, sessions.first().targetLabel, System.currentTimeMillis(), result.score, result.band,
                 result.findings.size, sessions.map { it.plan.label }, sample = true),
@@ -227,7 +239,7 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     fun resetCamera() { _cameraResult.value = CameraCheckState.Idle }
 
     fun exportPdf(bundle: AuditBundle, share: Boolean) = viewModelScope.launch {
-        val md = withContext(Dispatchers.IO) { graph.repository.markdownFile(bundle.meta.id).readText() }
+        val md = withContext(Dispatchers.IO) { markdown(bundle) }
         val pdf = withContext(Dispatchers.IO) { PdfExporter.render(md, File(bundle.dir, "TraceVeil-${bundle.meta.targetLabel.filter { it.isLetterOrDigit() }}.pdf")) }
         if (share) ExportManager.share(ctx, pdf, "application/pdf")
         else {
@@ -237,12 +249,15 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun saveMarkdown(bundle: AuditBundle) = viewModelScope.launch {
-        val f = graph.repository.markdownFile(bundle.meta.id)
+        val f = withContext(Dispatchers.IO) {
+            File(bundle.dir, "TraceVeil-${bundle.meta.id}-export.md").apply { writeText(markdown(bundle)) }
+        }
         val ok = withContext(Dispatchers.IO) { ExportManager.saveToDownloads(ctx, f, "TraceVeil-${bundle.meta.id}.md", "text/markdown") }
         _toast.value = if (ok) "Markdown saved to Downloads/TraceVeil" else "Could not save the report"
     }
 
-    fun markdown(bundle: AuditBundle): String = graph.repository.markdownFile(bundle.meta.id).takeIf { it.exists() }?.readText().orEmpty()
+    fun markdown(bundle: AuditBundle): String = EvidenceReport.annotate(
+        graph.repository.markdownFile(bundle.meta.id).takeIf { it.exists() }?.readText().orEmpty(), bundle.sessions)
 
     fun copy(label: String, text: String) {
         ExportManager.copy(ctx, label, text)

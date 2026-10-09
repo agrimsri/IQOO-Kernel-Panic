@@ -42,6 +42,24 @@ class GroundedAnswerTest {
 
     private val live = leaky.copy(label = "LeakyShop", sample = false)
 
+    @Test fun `missed refusal is not described as a completed clean refusal test`() {
+        val missed = live.copy(result = AuditResult(emptyList(), 51, ScoreBand.AT_RISK),
+            plans = setOf(AuditPlan.REJECT), completedPlans = emptySet())
+        val a = answerer.answer("What happened after I rejected?", missed, CopilotLanguage.EN)
+        assertTrue(a.text, a.text.contains("C2 not tested"))
+        assertFalse(a.text, a.text.contains("did not run"))
+        assertFalse(a.text, a.text.contains("did not record C2"))
+    }
+
+    @Test fun `score reply qualifies an incomplete choice in both languages`() {
+        val missed = live.copy(result = AuditResult(emptyList(), 51, ScoreBand.AT_RISK),
+            plans = setOf(AuditPlan.REJECT), completedPlans = emptySet())
+        val en = answerer.answer("What is the score?", missed, CopilotLanguage.EN)
+        val hi = answerer.answer(CopilotQuestions.byIntent(CopilotIntent.SCORE).hi, missed, CopilotLanguage.HI)
+        assertTrue(en.text, en.text.contains("C2 not tested"))
+        assertTrue(hi.text, hi.text.contains("C2 की जाँच नहीं हुई"))
+    }
+
     @Test
     fun `children question without C9 cites an s9 passage and never calls the app safe`() {
         val a = answerer.answer("Safe for children?", leaky, CopilotLanguage.EN)
