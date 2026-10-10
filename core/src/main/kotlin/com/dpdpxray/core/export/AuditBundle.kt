@@ -6,6 +6,8 @@ import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.ScoreBand
 import com.dpdpxray.core.quarantine.QuarantineReport
 import com.dpdpxray.core.report.AuditJson
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -106,6 +108,14 @@ data class BundleMeta(
     val timingProfile: String? = null,
     /** Why an inconclusive result has no score (Inconclusive.Reason name); absent in older exports. */
     val inconclusiveReason: String? = null,
+    /**
+     * The audited app's versionName / versionCode at audit start (the sessions' manifest facts hold the same values).
+     * Absent in older exports and when not recorded: unknown, never a version. Written only when present.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val targetVersionName: String? = null,
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val targetVersionCode: Long? = null,
 )
 
 /** The text is not a readable bundle of the expected kind; the message says why in plain words. */

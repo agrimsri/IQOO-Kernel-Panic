@@ -126,7 +126,7 @@ class MainActivity : ComponentActivity() {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
         }
         lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.RESUMED) { vm.refreshPreflight() }
+            repeatOnLifecycle(Lifecycle.State.RESUMED) { vm.refreshPreflight(); vm.refreshUpdates() }
         }
         if (savedInstanceState == null) AssistantEntry.featureFrom(intent)?.let { assistantFeatures.trySend(it) }
         addOnNewIntentListener { AssistantEntry.featureFrom(it)?.let { f -> assistantFeatures.trySend(f) } }
@@ -235,10 +235,11 @@ class MainActivity : ComponentActivity() {
                                 onAllReports = { nav.openTab(AppTab.REPORTS) },
                                 onAutomation = { nav.navigate("settings") },
                                 onTrust = { nav.navigate(TrustRoutes.ROUTE) },
+                                onRecheck = { nav.navigate(ApkGuardRoutes.recheckPicker(it)) },
                             )
                         }
                         composable(AppTabs.REPORTS) {
-                            ReportsScreen(vm, onOpen = { nav.navigate("results/$it") })
+                            ReportsScreen(vm, onOpen = { nav.navigate("results/$it") }, onRecheck = { nav.navigate(ApkGuardRoutes.recheckPicker(it)) })
                         }
                         composable(AppTabs.MORE) {
                             MoreScreen(
@@ -253,11 +254,18 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         trustDestination(nav)
-                        composable("pick?q={q}", arguments = listOf(navArgument("q") { type = NavType.StringType; defaultValue = "" })) { e ->
+                        composable(
+                            "pick?q={q}&select={select}",
+                            arguments = listOf(
+                                navArgument("q") { type = NavType.StringType; defaultValue = "" },
+                                navArgument("select") { type = NavType.StringType; defaultValue = "" },
+                            ),
+                        ) { e ->
                             AppPickerScreen(
                                 vm, onBack = { nav.popBackStack() }, onStarted = { nav.navigate("live") { popUpTo("home") } },
                                 initialQuery = e.arguments?.getString("q").orEmpty(),
                                 onQuarantine = { nav.navigateToQuarantine(it) },
+                                preselect = e.arguments?.getString("select").orEmpty().takeIf { ApkGuardRoutes.isPackageName(it) }.orEmpty(),
                             )
                         }
                         composable(QuarantineRoutes.ROUTE) { e ->

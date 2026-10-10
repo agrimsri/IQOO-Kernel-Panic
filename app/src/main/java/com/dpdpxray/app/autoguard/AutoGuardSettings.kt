@@ -30,6 +30,7 @@ import com.dpdpxray.app.ui.components.Tag
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.components.SwitchRow
+import com.dpdpxray.app.ui.guide.guideLang
 import com.dpdpxray.app.ui.theme.Film
 import java.time.Instant
 import java.time.ZoneId
@@ -73,6 +74,14 @@ fun AutoGuardSettingsCard(onCheckup: (() -> Unit)?, modifier: Modifier = Modifie
                     Modifier.weight(1f),
                 )
             }
+            // Update Watch rides on the same job and live receiver, so it is offered only while that check is on.
+            val lang = guideLang()
+            SwitchRow(
+                UpdateWatchCopy.switchTitle.pick(lang),
+                UpdateWatchCopy.switchDetail.pick(lang),
+                s.alertCheckedAppUpdates,
+                { v -> store.update { it.copy(alertCheckedAppUpdates = v) } },
+            )
         }
         Hairline()
         SwitchRow(

@@ -63,6 +63,7 @@ import com.dpdpxray.app.audit.AuditPlanCoverage
 import com.dpdpxray.app.audit.AuditTimingPolicy
 import com.dpdpxray.app.data.AuditNetworkReadings
 import com.dpdpxray.app.data.AuditComparisonResult
+import com.dpdpxray.app.data.UpdateDiffWording
 import com.dpdpxray.app.data.LensChoice
 import com.dpdpxray.app.netproof.NetworkProofCard
 import com.dpdpxray.app.ui.XrayViewModel
@@ -163,6 +164,8 @@ fun ResultsScreen(
                 val lensSettings by vm.settings.collectAsState()
                 val choice = remember(lensSettings.legalProfile) { vm.lensChoice(lensSettings.legalProfile) }
                 val view = remember(b.meta.id, choice.profile) { vm.legal.view(r, choice.profile) }
+                // Before / after (and Update Watch's version change) is read once and shared by the banner and the card.
+                val beforeAfter by produceState<XrayViewModel.BeforeAfter?>(null, b.meta.id) { value = vm.beforeAfter(b) }
                 ScorePanel(b, grade, view, choice, Modifier.reveal(0))
                 FoldText(
                     headline(r.findings), Modifier.padding(top = 16.dp).reveal(1),
@@ -176,6 +179,11 @@ fun ResultsScreen(
                         gaps.forEach { Callout(it, fold = true) }
                         freshHint?.let { Callout(it, fold = true) }
                     }
+                }
+
+                // Update Watch: this check is of a different version than the previous one; the full diff is below.
+                beforeAfter?.update?.let { u ->
+                    Callout(UpdateDiffWording.banner(u, beforeAfter?.comparison), Modifier.padding(top = 12.dp), color = Film.scan, glyph = Glyph.RESET)
                 }
 
                 val fixCount = vm.fixesFor(b).size
@@ -243,21 +251,34 @@ fun ResultsScreen(
                     }
 
 
-                    val comparison by produceState<AuditComparisonResult?>(null, b.meta.id) { value = vm.previousComparison(b) }
-                    val change = comparison
+                    val change = beforeAfter?.comparison
+                    val update = beforeAfter?.update
+                    // Update Watch: across an app update the card opens by itself and lists what changed between the two
+                    // checks. Keyed so it opens once the comparison (read from disk) arrives.
+                    androidx.compose.runtime.key(update != null) {
                     CollapsibleCard(
                         "Before / after",
-                        summary = when (change) {
-                            null -> "Checking earlier saved audits…"
-                            is AuditComparisonResult.Unavailable -> change.reason
-                            is AuditComparisonResult.Available -> "${if (change.scoreDelta > 0) "+${change.scoreDelta}" else change.scoreDelta.toString()} points since the previous audit"
+                        summary = when {
+                            change == null -> "Checking earlier saved audits…"
+                            update != null && change is AuditComparisonResult.Available -> UpdateDiffWording.summary(update, change)
+                            update != null && change is AuditComparisonResult.Unavailable -> "${UpdateDiffWording.title(update)} · ${change.reason}"
+                            change is AuditComparisonResult.Unavailable -> change.reason
+                            change is AuditComparisonResult.Available -> "${if (change.scoreDelta > 0) "+${change.scoreDelta}" else change.scoreDelta.toString()} points since the previous audit"
+                            else -> ""
                         },
                         glyph = Glyph.RESET,
+                        initiallyOpen = update != null,
                     ) {
-                        when (change) {
-                            null -> SkeletonLines(2, label = "Checking earlier saved audits")
-                            is AuditComparisonResult.Unavailable -> Note(change.reason)
-                            is AuditComparisonResult.Available -> {
+                        when {
+                            change == null -> SkeletonLines(2, label = "Checking earlier saved audits")
+                            update != null && change is AuditComparisonResult.Available -> UpdateDiff(update, change, b.meta.targetLabel, vm)
+                            update != null && change is AuditComparisonResult.Unavailable -> {
+                                Text(UpdateDiffWording.title(update), style = MaterialTheme.typography.titleMedium)
+                                Note(change.reason)
+                                beforeAfter?.previousTimeMs?.let { Note(UpdateDiffWording.honest(update, it)) }
+                            }
+                            change is AuditComparisonResult.Unavailable -> Note(change.reason)
+                            change is AuditComparisonResult.Available -> {
                                 val delta = if (change.scoreDelta > 0) "+${change.scoreDelta}" else change.scoreDelta.toString()
                                 Text("$delta points since the previous audit", style = MaterialTheme.typography.titleMedium)
                                 Note("Same package and audit plans. Previous audit: ${java.time.Instant.ofEpochMilli(change.previousTimeMs).atZone(java.time.ZoneId.systemDefault())}.")
@@ -267,6 +288,7 @@ fun ResultsScreen(
                                 KeyCaveat("Capture coverage can differ. A finding not repeated is not proof it was fixed or that the app is safe.")
                             }
                         }
+                    }
                     }
 
                     CollapsibleCard(

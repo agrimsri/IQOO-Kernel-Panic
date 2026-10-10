@@ -48,7 +48,8 @@ import kotlin.concurrent.thread
  * LeakyShop is the demo "victim" app for TraceVeil.
  * It does NOT contain real tracker SDKs and sends no data: it performs the same DNS lookups those SDKs make when they
  * initialise, which is exactly the evidence TraceVeil captures. The `leaky` flavor behaves like a typical non-compliant app;
- * the `fixed` flavor shows the DPDP-compliant pattern.
+ * the `fixed` flavor shows the DPDP-compliant pattern; `leakyV11` is version 1.1 of the leaky app, a partial fix (see the
+ * behaviour flags in build.gradle.kts).
  */
 object SdkSimulator {
     const val FIREBASE_ANALYTICS = "app-measurement.com"
@@ -75,7 +76,7 @@ class ShopApp : Application() {
     override fun onCreate() {
         super.onCreate()
         SdkSimulator.touch(SdkSimulator.OWN_API)
-        if (!BuildConfig.COMPLIANT) {
+        if (BuildConfig.TRACKERS_AT_LAUNCH) {
             // The classic mistake: SDKs auto-initialise in Application.onCreate, before any consent.
             SdkSimulator.touch(SdkSimulator.FIREBASE_ANALYTICS, SdkSimulator.FACEBOOK, SdkSimulator.CRASHLYTICS, SdkSimulator.APPSFLYER)
         } else if (Consent.accepted(this)) {
@@ -101,7 +102,7 @@ class ShopActivity : ComponentActivity() {
     @Composable
     private fun LeakyConsent(onDone: () -> Unit) {
         var manage by remember { mutableStateOf(false) }
-        var share by remember { mutableStateOf(true) } // pre-ticked: a dark pattern
+        var share by remember { mutableStateOf(BuildConfig.PRE_TICKED) } // pre-ticked: a dark pattern
         if (!manage) {
             AlertDialog(
                 onDismissRequest = {},
@@ -123,6 +124,10 @@ class ShopActivity : ComponentActivity() {
                         onDone()
                     }) { Text("Accept & Continue") }
                 },
+                // 1.1 adds a visible Reject on the first screen. Refusing here stores the choice and contacts no tracker.
+                dismissButton = if (BuildConfig.REJECT_ON_FIRST_SCREEN) {
+                    { OutlinedButton(onClick = { Consent.save(this, false); onDone() }) { Text("Reject") } }
+                } else null,
             )
         } else {
             AlertDialog(
@@ -133,8 +138,10 @@ class ShopActivity : ComponentActivity() {
                 dismissButton = {
                     TextButton(onClick = {
                         Consent.save(this, false)
-                        // The bug TraceVeil catches: refusal is stored but the SDKs keep running.
-                        SdkSimulator.touch(SdkSimulator.FACEBOOK, SdkSimulator.FIREBASE_ANALYTICS, SdkSimulator.APPSFLYER)
+                        // The bug TraceVeil catches: refusal is stored but the SDKs keep running (fixed in 1.1).
+                        if (BuildConfig.TRACKERS_AFTER_REJECT) {
+                            SdkSimulator.touch(SdkSimulator.FACEBOOK, SdkSimulator.FIREBASE_ANALYTICS, SdkSimulator.APPSFLYER)
+                        }
                         onDone()
                     }) { Text("Reject all", fontSize = 12.sp) }
                 },

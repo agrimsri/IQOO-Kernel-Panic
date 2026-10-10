@@ -112,12 +112,15 @@ fun HomeScreen(
     onAutomation: (() -> Unit)? = null,
     /** Opens "Why you can trust TraceVeil"; null hides the trust card. */
     onTrust: (() -> Unit)? = null,
+    /** Update Watch "Re-check": opens the check flow with this package selected. */
+    onRecheck: (String) -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val pf by vm.preflight.collectAsState()
     val audits by vm.audits.collectAsState()
     val llm by vm.llmStatus.collectAsState()
     val progress by vm.progress.collectAsState()
+    val updated by vm.updatedApps.collectAsState()
     var showSampleFixtures by remember { mutableStateOf(false) }
     val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { vm.refreshPreflight() }
     LaunchedEffect(vm) { vm.refreshPreflight() }
@@ -170,6 +173,11 @@ fun HomeScreen(
         if (todo.isEmpty()) {
             Spacer(Modifier.height(12.dp))
             Box(Modifier.reveal(3)) { ReadyPanel(items, aiLine, fix, onLab) }
+        }
+
+        if (updated.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            UpdatedSinceCard(updated, onRecheck, Modifier.reveal(3))
         }
 
         if (onTrust != null) {

@@ -36,6 +36,15 @@ object ApkGuardRoutes {
     }
 
     /**
+     * The audit picker searched for [pkg] with that app selected, so its check sheet opens at once (Update Watch
+     * "Re-check"). Nothing starts by itself: the person still taps Start.
+     */
+    fun recheckPicker(pkg: String): String {
+        require(isPackageName(pkg)) { "A valid package name is required" }
+        return "$AUDIT_PICKER?q=$pkg&select=$pkg"
+    }
+
+    /**
      * A quarantine run is offered for an installed app only (a not-installed APK file has nothing to run), and never
      * for TraceVeil itself.
      */

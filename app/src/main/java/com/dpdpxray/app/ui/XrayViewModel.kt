@@ -75,6 +75,25 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     val liveNet = CaptureBus.events
     val liveConsent = ConsentBus.events
 
+    private val _updatedApps = MutableStateFlow<List<com.dpdpxray.core.update.UpdatedApp>>(emptyList())
+
+    /** Update Watch: checked apps whose installed version differs from their latest check (empty until read). */
+    val updatedApps: StateFlow<List<com.dpdpxray.core.update.UpdatedApp>> = _updatedApps.asStateFlow()
+
+    /** Re-reads the installed versions of checked apps (on this phone, read-only). */
+    fun refreshUpdates() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { com.dpdpxray.app.autoguard.UpdateWatchSource.updates(ctx) }.onSuccess { _updatedApps.value = it }
+        }
+    }
+
+    init {
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(audits, com.dpdpxray.app.autoguard.UpdateWatchSource.changes) { a, c -> a.map { it.id } to c }
+                .collect { refreshUpdates() }
+        }
+    }
+
     private val _preflight = MutableStateFlow(Preflight(false, false, false, false, false, false, false))
     val preflight = _preflight.asStateFlow()
 
@@ -244,10 +263,26 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
             EvidenceReport.annotate(if (meta.sample) SampleReport.annotate(built, sessions) else built, sessions, meta.timingProfile, sample = meta.sample)
         }.getOrDefault("")
 
-    suspend fun previousComparison(bundle: AuditBundle): AuditComparisonResult {
+    suspend fun previousComparison(bundle: AuditBundle): AuditComparisonResult = beforeAfter(bundle).comparison
+
+    /** The "Before / after" card: the comparison with the previous audit, and the version update between them if any. */
+    data class BeforeAfter(val comparison: AuditComparisonResult, val update: com.dpdpxray.app.data.VersionUpdate?, val previousTimeMs: Long?)
+
+    suspend fun beforeAfter(bundle: AuditBundle): BeforeAfter {
         val previousId = AuditComparison.previousId(bundle.meta, audits.value)
         val previous = previousId?.let { graph.repository.load(it) }
-        return AuditComparison.compare(bundle, previous)
+        return BeforeAfter(AuditComparison.compare(bundle, previous), AuditComparison.update(bundle, previous), previous?.meta?.createdAtMs)
+    }
+
+    /** Opens Android's share sheet with [text]; never sends anything by itself. */
+    fun shareText(subject: String, text: String) {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        runCatching { ctx.startActivity(Intent.createChooser(send, subject).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .onFailure { _toast.value = "No sharing app is available." }
     }
 
     private val citationCache = java.util.concurrent.ConcurrentHashMap<String, List<Passage>>()
