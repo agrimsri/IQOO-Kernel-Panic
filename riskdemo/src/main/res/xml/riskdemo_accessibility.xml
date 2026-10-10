@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Declared only so APK Guard's static check can see an accessibility service, as fake challan APKs have.
+  It subscribes to no event types (so Android delivers none), is limited to this app's own package,
+  cannot read window content and asks for no gestures or key events. It is never switched on by the app.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/accessibility_description"
+    android:packageNames="com.traceveil.riskdemo"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="0"
+    android:canRetrieveWindowContent="false" />
