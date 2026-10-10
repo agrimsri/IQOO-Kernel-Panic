@@ -37,8 +37,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.ai.BackendKind
-import com.dpdpxray.app.ai.DiagnosticRow
-import com.dpdpxray.app.ai.LlmOutcome
+import com.dpdpxray.app.ai.AnswerCheckReport
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.ai.ModelFiles
 import com.dpdpxray.app.ui.CameraCheckState
@@ -86,7 +85,7 @@ fun AiLabScreen(vm: XrayViewModel, onBack: () -> Unit) {
             TextButton(onClick = { vm.unloadModel() }) { Text("Unload to free memory", color = Film.boneDim) }
 
             SectionTitle("Speed on this phone")
-            Note("Runs LiteRT-LM's built-in benchmark on each processor. NPU needs a Qualcomm-compiled bundle in the models folder.")
+            Note("Runs LiteRT-LM's built-in benchmark on each processor. NPU needs a bundle compiled for this phone's chip (its file name must name it, e.g. sm8850); the GPU model is never used in its place.")
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BackendKind.entries.forEach { k ->
                     SecondaryAction(if (running == k) "Running…" else k.name, { vm.runBench(k) }, Modifier.weight(1f), enabled = running == null)
@@ -106,11 +105,11 @@ fun AiLabScreen(vm: XrayViewModel, onBack: () -> Unit) {
             if (!headroom.isNaN()) Note(String.format(Locale.US, "Thermal headroom: %.2f (1.0 means the phone is about to throttle)", headroom))
 
             SectionTitle("Answer check")
-            Note("Sends one fixed test prompt (no audit data) under each setting and shows what the model returned, to find why answers come back empty.")
+            Note("Sends fixed test prompts (no audit data) with the app's current settings and with the old ones, shows what came back, and says which setting breaks answers on this phone. Thinking text is never shown.")
             val lastProblem by vm.graph.llm.lastProblem.collectAsState()
             lastProblem?.let { Note("Last problem: $it", Film.high) }
             val scope = rememberCoroutineScope()
-            var diag by remember { mutableStateOf<List<DiagnosticRow>?>(null) }
+            var diag by remember { mutableStateOf<AnswerCheckReport?>(null) }
             var diagRunning by remember { mutableStateOf(false) }
             SecondaryAction(
                 if (diagRunning) "Checking…" else "Run answer check",
@@ -118,12 +117,16 @@ fun AiLabScreen(vm: XrayViewModel, onBack: () -> Unit) {
                 Modifier.fillMaxWidth().padding(top = 8.dp), enabled = !diagRunning && status is LlmStatus.Ready,
             )
             if (status !is LlmStatus.Ready) Note("Load the model first.")
-            diag?.forEach { r ->
-                Spacer(Modifier.height(8.dp))
-                RuleRow(if (r.outcome is LlmOutcome.Text) Film.clear else Film.leak) {
-                    Text(r.label, style = MaterialTheme.typography.titleMedium)
-                    Text("${r.outcome.describe()} · ${r.ms} ms", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+            diag?.let { report ->
+                report.conclusions.forEach { Note(it, Film.scan) }
+                report.rows.forEach { r ->
+                    Spacer(Modifier.height(8.dp))
+                    RuleRow(if (r.ok) Film.clear else Film.leak) {
+                        Text(r.label, style = MaterialTheme.typography.titleMedium)
+                        Text(r.summary, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                    }
                 }
+                if (report.modelInfo.isNotBlank()) CodeBlock(report.modelInfo, Modifier.padding(top = 8.dp))
             }
 
             SectionTitle("Legal search")
