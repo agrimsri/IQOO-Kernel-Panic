@@ -63,9 +63,12 @@ class AuditRepository(private val context: Context) {
         refresh()
     }
 
-    suspend fun load(id: String): AuditBundle? = withContext(Dispatchers.IO) {
+    suspend fun load(id: String): AuditBundle? = withContext(Dispatchers.IO) { loadNow(id) }
+
+    /** Blocking [load], for callers already on an IO thread (the backup writer reads one audit at a time). */
+    fun loadNow(id: String): AuditBundle? {
         val dir = File(root, id)
-        runCatching {
+        return runCatching {
             AuditBundle(
                 meta = AuditJson.json.decodeFromString(AuditMeta.serializer(), File(dir, META).readText()),
                 sessions = AuditJson.decodeSessions(File(dir, SESSIONS).readText()),

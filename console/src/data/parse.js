@@ -2,8 +2,11 @@
 //   traceveil.audit.v1       { schema, exportedAt, app{package,label}, meta, sessions[], result{findings[],score,band}, networkReadings, tool }
 //   traceveil.quarantine.v1  { schema, exportedAt, report{...core QuarantineReport...} }
 //   traceveil.console-backup.v1 (this console's own "Download all data" file)
+//   traceveil.backup.v1      the phone's "Back up my checks" file: each item of "audits" is a traceveil.audit.v1 bundle.
+//                            Its sha256 is checked by the phone on restore, not here; each audit gets the same checks as
+//                            a single export.
 // A bare QuarantineReport (the phone's saved report JSON) is accepted too. Unknown fields are kept and ignored.
-import { AUDIT_SCHEMA, QUARANTINE_SCHEMA, BACKUP_SCHEMA, PLAN } from "./model";
+import { AUDIT_SCHEMA, QUARANTINE_SCHEMA, BACKUP_SCHEMA, PHONE_BACKUP_SCHEMA, PLAN } from "./model";
 
 export class ImportError extends Error {}
 
@@ -25,13 +28,14 @@ export function parseExportText(text, fileName = "file") {
   if (schema === BACKUP_SCHEMA) {
     return [...arr(data.audits).map((b) => auditRecord(b, fileName, importedAt)), ...arr(data.quarantine).map((b) => quarantineRecord(b, fileName, importedAt))];
   }
+  if (schema === PHONE_BACKUP_SCHEMA) return arr(data.audits).map((b) => auditRecord(b, fileName, importedAt));
   if (schema === AUDIT_SCHEMA) return [auditRecord(data, fileName, importedAt)];
   if (schema === QUARANTINE_SCHEMA) return [quarantineRecord(data, fileName, importedAt)];
   if (!schema && isObj(data.observations) && typeof data.targetPackage === "string") {
     return [quarantineRecord({ schema: QUARANTINE_SCHEMA, exportedAt: null, report: data, rawReport: true }, fileName, importedAt)];
   }
   if (schema && schema.startsWith("traceveil.")) {
-    throw new ImportError(`${fileName}: schema "${schema}" is not supported by this console version (it reads ${AUDIT_SCHEMA} and ${QUARANTINE_SCHEMA}).`);
+    throw new ImportError(`${fileName}: schema "${schema}" is not supported by this console version (it reads ${AUDIT_SCHEMA}, ${QUARANTINE_SCHEMA} and ${PHONE_BACKUP_SCHEMA}).`);
   }
   throw new ImportError(`${fileName}: not a TraceVeil export. Export an audit or quarantine report from the TraceVeil app and drop that file here.`);
 }

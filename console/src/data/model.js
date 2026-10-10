@@ -9,6 +9,8 @@ import lensPassages from "@core-resources/law/passages.json";
 export const AUDIT_SCHEMA = "traceveil.audit.v1";
 export const QUARANTINE_SCHEMA = "traceveil.quarantine.v1";
 export const BACKUP_SCHEMA = "traceveil.console-backup.v1";
+/** The phone's "Back up my checks" file: { schema, createdAt, appVersion, audits: [traceveil.audit.v1 ...], sha256 }. */
+export const PHONE_BACKUP_SCHEMA = "traceveil.backup.v1";
 export const POLICY_SCHEMA = "traceveil.policy.v1";
 
 export const PLAN = {

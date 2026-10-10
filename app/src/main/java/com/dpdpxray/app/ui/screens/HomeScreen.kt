@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.control.DeviceChecks
+import com.dpdpxray.app.trust.HomeTrustCard
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.FoldText
 import com.dpdpxray.app.ui.components.GroupHeader
@@ -83,6 +84,7 @@ import com.dpdpxray.app.ui.guide.SetupItem
 import com.dpdpxray.app.ui.guide.SetupKind
 import com.dpdpxray.app.ui.guide.SetupNeed
 import com.dpdpxray.app.ui.guide.SetupSteps
+import com.dpdpxray.app.ui.guide.guideLang
 import com.dpdpxray.app.ui.modes.ModeGlyph
 import com.dpdpxray.app.ui.modes.ModeGlyphIcon
 import com.dpdpxray.app.ui.theme.Brand
@@ -108,6 +110,8 @@ fun HomeScreen(
     onAllReports: () -> Unit = {},
     /** Opens Settings, where developer automation (laptop and CI runs) lives; null hides the card. */
     onAutomation: (() -> Unit)? = null,
+    /** Opens "Why you can trust TraceVeil"; null hides the trust card. */
+    onTrust: (() -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
     val pf by vm.preflight.collectAsState()
@@ -166,6 +170,11 @@ fun HomeScreen(
         if (todo.isEmpty()) {
             Spacer(Modifier.height(12.dp))
             Box(Modifier.reveal(3)) { ReadyPanel(items, aiLine, fix, onLab) }
+        }
+
+        if (onTrust != null) {
+            Spacer(Modifier.height(12.dp))
+            HomeTrustCard(guideLang(), onTrust, Modifier.reveal(3))
         }
 
         val latest = audits.firstOrNull()

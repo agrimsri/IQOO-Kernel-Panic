@@ -455,6 +455,7 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit, onCheckup: (() -> Unit
                     detail = "Speech recognition and answers still stay on this phone.",
                 )
             }
+            BackupRestoreCard(vm, Modifier.reveal(8))
             SectionCard(Modifier.reveal(8), title = "Not legal advice", glyph = Glyph.BOOK, accent = Film.warn) {
                 FoldText("Results are an automated technical assessment. Legal passages come from the selected legal lens (India's DPDP Act 2023 and Rules 2025, the EU GDPR and ePrivacy Directive, UK GDPR and PECR, California's CCPA, US COPPA, Brazil's LGPD or Singapore's PDPA) and are context, not a verdict.")
             }

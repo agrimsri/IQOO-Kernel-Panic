@@ -25,6 +25,9 @@ data class FixTemplate(
 class FixCatalog(private val templates: List<FixTemplate>) {
     private val byId = templates.associateBy { it.id }
 
+    /** The template with this id (an `sdkKey` or a UI fix id), or null. */
+    fun template(id: String): FixTemplate? = byId[id]
+
     fun fixesFor(result: AuditResult, catalog: TrackerCatalog): List<FixTemplate> {
         val sdkFixes = result.findings
             .filter { f -> SDK_CHECKS.contains(f.checkId) }

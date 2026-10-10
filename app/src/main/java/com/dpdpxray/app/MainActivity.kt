@@ -234,6 +234,7 @@ class MainActivity : ComponentActivity() {
                                 onLive = { nav.navigate("live") },
                                 onAllReports = { nav.openTab(AppTab.REPORTS) },
                                 onAutomation = { nav.navigate("settings") },
+                                onTrust = { nav.navigate(TrustRoutes.ROUTE) },
                             )
                         }
                         composable(AppTabs.REPORTS) {

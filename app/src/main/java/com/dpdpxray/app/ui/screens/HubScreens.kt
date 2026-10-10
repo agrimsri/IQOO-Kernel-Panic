@@ -97,6 +97,8 @@ fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit) {
                 )
             }
             itemsIndexed(audits, key = { _, a -> a.id }) { i, a -> RecentCheckCard(a, Modifier.reveal(1 + i).animateItem()) { onOpen(a.id) } }
+            // Back up / restore: also reachable on a new phone, when the list above is still empty.
+            item(key = "backup") { BackupRestoreCard(vm, Modifier.padding(top = 14.dp)) }
         }
     }
 }

@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.data.AuditBundle
+import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.audit.AuditPlanCoverage
 import com.dpdpxray.app.audit.AuditTimingPolicy
 import com.dpdpxray.app.data.AuditNetworkReadings
@@ -109,6 +110,7 @@ import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
 import com.dpdpxray.app.ui.theme.bandColor
 import com.dpdpxray.app.ui.theme.severityColor
+import com.dpdpxray.core.attribution.SdkAttribution
 import com.dpdpxray.core.law.LawRelation
 import com.dpdpxray.core.law.LegalLens
 import com.dpdpxray.core.law.LegalProfile
@@ -199,6 +201,15 @@ fun ResultsScreen(
                 if (r.findings.isEmpty()) EmptyHint("No consent problems in the captured evidence.", glyph = Glyph.CHECK, color = Film.clear)
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     r.findings.forEachIndexed { i, f -> FindingRow(f, ResultSources.of(f, b.sessions), view, Modifier.reveal(5 + i)) { onFinding(f.checkId) } }
+                }
+                // "Which SDK caused this?": the full card in developer mode, one calm line in everyday mode.
+                val sdkGroups = remember(b.meta.id, lensSettings.firstPartyDomains) { vm.sdkGroups(b) }
+                if (lensSettings.audience == Audience.DEVELOPER) {
+                    SdkAttributionCard(vm, b, sdkGroups, Modifier.padding(top = 12.dp))
+                } else {
+                    SdkAttribution.headline(sdkGroups, byCompany = true)?.let {
+                        Text(it, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 10.dp))
+                    }
                 }
 
                 GroupHeader("Evidence and limits")
