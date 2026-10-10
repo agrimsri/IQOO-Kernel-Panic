@@ -113,11 +113,33 @@ Settings you use often can live in `traceveil.toml` (`python3 -m traceveil init`
   "findings": [
     { "check": "C1", "severity": "HIGH", "title": "Trackers contacted before consent", "confidence": 1.0 }
   ],
-  "sessions": [ { "plan": "REJECT", "netEvents": 12, "consentChoice": "REJECT", "notes": [] } ]
+  "sessions": [ { "plan": "REJECT", "netEvents": 12, "consentChoice": "REJECT", "notes": [] } ],
+  "observedTrackers": [ { "entity": "AppsFlyer", "category": "ATTRIBUTION", "lookups": 4, "phases": ["AFTER_REJECT", "BEFORE_CONSENT"] } ]
 }
 ```
 
 `score` is `null` (never 0) when the result is inconclusive. The report is a technical assessment, not legal advice.
+`observedTrackers` lists every catalogue tracker the app looked up, by consent phase (debug APKs built from this version on; older reports do not have it).
+
+## 3a. SDK inventory: "SDK found in APK" vs "tracker observed live"
+
+Lists the tracking SDKs bundled in an APK (from the class names in its `classes*.dex`) and compares them with what an audit actually saw. No phone is needed unless you pass `--package`.
+
+```bash
+traceveil sdks --apk app/build/outputs/apk/debug/app-debug.apk                                   # static only
+traceveil sdks --apk app-debug.apk --report .traceveil/reports/<request_id>.json                  # compare with an audit
+traceveil sdks --apk app-debug.apk --report <request_id> --package com.example.app --fail-on-consent   # + permissions, CI gate
+```
+
+| Group | Meaning | Evidence |
+|---|---|---|
+| `in APK + live` | SDK code is bundled and its hosts were looked up | Observed |
+| `in APK only` | SDK code is bundled, no lookup in this audit | Not established (may be dormant, consent-gated, or not triggered) |
+| `live only` | Tracker hosts looked up, but no bundled SDK matched | Inferred (WebView, custom HTTP code, renamed/obfuscated SDK) |
+
+Each row gets next steps: gate the SDK on consent if it was looked up before consent or after Reject; remove it if unused; and, for ad SDKs in an app that requests location (from `--package`), review the SDK's location defaults.
+`--fail-on-consent` exits 1 when a bundled SDK was looked up before consent or after Reject. `--json` / `--out` give the JSON inventory.
+The signature list (`src/traceveil/data/sdk_signatures.json`) is hand-written from public package names and covers the tracker catalogue's entities. Obfuscated or unlisted SDKs are not recognised; bundled code does not prove it ran; a lookup does not prove what data was sent.
 
 ## 4. Exit codes (for scripts and CI)
 

@@ -67,7 +67,7 @@ class DebugAuditReceiver : BroadcastReceiver() {
                         if (bundle == null) {
                             store.write(request.requestId, CliAuditReport.STATUS_FILE, CliAuditReport.status(request.requestId, "failed", auditId = end.auditId, error = "saved audit could not be read"))
                         } else {
-                            store.write(request.requestId, CliAuditReport.REPORT_FILE, CliAuditReport.build(request.requestId, bundle))
+                            store.write(request.requestId, CliAuditReport.REPORT_FILE, CliAuditReport.build(request.requestId, bundle, g.catalog()))
                             store.write(request.requestId, CliAuditReport.STATUS_FILE, CliAuditReport.status(request.requestId, "done", auditId = end.auditId))
                         }
                     }

@@ -13,6 +13,10 @@ import com.dpdpxray.core.model.PenaltyBand
 import com.dpdpxray.core.model.ScoreBand
 import com.dpdpxray.core.model.Severity
 import com.dpdpxray.core.model.CheckId
+import com.dpdpxray.core.model.Category
+import com.dpdpxray.core.model.NetEvent
+import com.dpdpxray.core.trackers.TrackerCatalog
+import com.dpdpxray.core.trackers.TrackerEntry
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -83,6 +87,23 @@ class CliAuditTest {
         assertEquals("C1", f["check"]!!.jsonPrimitive.content)
         assertEquals("HIGH", f["severity"]!!.jsonPrimitive.content)
         assertEquals("REJECT", obj["sessions"]!!.jsonArray.single().jsonObject["consentChoice"]!!.jsonPrimitive.content)
+    }
+
+    @Test fun `observed trackers list every catalogue entity looked up, by phase, only when a catalogue is given`() {
+        val catalog = TrackerCatalog(listOf(TrackerEntry("AppsFlyer", Category.ATTRIBUTION, listOf("appsflyer.com"))))
+        val b = bundle(21).let { b ->
+            b.copy(sessions = b.sessions.map { s ->
+                s.copy(netEvents = listOf(NetEvent(0, "t.appsflyer.com"), NetEvent(5, "api.x.example"), NetEvent(6, "launches.appsflyer.com")))
+            })
+        }
+        assertFalse("observedTrackers" in Json.parseToJsonElement(CliAuditReport.build("r1", b)).jsonObject)
+        val obj = Json.parseToJsonElement(CliAuditReport.build("r1", b, catalog)).jsonObject
+        assertEquals("observedTrackers", obj.keys.last())
+        val t = obj["observedTrackers"]!!.jsonArray.single().jsonObject
+        assertEquals("AppsFlyer", t["entity"]!!.jsonPrimitive.content)
+        assertEquals("ATTRIBUTION", t["category"]!!.jsonPrimitive.content)
+        assertEquals(2, t["lookups"]!!.jsonPrimitive.int)
+        assertEquals(listOf("AFTER_REJECT", "BEFORE_CONSENT"), t["phases"]!!.jsonArray.map { it.jsonPrimitive.content })
     }
 
     @Test fun `unknown score stays null and is never turned into zero`() {

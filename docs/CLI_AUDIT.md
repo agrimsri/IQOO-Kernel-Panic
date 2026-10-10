@@ -17,7 +17,7 @@ Defaults are conservative: you tap Accept/Reject yourself, and app data is **not
 
 1. The CLI sends `am broadcast -a com.dpdpxray.app.debug.RUN_AUDIT -n com.dpdpxray.app/.cli.DebugAuditReceiver --es request_id ... --es package ...`.
 2. `DebugAuditReceiver` (in `app/src/debug/` only, declared in the debug manifest, `android:permission="android.permission.DUMP"` so only the adb shell can call it) validates the request and starts the existing `AuditOrchestrator`. Release builds contain neither the class nor the manifest entry (checked in the merged release manifest and by `CliAuditTest`).
-3. Progress goes to `<external files>/reports/<request_id>/status.json` (`accepted|running|done|failed`); on success `report.json` is written there atomically. On a phone: `/sdcard/Android/data/com.dpdpxray.app/files/reports/<request_id>/`.
+3. Progress goes to `<external files>/reports/<request_id>/status.json` (`accepted|running|done|failed`); on success `report.json` is written there atomically. Its last key, `observedTrackers`, lists every catalogue entity the app looked up (lookups and consent phases); `traceveil sdks` compares it with the SDKs bundled in the APK. On a phone: `/sdcard/Android/data/com.dpdpxray.app/files/reports/<request_id>/`.
 4. The CLI polls `status.json`, reads `report.json`, validates it (`schemaVersion` 1, matching `requestId`, required keys), saves it to `.traceveil/reports/<request_id>.json` and prints a summary.
 
 Pure, unit-tested code is in `app/src/main/.../cli/` (`CliAuditRequest`, `CliAuditReport`, `CliReportStore`); CLI logic is `src/traceveil/audit.py`.
