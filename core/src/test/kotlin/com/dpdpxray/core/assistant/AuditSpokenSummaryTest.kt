@@ -59,6 +59,7 @@ class AuditSpokenSummaryTest {
         val text = en(e)
         assertTrue(text, text.contains("too few lookups were captured to give a score"))
         assertFalse(text, text.contains("out of 100"))
+        assertFalse(text, text.contains("history"))
     }
 
     @Test fun `a clean full score is never called safe`() {
@@ -89,7 +90,90 @@ class AuditSpokenSummaryTest {
     }
 
     @Test fun `every live summary is limited to this check`() {
-        val variants = listOf(leaky, leaky.copy(result = AuditResult(emptyList(), 100, ScoreBand.READY)))
+        val variants = listOf(leaky, leaky.copy(result = AuditResult(emptyList(), 100, ScoreBand.READY)), keptDataOld, keptDataNew, keptDataNoTrackers)
         variants.forEach { assertTrue(en(it).contains("In this check")); assertTrue(hi(it).contains("इस जाँच में")) }
+    }
+
+    // --- consent history unknown (U1): never a readiness verdict -------------------------------------------------------
+
+    private val u1Trackers = finding(CheckId.U1, Severity.INFO, listOf("Google Analytics for Firebase", "Meta", "AppsFlyer", "Adjust"))
+
+    /** Saved before U1 with tracker lookups made a result inconclusive: band READY and a full score. */
+    private val keptDataOld = leaky.copy(label = "Instagram", result = AuditResult(listOf(u1Trackers), 100, ScoreBand.READY))
+
+    /** The same check scored by the current rules: Inconclusive, no score. */
+    private val keptDataNew = keptDataOld.copy(result = AuditResult(listOf(u1Trackers), null, ScoreBand.INCONCLUSIVE))
+
+    private val keptDataNoTrackers = keptDataOld.copy(result = AuditResult(listOf(finding(CheckId.U1, Severity.INFO)), 100, ScoreBand.READY))
+
+    private val readyWord = Regex("\\bready\\b", RegexOption.IGNORE_CASE)
+
+    @Test fun `an old saved READY result with U1 tracker lookups gets no score and no verdict`() {
+        val text = en(keptDataOld)
+        assertFalse(text, text.contains("out of 100"))
+        assertFalse(text, readyWord.containsMatchIn(text))
+        assertTrue(text, text.startsWith("In this check of Instagram, there is no readiness verdict"))
+        assertTrue(text, text.contains("consent history is unknown"))
+        assertTrue(text, text.contains("Google Analytics for Firebase, Meta, AppsFlyer and 1 more"))
+        assertTrue(text, text.contains("run a Full check of a test install"))
+        assertFalse(text, text.contains("safety certificate"))
+        assertFalse(text, text.contains("consent screen needs work"))
+    }
+
+    @Test fun `a new INCONCLUSIVE result with U1 tracker lookups says Inconclusive because history is unknown`() {
+        val text = en(keptDataNew)
+        assertTrue(text, text.startsWith("In this check of Instagram, the result is Inconclusive"))
+        assertTrue(text, text.contains("consent history is unknown"))
+        assertFalse(text, text.contains("too few lookups"))
+        assertFalse(text, text.contains("out of 100"))
+        assertFalse(text, readyWord.containsMatchIn(text))
+        assertTrue(text, text.contains("Google Analytics for Firebase, Meta, AppsFlyer and 1 more"))
+        assertTrue(text, text.contains("run a Full check of a test install"))
+    }
+
+    @Test fun `U1 without tracker lookups may keep its score but adds the consent-history caveat and no band`() {
+        val text = en(keptDataNoTrackers)
+        assertTrue(text, text.startsWith("In this check, Instagram scored 100 out of 100."))
+        assertTrue(text, text.contains("Consent history is unknown, because the app kept its data from before"))
+        assertFalse(text, readyWord.containsMatchIn(text))
+        assertTrue(text, text.contains("not a safety certificate"))
+    }
+
+    @Test fun `low visibility is called Inconclusive with too few lookups`() {
+        val e = leaky.copy(result = AuditResult(listOf(finding(CheckId.V0, Severity.INFO)), null, ScoreBand.INCONCLUSIVE))
+        assertTrue(en(e), en(e).contains("the result is Inconclusive: too few lookups were captured to give a score"))
+        assertTrue(hi(e), hi(e).contains("अनिर्णायक"))
+    }
+
+    @Test fun `the consent screen is said to need work only when a consent-screen finding exists`() {
+        val c10Only = leaky.copy(result = AuditResult(listOf(finding(CheckId.C10, Severity.MEDIUM)), 90, ScoreBand.READY))
+        val text = en(c10Only)
+        assertFalse(text, text.contains("consent screen needs work"))
+        assertTrue(text, text.contains("No tracker lookups before consent were recorded."))
+        assertTrue(text, text.contains("1 finding; the most serious is C10, ${CheckId.C10.title}."))
+        listOf(CheckId.C3, CheckId.C4, CheckId.C5, CheckId.C6, CheckId.C7, CheckId.C8).forEach { id ->
+            val screen = leaky.copy(result = AuditResult(listOf(finding(id, Severity.MEDIUM)), 85, ScoreBand.READY))
+            assertTrue(id.code, en(screen).contains("the consent screen needs work"))
+        }
+    }
+
+    @Test fun `no summary says DPDP-ready`() {
+        val variants = listOf(leaky, leaky.copy(result = AuditResult(emptyList(), 100, ScoreBand.READY)), keptDataOld, keptDataNew, keptDataNoTrackers)
+        variants.flatMap { listOf(en(it), hi(it)) }.forEach { assertFalse(it, it.contains("DPDP", ignoreCase = true)) }
+        assertTrue(en(leaky.copy(result = AuditResult(emptyList(), 100, ScoreBand.READY))).contains("scored 100 out of 100: Ready."))
+    }
+
+    @Test fun `Hindi never calls an unknown-history result ready and names the trackers`() {
+        listOf(keptDataOld, keptDataNew, keptDataNoTrackers).forEach { e ->
+            val text = hi(e)
+            assertFalse(text, text.contains("तैयार"))
+            assertTrue(text, text.contains("सहमति का इतिहास अज्ञात है"))
+        }
+        val text = hi(keptDataNew)
+        assertTrue(text, text.contains("अनिर्णायक"))
+        assertFalse(text, text.contains("100 में से"))
+        assertTrue(text, text.contains("Google Analytics for Firebase, Meta, AppsFlyer और 1 अन्य"))
+        assertTrue(text, text.contains("पूरी जाँच"))
+        assertFalse(hi(keptDataOld), hi(keptDataOld).contains("100 में से"))
     }
 }
