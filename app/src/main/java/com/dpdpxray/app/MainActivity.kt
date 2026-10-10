@@ -38,6 +38,8 @@ import com.dpdpxray.app.apkguard.ApkGuardRoutes
 import com.dpdpxray.app.apkguard.ApkGuardSubject
 import androidx.navigation.navArgument
 import com.dpdpxray.app.audit.AuditProgress
+import com.dpdpxray.app.autoguard.AutoGuardRoutes
+import com.dpdpxray.app.autoguard.CheckupScreen
 import com.dpdpxray.app.quarantine.QuarantineRoutes
 import com.dpdpxray.app.quarantine.QuarantineScreen
 import com.dpdpxray.app.quarantine.navigateToQuarantine
@@ -234,13 +236,20 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("lab") { AiLabScreen(vm, onBack = { nav.popBackStack() }) }
                         composable("camera") { CameraCheckScreen(vm, onBack = { nav.popBackStack() }) }
-                        composable("settings") { SettingsScreen(vm, onBack = { nav.popBackStack() }) }
+                        composable("settings") {
+                            SettingsScreen(vm, onBack = { nav.popBackStack() }, onCheckup = { nav.navigate(AutoGuardRoutes.CHECKUP) })
+                        }
                         composable(ApkGuardRoutes.HUB) {
                             ApkGuardHubScreen(
                                 onBack = null,
                                 onOpenApp = { nav.navigate(ApkGuardRoutes.app(it)) },
                                 onOpenFile = { nav.navigate(ApkGuardRoutes.file(it)) },
+                                onCheckup = { nav.navigate(AutoGuardRoutes.CHECKUP) },
                             )
+                        }
+                        // Auto-guard "My phone checkup"; also opened by its weekly notification.
+                        composable(AutoGuardRoutes.CHECKUP) {
+                            CheckupScreen(onBack = { nav.popBackStack() }, onOpenApp = { nav.navigate(ApkGuardRoutes.app(it)) })
                         }
                         composable(ApkGuardRoutes.APP) { e ->
                             ApkGuardResultScreen(
