@@ -59,6 +59,9 @@ function buildAuditView(rec) {
     gaps,
     plansKey: sessions.map((s) => s.plan).sort().join(","),
     lens: lensOf(b),
+    // The audited app's version at audit start (Update Watch fields); absent in older exports: unknown, never a version.
+    versionName: typeof b.meta?.targetVersionName === "string" && b.meta.targetVersionName ? b.meta.targetVersionName : null,
+    versionCode: typeof b.meta?.targetVersionCode === "number" ? b.meta.targetVersionCode : null,
     // "Which SDK caused this?" as exported by the phone (core SdkAttribution); null when the export has no such part.
     sdkGroups: Array.isArray(b.sdkAttribution?.groups) ? b.sdkAttribution.groups : null,
     sdkBasis: typeof b.sdkAttribution?.basis === "string" ? b.sdkAttribution.basis : null,

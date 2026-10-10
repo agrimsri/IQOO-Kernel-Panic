@@ -2,8 +2,9 @@
 //   node scripts/smoke.mjs        (or: npm run smoke)
 // Checks: first visit loads the labelled samples and starts the tour; importing a valid audit, a bare quarantine
 // report and a broken file; importing the traceveil-ci sample bundles from ../docs/samples (the same files the CLI
-// tests gate); the SDK groups (sdkAttribution) those samples carry; same-package compare; the policy preview with the
-// CLI's defaults and rules; deleting all data stays deleted on reload; no console errors and no network requests.
+// tests gate); the SDK groups (sdkAttribution) those samples carry; same-package compare; app versions in compare;
+// the policy preview with the CLI's defaults and rules; deleting all data stays deleted on reload; no console errors
+// and no network requests.
 import puppeteer from "puppeteer-core";
 import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -153,6 +154,27 @@ check(t.includes("Legal lens: US children (COPPA)") && t.includes("named in the 
   "an export's legalProfile selects its lens and the lens score skips not-applicable checks");
 check(t.includes("US children (COPPA): Not applicable"), "a not-applicable finding is labelled, not hidden");
 check(await page.$("[data-tour=sdk]") === null, "an export without sdkAttribution shows no SDK card");
+
+// 5b. app versions in compare
+const v10 = structuredClone(leaky);
+delete v10.sample; v10.meta.sample = false; v10.meta.id = "audit-smoke-v10"; v10.meta.targetVersionName = "1.0"; v10.meta.targetVersionCode = 10;
+const v11 = structuredClone(v10);
+v11.meta.id = "audit-smoke-v11"; v11.meta.targetVersionName = "1.1"; v11.meta.targetVersionCode = 11; v11.meta.createdAtMs += 7_200_000;
+const rel = { v10: join(tmp, "release-1.0.json"), v11: join(tmp, "release-1.1.json") };
+writeFileSync(rel.v10, JSON.stringify(v10));
+writeFileSync(rel.v11, JSON.stringify(v11));
+const input3 = await page.$("input[type=file]");
+await input3.uploadFile(rel.v10, rel.v11);
+await sleep(1500);
+await go("/compare?a=audit-smoke-v10&b=audit-smoke-v11");
+t = await text();
+check(t.includes("Version 1.0 → 1.1"), "compare shows the app versions when both exports carry them");
+await go("/compare?a=audit-1791590915883&b=audit-smoke-v11");
+t = await text();
+check(!/Version \S+ → /.test(t), "no version line when only one export carries a version");
+await go("/audits/audit-smoke-v11");
+t = (await text()).toLowerCase();
+check(t.includes("version 1.1 (11)"), "the audit page shows the audited app's version");
 
 // 6. delete everything, reload: samples do not come back
 await go("/settings");

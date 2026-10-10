@@ -28,7 +28,7 @@ export default function AuditDetail({ id }) {
       <PageHead
         kicker={<span className="row" style={{ gap: 8, display: "inline-flex" }}>Consent audit {a.sample && <SampleBadge info={a.sampleInfo} />}</span>}
         title={<span className="row" style={{ gap: 12, display: "inline-flex" }}><AppMark label={a.label} size="lg" />{a.label}</span>}
-        sub={<Meta items={[<span className="mono-s" key="p">{a.pkg}</span>, a.device && <span key="d"><Smartphone size={13} />{a.device}{a.android ? ` · Android ${a.android}` : ""}</span>, <span key="t">{fmtDate(a.createdAtMs)}</span>, <span key="l">{plural(a.lookups, "lookup")}</span>]} />}
+        sub={<Meta items={[<span className="mono-s" key="p">{a.pkg}</span>, a.device && <span key="d"><Smartphone size={13} />{a.device}{a.android ? ` · Android ${a.android}` : ""}</span>, <span key="t">{fmtDate(a.createdAtMs)}</span>, a.versionName && <span key="v">Version {a.versionName}{a.versionCode != null ? ` (${a.versionCode})` : ""}</span>, <span key="l">{plural(a.lookups, "lookup")}</span>]} />}
         right={(
           <div className="row wrap">
             {compareTo && <button className="btn sm" onClick={() => navigate(`/compare?a=${encodeURIComponent(a.id)}&b=${encodeURIComponent(compareTo.id)}`)}><GitCompareArrows size={15} />Compare</button>}
