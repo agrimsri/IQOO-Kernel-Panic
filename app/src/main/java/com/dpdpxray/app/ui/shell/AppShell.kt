@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -93,47 +94,30 @@ fun NavController.openTab(tab: AppTab) {
 }
 
 /**
- * The bottom bar in the film palette: line glyphs, and a brand-gradient pill behind the selected tab that glides to
- * the new tab (instant with reduced motion). Each item is a tab to TalkBack, with its selected state.
+ * The bottom bar: a flat surface with a hairline on top, a line glyph and a short label per tab. The selected tab takes
+ * the accent colour; there is no pill. Each item is a tab to TalkBack, with its selected state.
  */
 @Composable
 fun AppBottomBar(current: AppTab?, onSelect: (AppTab) -> Unit) {
     val reduce = LocalReduceMotion.current
     val tabs = AppTab.entries
-    val index = current?.let { tabs.indexOf(it) } ?: -1
-    Column(Modifier.fillMaxWidth().background(FilmExtra.bar)) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(FilmExtra.hairline))
-        BoxWithConstraints(Modifier.fillMaxWidth().navigationBarsPadding().height(72.dp)) {
-            val itemWidth = maxWidth / tabs.size
-            val pill = 56.dp
-            val x by animateDpAsState(
-                itemWidth * index.coerceAtLeast(0) + (itemWidth - pill) / 2,
-                if (reduce) snap() else tween(Motion.LONG, easing = Motion.emphasized), label = "tab-indicator",
-            )
-            if (index >= 0) {
-                Box(
-                    Modifier.offset { IntOffset(x.roundToPx(), 10.dp.roundToPx()) }.size(width = pill, height = 30.dp)
-                        .clip(CircleShape).background(Brand.horizontal),
-                )
-            }
-            Row(Modifier.fillMaxSize().selectableGroup()) {
-                tabs.forEach { tab ->
-                    val selected = tab == current
-                    val tint by animateColorAsState(if (selected) Film.base else Film.boneDim, if (reduce) snap() else tween(Motion.MEDIUM), label = "tab-tint")
-                    val labelTint by animateColorAsState(if (selected) Brand.peach else Film.boneDim, if (reduce) snap() else tween(Motion.MEDIUM), label = "tab-label")
-                    Column(
-                        Modifier.weight(1f).fillMaxHeight()
-                            .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(tab) }),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Box(Modifier.padding(top = 10.dp).size(width = 56.dp, height = 30.dp), contentAlignment = Alignment.Center) {
-                            GlyphIcon(tab.glyph, tint, size = 22.dp)
-                        }
-                        Text(
-                            tab.label, style = MaterialTheme.typography.labelMedium, color = labelTint, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                    }
+    Column(Modifier.fillMaxWidth().background(Film.raised)) {
+        Box(Modifier.fillMaxWidth().height(0.5.dp).background(FilmExtra.hairline))
+        Row(Modifier.fillMaxWidth().navigationBarsPadding().height(64.dp).selectableGroup()) {
+            tabs.forEach { tab ->
+                val selected = tab == current
+                val tint by animateColorAsState(if (selected) Film.scan else Film.boneDim, if (reduce) snap() else tween(Motion.SHORT), label = "tab-tint")
+                Column(
+                    Modifier.weight(1f).fillMaxHeight()
+                        .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(tab) }),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    GlyphIcon(tab.glyph, tint, size = 24.dp)
+                    Text(
+                        tab.label, style = MaterialTheme.typography.labelSmall, color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
                 }
             }
         }

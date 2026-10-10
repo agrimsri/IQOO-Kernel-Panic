@@ -51,6 +51,7 @@ import com.dpdpxray.app.ui.components.FoldText
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
+import com.dpdpxray.app.ui.theme.Radii
 
 /** Guidance preferences and the speaker, provided once by MainActivity for every guided screen. */
 @Stable
@@ -91,21 +92,12 @@ fun GuideBanner(step: GuideStep, modifier: Modifier = Modifier, speak: Boolean =
         DisposableEffect(step.key, speaker) { onDispose { speaker.stop(step.key) } }
     }
 
-    val rail: Brush = when (step.tone) {
-        GuideTone.ACTION -> Brand.vertical
-        GuideTone.CAUTION -> SolidColor(Film.warn)
-        GuideTone.DONE -> SolidColor(Film.clear)
-        GuideTone.WAIT -> SolidColor(Film.scan)
-        GuideTone.INFO -> SolidColor(Film.line)
-    }
-    val shape = RoundedCornerShape(18.dp)
-    // The rail is drawn, not measured, so wrapped text and the folded body never get clipped.
+    val shape = RoundedCornerShape(Radii.card)
     Row(
-        modifier.fillMaxWidth().clip(shape).background(BannerFill).border(1.dp, FilmExtra.cardEdge, shape)
-            .drawBehind { drawRect(rail, size = Size(5.dp.toPx(), size.height)) }
+        modifier.fillMaxWidth().clip(shape).background(Film.raised)
             .semantics { liveRegion = LiveRegionMode.Polite },
     ) {
-        Column(Modifier.weight(1f).padding(start = 19.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)) {
+        Column(Modifier.weight(1f).padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 StepTicks(step.index, step.total, step.tone)
                 Spacer(Modifier.width(10.dp))
@@ -141,9 +133,6 @@ fun GuideBanner(step: GuideStep, modifier: Modifier = Modifier, speak: Boolean =
         }
     }
 }
-
-/** The banner surface: one step lighter than a card, lit from the top. */
-private val BannerFill = Brush.verticalGradient(listOf(Color(0xFF213B4F), FilmExtra.raisedHigh))
 
 /** Progress as small ticks: done steps dim, the current one in its tone colour, the rest as outlines. */
 @Composable

@@ -452,8 +452,8 @@ private fun ResultGuidePanel(facts: ResultFacts, onAction: (NextAction) -> Unit)
     }
 }
 
-/** The recommended next step: a faint brand wash over the card surface. */
-private val FirstStepFill = Brush.linearGradient(listOf(Brand.coral.copy(alpha = 0.14f), Film.raised, Film.raised))
+/** The recommended next step: a faint accent tint over the card surface. */
+private val FirstStepFill: Brush get() = androidx.compose.ui.graphics.SolidColor(Film.scan.copy(alpha = 0.10f))
 
 /** Severity summary inside the score card: a proportional strip, then one chip per severity present. */
 @Composable
