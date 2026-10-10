@@ -70,8 +70,9 @@ object NewAppCheck {
 
     /**
      * Posts the alerts; returns the alerted packages and the alert to speak. A few apps get one notification each; more
-     * share one. Each install is claimed in the ledger right before its notification is posted (after its details were
-     * read), so the live receiver never alerts it as well and a failed read does not mark it as alerted.
+     * share one. Each install is claimed in the ledger right before its notification is posted, so the live receiver
+     * never alerts it as well. An app whose details Android will not return still gets an alert that says so; an app
+     * already uninstalled again gets none.
      */
     private fun alert(context: Context, store: AutoGuardStore, fresh: List<ChangedApp>): Pair<List<String>, InstallAlert?> {
         if (fresh.isEmpty()) return emptyList<String>() to null
@@ -79,8 +80,12 @@ object NewAppCheck {
             val alerted = mutableListOf<String>()
             var first: InstallAlert? = null
             fresh.forEach { app ->
-                val inspected = ApkInspector.readInstalled(context, app.packageName) ?: return@forEach
-                val alert = InstallAlertPolicy.alert(inspected.facts.label, ApkRiskRules.evaluate(inspected.facts).summary, app.packageName)
+                val inspected = ApkInspector.readInstalled(context, app.packageName)
+                val alert = when {
+                    inspected != null -> InstallAlertPolicy.alert(inspected.facts.label, ApkRiskRules.evaluate(inspected.facts).summary, app.packageName)
+                    ApkInspector.firstInstallTime(context, app.packageName) == null -> return@forEach // removed again
+                    else -> InstallAlertPolicy.unread(label(context, app.packageName), app.packageName)
+                }
                 if (!store.claim(app.packageName, app.firstInstallTime)) return@forEach
                 ApkInstallWatcher.postInstallAlert(context, app.packageName, alert)
                 alerted += app.packageName
@@ -88,10 +93,9 @@ object NewAppCheck {
             }
             return alerted to first
         }
-        val pm = context.packageManager
         val claimed = fresh.filter { store.claim(it.packageName, it.firstInstallTime) }.map { it.packageName }
         if (claimed.isEmpty()) return emptyList<String>() to null
-        val names = claimed.map { pkg -> runCatching { pm.getApplicationLabel(applicationInfo(pm, pkg)).toString() }.getOrDefault(pkg) }
+        val names = claimed.map { label(context, it) }
         val alert = InstallAlertPolicy.combined(names)
         ApkInstallWatcher.postCombinedAlert(context, claimed, alert)
         return claimed to alert
@@ -107,6 +111,12 @@ object NewAppCheck {
         else @Suppress("DEPRECATION") pm.getPackageInfo(pkg, 0)
         toChanged(info)
     }.getOrNull()
+
+    /** The app's name as the launcher shows it, or its package name. */
+    private fun label(context: Context, pkg: String): String {
+        val pm = context.packageManager
+        return runCatching { pm.getApplicationLabel(applicationInfo(pm, pkg)).toString() }.getOrNull()?.takeIf { it.isNotBlank() } ?: pkg
+    }
 
     private fun applicationInfo(pm: PackageManager, pkg: String): ApplicationInfo =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) pm.getApplicationInfo(pkg, PackageManager.ApplicationInfoFlags.of(0))

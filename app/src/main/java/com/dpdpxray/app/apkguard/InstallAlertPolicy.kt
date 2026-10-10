@@ -49,6 +49,21 @@ object InstallAlertPolicy {
 
     private const val MAX_NAMED = 4
 
+    /**
+     * A new install whose details Android did not return (rare). The person is still told about the install; nothing
+     * is said about what the app can do, because nothing was read.
+     */
+    fun unread(label: String?, packageName: String): InstallAlert {
+        val name = displayName(label, packageName)
+        return InstallAlert(
+            title = "New app installed: $name — check it before you open it",
+            text = "TraceVeil could not read its details yet. Tap to check it in APK Guard.",
+            hindi = "नया ऐप इंस्टॉल हुआ: $name — खोलने से पहले जाँच लें। TraceVeil अभी इसकी जानकारी नहीं पढ़ पाया।",
+            spokenEn = "New app installed: $name. Check it in TraceVeil before you open it.",
+            spokenHi = "नया ऐप इंस्टॉल हुआ: $name. खोलने से पहले TraceVeil में जाँच लें।",
+        )
+    }
+
     /** The app's name, or its package name when it has none, shortened so a notification title stays readable. */
     private fun displayName(label: String?, packageName: String): String =
         (label?.trim()?.takeIf { it.isNotEmpty() } ?: packageName).let { if (it.length > MAX_LABEL) it.take(MAX_LABEL - 1) + "…" else it }

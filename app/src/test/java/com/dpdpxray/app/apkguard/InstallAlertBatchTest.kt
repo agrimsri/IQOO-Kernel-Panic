@@ -22,6 +22,14 @@ class InstallAlertBatchTest {
         assertTrue(alert.hindi, alert.hindi.contains("और 5 अन्य"))
     }
 
+    @Test fun `an app whose details could not be read is still announced, without claims`() {
+        val alert = InstallAlertPolicy.unread("Fast Loan", "com.fast.loan")
+        assertEquals("New app installed: Fast Loan — check it before you open it", alert.title)
+        assertTrue(alert.text.contains("could not read"))
+        assertFalse(alert.text.contains("Nothing unusual"))
+        assertEquals("New app installed: com.x.app — check it before you open it", InstallAlertPolicy.unread(null, "com.x.app").title)
+    }
+
     @Test fun `the combined alert asks for a check and never judges`() {
         val alert = InstallAlertPolicy.combined(listOf("A".repeat(200), "com.x.app"))
         assertTrue(alert.text.length < 200)
