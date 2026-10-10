@@ -86,6 +86,7 @@ fun ListRow(
     onClick: (() -> Unit)? = null,
     chevron: Boolean = onClick != null,
     titleColor: Color = Film.bone,
+    subtitleMaxLines: Int = 2,
 ) {
     Row(
         modifier.fillMaxWidth().heightIn(min = 56.dp)
@@ -99,7 +100,7 @@ fun ListRow(
         }
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = titleColor)
-            if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, maxLines = subtitleMaxLines, overflow = TextOverflow.Ellipsis)
         }
         if (trailing != null) {
             Spacer(Modifier.width(8.dp))

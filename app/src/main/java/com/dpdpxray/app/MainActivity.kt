@@ -61,7 +61,6 @@ import com.dpdpxray.app.ui.guide.GuideViewModel
 import com.dpdpxray.app.ui.guide.LocalGuide
 import com.dpdpxray.app.ui.guide.OnboardingGate
 import com.dpdpxray.app.ui.onboarding.OnboardingScreen
-import com.dpdpxray.app.ui.modes.EverydayHomeScreen
 import com.dpdpxray.app.ui.modes.ModeRoutes
 import com.dpdpxray.app.voice.VoiceCopilotScreen
 import com.dpdpxray.app.voice.wake.AssistantEntry
@@ -206,22 +205,9 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("home") {
-                            // Everyday mode gets its own front door; both doors open the same screens and engine.
-                            if (settings.audience == Audience.USER) {
-                                val routeIfPresent: (String) -> (() -> Unit)? = { r -> if (nav.graph.findNode(r) != null) { { nav.navigate(r) } } else null }
-                                EverydayHomeScreen(
-                                    vm,
-                                    onCheckApp = { nav.navigate("pick") },
-                                    onApkFile = { nav.navigate(ApkGuardRoutes.file(it)) },
-                                    onAlerts = { nav.openTab(AppTab.APK) },
-                                    onOpen = { nav.navigate("results/$it") },
-                                    onAllReports = { nav.openTab(AppTab.REPORTS) },
-                                    onLive = { nav.navigate("live") },
-                                    onSettings = { nav.navigate("settings") },
-                                    onCheckup = routeIfPresent(ModeRoutes.CHECKUP),
-                                    onTrust = routeIfPresent(ModeRoutes.TRUST),
-                                )
-                            } else HomeScreen(
+                            // One Home for both modes; developer mode adds a few rows. Everything opens the same screens and engine.
+                            val routeIfPresent: (String) -> (() -> Unit)? = { r -> if (nav.graph.findNode(r) != null) { { nav.navigate(r) } } else null }
+                            HomeScreen(
                                 vm,
                                 onAudit = { nav.navigate("pick") },
                                 onOpen = { nav.navigate("results/$it") },
@@ -229,8 +215,8 @@ class MainActivity : ComponentActivity() {
                                 onCamera = { nav.navigate("camera") },
                                 onSettings = { nav.navigate("settings") },
                                 onVoice = { nav.navigate(AuditRoutes.voice(it)) },
-                                onApk = apkCheck(),
-                                onHowItWorks = { nav.navigate(OnboardingGate.ONBOARDING) },
+                                onApkFile = { nav.navigate(ApkGuardRoutes.file(it)) },
+                                onCheckup = routeIfPresent(ModeRoutes.CHECKUP),
                                 onLive = { nav.navigate("live") },
                                 onAllReports = { nav.openTab(AppTab.REPORTS) },
                                 onAutomation = { nav.navigate("settings") },
