@@ -26,12 +26,15 @@ object SarvamTts {
     private const val ENDPOINT = "https://api.sarvam.ai/text-to-speech"
     const val MAX_CHARS = 2500
 
+    /** Female Indian voices from Sarvam's bulbul:v3 catalogue: `ishita` (en-IN) and `priya` (hi-IN). */
+    fun speakerFor(language: CopilotLanguage): String = if (language == CopilotLanguage.HI) "priya" else "ishita"
+
     fun requestBody(text: String, language: CopilotLanguage): String = JsonObject(
         mapOf(
             "text" to JsonPrimitive(text.take(MAX_CHARS)),
             "language_code" to JsonPrimitive(language.tag),
             "model" to JsonPrimitive("bulbul:v3"),
-            "speaker" to JsonPrimitive("shubh"),
+            "speaker" to JsonPrimitive(speakerFor(language)),
             "pace" to JsonPrimitive(1.0),
             "speech_sample_rate" to JsonPrimitive(22050),
             "output_audio_codec" to JsonPrimitive("wav"),

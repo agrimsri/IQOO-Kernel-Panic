@@ -54,6 +54,7 @@ import com.dpdpxray.app.ui.components.SecondaryAction
 import com.dpdpxray.app.ui.components.SectionTitle
 import com.dpdpxray.app.ui.components.TopBar
 import com.dpdpxray.app.ui.theme.Film
+import com.dpdpxray.app.voice.ApiEnv
 import com.dpdpxray.core.model.RejectOption
 import com.dpdpxray.core.model.ScreenAudit
 import kotlinx.coroutines.launch
@@ -248,6 +249,12 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit) {
             Note(
                 "TraceVeil uploads nothing. Its only network use is relaying the audited app's own DNS lookups during an audit. " +
                     "Reports, screenshots and AI analysis stay on this phone until you export them.",
+            )
+            val ctx = LocalContext.current
+            if (remember { ApiEnv.load(ctx).useApi }) Note(
+                "Online voice is switched on for this build: Voice Copilot sends each spoken answer's text to Sarvam AI to make speech. " +
+                    "Speech recognition and answers still stay on this phone.",
+                Film.high,
             )
             SectionTitle("Not legal advice")
             Note("Results are an automated technical assessment with citations to the DPDP Act 2023 and DPDP Rules 2025.")
