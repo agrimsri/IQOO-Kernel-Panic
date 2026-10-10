@@ -45,12 +45,11 @@ fun VoiceAssistantHost(nav: NavController, vm: XrayViewModel) {
                     val outcome = runCatching {
                         when (val action = req.action) {
                             is AssistantAction.StartAudit ->
-                                if (vm.startAudit(action.config)) {
-                                    nav.navigate("live") { popUpTo("home") }
-                                    VoiceAssistant.get(context).followUp(action.config, req.hindi)
-                                    UiOutcome.Done
-                                } else {
-                                    UiOutcome.Failed(vm.toast.value)
+                                VoiceAuditStart.start(action.config, { vm.progress.value }, vm::startAudit, { vm.toast.value }).also {
+                                    if (it == UiOutcome.Done) {
+                                        nav.navigate("live") { popUpTo("home") }
+                                        VoiceAssistant.get(context).followUp(action.config, req.hindi, req.speak)
+                                    }
                                 }
                             is AssistantAction.Navigate -> navigate(nav, action.route)
                             AssistantAction.PickApkFile -> {

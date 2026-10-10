@@ -49,13 +49,13 @@ object VoiceCommandParser {
     private val WAKE_WORDS = setOf("hey", "hi", "ok", "okay", "हे", "हाय", "trace", "traceveil", "veil", "veal", "vail", "ट्रेस", "ट्रेसवील", "वील")
     private val WAKE_CORE = setOf("trace", "traceveil", "ट्रेस", "ट्रेसवील")
 
-    private val CHECK_VERBS = setOf(
+    internal val CHECK_VERBS = setOf(
         "check", "checkup", "audit", "scan", "test", "inspect", "examine", "analyse", "analyze", "investigate",
         "jaanch", "janch", "jaancho", "jancho", "jaanchiye", "जांच", "जांचो", "जांचिए", "चेक", "स्कैन", "ऑडिट", "टेस्ट", "परखो",
     )
 
     /** Politeness and connective words that never belong to an app name. */
-    private val FILLER = setOf(
+    internal val FILLER = setOf(
         "please", "plz", "kindly", "can", "could", "would", "will", "you", "u", "now", "just", "quickly", "quick", "again", "for", "me",
         "a", "an", "the", "this", "that", "of", "on", "my", "app", "apps", "application", "run", "do", "start", "begin", "go", "ahead",
         "if", "is", "it", "whether", "safe", "okay", "ok", "and", "up",
@@ -66,7 +66,7 @@ object VoiceCommandParser {
     )
 
     /** Asking for a deeper audit than voice runs; removed from the name and reported back to the user. */
-    private val MORE_WORDS = setOf("full", "complete", "detailed", "reset", "clear", "wipe", "fresh", "poora", "pura", "poori", "puri", "पूरा", "पूरी", "रीसेट")
+    internal val MORE_WORDS = setOf("full", "complete", "detailed", "reset", "clear", "wipe", "fresh", "poora", "pura", "poori", "puri", "पूरा", "पूरी", "रीसेट")
 
     private val STOP_WORDS = setOf("stop", "quiet", "sleep", "band", "ruko", "ruk", "chup", "bas", "बंद", "रुको", "रुक", "चुप", "बस")
     private val STOP_ALLOWED = STOP_WORDS + setOf(

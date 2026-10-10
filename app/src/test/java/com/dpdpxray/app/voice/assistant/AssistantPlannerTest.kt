@@ -91,6 +91,39 @@ class AssistantPlannerTest {
         assertNull(AssistantPlanner.checkPicked(instagram, ctx.copy(auditRunning = true)).action)
     }
 
+    @Test fun `a running check is named and nothing is promised about it`() {
+        val running = ctx.copy(auditRunning = true, runningLabel = "LeakyShop")
+        val step = plan("check Instagram", running)
+        assertEquals("A check of LeakyShop is already running. Wait for it to finish, then ask me again.", step.reply.en)
+        assertTrue(step.reply.hi, step.reply.hi.contains("LeakyShop"))
+        assertEquals(step.reply, AssistantPlanner.checkPicked(instagram, running).reply)
+        // Started from the app picker, nothing follows that check, so the reply must not promise to report on it.
+        listOf(step.reply, plan("check Instagram", ctx.copy(auditRunning = true)).reply).forEach { r ->
+            assertFalse(r.en, r.en.contains("I'll tell you"))
+            assertFalse(r.hi, r.hi.contains("बताऊँगा"))
+        }
+    }
+
+    @Test fun `a start the screen refused because another check runs says so instead of the planned reply`() {
+        val start = plan("check Instagram").action as AssistantAction.StartAudit
+        val planned = plan("check Instagram").reply
+        assertEquals(planned, AssistantPlanner.afterScreenWork(planned, start, UiOutcome.Done))
+        val busy = AssistantPlanner.afterScreenWork(planned, start, UiOutcome.CheckRunning("LeakyShop"))
+        assertEquals("A check of LeakyShop is already running. Wait for it to finish, then ask me again.", busy.en)
+        assertEquals(AssistantCopy.tapNotification, AssistantPlanner.afterScreenWork(planned, start, UiOutcome.NotReached()))
+        assertEquals(AssistantCopy.unlockFirst, AssistantPlanner.afterScreenWork(planned, start, UiOutcome.NotReached(locked = true)))
+        assertEquals(AssistantCopy.couldNotStart("no VPN"), AssistantPlanner.afterScreenWork(planned, start, UiOutcome.Failed("no VPN")))
+    }
+
+    @Test fun `the end of a voice-started check is spoken only when answers are spoken`() {
+        val evidence = saved.evidence
+        assertNull(AssistantPlanner.checkEnded(evidence, failure = null, speak = false))
+        assertNull(AssistantPlanner.checkEnded(null, failure = "VPN lost", speak = false))
+        assertTrue(AssistantPlanner.checkEnded(evidence, failure = null, speak = true)!!.en.startsWith("In this check, LeakyShop scored 100 out of 100"))
+        assertEquals(AssistantCopy.checkStopped("VPN lost"), AssistantPlanner.checkEnded(null, failure = "VPN lost", speak = true))
+        assertEquals(AssistantCopy.checkCancelled, AssistantPlanner.checkEnded(null, failure = null, speak = true))
+    }
+
     @Test fun `a voice command never starts a Full audit, Fast Preview or a reset`() {
         listOf("check Instagram", "check leaky shop", "audit spotify", "run a full audit of instagram", "reset and check instagram").forEach { text ->
             val action = plan(text).action

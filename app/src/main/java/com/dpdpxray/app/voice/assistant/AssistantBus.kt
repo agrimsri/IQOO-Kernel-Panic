@@ -21,10 +21,16 @@ sealed interface UiOutcome {
 
     /** An optional action was dropped because TraceVeil was not on screen. */
     data object Skipped : UiOutcome
+
+    /** Another check, of [app], was already running, so nothing was started. */
+    data class CheckRunning(val app: String) : UiOutcome
 }
 
-/** One piece of screen work; [hindi] is the language the user spoke, for the follow-up reply. */
-class UiRequest internal constructor(val action: AssistantAction, val hindi: Boolean, val createdAtMs: Long) {
+/**
+ * One piece of screen work; [hindi] is the language the user spoke and [speak] whether replies are spoken, both for
+ * the follow-up when a check this starts ends.
+ */
+class UiRequest internal constructor(val action: AssistantAction, val hindi: Boolean, val speak: Boolean, val createdAtMs: Long) {
     internal val result = CompletableDeferred<UiOutcome>()
 }
 
@@ -51,17 +57,39 @@ object AssistantBus {
         _routes.value = routes
     }
 
-    /** Queues [action] and waits up to [waitMs] for the host to perform it. On a timeout the request stays queued. */
-    suspend fun request(action: AssistantAction, hindi: Boolean, waitMs: Long): UiOutcome {
-        val req = enqueue(action, hindi)
-        return withTimeoutOrNull(waitMs) { req.result.await() } ?: UiOutcome.NotReached()
+    /**
+     * Queues [action] and waits up to [waitMs] for the host to perform it. On a timeout the request stays queued (the
+     * user may still tap the notification); if the caller is cancelled first, the request is withdrawn, so a command
+     * that was stopped can never run later.
+     */
+    suspend fun request(
+        action: AssistantAction,
+        hindi: Boolean,
+        speak: Boolean,
+        waitMs: Long,
+        nowMs: Long = SystemClock.elapsedRealtime(),
+    ): UiOutcome {
+        val req = enqueue(action, hindi, speak, nowMs)
+        var answered = false
+        try {
+            val outcome = withTimeoutOrNull(waitMs) { req.result.await() } ?: UiOutcome.NotReached()
+            answered = true
+            return outcome
+        } finally {
+            if (!answered) withdraw(req)
+        }
     }
 
     /** Queues [action] without waiting, replacing any older request. */
-    fun enqueue(action: AssistantAction, hindi: Boolean): UiRequest {
-        val req = UiRequest(action, hindi, SystemClock.elapsedRealtime())
+    fun enqueue(action: AssistantAction, hindi: Boolean, speak: Boolean, nowMs: Long = SystemClock.elapsedRealtime()): UiRequest {
+        val req = UiRequest(action, hindi, speak, nowMs)
         _pending.getAndUpdate { req }?.result?.complete(UiOutcome.NotReached())
         return req
+    }
+
+    /** Drops [req] unless the host has already taken it. */
+    private fun withdraw(req: UiRequest) {
+        if (_pending.compareAndSet(req, null)) req.result.complete(UiOutcome.NotReached())
     }
 
     /** Takes the waiting request for the host to perform, unless it is stale. */

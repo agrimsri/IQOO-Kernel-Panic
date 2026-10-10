@@ -16,7 +16,6 @@ import com.dpdpxray.app.voice.wake.WakeController
 import com.dpdpxray.app.voice.wake.WakeRuntime
 import com.dpdpxray.app.voice.wake.WakeStopReason
 import com.dpdpxray.core.assistant.AppCandidate
-import com.dpdpxray.core.assistant.AuditSpokenSummary
 import com.dpdpxray.core.assistant.ChoiceReply
 import com.dpdpxray.core.assistant.VoiceCommand
 import com.dpdpxray.core.assistant.VoiceCommandParser
@@ -79,8 +78,11 @@ class VoiceAssistant private constructor(private val app: Application) {
     val hasPendingChoice: Boolean
         get() = choices.isNotEmpty() && SystemClock.elapsedRealtime() - choicesAtMs < CHOICE_TTL_MS
 
-    /** Handles one utterance and returns the reply; the caller speaks it (see [say]). */
-    suspend fun handle(text: String, source: AssistantSource, preferHindi: Boolean, focusAuditId: String? = null): Turn {
+    /**
+     * Handles one utterance and returns the reply; the caller speaks it (see [say]). [speak] is false when the caller
+     * keeps answers silent (the copilot's "Speak answers" switch); a check this starts then ends without speaking too.
+     */
+    suspend fun handle(text: String, source: AssistantSource, preferHindi: Boolean, focusAuditId: String? = null, speak: Boolean = true): Turn {
         val parsed = VoiceCommandParser.parse(text)
         val hindi = preferHindi || parsed.hindi
         val offered = choices.takeIf { hasPendingChoice }.orEmpty()
@@ -108,13 +110,8 @@ class VoiceAssistant private constructor(private val app: Application) {
             Log.i(TAG, "command $kind outcome=none")
             return Turn(step.reply, hindi, kind, step.choices, step.stopListening)
         }
-        val outcome = perform(action, source, hindi)
-        val reply = when (outcome) {
-            UiOutcome.Done, UiOutcome.Skipped -> step.reply
-            UiOutcome.Unavailable -> AssistantCopy.screenMissing
-            is UiOutcome.Failed -> if (action is AssistantAction.StartAudit) AssistantCopy.couldNotStart(outcome.reason) else AssistantCopy.openApp
-            is UiOutcome.NotReached -> if (outcome.locked) AssistantCopy.unlockFirst else AssistantCopy.tapNotification
-        }
+        val outcome = perform(action, source, hindi, speak)
+        val reply = AssistantPlanner.afterScreenWork(step.reply, action, outcome)
         Log.i(TAG, "command $kind outcome=${outcome::class.simpleName}")
         return Turn(reply, hindi, kind, step.choices, step.stopListening, waiting = action.takeIf { outcome is UiOutcome.NotReached })
     }
@@ -125,7 +122,7 @@ class VoiceAssistant private constructor(private val app: Application) {
      */
     fun submit(text: String, preferHindi: Boolean, focusAuditId: String?, speak: Boolean, onTurn: (Turn) -> Unit): Job = scope.launch {
         voice.stop()
-        val turn = handle(text, AssistantSource.COPILOT, preferHindi, focusAuditId)
+        val turn = handle(text, AssistantSource.COPILOT, preferHindi, focusAuditId, speak)
         // The wake-word service stops itself after its own reply; from the copilot it is stopped here.
         if (turn.stopListening) WakeController.stop(WakeStopReason.USER)
         onTurn(turn)
@@ -166,6 +163,7 @@ class VoiceAssistant private constructor(private val app: Application) {
         repository.refresh()
         val id = focusAuditId ?: repository.audits.value.firstOrNull()?.id
         val audit = id?.let { repository.load(it) }?.let { b -> SavedAudit(b.meta.id, copilotEvidence(b.meta, b.sessions, b.result)) }
+        val running = graph.orchestrator.progress.value as? AuditProgress.Running
         AssistantContext(
             source = source,
             apps = if (needsApps) runCatching { InstalledApps.load(app) }.getOrDefault(emptyList()) else emptyList(),
@@ -175,7 +173,8 @@ class VoiceAssistant private constructor(private val app: Application) {
                 privateDnsActive = DeviceChecks.privateDnsActive(app),
             ),
             audit = audit,
-            auditRunning = graph.orchestrator.progress.value is AuditProgress.Running,
+            auditRunning = running != null,
+            runningLabel = running?.config?.targetLabel,
             quarantineActive = QuarantineController.isActive,
             routes = AssistantBus.routes.value,
             wakeListening = WakeRuntime.state.value.active,
@@ -188,17 +187,17 @@ class VoiceAssistant private constructor(private val app: Application) {
      * TraceVeil is asked to come forward (Android allows it only in some cases, for example while the consent watcher
      * is bound); if it does not appear in time, the request waits for the user to tap the notification.
      */
-    private suspend fun perform(action: AssistantAction, source: AssistantSource, hindi: Boolean): UiOutcome {
+    private suspend fun perform(action: AssistantAction, source: AssistantSource, hindi: Boolean, speak: Boolean): UiOutcome {
         if (action is AssistantAction.Navigate && action.optional) {
-            return if (AssistantBus.hostActive) AssistantBus.request(action, hindi, OPTIONAL_WAIT_MS) else UiOutcome.Skipped
+            return if (AssistantBus.hostActive) AssistantBus.request(action, hindi, speak, OPTIONAL_WAIT_MS) else UiOutcome.Skipped
         }
-        if (AssistantBus.hostActive || source == AssistantSource.COPILOT) return AssistantBus.request(action, hindi, HOST_WAIT_MS)
+        if (AssistantBus.hostActive || source == AssistantSource.COPILOT) return AssistantBus.request(action, hindi, speak, HOST_WAIT_MS)
         if (locked()) {
-            AssistantBus.enqueue(action, hindi)
+            AssistantBus.enqueue(action, hindi, speak)
             return UiOutcome.NotReached(locked = true)
         }
         DeviceChecks.bringXrayToFront(app)
-        return AssistantBus.request(action, hindi, BRING_FORWARD_WAIT_MS)
+        return AssistantBus.request(action, hindi, speak, BRING_FORWARD_WAIT_MS)
     }
 
     private fun locked(): Boolean {
@@ -209,9 +208,10 @@ class VoiceAssistant private constructor(private val app: Application) {
 
     /**
      * Called by the host after it started a check for a voice command: when the check ends, the saved result is
-     * spoken and its screen opened. A cancelled or failed check is reported as such; nothing is invented.
+     * spoken (only if [speak]) and its screen opened. A cancelled or failed check is reported as such; nothing is
+     * invented.
      */
-    fun followUp(config: AuditConfig, hindi: Boolean) {
+    fun followUp(config: AuditConfig, hindi: Boolean, speak: Boolean) {
         followUp?.cancel()
         val startedAt = System.currentTimeMillis()
         _busy.value = true
@@ -224,19 +224,15 @@ class VoiceAssistant private constructor(private val app: Application) {
                     graph.repository.audits.value.firstOrNull { it.targetPackage == config.targetPackage && it.createdAtMs >= startedAt && !it.sample }?.id
                 }
                 if (id == null) {
-                    val reason = (end as? AuditProgress.Failed)?.message
-                    voice.say(if (reason != null) AssistantCopy.checkStopped(reason) else AssistantCopy.checkCancelled, hindi)
+                    AssistantPlanner.checkEnded(null, (end as? AuditProgress.Failed)?.message, speak)?.let { voice.say(it, hindi) }
                     return@launch
                 }
                 val bundle = withContext(Dispatchers.IO) { graph.repository.load(id) } ?: return@launch
                 val evidence = copilotEvidence(bundle.meta, bundle.sessions, bundle.result)
                 // The live screen usually opens the result itself; this covers a user who moved elsewhere meanwhile.
                 delay(RESULT_SETTLE_MS)
-                if (AssistantBus.hostActive) AssistantBus.request(AssistantAction.Navigate(AssistantPlanner.resultRoute(id), optional = true), hindi, OPTIONAL_WAIT_MS)
-                val summary = Said(
-                    AuditSpokenSummary.summarize(evidence, CopilotLanguage.EN),
-                    AuditSpokenSummary.summarize(evidence, CopilotLanguage.HI),
-                )
+                if (AssistantBus.hostActive) AssistantBus.request(AssistantAction.Navigate(AssistantPlanner.resultRoute(id), optional = true), hindi, speak, OPTIONAL_WAIT_MS)
+                val summary = AssistantPlanner.checkEnded(evidence, null, speak) ?: return@launch
                 Log.i(TAG, "voice check finished; speaking its saved result")
                 voice.say(summary, hindi)
             } finally {
