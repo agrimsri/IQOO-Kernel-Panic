@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Single-colour TraceVeil mark for Android 13+ themed icons (only alpha is used). Same geometry as docs/brand/traceveil-mark-mono.svg, scaled like ic_launcher_foreground. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:name="arcInner"
+        android:pathData="M67.11,55.47 A8.57,8.57 0 0,1 55.47,67.11"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3.95" />
+    <path android:name="arcOuter"
+        android:pathData="M73.09,49.04 A17.14,17.14 0 0,1 72.13,71.28 M62.27,76.52 A17.14,17.14 0 0,1 49.04,73.09"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3.95" />
+    <path android:name="lookup"
+        android:pathData="M64.08,74.72 A3.56,3.56 0 1,1 71.2,74.72 A3.56,3.56 0 1,1 64.08,74.72 Z"
+        android:fillColor="#FFFFFFFF" />
+    <path android:name="veil"
+        android:pathData="M39.86,79.32 A29,29 0 1,1 79.32,39.86 A36.91,36.91 0 0,0 39.86,79.32 Z"
+        android:fillColor="#FFFFFFFF" />
+    <path android:name="lining"
+        android:pathData="M39.86,79.32 A42.18,42.18 0 0,1 79.32,39.86 Z"
+        android:fillColor="#FFFFFFFF" />
+</vector>

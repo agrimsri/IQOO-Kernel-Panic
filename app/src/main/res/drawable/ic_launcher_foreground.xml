@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TraceVeil mark: a lens under a lifted veil, two scan arcs and one red lookup. Same geometry as docs/brand/traceveil-mark.svg, scaled to a 29 dp lens radius (inside the 33 dp safe zone). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:name="lens"
+        android:pathData="M25,54 A29,29 0 1,1 83,54 A29,29 0 1,1 25,54 Z"
+        android:fillColor="#FF0B1824" />
+    <path android:name="arcInner"
+        android:pathData="M65.65,53.53 A8.57,8.57 0 0,1 53.53,65.65"
+        android:strokeColor="#FF7FD3E6"
+        android:strokeWidth="3.95" />
+    <path android:name="arcOuter"
+        android:pathData="M71.71,47.48 A17.14,17.14 0 0,1 72.13,71.28 M62.27,76.52 A17.14,17.14 0 0,1 47.48,71.71"
+        android:strokeColor="#FF7FD3E6"
+        android:strokeWidth="3.95"
+        android:strokeAlpha="0.55" />
+    <path android:name="lookup"
+        android:pathData="M64.08,74.72 A3.56,3.56 0 1,1 71.2,74.72 A3.56,3.56 0 1,1 64.08,74.72 Z"
+        android:fillColor="#FFFF5A4E" />
+    <path android:name="veil"
+        android:pathData="M39.86,79.32 A29,29 0 1,1 79.32,39.86 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="33.57" android:startY="33.57" android:endX="59.59" android:endY="59.59">
+                <item android:offset="0" android:color="#FFFAA275" />
+                <item android:offset="0.5" android:color="#FFFF8C61" />
+                <item android:offset="1" android:color="#FFCE6A85" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:name="shade"
+        android:pathData="M39.86,79.32 A35.59,35.59 0 0,1 79.32,39.86 Z"
+        android:fillColor="#FF8E3F5C"
+        android:fillAlpha="0.3" />
+    <path android:name="lining"
+        android:pathData="M39.86,79.32 A42.18,42.18 0 0,1 79.32,39.86 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="39.82" android:startY="39.82" android:endX="59.59" android:endY="59.59">
+                <item android:offset="0" android:color="#FFFFF1E8" />
+                <item android:offset="1" android:color="#FFFAA275" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>
