@@ -82,5 +82,7 @@ dependencies {
     implementation(libs.qnn.runtime)
 
     testImplementation(libs.junit)
+    // Test-only certificate chain builder for evidence signing (core/src/testFixtures).
+    testImplementation(testFixtures(project(":core")))
     testImplementation(libs.kotlinx.coroutines.test)
 }

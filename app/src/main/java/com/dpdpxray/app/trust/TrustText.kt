@@ -1,5 +1,6 @@
 package com.dpdpxray.app.trust
 
+import com.dpdpxray.core.evidence.EvidenceSignatures
 import com.dpdpxray.core.model.ScoreBand
 import java.util.Locale
 
@@ -93,6 +94,16 @@ object TrustText {
             "Your audits stay here",
             "Audits, consent-screen screenshots and reports are saved in TraceVeil's private storage on this phone.",
             "They leave the phone only when you tap Share or Save (Save copies to Downloads/TraceVeil). Deleting an audit deletes its folder.",
+        ),
+        Claim(
+            "Signing key for exports",
+            "Where this phone supports it, exported audit data is signed with a key kept in its secure hardware (StrongBox or TEE). The private key never leaves the phone.",
+            "Key \"${EvidenceSignatures.KEY_ALIAS}\" is made the first time audit data is exported and signs only audit data you export, " +
+                "or that TraceVeil Runner writes for a paired laptop. " +
+                "A laptop checks the signature offline with traceveil-ci verify: it shows the file is unchanged and was signed by a key " +
+                "in a phone's secure hardware that Android made for TraceVeil. It does not prove the phone was free of tampering or that " +
+                "what an audit recorded is true. A phone that cannot attest such a key shows \"${EvidenceSignatures.UNAVAILABLE}\" and " +
+                "exports unsigned.",
         ),
         Claim(
             "Android backup",
