@@ -66,6 +66,7 @@ dependencies {
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
     implementation(libs.litertlm.android)
+    implementation(libs.vosk.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
