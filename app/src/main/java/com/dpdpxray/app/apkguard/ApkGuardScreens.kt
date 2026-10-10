@@ -159,7 +159,12 @@ private fun InstalledRow(app: ApkInspector.ListedApp, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(app.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(app.packageName, fontFamily = Mono, fontSize = 12.sp, color = Film.boneDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(if (app.isSystem) "Came with the phone" else "Installed ${date(app.firstInstallTime)}", style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
+            Text(
+                when {
+                    app.isSystem -> "Came with the phone"
+                    ApkInspector.plausibleInstallTime(app.firstInstallTime) -> "Installed ${date(app.firstInstallTime)}"
+                    else -> "Install date not reported (preloaded)"
+                }, style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
         }
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (!app.hasLauncher) Tag("No launcher screen", Film.warn)

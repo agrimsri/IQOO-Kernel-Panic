@@ -169,4 +169,10 @@ class ApkGuardMappingTest {
         assertEquals("New app installed: com.x.app — check it before you open it", InstallAlertPolicy.alert(" ", ApkRiskRules.summary(emptyList()), "com.x.app").title)
         assertTrue(InstallAlertPolicy.alert("A".repeat(200), ApkRiskRules.summary(emptyList())).title.length < 120)
     }
+
+    @Test
+    fun `a preload date before Android 1_0 is not shown as an install date`() {
+        assertFalse(ApkInspector.plausibleInstallTime(3_456_000_000L)) // 10 Feb 1970, seen for vivo-preloaded PhonePe
+        assertTrue(ApkInspector.plausibleInstallTime(1_791_500_000_000L)) // Oct 2026
+    }
 }

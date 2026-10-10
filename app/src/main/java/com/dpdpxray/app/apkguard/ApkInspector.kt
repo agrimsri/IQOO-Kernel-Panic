@@ -89,7 +89,7 @@ object ApkInspector {
             facts = facts,
             icon = runCatching { ai.loadIcon(pm).toBitmap(128, 128) }.getOrNull(),
             isSystemApp = isSystem,
-            firstInstallTime = info.firstInstallTime,
+            firstInstallTime = info.firstInstallTime.takeIf(::plausibleInstallTime),
             lastUpdateTime = info.lastUpdateTime,
             initiatingPackage = initiating?.takeIf { it != installer },
         )
@@ -237,6 +237,14 @@ object ApkInspector {
         val label = info.applicationInfo?.let { runCatching { it.loadLabel(pm).toString() }.getOrNull() } ?: pkg
         return InstalledTwin(label, signers(info).map { ApkFactsMapper.sha256Hex(it.toByteArray()) })
     }
+
+    /**
+     * Android reports a date before Android 1.0 (e.g. "10 Feb 1970") for some apps the phone maker preloads; that is
+     * not a real install date, so it is shown as not reported.
+     */
+    fun plausibleInstallTime(epochMs: Long): Boolean = epochMs >= ANDROID_1_0_MS
+
+    private const val ANDROID_1_0_MS = 1_222_128_000_000L // 23 Sep 2008
 
     // --- installed list for the hub ---------------------------------------------------------------------------------
 
