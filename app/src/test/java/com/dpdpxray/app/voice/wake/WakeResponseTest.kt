@@ -6,14 +6,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Arming rules and stop explanations. */
 class WakeResponseTest {
-    @Test fun `a visible app changes screen directly, otherwise the user taps a notification`() {
-        assertEquals(WakeLaunch.DIRECT, WakeResponse.launch(appVisible = true, notificationsAllowed = true))
-        assertEquals(WakeLaunch.DIRECT, WakeResponse.launch(appVisible = true, notificationsAllowed = false))
-        assertEquals(WakeLaunch.NOTIFICATION, WakeResponse.launch(appVisible = false, notificationsAllowed = true))
-        assertEquals(WakeLaunch.NONE, WakeResponse.launch(appVisible = false, notificationsAllowed = false))
-    }
-
     private val ok = BatteryReading(70, charging = false, systemLow = false)
 
     @Test fun `arming needs the model, the microphone, a visible notification and battery`() {

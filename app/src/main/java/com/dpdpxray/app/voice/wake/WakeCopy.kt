@@ -2,6 +2,8 @@ package com.dpdpxray.app.voice.wake
 
 /** Plain on-screen and notification wording for Hey TraceVeil, kept in one place so it can be tested. */
 object WakeCopy {
+    const val HEARING_TITLE = "Hey TraceVeil heard you — listening for one command"
+
     fun notificationTitle(paused: Boolean): String =
         if (paused) "Hey TraceVeil is paused — tap to stop" else "Listening for “Hey TraceVeil” — tap to stop"
 

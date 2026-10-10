@@ -37,8 +37,12 @@ object WakeRuntime {
     private val _events = MutableStateFlow(WakeEventLog())
     val events: StateFlow<WakeEventLog> = _events.asStateFlow()
 
+    private val _uiVisible = MutableStateFlow(false)
     /** True while a TraceVeil activity is started (visible); set by [HeyTraceVeilHooks]. */
-    @Volatile var uiVisible: Boolean = false
+    val uiVisibleFlow: StateFlow<Boolean> = _uiVisible.asStateFlow()
+    var uiVisible: Boolean
+        get() = _uiVisible.value
+        set(value) { _uiVisible.value = value }
 
     private val _copilotOpen = MutableStateFlow(false)
     /** True while the voice copilot screen is the current destination; the wake word lets go of the microphone. */

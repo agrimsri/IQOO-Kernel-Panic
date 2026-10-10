@@ -208,18 +208,3 @@ object WakeArming {
         else -> WakeSessionPolicy.startProblem(battery)
     }
 }
-
-enum class WakeLaunch { DIRECT, NOTIFICATION, NONE }
-
-/**
- * How a command that needs TraceVeil's screen reaches it. Android 10+ blocks activity starts from the background, so
- * the screen changes directly only while TraceVeil is on screen (or Android lets it come forward); otherwise a
- * high-priority notification is posted for the user to tap. The spoken reply only promises what will actually happen.
- */
-object WakeResponse {
-    fun launch(appVisible: Boolean, notificationsAllowed: Boolean): WakeLaunch = when {
-        appVisible -> WakeLaunch.DIRECT
-        notificationsAllowed -> WakeLaunch.NOTIFICATION
-        else -> WakeLaunch.NONE
-    }
-}
