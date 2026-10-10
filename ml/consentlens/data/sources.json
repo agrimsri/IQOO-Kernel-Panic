@@ -1,0 +1,573 @@
+{
+ "sources": {
+  "aosp-permissioncontroller": {
+   "url": "https://android.googlesource.com/platform/packages/modules/Permission/+/26231a7eac744c7d2a8fea4740926620f56b20c6/PermissionController/res/",
+   "licence": "Apache-2.0",
+   "revision": "26231a7eac744c7d2a8fea4740926620f56b20c6",
+   "date": "2025-03-24 (commit date)",
+   "notice": "Copyright (C) The Android Open Source Project. Licensed under the Apache License, Version 2.0."
+  },
+  "aosp-framework": {
+   "url": "https://android.googlesource.com/platform/frameworks/base/+/1cdfff555f4a21f71ccc978290e2e212e2f8b168/core/res/res/",
+   "licence": "Apache-2.0",
+   "revision": "1cdfff555f4a21f71ccc978290e2e212e2f8b168",
+   "date": "refs/heads/main on 2026-10-10",
+   "notice": "Copyright (C) The Android Open Source Project. Licensed under the Apache License, Version 2.0."
+  },
+  "klaro": {
+   "url": "https://github.com/kiprotect/klaro/tree/db9f1aca906a392990c58c58475366a091012ea7/src/translations",
+   "licence": "BSD-3-Clause",
+   "revision": "db9f1aca906a392990c58c58475366a091012ea7",
+   "date": "2025-03-27",
+   "notice": "Copyright (c) 2019-2020, KIProtect GmbH and Klaro contributors. BSD 3-Clause License."
+  },
+  "tarteaucitron": {
+   "url": "https://github.com/AmauriC/tarteaucitron.js/tree/07254bb6ff2858e2ab6a9b45c391d655a55a9c54/lang",
+   "licence": "MIT",
+   "revision": "07254bb6ff2858e2ab6a9b45c391d655a55a9c54",
+   "date": "2026-10-08",
+   "notice": "Copyright (c) Amauri CHAMPEAUX and tarteaucitron.js contributors. MIT License."
+  },
+  "traceveil-lexicon": {
+   "url": "core/src/main/kotlin/com/dpdpxray/core/consent/ConsentLexicon.kt and core/.../screen/ScreenAuditing.kt",
+   "licence": "MIT (this repository)",
+   "revision": "repository HEAD",
+   "date": "2026-10-10",
+   "notice": "TraceVeil's own deterministic lexicon (EN/HI/KN)."
+  },
+  "traceveil-leakyshop": {
+   "url": "leakyshop/src/main/java/com/leakyshop/demo/Shop.kt",
+   "licence": "MIT (this repository)",
+   "revision": "repository HEAD",
+   "date": "2026-10-10",
+   "notice": "Consent dialog strings of TraceVeil's controlled demo app (leaky and fixed flavours)."
+  }
+ },
+ "stats": {
+  "rows_before_dedupe": 21748,
+  "rows": 18655,
+  "dropped_conflicting_texts": [
+   {
+    "lang_group": "el",
+    "text": "Εξατομίκευση",
+    "roles": [
+     "MANAGE",
+     "PURPOSE_NOTICE"
+    ],
+    "keys": [
+     "aosp-permissioncontroller:permission_rationale_purpose_personalization",
+     "tarteaucitron:personalize"
+    ]
+   },
+   {
+    "lang_group": "kk",
+    "text": "Өшіру",
+    "roles": [
+     "OTHER",
+     "REJECT"
+    ],
+    "keys": [
+     "aosp-framework:sms_control_no",
+     "aosp-permissioncontroller:off"
+    ]
+   },
+   {
+    "lang_group": "ko",
+    "text": "맞춤설정",
+    "roles": [
+     "OTHER",
+     "PURPOSE_NOTICE"
+    ],
+    "keys": [
+     "aosp-framework:relationTypeCustom",
+     "aosp-permissioncontroller:permission_rationale_purpose_personalization"
+    ]
+   },
+   {
+    "lang_group": "ky",
+    "text": "Жок",
+    "roles": [
+     "OTHER",
+     "REJECT"
+    ],
+    "keys": [
+     "aosp-framework:accessibility_dialog_button_deny",
+     "aosp-permissioncontroller:app_permission_button_deny",
+     "aosp-permissioncontroller:default_app_none",
+     "aosp-permissioncontroller:grant_dialog_button_deny"
+    ]
+   },
+   {
+    "lang_group": "pl",
+    "text": "Personalizacja",
+    "roles": [
+     "MANAGE",
+     "PURPOSE_NOTICE"
+    ],
+    "keys": [
+     "aosp-permissioncontroller:permission_rationale_purpose_personalization",
+     "tarteaucitron:personalize"
+    ]
+   },
+   {
+    "lang_group": "sv",
+    "text": "Anpassning",
+    "roles": [
+     "OTHER",
+     "PURPOSE_NOTICE"
+    ],
+    "keys": [
+     "aosp-framework:screen_compat_mode_scale",
+     "aosp-permissioncontroller:permission_rationale_purpose_personalization"
+    ]
+   },
+   {
+    "lang_group": "zh",
+    "text": "个性化",
+    "roles": [
+     "MANAGE",
+     "PURPOSE_NOTICE"
+    ],
+    "keys": [
+     "aosp-permissioncontroller:permission_rationale_purpose_personalization",
+     "tarteaucitron:personalize"
+    ]
+   },
+   {
+    "lang_group": "fr",
+    "text": "Personnaliser",
+    "roles": [
+     "MANAGE",
+     "OTHER"
+    ],
+    "keys": [
+     "aosp-framework:relationTypeCustom",
+     "tarteaucitron:personalize"
+    ]
+   },
+   {
+    "lang_group": "ko",
+    "text": "사용 안함",
+    "roles": [
+     "OTHER",
+     "REJECT"
+    ],
+    "keys": [
+     "aosp-framework:accessibility_shortcut_menu_item_status_off",
+     "aosp-framework:autofill_save_no"
+    ]
+   }
+  ],
+  "aosp_other_keys": [
+   "active_call_usage_qs",
+   "adjust_user_sensitive_per_app_header",
+   "all_unused_apps_category_title",
+   "app_name_unknown",
+   "app_not_found_dlg_title",
+   "assistant_record_audio_user_sensitive_summary",
+   "assistant_record_audio_user_sensitive_title",
+   "auto_revoke_setting_subtitle",
+   "automotive_blocked_required_app_summary",
+   "automotive_required_app_summary",
+   "automotive_required_app_title",
+   "blocked_location_title",
+   "blocked_sensor_summary",
+   "camera_usage_qs",
+   "default_app_none",
+   "default_apps",
+   "default_apps_manage_domain_urls",
+   "default_payment_app_other_nfc_services",
+   "default_permission_description",
+   "encryption_unaware_confirmation_message",
+   "filter_by_time",
+   "home_missing_work_profile_support",
+   "loading",
+   "menu_hide_system",
+   "menu_show_system",
+   "message_staging",
+   "off",
+   "one_unused_app_summary",
+   "ongoing_usage_dialog_last_separator",
+   "ongoing_usage_dialog_title_camera",
+   "other_permissions",
+   "permgrouprequest_finelocation_imagetext",
+   "permission_history_category_today",
+   "permission_history_category_yesterday",
+   "permission_subtitle_all_files",
+   "permission_subtitle_media_only",
+   "permission_usage_refresh",
+   "privacy_dashboard_emergency_location_dialog_title",
+   "privdash_label_7d",
+   "recent_call_usage_qs",
+   "request_role_current_default",
+   "request_role_set_as_default",
+   "role_assistant_label",
+   "role_automotive_navigation_label",
+   "role_browser_label",
+   "role_browser_short_label",
+   "role_call_redirection_label",
+   "role_call_screening_label",
+   "role_dialer_label",
+   "role_emergency_label",
+   "role_emergency_search_keywords",
+   "role_home_label",
+   "role_home_search_keywords",
+   "role_notes_label",
+   "role_notes_short_label",
+   "role_sms_short_label",
+   "role_wallet_label",
+   "role_wallet_short_label",
+   "safety_center_notification_app_label",
+   "safety_center_rescan_button",
+   "safety_center_view_recent_location_access",
+   "safety_privacy_qs_tile_subtitle",
+   "show_password_summary",
+   "sort_by_time",
+   "sort_spinner_recent",
+   "unused_apps",
+   "unused_apps_page_title",
+   "unused_apps_title",
+   "wear_check_your_phone_title",
+   "wear_phone_connection_error"
+  ],
+  "framework_other_keys": [
+   "CwMmi",
+   "PERSOSUBSTATE_RUIM_NETWORK2_SUCCESS",
+   "PERSOSUBSTATE_RUIM_RUIM_IN_PROGRESS",
+   "PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_ERROR",
+   "PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_PUK_IN_PROGRESS",
+   "PERSOSUBSTATE_SIM_NETWORK_PUK_ERROR",
+   "PERSOSUBSTATE_SIM_NETWORK_SUBSET_IN_PROGRESS",
+   "PERSOSUBSTATE_SIM_NETWORK_SUBSET_PUK_IN_PROGRESS",
+   "PERSOSUBSTATE_SIM_SIM_IN_PROGRESS",
+   "ThreeWCMmi",
+   "accessibility_label_clone_profile",
+   "accessibility_shortcut_menu_item_status_off",
+   "accessibility_system_action_dpad_left_label",
+   "activity_chooser_view_see_all",
+   "adb_active_notification_title",
+   "android_start_title",
+   "app_category_game",
+   "app_category_news",
+   "app_category_social",
+   "app_suspended_unsuspend_message",
+   "autofill_save_type_generic_card",
+   "autofill_save_type_username",
+   "biometric_error_generic",
+   "biometric_or_screen_lock_app_setting_name",
+   "car_mode_disable_notification_message",
+   "country_detector",
+   "csd_momentary_exposure_warning",
+   "date_picker_decrement_year_button",
+   "delete",
+   "description_target_unlock_tablet",
+   "display_manager_overlay_display_secure_suffix",
+   "display_rotation_camera_compat_toast_after_rotation",
+   "dynamic_mode_notification_title_v2",
+   "editTextMenuTitle",
+   "eventTypeBirthday",
+   "face_acquired_too_dark",
+   "face_error_not_enrolled",
+   "fingerprint_acquired_already_enrolled",
+   "fingerprint_acquired_insufficient",
+   "fingerprint_acquired_too_bright",
+   "fingerprint_authenticated",
+   "fingerprint_error_lockout_permanent",
+   "fingerprint_error_not_match",
+   "fingerprint_error_timeout",
+   "fingerprint_recalibrate_notification_name",
+   "fp_power_button_enrollment_title",
+   "global_action_assist",
+   "global_action_power_options",
+   "hour_picker_description",
+   "httpErrorBadUrl",
+   "importance_from_user",
+   "input_method_binding_label",
+   "input_method_ime_switch_button_desc",
+   "install_carrier_app_notification_title",
+   "invalidPuk",
+   "js_dialog_before_unload_negative_button",
+   "keyboard_shortcut_group_applications_maps",
+   "keyboardview_keycode_enter",
+   "keyguard_password_enter_pin_password_code",
+   "kg_invalid_sim_pin_hint",
+   "lockscreen_glogin_invalid_input",
+   "lockscreen_glogin_submit_button",
+   "lockscreen_sim_puk_locked_message",
+   "media_route_status_scanning",
+   "mediasize_chinese_prc_2",
+   "mediasize_chinese_roc_16k",
+   "mediasize_iso_b9",
+   "mediasize_iso_c6",
+   "mediasize_japanese_chou3",
+   "mediasize_japanese_chou4",
+   "mediasize_japanese_jis_b3",
+   "mediasize_japanese_you4",
+   "mediasize_na_ledger",
+   "mediasize_na_letter",
+   "mediasize_na_monarch",
+   "miniresolver_use_work_browser",
+   "mmiErrorNotSupported",
+   "needPuk",
+   "notification_channel_usb",
+   "notification_hidden_text",
+   "notification_history_title_placeholder",
+   "number_picker_increment_scroll_action",
+   "permgrouplab_contacts",
+   "permgrouplab_sms",
+   "permlab_bindCellBroadcastService",
+   "permlab_bindConditionProviderService",
+   "permlab_bluetooth_advertise",
+   "permlab_schedule_exact_alarm",
+   "permlab_turnScreenOn",
+   "permlab_writeSyncSettings",
+   "phoneTypeFaxHome",
+   "recent_tasks_title",
+   "region_picker_section_all",
+   "relationTypeCustom",
+   "reset",
+   "ringtone_picker_title",
+   "roamingText2",
+   "safeMode",
+   "satellite_messaging_unsupported_default_sms_app_notification_summary",
+   "screen_compat_mode_scale",
+   "seconds",
+   "select_multiple_keyboards_layout_notification_title",
+   "serviceClassSMS",
+   "serviceNotProvisioned",
+   "silent_mode",
+   "sipAddressTypeWork",
+   "sms_short_code_confirm_allow",
+   "storage_usb",
+   "time_picker_increment_minute_button",
+   "usb_contaminant_not_detected_title",
+   "usb_midi_peripheral_manufacturer_name",
+   "volume_bluetooth_call",
+   "volume_call",
+   "volume_music",
+   "volume_music_hint_playing_through_bluetooth",
+   "vr_listener_binding_label",
+   "wfcSpnFormat_wifi_calling_wo_hyphen",
+   "wfc_mode_wifi_preferred_summary",
+   "whichViewApplicationLabel",
+   "work_profile_telephony_paused_turn_on_button"
+  ],
+  "skipped": [
+   [
+    "ca",
+    "consentNotice.description",
+    "1 sentences, split not reviewed"
+   ],
+   [
+    "cs",
+    "consentNotice.description",
+    "4 sentences, split not reviewed"
+   ],
+   [
+    "da",
+    "consentNotice.description",
+    "1 sentences, split not reviewed"
+   ],
+   [
+    "el",
+    "consentNotice.description",
+    "1 sentences, split not reviewed"
+   ],
+   [
+    "fi",
+    "consentNotice.description",
+    "1 sentences, split not reviewed"
+   ],
+   [
+    "hr",
+    "consentNotice.description",
+    "1 sentences, split not reviewed"
+   ],
+   [
+    "hu",
+    "*",
+    "YAML parse error: mapping values are not allowed here"
+   ],
+   [
+    "no",
+    "consentNotice.description",
+    "1 sentences, split not reviewed"
+   ],
+   [
+    "ro",
+    "consentNotice.description",
+    "2 sentences, split not reviewed"
+   ],
+   [
+    "ru",
+    "consentNotice.description",
+    "1 sentences, split not reviewed"
+   ],
+   [
+    "sr",
+    "consentNotice.description",
+    "1 sentences, split not reviewed"
+   ],
+   [
+    "sr-Cyrl",
+    "consentNotice.description",
+    "1 sentences, split not reviewed"
+   ],
+   [
+    "sv",
+    "consentNotice.description",
+    "1 sentences, split not reviewed"
+   ],
+   [
+    "tr",
+    "consentNotice.description",
+    "1 sentences, split not reviewed"
+   ],
+   [
+    "tr",
+    "*",
+    "parse error Expecting ',' delimiter: line 65 column 120 (char 2725)"
+   ]
+  ],
+  "by_source": {
+   "aosp-framework": 9419,
+   "aosp-permissioncontroller": 8197,
+   "klaro": 281,
+   "tarteaucitron": 701,
+   "traceveil-leakyshop": 13,
+   "traceveil-lexicon": 44
+  },
+  "by_role": {
+   "OTHER": 14701,
+   "ACCEPT": 957,
+   "REJECT": 601,
+   "MANAGE": 488,
+   "PURPOSE_NOTICE": 1515,
+   "PRIVACY_LINK": 211,
+   "WITHDRAW_INFO": 182
+  },
+  "by_lang_group": {
+   "af": 223,
+   "am": 227,
+   "ar": 249,
+   "as": 227,
+   "az": 226,
+   "be": 225,
+   "bg": 261,
+   "bn": 227,
+   "bs": 225,
+   "ca": 251,
+   "cs": 259,
+   "da": 246,
+   "de": 267,
+   "el": 252,
+   "en": 327,
+   "es": 403,
+   "et": 245,
+   "eu": 225,
+   "fa": 225,
+   "fi": 250,
+   "fr": 377,
+   "gl": 244,
+   "gu": 226,
+   "hi": 244,
+   "hr": 251,
+   "hu": 245,
+   "hy": 227,
+   "id": 224,
+   "is": 225,
+   "it": 265,
+   "he": 227,
+   "ja": 246,
+   "ka": 226,
+   "kk": 227,
+   "km": 226,
+   "kn": 228,
+   "ko": 238,
+   "ky": 225,
+   "lo": 223,
+   "lt": 247,
+   "lv": 247,
+   "mk": 226,
+   "ml": 226,
+   "mn": 225,
+   "mr": 226,
+   "ms": 227,
+   "my": 225,
+   "no": 250,
+   "ne": 226,
+   "nl": 263,
+   "or": 226,
+   "pa": 225,
+   "pl": 266,
+   "pt": 421,
+   "ro": 248,
+   "ru": 249,
+   "si": 227,
+   "sk": 248,
+   "sl": 224,
+   "sq": 246,
+   "sr": 440,
+   "sv": 251,
+   "sw": 226,
+   "ta": 224,
+   "te": 229,
+   "th": 224,
+   "tl": 226,
+   "tr": 228,
+   "uk": 249,
+   "ur": 224,
+   "uz": 225,
+   "vi": 246,
+   "zh": 569,
+   "zu": 228,
+   "oc": 42,
+   "lb": 22
+  },
+  "by_source_role": {
+   "aosp-permissioncontroller": {
+    "OTHER": 5353,
+    "MANAGE": 394,
+    "PURPOSE_NOTICE": 1099,
+    "ACCEPT": 722,
+    "REJECT": 308,
+    "PRIVACY_LINK": 159,
+    "WITHDRAW_INFO": 162
+   },
+   "aosp-framework": {
+    "OTHER": 9112,
+    "ACCEPT": 88,
+    "REJECT": 219
+   },
+   "klaro": {
+    "PURPOSE_NOTICE": 108,
+    "WITHDRAW_INFO": 12,
+    "OTHER": 38,
+    "ACCEPT": 60,
+    "PRIVACY_LINK": 26,
+    "MANAGE": 25,
+    "REJECT": 12
+   },
+   "tarteaucitron": {
+    "ACCEPT": 71,
+    "OTHER": 197,
+    "PURPOSE_NOTICE": 299,
+    "MANAGE": 61,
+    "REJECT": 47,
+    "PRIVACY_LINK": 26
+   },
+   "traceveil-lexicon": {
+    "ACCEPT": 15,
+    "REJECT": 15,
+    "MANAGE": 8,
+    "WITHDRAW_INFO": 6
+   },
+   "traceveil-leakyshop": {
+    "ACCEPT": 1,
+    "PURPOSE_NOTICE": 9,
+    "WITHDRAW_INFO": 2,
+    "OTHER": 1
+   }
+  }
+ }
+}
