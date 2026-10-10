@@ -21,7 +21,7 @@ This is what `final.bash` does, as plain commands. You need Python 3.11+ and `ad
 # 1. Install the CLI in a clean virtual environment
 python3 -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install traceveil==0.2.0         # or: pipx install traceveil
+pip install --upgrade traceveil      # or: pipx install traceveil
 traceveil --version
 
 # 2. Check the phone (USB debugging on, Traceveil debug APK installed)
@@ -140,6 +140,32 @@ traceveil sdks --apk app-debug.apk --report <request_id> --package com.example.a
 Each row gets next steps: gate the SDK on consent if it was looked up before consent or after Reject; remove it if unused; and, for ad SDKs in an app that requests location (from `--package`), review the SDK's location defaults.
 `--fail-on-consent` exits 1 when a bundled SDK was looked up before consent or after Reject. `--json` / `--out` give the JSON inventory.
 The signature list (`src/traceveil/data/sdk_signatures.json`) is hand-written from public package names and covers the tracker catalogue's entities. Obfuscated or unlisted SDKs are not recognised; bundled code does not prove it ran; a lookup does not prove what data was sent.
+
+## 3b. Several privacy laws: `--jurisdictions` and `traceveil laws`
+
+The checks (C1-C15, NC) are observations, so they are the same everywhere. Each jurisdiction only changes **which provisions they map to and how much they weigh**. The score uses the app's formula (100 minus weights; inferred findings count half; READY >= 85, NEEDS_WORK >= 60).
+
+| id | Jurisdiction | Law | Model |
+|---|---|---|---|
+| `in` | India | DPDP Act 2023 + DPDP Rules 2025 | opt-in; uses the app's own severities, so its score always equals the app score |
+| `eu` | European Union | GDPR + ePrivacy Directive Art 5(3) | opt-in; prior consent for device access |
+| `uk` | United Kingdom | UK GDPR + DPA 2018 + PECR reg 6 | opt-in; prior consent for storage/access |
+| `us-ca` | California | CCPA/CPRA + CCPA Regulations; COPPA under 13 | notice at collection + opt-out (opt-in under 16) |
+| `br` | Brazil | LGPD | opt-in consent |
+
+Examples of what changes: under California's opt-out model, trackers before a choice (C1) weigh MEDIUM, not HIGH, but tracking after an opt-out (C2) stays CRITICAL. GDPR, UK GDPR and LGPD have no language list, so C8 is not scored there. Evidence problems (V0, or U1 naming trackers) make **every** jurisdiction inconclusive.
+
+```bash
+traceveil audit --package com.example.app                        # summary ends with a per-jurisdiction table
+traceveil audit --package com.example.app --policy eu            # the EU score/severities decide the exit code
+traceveil laws                                                   # re-read the newest saved report, no phone needed
+traceveil laws --report <request_id> --jurisdictions eu,us-ca --detail   # each finding with its provisions
+traceveil laws --list                                            # the laws and their official sources
+```
+
+Config: `audit.jurisdictions` (default all five) and `audit.policy` (default `in`, so exit codes are unchanged). The saved report gains a `jurisdictions` block. The mapping lives in `src/traceveil/data/jurisdictions.json` with official source links. **Severities are Traceveil's risk ranking for prioritising fixes, not legal advice or a compliance verdict.**
+
+Colours: summaries colour severities (CRITICAL, HIGH, MEDIUM, LOW), scores and bands, and tracker names, when the output is a terminal. `NO_COLOR=1` turns colours off; `FORCE_COLOR=1` keeps them on in pipes.
 
 ## 4. Exit codes (for scripts and CI)
 

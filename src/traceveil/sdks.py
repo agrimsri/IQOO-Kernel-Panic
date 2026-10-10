@@ -16,6 +16,7 @@ from importlib import resources
 from pathlib import Path
 
 from . import __version__
+from .colors import PLAIN, Style
 
 SCHEMA_VERSION = 1
 PRE_CONSENT = {"BEFORE_CONSENT", "NO_CONSENT_SEEN"}
@@ -181,7 +182,7 @@ def needs_attention(inv: dict) -> list[str]:
 _LABEL = {"in-apk-and-live": "in APK + live", "in-apk-only": "in APK only", "live-only": "live only"}
 
 
-def summary(inv: dict) -> str:
+def summary(inv: dict, style: Style = PLAIN) -> str:
     a = inv["apk"]
     lines = [f"Traceveil SDK inventory  {a['file']}  ({a['dexFiles']} dex, {a['classes']} classes)"]
     if inv["audit"]:
@@ -199,9 +200,13 @@ def summary(inv: dict) -> str:
             live = (f"{n} lookup{'' if n == 1 else 's'}" if n is not None else "named in findings") + (f": {', '.join(r['observed']['phases'])}" if r["observed"]["phases"] else "")
         elif inv["audit"]:
             live = "not looked up in this audit"
-        lines.append(f"  {_LABEL[r['status']]:<14} {r['entity']:<30} {r['category']:<15} {live}")
+        label = f"{_LABEL[r['status']]:<14}"
+        label = style.bad(label) if r["status"] == "in-apk-and-live" and r["observed"] and set(r["observed"]["phases"]) & (PRE_CONSENT | {"AFTER_REJECT"}) \
+            else style.warn(label) if r["status"] == "live-only" else style.dim(label) if r["status"] == "in-apk-only" else label
+        name = style.tracker(f"{r['entity']:<30}")
+        lines.append(f"  {label} {name} {r['category']:<15} {live}")
         for act in r["actions"]:
-            lines.append(f"      - {act}")
+            lines.append(f"      {style.dim('-')} {act}")
     if a["obfuscatedShare"] >= 0.3:
         lines.append(f"  note: {a['obfuscatedShare']:.0%} of classes look obfuscated; renamed SDKs are not recognised")
     c = inv["counts"]

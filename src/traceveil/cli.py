@@ -9,7 +9,8 @@ import sys
 from pathlib import Path
 
 from . import (audit, EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_POLICY, EXIT_USAGE, __version__, adb, config, egress,
-               netenv, report, sdks, shizuku)
+               laws, netenv, report, sdks, shizuku)
+from .colors import Style, enabled_for
 
 
 def _common(default) -> argparse.ArgumentParser:
@@ -41,6 +42,17 @@ def _parser() -> argparse.ArgumentParser:
     a.add_argument("--resume", metavar="REQUEST_ID", help="fetch the result of an earlier request instead of starting a new audit")
     a.add_argument("--json", action="store_true", help="print the JSON report instead of the summary")
     a.add_argument("--out", help="also write the JSON report to this file")
+    a.add_argument("--jurisdictions", help="laws to read the result under: comma list of in,eu,uk,us-ca,br or 'all' (default: audit.jurisdictions)")
+    a.add_argument("--policy", help="jurisdiction whose score and severities decide the exit code (default: audit.policy = in)")
+
+    lw = sub.add_parser("laws", parents=[shared], help="read a saved audit report under several privacy laws (no phone needed)")
+    lw.add_argument("--report", help="audit report: a JSON file, or a request id saved under output.dir (default: the newest)")
+    lw.add_argument("--jurisdictions", help="comma list of in,eu,uk,us-ca,br or 'all' (default: audit.jurisdictions)")
+    lw.add_argument("--policy", help="jurisdiction that decides the exit code (default: audit.policy = in)")
+    lw.add_argument("--detail", action="store_true", help="show each finding with the provisions it maps to")
+    lw.add_argument("--list", action="store_true", help="list the jurisdictions and their laws, then exit")
+    lw.add_argument("--json", action="store_true", help="print the JSON assessment instead of the summary")
+    lw.add_argument("--out", help="also write the JSON assessment to this file")
 
     k = sub.add_parser("sdks", parents=[shared], help="list tracking SDKs bundled in an APK and compare them with an audit's live lookups")
     k.add_argument("--apk", required=True, help="APK to inspect (no phone needed for this part)")
@@ -84,9 +96,10 @@ def cmd_doctor(args, cfg, dev: adb.Device) -> int:
     # An unset mode is Android's "Automatic": encrypted DNS can be used, which hides lookups from capture.
     rows.append(("Private DNS off", pdns == "off", f"mode={pdns or 'unset (Automatic)'}; set Private DNS to Off so lookups stay visible"))
     bad = 0
+    st = Style(enabled_for(sys.stdout))
     for name, ok, note in rows:
         bad += 0 if ok else 1
-        print(f"  [{'ok' if ok else '!!'}] {name:<22} {note}")
+        print(f"  [{st.ok('ok') if ok else st.warn('!!')}] {name:<22} {note}")
     print("  note: VPN permission, accessibility service and Shizuku grant are app-side and are checked from the Traceveil home screen.")
     return EXIT_PASS if bad == 0 else EXIT_DEVICE
 
@@ -120,13 +133,20 @@ def cmd_env(args, cfg, dev: adb.Device) -> int:
 
 
 def cmd_audit(args, cfg, dev: adb.Device) -> int:
-    io = audit.Io(interactive=sys.stdin.isatty() and sys.stdout.isatty(), color=sys.stderr.isatty() and not os.environ.get("NO_COLOR"))
+    io = audit.Io(interactive=sys.stdin.isatty() and sys.stdout.isatty(), color=enabled_for(sys.stderr),
+                  color_out=enabled_for(sys.stdout))
     plans = args.plans or None
     return audit.run_audit(dev, cfg, io, package=args.package or "", plans=plans, auto_drive=args.auto_drive, reset=args.reset,
-                           wait_s=args.wait, resume=args.resume, as_json=args.json, out_file=args.out)
+                           wait_s=args.wait, resume=args.resume, as_json=args.json, out_file=args.out,
+                           jurisdictions=args.jurisdictions, policy=args.policy)
 
 
-def _load_report(ref: str, cfg) -> dict:
+def _load_report(ref: str | None, cfg) -> dict:
+    if ref is None:
+        saved = sorted(Path(cfg["output"]["dir"]).glob("*.json"), key=lambda p: p.stat().st_mtime)
+        if not saved:
+            raise FileNotFoundError(f"no saved audit reports in {cfg['output']['dir']}; pass --report")
+        ref = str(saved[-1])
     path = Path(ref)
     if not path.exists():
         path = Path(cfg["output"]["dir"]) / f"{ref}.json"
@@ -157,7 +177,7 @@ def cmd_sdks(args, cfg, dev=None) -> int:
     except sdks.ApkError as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_INCONCLUSIVE
-    print(report.dumps(inv) if args.json else sdks.summary(inv))
+    print(report.dumps(inv) if args.json else sdks.summary(inv, Style(enabled_for(sys.stdout))))
     if args.out:
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.out).write_text(report.dumps(inv), encoding="utf-8")
@@ -165,6 +185,34 @@ def cmd_sdks(args, cfg, dev=None) -> int:
     if flagged:
         print(f"policy: {len(flagged)} bundled SDK(s) looked up before consent or after Reject: {', '.join(flagged)}", file=sys.stderr)
     return EXIT_FINDINGS if flagged else EXIT_PASS
+
+
+def cmd_laws(args, cfg, dev=None) -> int:
+    st = Style(enabled_for(sys.stdout))
+    if args.list:
+        for p in laws.load_profiles():
+            print(f"  {st.bold(p['id']):<8} {p['name']:<16} {p['law']}")
+            print(f"           {st.dim(p['model'] + '  ' + ' '.join(p['sources']))}")
+        return EXIT_PASS
+    try:
+        rep = _load_report(args.report, cfg)
+        block = laws.assess_all(rep, args.jurisdictions or cfg["audit"]["jurisdictions"], args.policy or cfg["audit"]["policy"])
+    except (OSError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    code, reasons = audit.exit_for_report(laws.policy_view(block), cfg["audit"]["fail_on"], int(cfg["audit"]["min_score"]))
+    if args.json:
+        print(report.dumps(block))
+    else:
+        t = rep.get("target", {})
+        print(f"Traceveil laws  {st.bold(t.get('label', '?'))} ({t.get('package', '?')})  report {rep.get('requestId', '?')}")
+        print(laws.detail(block, st) if args.detail else "\n".join(laws.table(block, st)))
+        for r in reasons:
+            print(f"  {st.warn('policy:')} {r}")
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(report.dumps(block), encoding="utf-8")
+    return code
 
 
 def cmd_init(args, cfg, dev=None) -> int:
@@ -189,6 +237,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_init(args, cfg)
         if args.command == "sdks":
             return cmd_sdks(args, cfg)
+        if args.command == "laws":
+            return cmd_laws(args, cfg)
         dev = adb.connect(args.adb or cfg["device"]["adb"] or None, args.serial or cfg["device"]["serial"] or None, args.timeout)
         return {"doctor": cmd_doctor, "env": cmd_env, "audit": cmd_audit}[args.command](args, cfg, dev)
     except config.ConfigError as e:

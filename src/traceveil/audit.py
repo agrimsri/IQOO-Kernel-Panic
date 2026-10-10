@@ -13,7 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, adb
+from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, adb, laws
+from .colors import PLAIN, Style
 from .netenv import OWN_PACKAGE
 
 ACTION = "com.dpdpxray.app.debug.RUN_AUDIT"
@@ -34,6 +35,7 @@ class Io:
     color: bool = False
     prompt: Callable[[str], str] = input
     poll_s: float = 2.0
+    color_out: bool = False   # colours in the summary on stdout (`color` covers stderr messages)
 
     def __post_init__(self):
         self.out = self.out or sys.stdout
@@ -116,13 +118,28 @@ def exit_for_report(rep: dict, fail_on: str, min_score: int) -> tuple[int, list[
     return (EXIT_FINDINGS if reasons else EXIT_PASS), reasons
 
 
-def summary(rep: dict, reasons: list[str], saved: Path) -> str:
+MAX_NAMES = 4
+
+
+def _names(entities: list, style: Style) -> str:
+    shown = ", ".join(style.tracker(e) for e in entities[:MAX_NAMES])
+    return shown + (style.dim(f" (+{len(entities) - MAX_NAMES} more)") if len(entities) > MAX_NAMES else "")
+
+
+def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) -> str:
     t = rep["target"]
-    lines = [f"Traceveil audit  {t.get('label', '?')} ({t.get('package', '?')})  score {rep['score']} / {rep['band']}  findings {len(rep['findings'])}"]
+    lines = [f"Traceveil audit  {style.bold(t.get('label', '?'))} ({t.get('package', '?')})  "
+             f"score {style.score(rep['score'], rep['band'])} / {style.band(rep['band'])}  findings {len(rep['findings'])}"]
     for f in rep["findings"]:
-        lines.append(f"  {f.get('check', '?'):<4} {f.get('severity', '?'):<8} {f.get('title', '')}")
+        sev = str(f.get("severity", "?"))
+        tag = style.dim(" inferred") if str(f.get("evidenceType", "")).upper() == "INFERRED" else ""
+        lines.append(f"  {f.get('check', '?'):<4} {style.severity(sev, 8)} {f.get('title', '')}{tag}")
+        if f.get("entities"):
+            lines.append(f"       {style.dim('trackers:')} {_names(f['entities'], style)}")
+    if rep.get("jurisdictions"):
+        lines += laws.table(rep["jurisdictions"], style)
     for r in reasons:
-        lines.append(f"  policy: {r}")
+        lines.append(f"  {style.warn('policy:')} {r}")
     lines.append(f"  report saved: {saved}")
     return "\n".join(lines)
 
@@ -153,7 +170,7 @@ def _wait_for_device(dev, io: Io, deadline: list[float], request_id: str) -> boo
 
 def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_drive: bool, reset: bool, wait_s: float,
               resume: str | None, as_json: bool, out_file: str | None, request_id: str | None = None,
-              fail_on_override: str | None = None) -> int:
+              fail_on_override: str | None = None, jurisdictions=None, policy: str | None = None) -> int:
     request_id = resume or request_id or new_request_id()
     package = package or cfg["target"]["package"]
     if not resume and not package:
@@ -200,6 +217,10 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
     if rep is None:
         return _fail(io, problem, EXIT_INCONCLUSIVE)
 
+    try:
+        rep["jurisdictions"] = laws.assess_all(rep, jurisdictions or cfg["audit"]["jurisdictions"], policy or cfg["audit"]["policy"])
+    except ValueError as e:
+        return _fail(io, str(e), EXIT_USAGE)
     out_dir = Path(cfg["output"]["dir"])
     out_dir.mkdir(parents=True, exist_ok=True)
     saved = out_dir / f"{request_id}.json"
@@ -207,6 +228,7 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
     if out_file:
         Path(out_file).parent.mkdir(parents=True, exist_ok=True)
         Path(out_file).write_text(json.dumps(rep, indent=2), encoding="utf-8")
-    code, reasons = exit_for_report(rep, fail_on_override or cfg["audit"]["fail_on"], int(cfg["audit"]["min_score"]))
-    print(json.dumps(rep, indent=2) if as_json else summary(rep, reasons, saved), file=io.out)
+    code, reasons = exit_for_report(laws.policy_view(rep["jurisdictions"]), fail_on_override or cfg["audit"]["fail_on"],
+                                    int(cfg["audit"]["min_score"]))
+    print(json.dumps(rep, indent=2) if as_json else summary(rep, reasons, saved, Style(io.color_out)), file=io.out)
     return code
