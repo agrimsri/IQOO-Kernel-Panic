@@ -43,6 +43,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Launcher shortcuts and "Hey Google, open TraceVeil …" features; Google stays the default assistant. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <!-- Started only from the Settings button while TraceVeil is on screen; never exported, never on boot. -->
