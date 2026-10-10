@@ -172,7 +172,8 @@ A **quick audit** runs one plan (open the app and accept) in about 40 seconds.
 kernel-panic/
 ├── core/        Pure Kotlin/JVM library: all the logic, fully unit-tested
 ├── app/         The Android app (Jetpack Compose)
-└── leakyshop/   A small test app with "leaky" and "fixed" flavours
+├── leakyshop/   A small test app with "leaky" and "fixed" flavours
+└── riskdemo/    A harmless TEST app with fake-challan-style signals (see riskdemo/README.md)
 ```
 
 ### `core/`: the auditing brain (no Android dependencies)
@@ -232,6 +233,7 @@ cd IQOO-Kernel-Panic
 ./gradlew :core:test                 # run the 65 unit tests
 ./gradlew :app:assembleDebug         # build TraceVeil
 ./gradlew :leakyshop:assembleLeakyDebug :leakyshop:assembleFixedDebug   # build the test apps
+./gradlew :riskdemo:assembleDebug     # build the harmless TEST Challan demo app
 ```
 
 ### Install

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The word TEST in white block letters, inside the adaptive-icon safe zone, so the launcher icon is unmistakable. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M25.5,44H37.5V47.5H25.5ZM29.75,47.5H33.25V64H29.75ZM40.5,44H44V64H40.5ZM44,44H52.5V47.5H44ZM44,52.25H51V55.75H44ZM44,60.5H52.5V64H44ZM55.5,44H67.5V47.5H55.5ZM55.5,47.5H59V52.25H55.5ZM55.5,52.25H67.5V55.75H55.5ZM64,55.75H67.5V60.5H64ZM55.5,60.5H67.5V64H55.5ZM70.5,44H82.5V47.5H70.5ZM74.75,47.5H78.25V64H74.75Z" />
+</vector>

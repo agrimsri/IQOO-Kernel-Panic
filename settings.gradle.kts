@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "TraceVeil"
-include(":core", ":app", ":leakyshop")
+include(":core", ":app", ":leakyshop", ":riskdemo")
