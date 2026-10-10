@@ -32,7 +32,6 @@ data class RunOptions(
     val format: String,
     val sarif: File?,
     val childFacing: Boolean,
-    val requireSignature: Boolean = false,
 ) {
     companion object {
         val VALUE_OPTIONS = listOf("--device", "--package", "--apk", "--mode", "--token", "--policy", "--timeout", "--out", "--adb", "--format", "--sarif")
@@ -100,15 +99,13 @@ data class RunOptions(
                 if (!f.isFile) throw UsageException("policy file not found: $path")
                 Policy.parse(f.readText(Charsets.UTF_8)) to "policy file ${LoadedBundle.displayPath(f, cwd)}"
             } ?: (Policy() to DEFAULT_POLICY_SOURCE)
-            val requireSignature = TraceVeilCi.REQUIRE_SIGNATURE in flags
-            val (policy, policySource) = TraceVeilCi.withRequireSignature(filePolicy, fileSource, requireSignature)
+            val (policy, policySource) = TraceVeilCi.withRequireSignature(filePolicy, fileSource, TraceVeilCi.REQUIRE_SIGNATURE in flags)
 
             val apk = values["--apk"]?.let { path -> resolve(path).also { if (!it.isFile) throw UsageException("APK not found: $path") } }
             return RunOptions(
                 packageName = pkg, device = device, apk = apk, mode = mode, token = token.trim(), policy = policy, policySource = policySource,
                 timeoutSeconds = timeout, outDir = resolve(values["--out"] ?: DEFAULT_OUT), adb = values["--adb"] ?: env["ADB"]?.takeIf { it.isNotBlank() } ?: "adb",
                 format = format, sarif = values["--sarif"]?.let(::resolve), childFacing = "--child-facing" in flags,
-                requireSignature = requireSignature,
             )
         }
 
