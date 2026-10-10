@@ -28,8 +28,25 @@ class NetworkCodeScanTest {
     @Test
     fun `only the files the trust screen lists use the network`() {
         val found = scan(appRoot).map { it.relativeTo(appRoot).invariantSeparatorsPath }.toSet()
-        val listed = TrustText.networkPaths(onlineVoiceOn = false, fallbackResolvers = DnsForwarder.FALLBACKS).map { it.sourceFile }.toSet()
+        // The code scan covers every build, so it is compared with the list of a build that includes the online voice.
+        val listed = TrustText.networkPaths(onlineVoiceOn = false, fallbackResolvers = DnsForwarder.FALLBACKS, onlineVoiceAvailable = true).map { it.sourceFile }.toSet()
         assertEquals("Network code changed: update TrustText.networkPaths and the trust screen", listed, found)
+    }
+
+    @Test
+    fun `a build without the online voice leaves out only Sarvam, and nothing can reach Sarvam without the choice`() {
+        val withVoice = TrustText.networkPaths(false, DnsForwarder.FALLBACKS, onlineVoiceAvailable = true).map { it.sourceFile }.toSet()
+        val without = TrustText.networkPaths(false, DnsForwarder.FALLBACKS, onlineVoiceAvailable = false).map { it.sourceFile }.toSet()
+        assertEquals(setOf("voice/SarvamTts.kt"), withVoice - without)
+        val kotlin = appRoot.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+        // SarvamTts is called only by CloudSpeechOutput...
+        val call = Regex("""\bSarvamTts\.\w+\(""")
+        assertEquals(setOf("CloudSpeechOutput.kt"), kotlin.filter { it.name != "SarvamTts.kt" && call.containsMatchIn(it.readText()) }.map { it.name }.toSet())
+        // ...which is built in one place, on the same line as SpeechOutputChoice.choose, which says OFFLINE without the voice.
+        val builders = kotlin.filter { it.name != "CloudSpeechOutput.kt" && it.readText().contains("CloudSpeechOutput(") }
+        assertEquals(listOf("VoiceViewModel.kt"), builders.map { it.name })
+        val line = builders.single().readLines().single { it.contains("CloudSpeechOutput(") }
+        assertTrue(line, line.contains("SpeechOutputChoice.choose(") && line.contains("SpeechOutputChoice.ONLINE"))
     }
 
     @Test
