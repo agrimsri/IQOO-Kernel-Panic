@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import java.io.File
 
@@ -31,9 +33,12 @@ data class AuditMeta(
     /**
      * The audited app's versionName and versionCode, read from its installed manifest when the audit started (the same
      * values the sessions' manifest facts hold). Both null = not recorded (audits saved before these fields existed,
-     * samples, or an unreadable manifest); [CheckedApps] then falls back to the sessions.
+     * samples, or an unreadable manifest); [CheckedApps] then falls back to the sessions. Written only when recorded,
+     * so meta files and exported bundles without a version stay exactly as before.
      */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
     val targetVersionName: String? = null,
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
     val targetVersionCode: Long? = null,
 )
 

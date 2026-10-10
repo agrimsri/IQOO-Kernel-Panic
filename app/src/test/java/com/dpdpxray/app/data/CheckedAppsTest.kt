@@ -9,6 +9,7 @@ import com.dpdpxray.core.update.AppVersion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import kotlinx.serialization.json.jsonObject
 import org.junit.Test
 
 class CheckedAppsTest {
@@ -37,6 +38,18 @@ class CheckedAppsTest {
         val back = AuditJson.json.decodeFromString(AuditMeta.serializer(), AuditJson.json.encodeToString(AuditMeta.serializer(), meta))
         assertEquals(meta, back)
         assertEquals(AppVersion("1.1", 2), CheckedApps.version(back))
+    }
+
+    @Test
+    fun `version keys are written only when recorded and the core bundle view reads them`() {
+        val without = AuditJson.json.encodeToJsonElement(AuditMeta.serializer(), meta("a", 1)).jsonObject
+        assertTrue("targetVersionName" !in without && "targetVersionCode" !in without)
+        val with = AuditJson.json.encodeToJsonElement(AuditMeta.serializer(), meta("a", 1, "1.1", 2)).jsonObject
+        val core = AuditJson.json.decodeFromJsonElement(com.dpdpxray.core.export.BundleMeta.serializer(), with)
+        assertEquals("1.1", core.targetVersionName)
+        assertEquals(2L, core.targetVersionCode)
+        val coreKeys = AuditJson.json.encodeToJsonElement(com.dpdpxray.core.export.BundleMeta.serializer(), core).jsonObject.keys
+        assertEquals(with.keys, coreKeys)
     }
 
     @Test
