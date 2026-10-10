@@ -17,7 +17,6 @@ import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
 import androidx.core.app.NotificationManagerCompat
 import com.dpdpxray.app.MainActivity
-import com.dpdpxray.app.apkguard.ApkFactsMapper
 import com.dpdpxray.app.apkguard.ApkInspector
 import com.dpdpxray.app.apkguard.ApkInstallWatcher
 import com.dpdpxray.app.graph
@@ -51,7 +50,10 @@ object PhoneCheckupCollector {
                 val raw = RawCheckupApp(
                     packageName = info.packageName,
                     label = runCatching { ai.loadLabel(pm).toString() }.getOrNull(),
-                    grantedPermissions = ApkFactsMapper.granted(info.requestedPermissions, info.requestedPermissionsFlags, PackageInfo.REQUESTED_PERMISSION_GRANTED),
+                    grantedPermissions = SpecialAccess.effectiveGranted(
+                        SpecialAccess.granted(info.requestedPermissions, info.requestedPermissionsFlags, PackageInfo.REQUESTED_PERMISSION_GRANTED),
+                        ai.targetSdkVersion,
+                    ) { op -> opMode(ops, op, ai.uid, info.packageName) },
                     displayOverApps = SpecialAccess.displayOverApps(
                         declared = overlayDeclared,
                         mode = if (overlayDeclared) opMode(ops, AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW, ai.uid, info.packageName) else null,
@@ -102,7 +104,8 @@ object PhoneCheckupCollector {
 /** One checkup, on demand (the checkup screen) or weekly (the job), plus its notification. */
 object PhoneCheckupRun {
     const val CHANNEL = "phone_checkup"
-    private const val NOTIFICATION_ID = 0x4A1001
+    /** Outside the install-alert id ranges (0x4A0000..0x4BFFFF), so the two never replace each other. */
+    private const val NOTIFICATION_ID = 0x4C0001
 
     /** Reads the phone and evaluates it. Blocking; call off the main thread. Throws if Android refuses the app list. */
     fun now(context: Context): PhoneCheckupResult = PhoneCheckup.evaluate(PhoneCheckupCollector.collect(context))

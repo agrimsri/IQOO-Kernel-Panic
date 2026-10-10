@@ -52,6 +52,22 @@ class SpecialAccessTest {
         assertFalse(SpecialAccess.installEligible(declared = false, targetSdk = null))
     }
 
+    @Test fun `requested permissions without grant flags are unknown, not none`() {
+        assertNull(SpecialAccess.granted(arrayOf("android.permission.READ_SMS"), null, grantedFlag = 2))
+        assertEquals(emptySet<String>(), SpecialAccess.granted(null, null, grantedFlag = 2))
+        assertEquals(setOf("android.permission.READ_SMS"), SpecialAccess.granted(arrayOf("android.permission.READ_SMS"), intArrayOf(2), grantedFlag = 2))
+    }
+
+    @Test fun `old apps count SMS only while its app op allows it`() {
+        val sms = setOf("android.permission.READ_SMS", "android.permission.RECEIVE_SMS", "android.permission.CAMERA")
+        val modes = mapOf("android:read_sms" to OpMode.IGNORED, "android:receive_sms" to OpMode.ALLOWED)
+        assertEquals(setOf("android.permission.RECEIVE_SMS", "android.permission.CAMERA"), SpecialAccess.effectiveGranted(sms, targetSdk = 22) { modes[it] })
+        assertNull("an unreadable mode is unknown", SpecialAccess.effectiveGranted(sms, targetSdk = 22) { null })
+        // Apps with runtime permissions: the granted flag already reflects the switch.
+        assertEquals(sms, SpecialAccess.effectiveGranted(sms, targetSdk = 34) { error("not read") })
+        assertNull(SpecialAccess.effectiveGranted(null, targetSdk = 22) { OpMode.ALLOWED })
+    }
+
     @Test fun `accessibility settings list gives package names`() {
         val value = "com.screen.reader/com.screen.reader.ReaderService:com.loan.fast/.Helper: :broken"
         assertEquals(setOf("com.screen.reader", "com.loan.fast"), SpecialAccess.packagesInComponentList(value))

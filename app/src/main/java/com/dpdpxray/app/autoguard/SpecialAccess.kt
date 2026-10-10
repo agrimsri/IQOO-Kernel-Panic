@@ -1,5 +1,6 @@
 package com.dpdpxray.app.autoguard
 
+import com.dpdpxray.app.apkguard.ApkFactsMapper
 import com.dpdpxray.core.apk.CheckupFacts
 import com.dpdpxray.core.apk.InstallOrigin
 
@@ -43,6 +44,39 @@ object SpecialAccess {
 
     /** Android 8 (API 26) made apps declare REQUEST_INSTALL_PACKAGES before they can be allowed to install apps. */
     private const val INSTALL_DECLARATION_SDK = 26
+
+    /** Apps built for Android 6 (API 23) or later get runtime permissions; older apps are switched through AppOps. */
+    private const val RUNTIME_PERMISSIONS_SDK = 23
+
+    /** The AppOps behind each SMS permission the checkup counts (AppOpsManager.OPSTR_READ_SMS / OPSTR_RECEIVE_SMS). */
+    val SMS_OPS = mapOf("android.permission.READ_SMS" to "android:read_sms", "android.permission.RECEIVE_SMS" to "android:receive_sms")
+
+    /**
+     * Granted permissions from PackageInfo. When Android lists requested permissions but no flags, the grant state is
+     * unknown (null), not "none granted".
+     */
+    fun granted(requested: Array<String>?, flags: IntArray?, grantedFlag: Int): Set<String>? =
+        if (requested != null && flags == null) null else ApkFactsMapper.granted(requested, flags, grantedFlag)
+
+    /**
+     * The SMS permissions actually in force. Apps built before runtime permissions (target SDK below 23) always show
+     * them as granted; the switch a person flips in Settings only changes the AppOps mode, so for those apps each
+     * counted SMS permission is checked against its mode. [opMode] returns null when the mode cannot be read, which
+     * makes the answer unknown.
+     */
+    fun effectiveGranted(granted: Set<String>?, targetSdk: Int?, opMode: (String) -> OpMode?): Set<String>? {
+        if (granted == null || targetSdk == null || targetSdk >= RUNTIME_PERMISSIONS_SDK) return granted
+        val inForce = granted.toMutableSet()
+        for ((permission, op) in SMS_OPS) {
+            if (permission !in granted) continue
+            when (opMode(op)) {
+                OpMode.ALLOWED, OpMode.FOREGROUND, OpMode.DEFAULT -> Unit
+                OpMode.IGNORED, OpMode.ERRORED -> inForce.remove(permission)
+                OpMode.UNKNOWN, null -> return null
+            }
+        }
+        return inForce
+    }
 
     /**
      * "Display over other apps". In the default mode Android falls back to whether the permission itself is granted
