@@ -160,6 +160,9 @@ object EverydaySheetCopy {
     val quickTitle = Bi("Quick check: say No", "जल्दी जाँच: 'ना' कहें")
     val quickDetail = Bi("Opens the app once, says No (Reject) to its consent popup, then watches for 15 seconds. The app keeps its data.",
         "ऐप एक बार खुलता है, कंसेंट पॉपअप पर 'ना' (Reject) कहा जाता है, फिर 15 सेकंड तक देखा जाता है। ऐप का डेटा नहीं हटता।")
+    /** Quick with clearing approved under Advanced: the same single No run, from a fresh start. */
+    val quickDetailFresh = Bi("Clears the app's data, opens it once, says No (Reject) to its consent popup, then watches for 15 seconds.",
+        "ऐप का डेटा साफ़ करके उसे एक बार खोलता है, कंसेंट पॉपअप पर 'ना' (Reject) कहा जाता है, फिर 15 सेकंड तक देखा जाता है।")
     val agentTitle = Bi("Let TraceVeil tap No for me", "TraceVeil मेरे लिए 'ना' दबाए")
     val agentDetail = Bi("Off: you tap it yourself when the app asks.", "बंद: ऐप पूछे तो आप खुद दबाएँ।")
     val quickCaveat = Bi(
@@ -193,6 +196,6 @@ object EverydaySheetCopy {
         "सिर्फ़ इस ऐप का इंटरनेट काटता है और दर्ज करता है कि यह कहाँ पहुँचने की कोशिश करता है और कौन-सी अनुमतियाँ माँगता है। यह ऐप के बारे में फ़ैसला नहीं देता।")
 
     fun all(): List<Bi> = listOf(title("App"), guide("App").title, guide("App").body, guide("App").spoken, quickTitle, quickDetail,
-        agentTitle, agentDetail, quickCaveat, resetCaveat, start, advanced, advancedSummary, fullTitle, fullDetail, fullNeeds,
+        quickDetailFresh, agentTitle, agentDetail, quickCaveat, resetCaveat, start, advanced, advancedSummary, fullTitle, fullDetail, fullNeeds,
         resetTitle, resetDetail, childTitle, childDetail, gmsTitle, gmsDetail, quarantine, quarantineNote)
 }
