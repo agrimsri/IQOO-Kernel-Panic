@@ -14,7 +14,7 @@ DEFAULTS = {
     "device": {"serial": "", "adb": ""},
     "target": {"package": "", "apk_glob": "app/build/outputs/apk/debug/*.apk"},
     "audit": {"plans": ["silent", "reject", "accept"], "min_score": 0, "fail_on": "high",
-              "jurisdictions": ["in", "eu", "uk", "us-ca", "br"], "policy": "in"},
+              "lenses": "all", "policy": "INDIA"},
     "network": {"check_vpn": "warn", "online_ip": False, "endpoint": "", "cache_ttl_hours": 24, "redact_ip": True},
     "output": {"dir": ".traceveil/reports", "formats": ["json", "summary"]},
 }
@@ -33,8 +33,8 @@ apk_glob = "app/build/outputs/apk/debug/*.apk"
 plans = ["silent", "reject", "accept"]
 min_score = 0
 fail_on = "high"
-jurisdictions = ["in", "eu", "uk", "us-ca", "br"]   # laws each audit is also read under: in, eu, uk, us-ca, br (or "all")
-policy = "in"            # which jurisdiction's score and severities decide the exit code
+lenses = "all"           # legal lenses (same rules as the app): "all" or e.g. ["INDIA", "EU", "UK", "US_CALIFORNIA"]
+policy = "INDIA"         # the lens whose score decides the exit code
 
 [network]
 check_vpn = "warn"       # off | warn | fail
@@ -88,13 +88,12 @@ def load(path: str | None = None, cwd: Path | None = None) -> dict:
 
 def validate(cfg: dict) -> None:
     from . import laws
-    known = laws.ids()
-    if cfg["audit"].get("policy") not in known:
-        raise ConfigError(f"audit.policy must be one of {known}, got {cfg['audit'].get('policy')!r}")
+    if laws.parse(cfg["audit"].get("policy", "")) is None:
+        raise ConfigError(f"audit.policy must be one of {laws.ids()}, got {cfg['audit'].get('policy')!r}")
     try:
-        laws.select(cfg["audit"].get("jurisdictions"))
+        laws.select(cfg["audit"].get("lenses"))
     except ValueError as e:
-        raise ConfigError(f"audit.jurisdictions: {e}") from e
+        raise ConfigError(f"audit.lenses: {e}") from e
     mode = cfg["network"].get("check_vpn")
     if mode not in CHECK_VPN_MODES:
         raise ConfigError(f"network.check_vpn must be one of {CHECK_VPN_MODES}, got {mode!r}")

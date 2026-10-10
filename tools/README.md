@@ -141,31 +141,32 @@ Each row gets next steps: gate the SDK on consent if it was looked up before con
 `--fail-on-consent` exits 1 when a bundled SDK was looked up before consent or after Reject. `--json` / `--out` give the JSON inventory.
 The signature list (`src/traceveil/data/sdk_signatures.json`) is hand-written from public package names and covers the tracker catalogue's entities. Obfuscated or unlisted SDKs are not recognised; bundled code does not prove it ran; a lookup does not prove what data was sent.
 
-## 3b. Several privacy laws: `--jurisdictions` and `traceveil laws`
+## 3b. Legal lenses: several countries' privacy laws
 
-The checks (C1-C15, NC) are observations, so they are the same everywhere. Each jurisdiction only changes **which provisions they map to and how much they weigh**. The score uses the app's formula (100 minus weights; inferred findings count half; READY >= 85, NEEDS_WORK >= 60).
+The CLI uses the **same deterministic legal lenses as the app** (`LegalLens`, data in `core/src/main/resources/law/`, copied into the package by `tools/sync_law_data.py`). Findings and severities never change; each lens marks every check as **required** by that law, **context**, or **not applicable**, with the law's own passages and source links. The lens score is the app's score without the not-applicable findings, so the INDIA lens always equals the app score.
 
-| id | Jurisdiction | Law | Model |
-|---|---|---|---|
-| `in` | India | DPDP Act 2023 + DPDP Rules 2025 | opt-in; uses the app's own severities, so its score always equals the app score |
-| `eu` | European Union | GDPR + ePrivacy Directive Art 5(3) | opt-in; prior consent for device access |
-| `uk` | United Kingdom | UK GDPR + DPA 2018 + PECR reg 6 | opt-in; prior consent for storage/access |
-| `us-ca` | California | CCPA/CPRA + CCPA Regulations; COPPA under 13 | notice at collection + opt-out (opt-in under 16) |
-| `br` | Brazil | LGPD | opt-in consent |
-
-Examples of what changes: under California's opt-out model, trackers before a choice (C1) weigh MEDIUM, not HIGH, but tracking after an opt-out (C2) stays CRITICAL. GDPR, UK GDPR and LGPD have no language list, so C8 is not scored there. Evidence problems (V0, or U1 naming trackers) make **every** jurisdiction inconclusive.
+| Lens | Law |
+|---|---|
+| `INDIA` (`in`) | DPDP Act 2023 + DPDP Rules 2025 |
+| `EU` (`eu`, `gdpr`) | GDPR + ePrivacy Directive Art 5(3) |
+| `UK` | UK GDPR + PECR reg 6 |
+| `US_CALIFORNIA` (`us-ca`, `ccpa`) | CCPA/CPRA |
+| `US_CHILDREN` (`coppa`) | COPPA |
+| `BRAZIL` (`br`, `lgpd`) | LGPD |
+| `SINGAPORE` (`sg`, `pdpa`) | PDPA |
+| `GLOBAL_BASELINE` (`global`) | consent-first good practice (not a law) |
 
 ```bash
-traceveil audit --package com.example.app                        # summary ends with a per-jurisdiction table
-traceveil audit --package com.example.app --policy eu            # the EU score/severities decide the exit code
-traceveil laws                                                   # re-read the newest saved report, no phone needed
-traceveil laws --report <request_id> --jurisdictions eu,us-ca --detail   # each finding with its provisions
-traceveil laws --list                                            # the laws and their official sources
+traceveil audit --package com.example.app                      # summary ends with all 8 lenses
+traceveil audit --package com.example.app --lens eu,us-ca --policy eu   # the EU lens decides the exit code
+traceveil lens                                                 # re-read the newest saved report, no phone needed
+traceveil lens --report <request_id> --lens eu --detail        # relation, the law's note and cited passages per finding
+traceveil lens --list
 ```
 
-Config: `audit.jurisdictions` (default all five) and `audit.policy` (default `in`, so exit codes are unchanged). The saved report gains a `jurisdictions` block. The mapping lives in `src/traceveil/data/jurisdictions.json` with official source links. **Severities are Traceveil's risk ranking for prioritising fixes, not legal advice or a compliance verdict.**
+Config: `audit.lenses` (default `"all"`) and `audit.policy` (default `"INDIA"`, so exit codes are unchanged). The saved report gains a `lenses` block. A lens is a reading of the evidence, not a legal verdict.
 
-Colours: summaries colour severities (CRITICAL, HIGH, MEDIUM, LOW), scores and bands, and tracker names, when the output is a terminal. `NO_COLOR=1` turns colours off; `FORCE_COLOR=1` keeps them on in pipes.
+Colours: severities (CRITICAL, HIGH, MEDIUM, LOW), scores, bands and tracker names are coloured on a terminal. `NO_COLOR=1` turns colours off; `FORCE_COLOR=1` keeps them in pipes.
 
 ## 4. Exit codes (for scripts and CI)
 

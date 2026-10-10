@@ -136,8 +136,8 @@ def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) ->
         lines.append(f"  {f.get('check', '?'):<4} {style.severity(sev, 8)} {f.get('title', '')}{tag}")
         if f.get("entities"):
             lines.append(f"       {style.dim('trackers:')} {_names(f['entities'], style)}")
-    if rep.get("jurisdictions"):
-        lines += laws.table(rep["jurisdictions"], style)
+    if rep.get("lenses"):
+        lines += laws.table(rep["lenses"], style)
     for r in reasons:
         lines.append(f"  {style.warn('policy:')} {r}")
     lines.append(f"  report saved: {saved}")
@@ -170,7 +170,7 @@ def _wait_for_device(dev, io: Io, deadline: list[float], request_id: str) -> boo
 
 def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_drive: bool, reset: bool, wait_s: float,
               resume: str | None, as_json: bool, out_file: str | None, request_id: str | None = None,
-              fail_on_override: str | None = None, jurisdictions=None, policy: str | None = None) -> int:
+              fail_on_override: str | None = None, lenses=None, policy: str | None = None) -> int:
     request_id = resume or request_id or new_request_id()
     package = package or cfg["target"]["package"]
     if not resume and not package:
@@ -218,7 +218,7 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
         return _fail(io, problem, EXIT_INCONCLUSIVE)
 
     try:
-        rep["jurisdictions"] = laws.assess_all(rep, jurisdictions or cfg["audit"]["jurisdictions"], policy or cfg["audit"]["policy"])
+        rep["lenses"] = laws.assess_all(rep, lenses or cfg["audit"]["lenses"], policy or cfg["audit"]["policy"])
     except ValueError as e:
         return _fail(io, str(e), EXIT_USAGE)
     out_dir = Path(cfg["output"]["dir"])
@@ -228,7 +228,7 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
     if out_file:
         Path(out_file).parent.mkdir(parents=True, exist_ok=True)
         Path(out_file).write_text(json.dumps(rep, indent=2), encoding="utf-8")
-    code, reasons = exit_for_report(laws.policy_view(rep["jurisdictions"]), fail_on_override or cfg["audit"]["fail_on"],
+    code, reasons = exit_for_report(laws.policy_view(rep["lenses"]), fail_on_override or cfg["audit"]["fail_on"],
                                     int(cfg["audit"]["min_score"]))
     print(json.dumps(rep, indent=2) if as_json else summary(rep, reasons, saved, Style(io.color_out)), file=io.out)
     return code

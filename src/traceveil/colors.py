@@ -11,7 +11,7 @@ _BAND = {"READY": "1;32", "NEEDS_WORK": "1;33", "AT_RISK": "1;31", "INCONCLUSIVE
 def enabled_for(stream) -> bool:
     if os.environ.get("NO_COLOR"):
         return False
-    if os.environ.get("FORCE_COLOR"):
+    if os.environ.get("FORCE_COLOR", "") not in ("", "0"):
         return True
     return bool(getattr(stream, "isatty", lambda: False)())
 
