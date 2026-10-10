@@ -1,6 +1,7 @@
 package com.dpdpxray.app.voice
 
 import com.dpdpxray.app.data.AuditMeta
+import com.dpdpxray.app.audit.AuditPlanCoverage
 import com.dpdpxray.core.copilot.AuditEvidence
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
@@ -11,4 +12,5 @@ fun copilotEvidence(meta: AuditMeta, sessions: List<AuditSession>, result: Audit
     sample = meta.sample,
     result = result,
     plans = sessions.map { it.plan }.toSet(),
+    completedPlans = AuditPlanCoverage.completedPlans(sessions),
 )

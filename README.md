@@ -8,7 +8,7 @@ Screenshots below show the original baseline and may display its former product 
 
 Current team setup and work split: [teammate handoff](docs/TEAM_HANDOFF.md), [active milestones](docs/planning/IMPLEMENTATION_MILESTONES.md), and [device verification](docs/VERIFICATION.md). Agrim starts the evidence contracts; Yashvi starts Voice Copilot; Nitya integrates their tested components. The handoff documents known AI failures and unfinished features.
 
-**Testing safety:** the existing Quick/Full audit may reset the selected app's data when Shizuku is authorized, even with automated tapping off. Use controlled demo or explicitly authorized developer-owned test apps only. Consumer-safe observation, comprehensive fraud protection and wake-word support are not implemented. DNS observations and scores are not payload evidence or legal certification.
+**Testing safety:** audit configuration defaults to keeping data and manual consent choices. The setup screen presets automation/reset only for the two controlled demo apps. Clearing another test app's data requires an explicit reset choice and Shizuku; keep that choice off for personal apps. Real-app observation is limited: it does not inspect encrypted payloads or provide comprehensive fraud protection, automatic permission interception or a background wake word. DNS observations and scores are not legal certification.
 
 **An on-device privacy auditor for Android apps, built around India's Digital Personal Data Protection (DPDP) Act 2023.**
 
@@ -17,9 +17,9 @@ Point TraceVeil at any app installed on your phone. It shows you:
 - whether it does so **before** the user has agreed to anything;
 - whether it **keeps doing it after the user says no**.
 
-It reads the app's consent screen for dark patterns, cites the exact section of the law each problem breaks, gives you copy-paste code to fix it, and exports a PDF report.
+It reviews the app's consent screen for potential dark patterns, provides relevant DPDP passages and developer fix templates, and exports a PDF report. Findings are technical signals for review, not determinations that an app broke the law. The evidence workflow can be used internationally; the current legal corpus is India-specific and voice UI supports English/Hindi.
 
-Everything runs on the phone. No cloud service, no account, no upload: **0 bytes of audit data leave the device.**
+Audit analysis, saved reports and the default voice copilot run on the phone without a cloud-answer fallback. Capture relays the target app's DNS queries. Network Proof shows qualified UID/DNS estimates, not a measured guarantee of zero uploads. Speech-pack downloads require a user action and provider connectivity; they are not cloud speech recognition. Reports leave the device when you choose to share them.
 
 <p align="center">
   <img src="docs/screenshots/home.png" width="230" alt="Home screen">
@@ -63,7 +63,7 @@ Existing tools don't close the gap:
 - Static scanners list SDKs but can't say *when* they fire relative to a consent choice.
 - Cloud scanners upload the app and its traffic somewhere else.
 
-TraceVeil closes the gap on the phone itself. It plays the user: opens the app from a fresh install, refuses consent, accepts consent. It times every tracker contact against the exact moment of the choice, and explains each problem in plain language with the matching text of the law.
+TraceVeil observes DNS lookups on the phone and relates them to recorded consent choices. Controlled full audits can reset a test app and exercise no interaction, Reject and Accept. Quick observation preserves a real app's current state unless the tester explicitly approves a reset; cached consent and encrypted DNS can limit evidence. An intended choice that never occurred is marked incomplete rather than treated as a passed check.
 
 ## What TraceVeil checks
 
@@ -342,8 +342,11 @@ adb push gemma-4-E2B-it.litertlm /sdcard/Android/data/com.dpdpxray.app/files/mod
 
 - **Code:** [MIT License](LICENSE) © 2026 Nitya Prakash Pandey.
 - **Archivo font:** SIL Open Font License 1.1 (Omnibus-Type).
-- **LiteRT-LM** and the **Shizuku API**: Apache License 2.0.
+- **LiteRT-LM:** Apache License 2.0.
+- **Shizuku API/provider 13.1.5:** MIT License (separate from the Shizuku app).
 - **Gemma models:** Gemma Terms of Use (not bundled).
 - **DPDP Act 2023 and DPDP Rules 2025:** text from Government of India publications.
+
+See the [attribution register](ATTRIBUTIONS.md) for licence evidence and remaining release checks, and [repository checks](docs/REPOSITORY_CHECKS.md) for CI and the read-only commit-date checker.
 
 > TraceVeil is a technical assessment tool. Its findings are not legal advice.

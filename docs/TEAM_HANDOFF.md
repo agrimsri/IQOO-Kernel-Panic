@@ -44,7 +44,7 @@ PDF/Markdown export, history, cancellation cleanup, GPU model loading and a GPU 
 | Owner | Owns now | Does not edit without coordination |
 | --- | --- | --- |
 | Agrim | A0–A5: DNS answers, trackers, rules, scoring/confidence, notice builder, capture; one additive `Model.kt` contract change | UI routes/screens, audit orchestration, repositories, manifest, Yashvi's voice/AI/geo files |
-| Yashvi | Y1–Y6: voice, AI adapters, Network Proof, map/geo/copilot, `ToolScreens.kt`, demo module | `Model.kt`, capture/rules, main routes, shared ViewModel, manifest, Gradle files, reports/repositories |
+| Yashvi | Y1–Y4: voice, AI adapters, Network Proof, map/geo/copilot, `ToolScreens.kt`, demo module | `Model.kt`, capture/rules, main routes, shared ViewModel, manifest, Gradle files, reports/repositories |
 | Nitya | Integration: `MainActivity.kt`, `XrayApp.kt`, `XrayViewModel.kt`, Home/Results/Live/Components/theme, manifest/build configuration, audit/data/report/control/consent, fixtures, CI/docs | Agrim's evidence engine and Yashvi's new components without their review |
 
 Use new feature files and self-contained components. Give Nitya exact signatures and a short wiring request rather than editing the shared hot files. Include the tests and expected error states with each handoff.
@@ -55,7 +55,7 @@ In particular, **Yashvi owns TTS and microphone code now**; Nitya will not build
 
 - The plans' “nothing has run on the iQOO” statements are older snapshots; use the qualified results above, not a claim of complete phone validation.
 - `N4` lists itself as a prerequisite, and the order mentions an undefined `N9`. Treat these as numbering errors: fixtures depend on A0; real evidence UI depends on A1/A3/A4. Do not invent an N9 feature.
-- Camera Check removal is the active decision, superseding older camera-upgrade proposals. Nitya must remove its Home entry and route before Yashvi removes the screen/helpers in `ToolScreens.kt`. Neither removal has happened in this checkpoint; AI Lab and Settings must remain intact.
+- Camera Check stays (team decision, 10 October): its Home entry, route, screen and helpers are kept. The earlier removal plan and older camera-upgrade proposals are superseded; camera analysis itself has not passed acceptance, so do not present it as verified.
 - The demo flavors have **different package IDs**. A “previous audit of the same package” query cannot compare them. Later show an explicitly labelled controlled demo comparison, or use actual before/after versions of one package. Never silently compare unrelated apps.
 - A0's `CaptureHealth` needs field names, counter units and meanings agreed before Yashvi implements Network Proof. The UID transmit counter and relay payload bytes may measure different layers. A residual is an estimate, **not proof of audit-data uploads or zero uploads**. Unsupported/reset/inconsistent counters must yield unavailable/uncertain, not be clamped into a reassuring zero.
 - `hqCountry` is not automatically a company's registered jurisdiction. Label headquarters as headquarters unless the cited source actually establishes registration.

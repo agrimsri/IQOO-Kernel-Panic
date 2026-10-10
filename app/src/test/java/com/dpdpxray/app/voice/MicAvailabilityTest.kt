@@ -26,6 +26,10 @@ class MicAvailabilityTest {
     fun `undecided permission asks rather than disabling`() = assertEquals(MicState.NeedsPermission, state(granted = false))
 
     @Test
+    fun `permission prompt remains available before a language pack is installed`() =
+        assertEquals(MicState.NeedsPermission, state(granted = false, installed = emptyList()))
+
+    @Test
     fun `no on-device recognizer disables the mic`() = assertTrue(reason(state(onDevice = false)).contains("no on-device"))
 
     @Test

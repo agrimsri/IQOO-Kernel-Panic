@@ -42,6 +42,45 @@ class GroundedAnswerTest {
 
     private val live = leaky.copy(label = "LeakyShop", sample = false)
 
+    @Test fun `missed refusal is not described as a completed clean refusal test`() {
+        val missed = live.copy(result = AuditResult(emptyList(), 51, ScoreBand.AT_RISK),
+            plans = setOf(AuditPlan.REJECT), completedPlans = emptySet())
+        val a = answerer.answer("What happened after I rejected?", missed, CopilotLanguage.EN)
+        assertTrue(a.text, a.text.contains("C2 not tested"))
+        assertFalse(a.text, a.text.contains("did not run"))
+        assertFalse(a.text, a.text.contains("did not record C2"))
+    }
+
+    @Test fun `score reply qualifies an incomplete choice in both languages`() {
+        val missed = live.copy(result = AuditResult(emptyList(), 51, ScoreBand.AT_RISK),
+            plans = setOf(AuditPlan.REJECT), completedPlans = emptySet())
+        val en = answerer.answer("What is the score?", missed, CopilotLanguage.EN)
+        val hi = answerer.answer(CopilotQuestions.byIntent(CopilotIntent.SCORE).hi, missed, CopilotLanguage.HI)
+        assertTrue(en.text, en.text.contains("C2 not tested"))
+        assertTrue(hi.text, hi.text.contains("C2 की जाँच नहीं हुई"))
+    }
+
+    @Test fun `missing Accept qualifies score in both languages without claiming C2 was untested`() {
+        val missed = live.copy(result = AuditResult(emptyList(), 51, ScoreBand.AT_RISK),
+            plans = setOf(AuditPlan.ACCEPT), completedPlans = emptySet())
+        val en = answerer.answer(CopilotIntent.SCORE, "score", missed, CopilotLanguage.EN)
+        val hi = answerer.answer(CopilotIntent.SCORE, "स्कोर", missed, CopilotLanguage.HI)
+        assertTrue(en.text, en.text.contains("Accept choice was not recorded"))
+        assertTrue(en.text, en.text.contains("incomplete"))
+        assertTrue(hi.text, hi.text.contains("स्वीकार करने का चुनाव दर्ज नहीं हुआ"))
+        assertTrue(hi.text, hi.text.contains("अधूरा"))
+        assertFalse(en.text, en.text.contains("C2 not tested"))
+        assertFalse(hi.text, hi.text.contains("C2 की जाँच नहीं हुई"))
+    }
+
+    @Test fun `all missing planned choices are qualified even on a refusal question`() {
+        val missed = live.copy(result = AuditResult(emptyList(), 51, ScoreBand.AT_RISK),
+            plans = setOf(AuditPlan.ACCEPT, AuditPlan.REJECT), completedPlans = emptySet())
+        val answer = answerer.answer(CopilotIntent.AFTER_REJECT, "after reject", missed, CopilotLanguage.EN)
+        assertTrue(answer.text, answer.text.contains("Accept choice was not recorded"))
+        assertEquals(1, Regex("C2 not tested").findAll(answer.text).count())
+    }
+
     @Test
     fun `children question without C9 cites an s9 passage and never calls the app safe`() {
         val a = answerer.answer("Safe for children?", leaky, CopilotLanguage.EN)
@@ -119,6 +158,17 @@ class GroundedAnswerTest {
                 assertFalse("${q.intent} $lang", a.refused)
                 assertTrue(a.citations.size <= 3)
             }
+        }
+    }
+
+    @Test
+    fun `each chip reaches its own intent and gives a distinct grounded reply`() {
+        CopilotLanguage.entries.forEach { language ->
+            val answers = CopilotQuestions.chips.map { q ->
+                val text = if (language == CopilotLanguage.EN) q.en else q.hi
+                answerer.answer(text, leaky, language).also { assertEquals(q.intent, it.intent) }
+            }
+            assertEquals(8, answers.map { it.text }.toSet().size)
         }
     }
 

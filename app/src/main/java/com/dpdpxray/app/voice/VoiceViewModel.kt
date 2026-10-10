@@ -2,17 +2,21 @@ package com.dpdpxray.app.voice
 
 import android.Manifest
 import android.app.Application
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dpdpxray.app.graph
 import com.dpdpxray.core.copilot.AuditEvidence
 import com.dpdpxray.core.copilot.CopilotLanguage
+import com.dpdpxray.core.copilot.CopilotIntent
 import com.dpdpxray.core.copilot.CopilotQuestion
 import com.dpdpxray.core.copilot.GroundedAnswer
 import com.dpdpxray.core.copilot.GroundedAnswerer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +40,8 @@ data class VoiceUiState(
     val speaking: Boolean = false,
     val voiceNote: String? = null,
     val cloudVoice: Boolean = false,
+    val canDownloadPack: Boolean = false,
+    val packNote: String? = null,
 )
 
 /** State for [VoiceCopilotScreen]. Reads one saved audit; answers come from [GroundedAnswerer], never from a model. */
@@ -46,15 +52,19 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
     private var evidence: AuditEvidence? = null
     private var installed: List<String>? = null
     private var permissionDenied = false
+    private var micCheckVersion = 0
+    private val answerGate = VoiceAnswerGate()
+    private val checkThrottle = CheckThrottle(CHECK_GAP_MS)
+    private var answerJob: Job? = null
 
-    private val _state = MutableStateFlow(VoiceUiState(cloudVoice = apiConfig.useApi))
+    private val _state = MutableStateFlow(VoiceUiState(cloudVoice = SpeechOutputChoice.choose(apiConfig) == SpeechOutputChoice.ONLINE))
     val state: StateFlow<VoiceUiState> = _state.asStateFlow()
 
     private val voice: SpeechOutput = run {
         val report = { s: VoiceOutputState -> _state.update { s.applyTo(it) } }
         val local = AnswerVoice(app, report)
         val key = apiConfig.sarvamKey
-        if (apiConfig.useApi && key != null) CloudSpeechOutput(app, key, local, report) else local
+        if (SpeechOutputChoice.choose(apiConfig) == SpeechOutputChoice.ONLINE && key != null) CloudSpeechOutput(app, key, local, report) else local
     }
 
     fun load(auditId: String) {
@@ -74,6 +84,7 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
     fun setLanguage(language: CopilotLanguage) {
         if (language == _state.value.language) return
         cancelListening()
+        cancelAnswer()
         voice.stop()
         _state.update { it.copy(language = language, answer = null, transcript = "", micMessage = null) }
         refreshMic()
@@ -85,18 +96,56 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Re-checks permission and language packs, e.g. after resuming from Settings. */
-    fun refreshMic() {
+    fun refreshMic(force: Boolean = false) {
+        val language = _state.value.language
+        if (!checkThrottle.allow(SystemClock.elapsedRealtime(), language, force)) {
+            recomputeMic() // the same check just ran; keep its result and only re-read the permission
+            return
+        }
+        val version = ++micCheckVersion
         installed = null
         recomputeMic()
-        recognizer.checkInstalledLanguages(_state.value.language) { langs ->
-            installed = langs
+        recognizer.checkLanguageSupport(language) { packs ->
+            if (version != micCheckVersion || language != _state.value.language) return@checkLanguageSupport
+            installed = packs?.installed
+            val choice = recognizer.choice(language)
+            _state.update { it.copy(
+                canDownloadPack = choice.status == PackStatus.DOWNLOADABLE,
+                packNote = when (choice.status) {
+                    PackStatus.INSTALLED -> "On-device recognition: ${choice.tag}."
+                    PackStatus.DOWNLOADABLE -> "${choice.tag} needs a language-pack download before voice input works."
+                    PackStatus.PENDING -> "${choice.tag} download is scheduled. Check again when it finishes."
+                    else -> null
+                },
+            ) }
             recomputeMic()
+        }
+    }
+
+    /** The Check again button: always runs, never throttled. */
+    fun recheckMic() = refreshMic(force = true)
+
+    fun downloadSpeechPack() {
+        if (!_state.value.canDownloadPack) return
+        cancelListening()
+        val requested = recognizer.requestModelDownload(_state.value.language)
+        _state.update { it.copy(
+            micMessage = if (requested) "Language-pack download requested. The speech provider may ask for approval; when it finishes, tap Check again."
+                else "The speech provider could not request a pack. Open voice settings or use the question chips.",
+        ) }
+    }
+
+    fun openVoiceSettings() {
+        val ctx = getApplication<Application>()
+        val settings = Intent("android.settings.TTS_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { ctx.startActivity(settings) }.onFailure {
+            _state.update { it.copy(voiceNote = "Open phone Settings and search for text-to-speech. Choose your preferred engine and install an offline voice.") }
         }
     }
 
     fun onPermissionResult(granted: Boolean) {
         permissionDenied = !granted
-        recomputeMic()
+        refreshMic(force = true)
     }
 
     private fun recomputeMic() {
@@ -122,6 +171,7 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (_state.value.mic != MicState.Ready) return
+        cancelAnswer(forListening = true)
         voice.stop()
         val started = recognizer.start(_state.value.language, object : OnDeviceRecognizer.Listener {
             override fun onPartial(text: String) = _state.update { it.copy(transcript = text) }
@@ -129,7 +179,10 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(transcript = text) }
                 ask(text)
             }
-            override fun onError(code: Int) = _state.update { it.copy(micMessage = MicAvailability.errorReason(code)) }
+            override fun onError(code: Int) = _state.update { it.copy(
+                micMessage = MicAvailability.errorReason(code),
+                canDownloadPack = it.canDownloadPack || (code == android.speech.SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE && Build.VERSION.SDK_INT >= 33),
+            ) }
             override fun onEnd() = _state.update { it.copy(listening = false) }
         })
         _state.update {
@@ -142,16 +195,23 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
         cancelListening()
         val text = if (_state.value.language == CopilotLanguage.HI) q.hi else q.en
         _state.update { it.copy(transcript = text) }
-        ask(text)
+        ask(text, q.intent)
     }
 
-    private fun ask(question: String) {
+    private fun ask(question: String, intent: CopilotIntent? = null) {
         val e = evidence ?: return
         val language = _state.value.language
-        viewModelScope.launch {
+        val request = answerGate.begin()
+        answerJob?.cancel()
+        voice.stop()
+        answerJob = viewModelScope.launch {
             _state.update { it.copy(answering = true) }
             // The embedding retriever may run a model, so retrieval stays off the main thread.
-            val answer = withContext(Dispatchers.Default) { GroundedAnswerer(graph.corpus, graph.retriever).answer(question, e, language) }
+            val answer = withContext(Dispatchers.Default) {
+                val answerer = GroundedAnswerer(graph.corpus, graph.retriever)
+                if (intent == null) answerer.answer(question, e, language) else answerer.answer(intent, question, e, language)
+            }
+            if (!answerGate.isCurrent(request)) return@launch
             _state.update { it.copy(answering = false, answer = answer, voiceNote = null) }
             if (_state.value.speakAnswers) voice.speak(answer.spokenText, language)
         }
@@ -161,8 +221,17 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Called when the screen pauses or leaves: no listening or speech continues in the background. */
     fun pause() {
+        ++micCheckVersion
         cancelListening()
+        cancelAnswer()
         voice.stop()
+    }
+
+    private fun cancelAnswer(forListening: Boolean = false) {
+        if (forListening) answerGate.beginListening() else answerGate.invalidate()
+        answerJob?.cancel()
+        answerJob = null
+        _state.update { it.copy(answering = false) }
     }
 
     private fun cancelListening() {
@@ -173,5 +242,9 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         recognizer.release()
         voice.release()
+    }
+
+    private companion object {
+        const val CHECK_GAP_MS = 2_000L
     }
 }

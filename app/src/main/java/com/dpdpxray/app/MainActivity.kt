@@ -22,6 +22,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.ui.XrayViewModel
+import com.dpdpxray.app.ui.AuditRoutes
+import com.dpdpxray.app.voice.VoiceCopilotScreen
 import com.dpdpxray.app.ui.screens.AiLabScreen
 import com.dpdpxray.app.ui.screens.AppPickerScreen
 import com.dpdpxray.app.ui.screens.CameraCheckScreen
@@ -71,6 +73,7 @@ class MainActivity : ComponentActivity() {
                                 onLab = { nav.navigate("lab") },
                                 onCamera = { nav.navigate("camera") },
                                 onSettings = { nav.navigate("settings") },
+                                onVoice = { nav.navigate(AuditRoutes.voice(it)) },
                             )
                         }
                         composable("pick") { AppPickerScreen(vm, onBack = { nav.popBackStack() }, onStarted = { nav.navigate("live") { popUpTo("home") } }) }
@@ -88,6 +91,7 @@ class MainActivity : ComponentActivity() {
                                 onFinding = { nav.navigate("finding/$id/${it.name}") },
                                 onFixes = { nav.navigate("fixes/$id") },
                                 onReport = { nav.navigate("report/$id") },
+                                onAsk = { nav.navigate(AuditRoutes.voice(id)) },
                             )
                         }
                         composable("finding/{id}/{check}") { e ->
@@ -96,6 +100,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("fixes/{id}") { e -> FixesScreen(vm, e.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() }) }
                         composable("report/{id}") { e -> ReportScreen(vm, e.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() }) }
+                        composable(AuditRoutes.VOICE) { e ->
+                            VoiceCopilotScreen(e.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() })
+                        }
                         composable("lab") { AiLabScreen(vm, onBack = { nav.popBackStack() }) }
                         composable("camera") { CameraCheckScreen(vm, onBack = { nav.popBackStack() }) }
                         composable("settings") { SettingsScreen(vm, onBack = { nav.popBackStack() }) }

@@ -20,8 +20,13 @@ class LocalVoicePickerTest {
     }
 
     @Test
-    fun `prefers the Indian English variant`() {
-        assertEquals("in", LocalVoicePicker.pick(listOf(v("us", "en-US", q = 400), v("in", "en-IN", q = 300)), CopilotLanguage.EN)?.name)
+    fun `prefers the regional variant when voice quality is equal`() {
+        assertEquals("in", LocalVoicePicker.pick(listOf(v("us", "en-US", q = 400), v("in", "en-IN", q = 400)), CopilotLanguage.EN)?.name)
+    }
+
+    @Test
+    fun `higher quality offline voice wins over lower quality regional voice`() {
+        assertEquals("us", LocalVoicePicker.pick(listOf(v("us", "en-US", q = 400), v("in", "en-IN", q = 200)), CopilotLanguage.EN)?.name)
     }
 
     @Test
