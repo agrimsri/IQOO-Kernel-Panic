@@ -173,7 +173,7 @@ The kept-data sample shows why unknown is not a pass. Its score is 100 because t
   FAIL  requirePlans       Plan A · Accept was not captured; Plan B · Reject was not captured
 ```
 
-Rule statuses are `PASS`, `FAIL` (a violation), `NOT ESTABLISHED` and `OFF` (not set in the policy). A `failOn` check the captured plans could not show (C2 without a recorded Reject choice; C9 without a child-facing declaration or a screen review that answered child audience; C1, C10 and NC when every plan ran on kept data without a consent screen; C3 to C8 without a reviewed consent screen) is never a pass by absence: it is reported as `C<n> NOT ESTABLISHED` and fails the gate, unless the policy sets `allowNotEstablished: true`, in which case it is listed with the status `NOT ESTABLISHED` and does not fail.
+Rule statuses are `PASS`, `FAIL` (a violation), `NOT ESTABLISHED` and `OFF` (not set in the policy). A `failOn` check the captured plans could not show (C2 without a recorded Reject choice; C9 without a child-facing declaration or a screen review that answered child audience; C1, C10 and NC when every plan ran on kept data without a consent screen; C3 to C8 without a reviewed consent screen; C11 without recorded DNS replies; C12 without a recorded background step; C13 when the installed manifest was not read; C14 when Android permission dialogs were not watched; C15 without a captured consent-screen tree; V1 without capture health or the Private DNS setting) is never a pass by absence: it is reported as `C<n> NOT ESTABLISHED` and fails the gate, unless the policy sets `allowNotEstablished: true`, in which case it is listed with the status `NOT ESTABLISHED` and does not fail.
 
 ### `diff`: release-to-release regression check
 
@@ -216,7 +216,7 @@ Swapping the arguments reports `Result: REGRESSION (exit 1)` with the five new f
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `failOn` | `["C2", "C9"]` | Fail when the re-evaluated result contains any of these check ids (C1–C10, NC, V0, U1, S1), or when the captured plans could not test one of them (NOT ESTABLISHED, see `allowNotEstablished`). The default is the two Critical checks: trackers after the user refused, and tracking in a child-facing app. |
+| `failOn` | `["C2", "C9"]` | Fail when the re-evaluated result contains any of these check ids (C1–C15, NC, V0, V1, U1, S1), or when the captured plans could not test one of them (NOT ESTABLISHED, see `allowNotEstablished`). The default is the two Critical checks: trackers after the user refused, and tracking in a child-facing app. |
 | `allowNotEstablished` | `false` | A `failOn` check that the captured plans could not test fails the gate. Set `true` to report it as NOT ESTABLISHED without failing. |
 | `minScore` | none | Fail when the score is below this (0–100). Not evaluated when the result is inconclusive. |
 | `maxHigh` | none | Fail when more than this many findings are High or Critical. |
