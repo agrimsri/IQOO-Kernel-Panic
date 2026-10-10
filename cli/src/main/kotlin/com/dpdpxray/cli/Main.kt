@@ -1,5 +1,10 @@
 package com.dpdpxray.cli
 
+import com.dpdpxray.core.evidence.EvidenceSignatures
+import com.dpdpxray.core.evidence.EvidenceVerifier
+import com.dpdpxray.core.evidence.GoogleAttestationRoots
+import com.dpdpxray.core.evidence.TrustedRoot
+import com.dpdpxray.core.automation.AutomationContract
 import com.dpdpxray.core.law.LegalProfile
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -40,6 +45,8 @@ fun main(args: Array<String>) {
  * `traceveil-ci diff <old.json> <new.json> [--format text|json] [--out file]`
  *
  * `traceveil-ci run --package <pkg> [options]` (see [RunCommand]): runs the audit on a USB-connected phone first.
+ * `traceveil-ci verify <bundle.json> [--sig file] [--format text|json] [--package pkg] [--signer-sha256 hex]`: checks the
+ * phone's hardware-backed signature (traceveil.signature.v1) offline; exit 0 verified, 1 not verified, 2 usage.
  *
  * Exit codes: 0 pass (diff: no regression), 1 policy violation (diff: regression), 2 usage or unreadable input
  * (run: also device, phone-side refusal or timeout).
@@ -54,6 +61,8 @@ class TraceVeilCi(
     private val adbFactory: (String) -> Adb = ::ProcessAdb,
     private val clock: RunClock = SystemRunClock,
     private val newRunId: () -> String = { RunIds.generate(clock.nowMs()) },
+    /** Roots `verify` trusts: Google's hardware attestation roots. Tests pass a test root here; there is no CLI option. */
+    private val trustedRoots: () -> List<TrustedRoot> = { GoogleAttestationRoots.all },
 ) {
     private val gate: Gate by gateFactory
     private val pretty = Json { prettyPrint = true }
@@ -65,6 +74,7 @@ class TraceVeilCi(
             "-V", "--version", "version" -> { out.println("${CliInfo.NAME} ${CliInfo.version}"); Exit.PASS }
             "check" -> check(Args.parse(args.drop(1), setOf("--policy", "--format", "--out", "--profile")))
             "diff" -> diff(Args.parse(args.drop(1), setOf("--format", "--out")))
+            "verify" -> verify(Args.parse(args.drop(1), setOf("--sig", "--format", "--package", "--signer-sha256")))
             "run" -> RunCommand(out, err, cwd, { gate }, env, adbFactory, clock, newRunId).run(args.drop(1))
             else -> throw UsageException("unknown command \"${args[0]}\"")
         }
@@ -111,6 +121,33 @@ class TraceVeilCi(
         val text = DiffText.render(d)
         emit(a, format, text) { if (format == "json") pretty.encodeToString(JsonObject.serializer(), DiffJson.render(d)) else text }
         return if (d.regression) Exit.VIOLATION else Exit.PASS
+    }
+
+    private fun verify(a: Args): Int {
+        if (a.positional.size != 1) throw UsageException("verify needs exactly one file: <bundle.json> (the exported file the signature covers)")
+        val format = a.format(setOf("text", "json"))
+        val file = resolve(a.positional.single())
+        val shown = LoadedBundle.displayPath(file, cwd)
+        if (!file.isFile) throw UsageException("$shown: no such file")
+        val explicit = a.options["--sig"]?.let { path ->
+            resolve(path).also { if (!it.isFile) throw UsageException("signature file not found: $path") }
+        }
+        val candidates = explicit?.let { listOf(it) } ?: EvidenceSignatures.candidatesFor(file.name).map { File(file.absoluteFile.parentFile, it) }
+        val sigFile = candidates.firstOrNull { it.isFile }
+        val bytes = runCatching { file.readBytes() }.getOrElse { throw UsageException("$shown: could not read the file (${it.message})") }
+        val report = sigFile?.let { s ->
+            val text = runCatching { s.readText(Charsets.UTF_8).removePrefix("﻿") }
+                .getOrElse { throw UsageException("${LoadedBundle.displayPath(s, cwd)}: could not read the file (${it.message})") }
+            EvidenceVerifier.verify(
+                bytes, text, roots = trustedRoots(),
+                expectedPackage = a.options["--package"] ?: AutomationContract.APP_PACKAGE,
+                expectedSignerSha256 = a.options["--signer-sha256"],
+            )
+        }
+        val outcome = VerifyOutcome(shown, sigFile?.let { LoadedBundle.displayPath(it, cwd) }, candidates.map { it.name }, report)
+        if (format == "json") out.println(pretty.encodeToString(JsonObject.serializer(), VerifyJson.render(outcome)))
+        else out.print(VerifyText.render(outcome))
+        return if (outcome.verified) Exit.PASS else Exit.VIOLATION
     }
 
     /** Reads every file first so all unreadable inputs are reported together. */
@@ -187,6 +224,7 @@ class TraceVeilCi(
             |  traceveil-ci run --package <pkg> [--device SERIAL] [--apk file.apk] [--mode full|quick] [--token T]
             |                   [--policy policy.json] [--timeout 300] [--out traceveil-out] [--adb path]
             |                   [--format text|json] [--sarif file] [--child-facing]
+            |  traceveil-ci verify <bundle.json> [--sig file] [--format text|json] [--package pkg] [--signer-sha256 hex]
             |  traceveil-ci --help | --version
             |
             |check  Re-evaluates each traceveil.audit.v1 bundle (from TraceVeil's Report screen: "Export audit data
@@ -201,6 +239,13 @@ class TraceVeilCi(
             |       --device, ANDROID_SERIAL or the only connected phone; adb from --adb, ADB or PATH. --apk installs
             |       the build first with adb install -r. Exit 2 also covers device problems, a refusal on the phone
             |       and --timeout. Setup and security model: docs/ci/RUNNER.md.
+            |
+            |verify Checks, offline, the signature TraceVeil writes next to an export (<file>.sig.json, made by a key in
+            |       the phone's Android Keystore): the file is unchanged, the key was generated in secure hardware
+            |       (StrongBox or TEE), which app created it (default expected: com.dpdpxray.app; --package to change,
+            |       --signer-sha256 to also require a signing-certificate digest), and the chain ends at a Google hardware
+            |       attestation root. Exit 0 verified, 1 not verified (also: no signature file), 2 usage. It cannot check
+            |       revocation offline. Format and threat model: docs/SIGNED_EVIDENCE.md.
             |
             |Policy keys (all optional; defaults in brackets):
             |  failOn            ["C2", "C9"]   fail when the re-evaluated result has any of these checks

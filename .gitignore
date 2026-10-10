@@ -18,6 +18,8 @@ google-services.json
 *.jks
 *.keystore
 *.pem
+# Public Android attestation certificate chains (no private key), used only as test inputs.
+!/core/src/test/resources/evidence/keyattestation/*.pem
 *.key
 
 /tools/tests/__pycache__/

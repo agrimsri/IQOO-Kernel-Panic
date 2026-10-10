@@ -1,0 +1,14 @@
+Real Android Key Attestation certificate chains, used only as test inputs.
+
+Source: https://github.com/android/keyattestation (Google's Kotlin key attestation verifier), directory testdata/,
+at commit 3f550f94a9e3c010dda7cdcad8bca764cd76d4f4 (2026-10-08), downloaded 11 October 2026:
+
+  caiman_sdk36_SB_EC_RKP.pem        <- testdata/caiman/sdk36/SB_EC_RKP.pem          (Pixel 9 Pro, StrongBox, RKP)
+  caiman_sdk36_SB_EC_RKP.json       <- testdata/caiman/sdk36/SB_EC_RKP.json         (upstream's decoded expectation)
+  tegu_sdk36_TEE_EC_2026_ROOT.pem   <- testdata/tegu/sdk36/TEE_EC_2026_ROOT.pem     (preproduction Pixel 9a, TEE, new root)
+  tegu_sdk36_TEE_EC_2026_ROOT.json  <- testdata/tegu/sdk36/TEE_EC_2026_ROOT.json
+  blueline_sdk28_TEE_EC_NONE.pem    <- testdata/blueline/sdk28/TEE_EC_NONE.pem      (Pixel 3, TEE, factory key)
+  blueline_sdk28_TEE_EC_NONE.json   <- testdata/blueline/sdk28/TEE_EC_NONE.json
+
+Licence: Apache License 2.0 (the repository's LICENSE, copied unchanged as LICENSE-Apache-2.0.txt). The files are
+unmodified. They contain public certificates only; no private key.

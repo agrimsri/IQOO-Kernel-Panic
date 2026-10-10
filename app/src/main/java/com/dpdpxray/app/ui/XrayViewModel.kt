@@ -27,6 +27,9 @@ import com.dpdpxray.app.data.LensChoice
 import com.dpdpxray.app.data.SampleAudit
 import com.dpdpxray.app.data.CheckBackups
 import com.dpdpxray.app.BuildConfig
+import com.dpdpxray.app.evidence.AndroidEvidenceKey
+import com.dpdpxray.app.evidence.EvidenceFiles
+import com.dpdpxray.app.evidence.EvidenceSigning
 import com.dpdpxray.app.graph
 import com.dpdpxray.app.report.AuditJsonExport
 import com.dpdpxray.app.report.ExportManager
@@ -41,6 +44,7 @@ import com.dpdpxray.core.export.AuditBackups
 import com.dpdpxray.core.export.AuditBundles
 import com.dpdpxray.core.export.BackupFormatException
 import com.dpdpxray.core.export.SdkAttributionExport
+import com.dpdpxray.core.evidence.EvidenceSignatures
 import com.dpdpxray.core.dpdp.Passage
 import com.dpdpxray.core.fixes.FixTemplate
 import com.dpdpxray.core.law.LegalLens
@@ -115,6 +119,11 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _cameraResult = MutableStateFlow<CameraCheckState>(CameraCheckState.Idle)
     val cameraResult = _cameraResult.asStateFlow()
+
+    /** The last audit-data export's signing line, as (audit id, line), for the Report screen. */
+    private val _evidenceLine = MutableStateFlow<Pair<String, String>?>(null)
+    val evidenceLine = _evidenceLine.asStateFlow()
+    private val evidenceKey by lazy { AndroidEvidenceKey(ctx) }
 
     private val _toast = MutableStateFlow<String?>(null)
     val toast = _toast.asStateFlow()
@@ -426,7 +435,11 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Audit data as a traceveil.audit.v1 JSON bundle for TraceVeil CI; it leaves the phone only when saved or shared. */
+    /**
+     * Audit data as a traceveil.audit.v1 JSON bundle for TraceVeil CI; it leaves the phone only when saved or shared. The
+     * file's exact bytes are also signed with this install's hardware key (<file>.sig.json next to it) when the phone
+     * can; otherwise the export goes ahead unsigned and says so.
+     */
     fun exportAuditJson(bundle: AuditBundle, share: Boolean) = viewModelScope.launch {
         val groups = withContext(Dispatchers.Default) { sdkGroups(bundle) }
         val file = runCatching {
@@ -435,10 +448,18 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
             .getOrElse { _toast.value = "Could not build the audit data export"; return@launch }
-        if (share) ExportManager.share(ctx, file, AuditJsonExport.MIME)
+        val signing = withContext(Dispatchers.IO) { EvidenceFiles.signNextTo(file, evidenceKey, BuildConfig.VERSION_NAME) }
+        _evidenceLine.value = bundle.meta.id to signing.line
+        val sig = (signing as? EvidenceSigning.Signed)?.file
+        if (share) ExportManager.share(ctx, listOfNotNull(file, sig), AuditJsonExport.MIME)
         else {
-            val ok = withContext(Dispatchers.IO) { ExportManager.saveToDownloads(ctx, file, file.name, AuditJsonExport.MIME) }
-            _toast.value = if (ok) "Audit data (JSON) saved to Downloads/TraceVeil" else "Could not save the audit data"
+            val saved = withContext(Dispatchers.IO) { ExportManager.saveToDownloads(ctx, file, file.name, AuditJsonExport.MIME) }
+            val sigSaved = sig?.let { withContext(Dispatchers.IO) { ExportManager.saveToDownloads(ctx, it, it.name, EvidenceSignatures.MIME) } }
+            _toast.value = when {
+                !saved -> "Could not save the audit data"
+                sigSaved == false -> "Audit data (JSON) saved to Downloads/TraceVeil, but its signature file could not be saved"
+                else -> "Audit data (JSON) saved to Downloads/TraceVeil · ${signing.line}"
+            }
         }
     }
 
