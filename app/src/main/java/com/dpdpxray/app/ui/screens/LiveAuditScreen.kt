@@ -70,6 +70,8 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
             }
             is AuditProgress.Running -> {
                 Text(p.config.targetLabel, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 24.dp))
+                Tag(if (p.config.fastPreview) "Fast Preview · limited evidence" else "Normal capture", if (p.config.fastPreview) Film.warn else Film.boneDim)
+                if (p.config.fastPreview) Note("8-second observation; delayed traffic may be missed. Silent and Reject are not tested.", Film.warn)
                 // The plans really are a sequence, so they are shown as numbered steps.
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     p.config.plans.forEachIndexed { i, plan ->

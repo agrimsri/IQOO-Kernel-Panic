@@ -14,7 +14,7 @@ class AuditComparisonTest {
     private fun bundle(id: String, time: Long, score: Int? = 21, sample: Boolean = false) = AuditBundle(
         AuditMeta(id, "com.leakyshop.demo", "LeakyShop", time, score,
             if (score == null) ScoreBand.INCONCLUSIVE else ScoreBand.AT_RISK, result.findings.size,
-            sessions.map { it.plan.label }, sample), sessions,
+            sessions.map { it.plan.label }, sample, timingProfile = "normal"), sessions,
         result.copy(score = score, band = if (score == null) ScoreBand.INCONCLUSIVE else ScoreBand.AT_RISK), File("unused"),
     )
 

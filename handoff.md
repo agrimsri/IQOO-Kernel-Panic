@@ -3,6 +3,28 @@
 Snapshot: 10 October 2026, before the Round 1 mentor session at 10:00 IST.
 This document distinguishes implemented code, verified observations and unfinished work. Read it completely before commands or edits.
 
+## 0. Latest continuation checkpoint — read before historical snapshots
+
+Fast Preview product commit: **619a0d5a386de689cd4a96bdcd8e0fafec528346**, on `nitya/evidence-integration`. This supersedes the older product-code/hash snapshot in sections 2/8; subsequent documentation commits do not change the APK. Normal Full remains the controlled-demo default; the user clarified that earlier normal timing should remain the main path. Preview is an optional single Accept-plan check with shorter observation, never a Full audit or safety pass.
+
+Final fresh verification: **303 core + 168 app = 471 tests**, zero failures/errors/skips; all three APKs built, BUILD SUCCESSFUL in43s/128tasks. Repository checker tests15/15 in17.334s. Final installed app SHA-256:
+
+```text
+6e1c8ddca15c04fc360bc50e30e2316de3d0ae6691e0bc3da49dfd69acd6b9db
+```
+
+The installed hash was compared against the local APK after a data-preserving `install -r`. Nitya's phone remains the coordinator's ADB lease. Preview on the immediately preceding runtime-equivalent APK `f55de2af…` completed `audit-1791594732012`: actual Accept, one lookup,10.373s capture/14.376s overall, honestly Inconclusive, persisted `fast_preview`, visible delayed-traffic/Silent/Reject limitations. Final-build undisturbed normal Full LeakyShop `audit-1791595268053` completed **21/100**, actual Reject all and Accept & Continue,5/8/7lookups,25.835/19.887/18.359s plan windows,64.484s overall. Saved health and UID readings match each plan and sampling brackets; no lost/dropped events reported. This is not ten-run reliability acceptance.
+
+Keep failed Full `audit-1791595035479`: Accept was missed during an in-run shell UI dump,21score with a visible incomplete-choice warning. Android UiAutomation suppresses other accessibility services by default, and a service rebind coincided with the dump. The undisturbed rerun succeeded without a speculative product change. Never run shell `uiautomator dump` during active capture; inspect own saved files or ordinary screenshots instead. Do not hide failed attempts.
+
+Final-build undisturbed fixed Full `audit-1791595440002` also passed: **100/100**,zero findings,one lookup per plan, actual Reject and Accept,62.907s overall. Results retains Low evidence confidence and the201byte/3packet estimate with accounting/zero-upload caveats. Own Results screenshot was captured locally and visually inspected. These are smoke tests, not the ten-run reliability criterion or human voice-quality acceptance.
+
+**Main moved while we worked:** `origin/main` is now `dac54e56673dfbc80f7bfbbc8e63639934c67ce0`, merge of Yashvi PR#7 at`cd7cfae`; it includes newer optional online voice and keep-Camera work. The tested integration branch intentionally does not include those new commits. Read-only `git merge-tree` against current main reports conflicts in `ToolScreens.kt`, `ui/screens/map/EndpointMapCard.kt` and `voice/VoiceViewModel.kt`. No merge was performed, no index/worktree conflicts were introduced, and main was not pushed by this work. **Do not call the combined main+integration build tested or merge blindly.** Coordinate those three Yashvi-owned files, preserve offline pack recovery/stale-answer cancellation/map unknown-facts safeguards and the new Preview Settings wording, then rebuild/retest the reconciled tree before Agrim accepts main.
+
+Claude Max's existing independent checkout `traceveil-claude-max`, branch`nitya/claude-audit-timing`, was clean on the coordinator's checks. Do not recreate or reset it. Its timing assignment remains read-only until an explicit lease; Preview is already implemented, so focus on cold GPU load and post-capture synchronous model review/cancellation. No overlapping audit/UI or ADB edits. `claude_max_prompt.md` is updated for this continuation.
+
+Read [Fast Preview](docs/FAST_PREVIEW.md), [next work](docs/NEXT_WORK.md), [NPU recommendation](docs/NPU_RECOMMENDATION.md) and [verification](docs/VERIFICATION.md). Actual phone SoC isSM8850; it has only its GPU Gemma4 bundle. Recommend a separate text-only Gemma3-1B INT4SM8850 candidate(~694MB), not a replacement for vision. Qualcomm dispatch/QNNV81 libraries, correct-SoC selection/context guards, licence approvals and real NPU benchmarks remain missing. No model/QAIRT download or terms acceptance occurred. Jovi and Hey TraceVeil remain unintegrated/unimplemented as detailed below.
+
 ## 1. Objective and current priorities
 
 Team Kernel Panic is building TraceVeil for the DPDPP-XRay track. It is a phone-first developer/privacy-review tool: observe an authorised app's DNS lookups around recorded consent choices, explain evidence and limits, offer practical developer fixes and export a report. It is not a universal fraud detector, permission firewall, payload inspector or legal certificate.

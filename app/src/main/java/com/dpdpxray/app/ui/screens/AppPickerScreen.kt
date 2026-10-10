@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -50,6 +52,7 @@ import com.dpdpxray.core.model.AuditPlan
 fun AppPickerScreen(vm: XrayViewModel, onBack: () -> Unit, onStarted: () -> Unit) {
     val apps by vm.apps.collectAsState()
     val pf by vm.preflight.collectAsState()
+    val settings by vm.settings.collectAsState()
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf<AuditableApp?>(null) }
     LaunchedEffect(Unit) { vm.refreshPreflight(); vm.loadApps() }
@@ -84,7 +87,7 @@ fun AppPickerScreen(vm: XrayViewModel, onBack: () -> Unit, onStarted: () -> Unit
 
     selected?.let { app ->
         ModalBottomSheet(onDismissRequest = { selected = null }, containerColor = Film.raised) {
-            AuditSetup(app, shizukuReady = pf.shizukuGranted) { config ->
+            AuditSetup(app, shizukuReady = pf.shizukuGranted, preferPreview = settings.fastDemo) { config ->
                 selected = null
                 if (vm.startAudit(config)) onStarted()
             }
@@ -93,16 +96,17 @@ fun AppPickerScreen(vm: XrayViewModel, onBack: () -> Unit, onStarted: () -> Unit
 }
 
 @Composable
-private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, onStart: (AuditConfig) -> Unit) {
+private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, preferPreview: Boolean, onStart: (AuditConfig) -> Unit) {
     val controlledDemo = app.packageName == "com.leakyshop.demo" || app.packageName == "com.leakyshop.demo.fixed"
     var allowReset by remember { mutableStateOf(controlledDemo) }
     val freshReset = allowReset && shizukuReady
     var full by remember { mutableStateOf(shizukuReady && controlledDemo) }
+    var preview by remember { mutableStateOf(preferPreview && !(shizukuReady && controlledDemo)) }
     var agent by remember { mutableStateOf(controlledDemo) }
     var child by remember { mutableStateOf(false) }
     var gms by remember { mutableStateOf(false) }
 
-    Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("Audit ${app.label}", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
         if (shizukuReady) Toggle("Allow clearing this test app's local data", "Developer testing only. Removes its saved state, accounts and settings before each run. Leave off for personal apps.", allowReset) {
@@ -110,12 +114,13 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, onStart: (Audit
             if (!it) full = false
         }
         PlanOption(
-            "Full audit, about 2 minutes",
-            "Three runs from a fresh install: no interaction, then Reject, then Accept. Catches tracking that ignores a refusal.",
+            "Full audit · normal timing",
+            "Three fresh-state runs: Silent, Reject, Accept. Observes Silent for 25 seconds and each choice for 15 seconds; launch, consent and AI review add time.",
             full, enabled = freshReset,
-        ) { full = true }
+        ) { full = true; preview = false }
         if (!freshReset) Note("Full audits need Shizuku and explicit approval to reset a test app between runs.", Film.warn)
-        PlanOption("Quick audit, about 40 seconds", "One run: open the app and accept consent.", !full, enabled = true) { full = false }
+        PlanOption("Quick audit · normal timing", "One Accept-plan run with 15 seconds of observation. No Silent or Reject comparison.", !full && !preview, enabled = true) { full = false; preview = false }
+        PlanOption("Fast Preview · limited evidence", "One Accept-plan run with 8 seconds of observation and a shorter consent-screen wait. Delayed traffic may be missed; not a Full audit.", preview, enabled = true) { full = false; preview = true }
         if (!freshReset) Note("Quick keeps the app's data. An already-opened app may keep its consent choice and not repeat launch-time DNS lookups. A missing dialog or quiet run is not a privacy pass.", Film.warn)
         else Note("Starting an audit clears this selected app's local data before each plan. Use a test app or a backed-up development build; do not use a personal app with data you need.", Film.warn)
 
@@ -130,7 +135,7 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, onStart: (Audit
                 AuditConfig(
                     targetPackage = app.packageName, targetLabel = app.label,
                     plans = if (full && freshReset) listOf(AuditPlan.SILENT, AuditPlan.REJECT, AuditPlan.ACCEPT) else listOf(AuditPlan.ACCEPT),
-                    childFacing = child, includeGms = gms, autoDrive = agent, resetAppData = freshReset,
+                    childFacing = child, includeGms = gms, autoDrive = agent, resetAppData = freshReset, fastPreview = preview,
                 ),
             )
         })

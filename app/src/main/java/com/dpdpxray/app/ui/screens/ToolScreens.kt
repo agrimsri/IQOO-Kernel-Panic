@@ -215,7 +215,7 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit) {
         TopBar("Settings", onBack)
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             SettingToggle("Presentation mode", "Larger text for projectors and screen sharing.", s.stageMode) { v -> vm.updateSettings { it.copy(stageMode = v) } }
-            SettingToggle("Fast audits", "Shorter waits (about 1 minute for a full audit). Good for quick checks and demos.", s.fastDemo) { v -> vm.updateSettings { it.copy(fastDemo = v) } }
+            SettingToggle("Prefer Fast Preview", "Defaults single-run checks to the shorter, clearly labelled Preview. Full audits keep normal timing; choose the mode in audit setup.", s.fastDemo) { v -> vm.updateSettings { it.copy(fastDemo = v) } }
             SettingToggle("Load AI when an audit starts", "Loads Gemma automatically if it is installed.", s.autoLoadModel) { v -> vm.updateSettings { it.copy(autoLoadModel = v) } }
 
             SectionTitle("Your own domains")

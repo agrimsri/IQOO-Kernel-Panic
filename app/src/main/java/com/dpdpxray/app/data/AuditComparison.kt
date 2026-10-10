@@ -3,6 +3,7 @@ package com.dpdpxray.app.data
 import com.dpdpxray.core.model.CheckId
 import com.dpdpxray.core.model.ScoreBand
 import com.dpdpxray.app.audit.AuditPlanCoverage
+import com.dpdpxray.app.audit.AuditTimingPolicy
 
 sealed interface AuditComparisonResult {
     data class Available(val previousId: String, val previousTimeMs: Long, val scoreDelta: Int, val noLongerRecorded: Set<CheckId>, val newlyRecorded: Set<CheckId>) : AuditComparisonResult
@@ -24,6 +25,13 @@ internal object AuditComparison {
             return unavailable("Different packages or sample/live modes cannot be compared automatically.")
         if (old.meta.plans.isEmpty() || old.meta.plans.toSet() != current.meta.plans.toSet())
             return unavailable("The audit plans changed. Run the same plans before comparing scores.")
+        if (!current.meta.sample || old.meta.timingProfile != null || current.meta.timingProfile != null) {
+            val known = setOf(AuditTimingPolicy.NORMAL, AuditTimingPolicy.FAST_PREVIEW)
+            if (old.meta.timingProfile !in known || current.meta.timingProfile !in known)
+                return unavailable("Capture timing was not recorded or is unknown. A score change cannot establish an improvement.")
+            if (old.meta.timingProfile != current.meta.timingProfile)
+                return unavailable("Capture timing profiles changed. Fast Preview and normal audits cannot establish a comparable score change.")
+        }
         if (AuditPlanCoverage.gaps(old.sessions).isNotEmpty() || AuditPlanCoverage.gaps(current.sessions).isNotEmpty())
             return unavailable("An intended consent choice was not completed. Repeat the same plans before comparing scores.")
         val before = old.result.score
