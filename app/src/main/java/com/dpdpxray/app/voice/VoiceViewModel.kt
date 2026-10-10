@@ -5,6 +5,7 @@ import android.app.Application
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dpdpxray.app.graph
@@ -53,16 +54,17 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
     private var permissionDenied = false
     private var micCheckVersion = 0
     private val answerGate = VoiceAnswerGate()
+    private val checkThrottle = CheckThrottle(CHECK_GAP_MS)
     private var answerJob: Job? = null
 
-    private val _state = MutableStateFlow(VoiceUiState(cloudVoice = apiConfig.useApi))
+    private val _state = MutableStateFlow(VoiceUiState(cloudVoice = SpeechOutputChoice.choose(apiConfig) == SpeechOutputChoice.ONLINE))
     val state: StateFlow<VoiceUiState> = _state.asStateFlow()
 
     private val voice: SpeechOutput = run {
         val report = { s: VoiceOutputState -> _state.update { s.applyTo(it) } }
         val local = AnswerVoice(app, report)
         val key = apiConfig.sarvamKey
-        if (apiConfig.useApi && key != null) CloudSpeechOutput(app, key, local, report) else local
+        if (SpeechOutputChoice.choose(apiConfig) == SpeechOutputChoice.ONLINE && key != null) CloudSpeechOutput(app, key, local, report) else local
     }
 
     fun load(auditId: String) {
@@ -94,9 +96,13 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Re-checks permission and language packs, e.g. after resuming from Settings. */
-    fun refreshMic() {
-        val version = ++micCheckVersion
+    fun refreshMic(force: Boolean = false) {
         val language = _state.value.language
+        if (!checkThrottle.allow(SystemClock.elapsedRealtime(), language, force)) {
+            recomputeMic() // the same check just ran; keep its result and only re-read the permission
+            return
+        }
+        val version = ++micCheckVersion
         installed = null
         recomputeMic()
         recognizer.checkLanguageSupport(language) { packs ->
@@ -115,6 +121,9 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
             recomputeMic()
         }
     }
+
+    /** The Check again button: always runs, never throttled. */
+    fun recheckMic() = refreshMic(force = true)
 
     fun downloadSpeechPack() {
         if (!_state.value.canDownloadPack) return
@@ -136,7 +145,7 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onPermissionResult(granted: Boolean) {
         permissionDenied = !granted
-        refreshMic()
+        refreshMic(force = true)
     }
 
     private fun recomputeMic() {
@@ -233,5 +242,9 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         recognizer.release()
         voice.release()
+    }
+
+    private companion object {
+        const val CHECK_GAP_MS = 2_000L
     }
 }

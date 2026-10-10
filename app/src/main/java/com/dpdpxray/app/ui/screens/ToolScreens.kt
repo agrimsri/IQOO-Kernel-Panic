@@ -52,6 +52,7 @@ import com.dpdpxray.app.ui.components.SectionTitle
 import com.dpdpxray.app.ui.components.TopBar
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.voice.ApiEnv
+import com.dpdpxray.app.voice.SpeechOutputChoice
 import com.dpdpxray.core.model.RejectOption
 import com.dpdpxray.core.model.ScreenAudit
 import kotlinx.coroutines.launch
@@ -227,12 +228,14 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit) {
             }
 
             SectionTitle("Privacy")
+            val ctx = LocalContext.current
+            val onlineVoice = remember { SpeechOutputChoice.choose(ApiEnv.load(ctx)) == SpeechOutputChoice.ONLINE }
             Note(
-                "TraceVeil uploads nothing. Its only network use is relaying the audited app's own DNS lookups during an audit. " +
+                (if (onlineVoice) "Apart from the online voice described below, TraceVeil uploads nothing. " else "TraceVeil uploads nothing. ") +
+                    "Its only other network use is relaying the audited app's own DNS lookups during an audit. " +
                     "Reports, screenshots and AI analysis stay on this phone until you export them.",
             )
-            val ctx = LocalContext.current
-            if (remember { ApiEnv.load(ctx).useApi }) Note(
+            if (onlineVoice) Note(
                 "Online voice is switched on for this build: Voice Copilot sends each spoken answer's text to Sarvam AI to make speech. " +
                     "Speech recognition and answers still stay on this phone.",
                 Film.high,

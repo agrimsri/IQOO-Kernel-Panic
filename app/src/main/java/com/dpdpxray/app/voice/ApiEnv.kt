@@ -26,6 +26,6 @@ object ApiEnv {
             .filter { it.isNotEmpty() && !it.startsWith("#") && '=' in it }
             .associate { line -> line.substringBefore('=').trim() to line.substringAfter('=').trim().trim('"', '\'') }
         val key = values["SARVAM_API_KEY"]?.takeIf { it.isNotBlank() }
-        return ApiConfig(useApi = values["USE_API"] == "true" && key != null, sarvamKey = key)
+        return ApiConfig(useApi = values["USE_API"].equals("true", ignoreCase = true) && key != null, sarvamKey = key)
     }
 }

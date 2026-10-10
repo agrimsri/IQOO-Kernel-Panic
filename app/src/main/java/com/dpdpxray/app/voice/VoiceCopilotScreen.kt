@@ -103,7 +103,7 @@ fun VoiceCopilotScreen(auditId: String, onBack: () -> Unit, vm: VoiceViewModel =
                 SecondaryAction("Download speech pack", vm::downloadSpeechPack, Modifier.fillMaxWidth().padding(top = 8.dp))
                 Note("Downloads a recognition model through your phone's speech provider. No microphone audio is sent by TraceVeil.")
             }
-            SecondaryAction("Check again", vm::refreshMic, Modifier.fillMaxWidth().padding(top = 8.dp), enabled = !s.listening)
+            SecondaryAction("Check again", vm::recheckMic, Modifier.fillMaxWidth().padding(top = 8.dp), enabled = !s.listening)
 
             SectionTitle("Or tap a question")
             CopilotQuestions.chips.forEach { q ->

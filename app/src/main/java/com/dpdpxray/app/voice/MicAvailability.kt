@@ -33,17 +33,7 @@ object MicAvailability {
 
     fun denied(): MicState = MicState.Unavailable("Microphone permission was not granted. $CHIPS")
 
-    fun errorReason(code: Int): String = when (code) {
-        SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Sorry, I did not catch that. Try again or tap a question."
-        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission was not granted. $CHIPS"
-        SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ->
-            "The on-device speech pack is missing. Use Download speech pack, then Check again. $CHIPS"
-        SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ->
-            "This recognition service does not support that language. Try another language or check speech settings. $CHIPS"
-        SpeechRecognizer.ERROR_AUDIO -> "The microphone could not be read. $CHIPS"
-        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "The speech recognizer is busy. Try again in a moment."
-        else -> "Speech recognition stopped (code $code). $CHIPS"
-    }
+    fun errorReason(code: Int): String = SpeechErrors.reason(code)
 
     private fun name(l: CopilotLanguage) = if (l == CopilotLanguage.HI) "Hindi" else "English"
 }
