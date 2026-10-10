@@ -1,9 +1,11 @@
 {
     "_comment": "TraceVeil CI release gate. Every key is optional; see docs/CI_MODE.md for each key and its default. Keys starting with _ are comments.",
-    "failOn": ["C2", "C9"],
+    "_failOn": "This example is for an app that is not directed at children, so it gates on C2 only. For an app used by children, add \"C9\" and audit with 'This app is used by children' switched on: without that declaration (or a consent-screen review that answers child audience) C9 is NOT ESTABLISHED, which fails the gate unless allowNotEstablished is true.",
+    "failOn": ["C2"],
     "minScore": 85,
     "maxHigh": 0,
     "requireFreshState": true,
     "allowInconclusive": false,
+    "allowNotEstablished": false,
     "requirePlans": ["ACCEPT", "REJECT", "SILENT"]
 }
