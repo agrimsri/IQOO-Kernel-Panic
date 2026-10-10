@@ -19,7 +19,8 @@
             "Plan A · Accept"
         ],
         "sample": true,
-        "timingProfile": null
+        "timingProfile": null,
+        "inconclusiveReason": null
     },
     "sessions": [
         {

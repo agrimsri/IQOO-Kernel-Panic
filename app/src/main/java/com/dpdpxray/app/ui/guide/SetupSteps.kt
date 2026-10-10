@@ -44,7 +44,9 @@ object RecentChecks {
 
     fun coverageWarning(meta: AuditMeta): String? = when {
         meta.sample -> null
-        meta.band == ScoreBand.INCONCLUSIVE -> "Inconclusive: too little was captured"
+        meta.band == ScoreBand.INCONCLUSIVE ->
+            if (meta.inconclusiveReason == "CONSENT_HISTORY_UNKNOWN") "Inconclusive: app kept its data, consent history unknown"
+            else "Inconclusive: too little was captured"
         meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW -> "Fast Preview: limited evidence"
         AuditPlan.REJECT.label !in meta.plans -> "Single run: Reject not tested"
         meta.timingProfile == null -> "Timing not recorded"

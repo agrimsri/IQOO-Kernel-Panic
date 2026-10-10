@@ -84,6 +84,8 @@ data class BundleMeta(
     val plans: List<String> = emptyList(),
     val sample: Boolean = false,
     val timingProfile: String? = null,
+    /** Why an inconclusive result has no score (Inconclusive.Reason name); absent in older exports. */
+    val inconclusiveReason: String? = null,
 )
 
 /** The text is not a readable bundle of the expected kind; the message says why in plain words. */

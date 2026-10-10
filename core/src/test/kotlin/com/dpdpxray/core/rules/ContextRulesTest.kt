@@ -189,8 +189,18 @@ class ContextRulesTest {
         assertTrue(u1.evidence.none { it.contains("no consent was ever requested") })
         assertTrue(u1.evidence.first().contains("kept its data"))
         assertEquals(EvidenceType.OBSERVED, u1.evidenceType)
+        // Trackers were looked up but whether consent came first is unknown: no score, never "Ready".
+        assertEquals(null, r.score)
+        assertEquals(ScoreBand.INCONCLUSIVE, r.band)
+        assertEquals(Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN, Inconclusive.reason(r.findings))
+    }
+
+    @Test
+    fun `kept-data run without third-party tracker lookups keeps its score`() {
+        val r = engine.evaluate(listOf(session("com.example.shop", hosts("api.shop.example", "cdn.shop.example"), freshState = false)))
+        assertTrue(CheckId.U1 in ids(r))
+        assertEquals(null, Inconclusive.reason(r.findings))
         assertEquals(100, r.score)
-        assertEquals(ScoreBand.READY, r.band)
     }
 
     @Test

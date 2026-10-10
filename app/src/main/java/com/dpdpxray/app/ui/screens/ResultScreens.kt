@@ -160,6 +160,7 @@ fun ResultsScreen(
                     band = r.band, score = r.score, findingCount = r.findings.size, fixCount = fixCount,
                     coverageGaps = gaps.isNotEmpty(), rejectPlanned = b.sessions.any { it.plan == AuditPlan.REJECT },
                     fastPreview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW, sample = b.meta.sample,
+                    inconclusiveReason = com.dpdpxray.core.rules.Inconclusive.reason(r.findings),
                 )
                 GuideBanner(ResultGuide.step(facts), Modifier.padding(top = 18.dp))
                 ResultGuidePanel(facts) { action ->
@@ -268,6 +269,9 @@ private fun headline(findings: List<Finding>): String {
     val v0 = findings.any { it.checkId == CheckId.V0 }
     return when {
         v0 -> "Too few lookups were captured to judge this app. See the first finding for how to re-run."
+        com.dpdpxray.core.rules.Inconclusive.reason(findings) == com.dpdpxray.core.rules.Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN ->
+            "No score: this app kept its data, so whether consent came before its tracker lookups is unknown " +
+                "(${findings.first { it.checkId == CheckId.U1 }.entities.joinToString()}). Run a Full check on a test install."
         c2 != null -> "Tracker hosts were looked up after the user refused consent: ${c2.entities.joinToString()}."
         c1 != null -> "Hosts of ${c1.entities.size} tracker${if (c1.entities.size == 1) "" else "s"} looked up before any consent choice: ${c1.entities.joinToString()}."
         findings.isEmpty() -> "No tracker lookups before consent and no consent-screen problems in this capture."

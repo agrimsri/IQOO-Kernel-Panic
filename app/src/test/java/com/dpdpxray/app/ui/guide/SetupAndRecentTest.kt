@@ -61,6 +61,9 @@ class SetupAndRecentTest {
         assertNull(RecentChecks.coverageWarning(meta()))
         assertNull(RecentChecks.coverageWarning(meta(sample = true, profile = null)))
         assertEquals("Inconclusive: too little was captured", RecentChecks.coverageWarning(meta(ScoreBand.INCONCLUSIVE, null)))
+        val history = AuditMeta(id = "a", targetPackage = "p", targetLabel = "P", createdAtMs = 0, score = null,
+            band = ScoreBand.INCONCLUSIVE, findingCount = 1, plans = listOf(AuditPlan.ACCEPT.label), inconclusiveReason = "CONSENT_HISTORY_UNKNOWN")
+        assertEquals("Inconclusive: app kept its data, consent history unknown", RecentChecks.coverageWarning(history))
         assertEquals("Fast Preview: limited evidence", RecentChecks.coverageWarning(meta(plans = listOf(AuditPlan.ACCEPT), profile = "fast_preview")))
         assertEquals("Single run: Reject not tested", RecentChecks.coverageWarning(meta(plans = listOf(AuditPlan.ACCEPT))))
         assertEquals("Timing not recorded", RecentChecks.coverageWarning(meta(profile = null)))

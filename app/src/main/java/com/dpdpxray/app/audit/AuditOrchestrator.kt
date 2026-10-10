@@ -154,6 +154,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             createdAtMs = System.currentTimeMillis(), score = result.score, band = result.band,
             findingCount = result.findings.size, plans = config.plans.map { it.label },
             timingProfile = timingProfile,
+            inconclusiveReason = com.dpdpxray.core.rules.Inconclusive.reason(result.findings)?.name,
         )
         graph.repository.save(meta, sessions, result, markdown, capturedPlans.map { it.upload })
         _progress.value = AuditProgress.Done(auditId)

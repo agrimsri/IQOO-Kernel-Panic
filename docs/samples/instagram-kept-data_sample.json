@@ -17,7 +17,8 @@
             "Plan C · No interaction"
         ],
         "sample": true,
-        "timingProfile": null
+        "timingProfile": null,
+        "inconclusiveReason": null
     },
     "sessions": [
         {

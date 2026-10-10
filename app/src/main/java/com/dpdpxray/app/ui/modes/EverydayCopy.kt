@@ -130,7 +130,7 @@ object EverydayCopy {
         ScoreBand.READY -> Bi("Nothing flagged in this check", "इस जाँच में कुछ नहीं मिला")
         ScoreBand.NEEDS_WORK -> Bi("Worth a look", "देखने लायक बातें")
         ScoreBand.AT_RISK -> Bi("Several things to review", "कई बातें देखनी हैं")
-        ScoreBand.INCONCLUSIVE -> Bi("Not enough was seen", "पर्याप्त नहीं दिखा")
+        ScoreBand.INCONCLUSIVE -> Bi("No verdict from this check", "इस जाँच से कोई निष्कर्ष नहीं")
     }
 
     /** Everything on the everyday Home, for wording checks. */

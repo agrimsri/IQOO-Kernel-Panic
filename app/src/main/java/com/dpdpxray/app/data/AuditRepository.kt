@@ -26,6 +26,8 @@ data class AuditMeta(
     val sample: Boolean = false,
     /** Null means this older audit did not record its timing profile. */
     val timingProfile: String? = null,
+    /** Why an inconclusive result has no score (core Inconclusive.Reason name); null when conclusive or not recorded. */
+    val inconclusiveReason: String? = null,
 )
 
 data class AuditBundle(

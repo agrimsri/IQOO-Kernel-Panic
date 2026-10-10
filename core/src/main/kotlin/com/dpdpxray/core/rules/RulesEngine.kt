@@ -344,9 +344,13 @@ class RulesEngine(
 }
 
 object ScoreCalculator {
-    /** 100 minus severity weights (inferred findings count half); V0 makes the result inconclusive. */
+    /**
+     * 100 minus severity weights (inferred findings count half). The result is inconclusive, with no score, when too few
+     * lookups were captured (V0) or when third-party trackers were looked up but consent history is unknown (U1 with
+     * entities): a kept-data run cannot tell whether consent came first, so it must never read as "Ready".
+     */
     fun compute(findings: List<Finding>): Pair<Int?, ScoreBand> {
-        if (findings.any { it.checkId == CheckId.V0 }) return null to ScoreBand.INCONCLUSIVE
+        if (Inconclusive.reason(findings) != null) return null to ScoreBand.INCONCLUSIVE
         val penalty = findings.sumOf { f -> f.severity.weight * if (f.evidenceType == EvidenceType.INFERRED) 0.5 else 1.0 }
         val score = (100 - penalty).coerceAtLeast(0.0).roundToInt()
         val band = when {
@@ -355,5 +359,25 @@ object ScoreCalculator {
             else -> ScoreBand.AT_RISK
         }
         return score to band
+    }
+}
+
+/** Why a result has no score. Screens, reports and spoken summaries word "Inconclusive" by this reason. */
+object Inconclusive {
+    enum class Reason(val en: String, val hi: String) {
+        LOW_VISIBILITY(
+            "Inconclusive: too little was captured to judge this app.",
+            "अनिर्णायक: इस ऐप को परखने लायक पर्याप्त नहीं दिखा।",
+        ),
+        CONSENT_HISTORY_UNKNOWN(
+            "Inconclusive: the app kept its data, so whether consent came before these tracker lookups is unknown.",
+            "अनिर्णायक: ऐप ने अपना डेटा रखा, इसलिए यह पता नहीं कि ट्रैकर लुकअप से पहले सहमति ली गई थी या नहीं।",
+        ),
+    }
+
+    fun reason(findings: List<Finding>): Reason? = when {
+        findings.any { it.checkId == CheckId.V0 } -> Reason.LOW_VISIBILITY
+        findings.any { it.checkId == CheckId.U1 && it.entities.isNotEmpty() } -> Reason.CONSENT_HISTORY_UNKNOWN
+        else -> null
     }
 }

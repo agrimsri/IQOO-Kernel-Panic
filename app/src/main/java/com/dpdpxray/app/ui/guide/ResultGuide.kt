@@ -14,6 +14,8 @@ data class ResultFacts(
     val rejectPlanned: Boolean,
     val fastPreview: Boolean,
     val sample: Boolean,
+    /** Why an inconclusive result has no score; null for the older "too little was captured" wording. */
+    val inconclusiveReason: com.dpdpxray.core.rules.Inconclusive.Reason? = null,
 )
 
 enum class NextAction { SEE_EVIDENCE, HOW_TO_FIX, CHECK_AGAIN, CHECK_REAL_APP, ASK, REPORT }
@@ -110,9 +112,9 @@ object ResultGuide {
 
     /** Step 4 of the journey. The spoken line carries only score, band and counts: no app, host or tracker names. */
     fun step(f: ResultFacts): GuideStep {
-        val scoreEn = if (f.band == ScoreBand.INCONCLUSIVE || f.score == null) "Inconclusive: too little was captured to score."
+        val scoreEn = if (f.band == ScoreBand.INCONCLUSIVE || f.score == null) (f.inconclusiveReason?.en ?: "Inconclusive: too little was captured to score.")
             else "Score ${f.score} out of 100: ${f.band.label}."
-        val scoreHi = if (f.band == ScoreBand.INCONCLUSIVE || f.score == null) "अनिर्णायक: स्कोर के लिए बहुत कम जानकारी दर्ज हुई।"
+        val scoreHi = if (f.band == ScoreBand.INCONCLUSIVE || f.score == null) (f.inconclusiveReason?.hi ?: "अनिर्णायक: स्कोर के लिए बहुत कम जानकारी दर्ज हुई।")
             else "स्कोर 100 में से ${f.score}: ${bandHi(f.band)}।"
         val extraEn = buildString {
             if (f.findingCount > 0 || f.band != ScoreBand.INCONCLUSIVE) append(" ${findings(f.findingCount)}.")
