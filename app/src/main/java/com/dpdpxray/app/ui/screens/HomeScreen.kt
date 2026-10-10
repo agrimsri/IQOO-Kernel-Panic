@@ -142,10 +142,10 @@ fun HomeScreen(
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("TraceVeil", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
+                Text("TraceVeil", style = MaterialTheme.typography.headlineMedium, maxLines = 1, modifier = Modifier.semantics { heading() })
                 Box(Modifier.padding(top = 4.dp).size(width = 44.dp, height = 3.dp).clip(CircleShape).background(Brand.horizontal))
             }
-            LinkAction("AI lab", onLab, glyph = Glyph.AI)
+            LinkAction("AI lab", onLab)
             LinkAction("Settings", onSettings, color = Film.boneDim)
         }
         Text("Apps promise. TraceVeil checks.", style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 10.dp))
