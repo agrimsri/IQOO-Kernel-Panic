@@ -70,11 +70,13 @@ class AssistantVoice(context: Context) {
         }
     }
 
+    /** Best effort: a phone without a tone generator stays silent. Cancellation still stops the caller and frees the tone. */
     private suspend fun beep() {
-        runCatching {
-            val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 80)
-            tone.startTone(ToneGenerator.TONE_PROP_BEEP, BEEP_MS)
+        val tone = runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, 80) }.getOrNull() ?: return
+        try {
+            runCatching { tone.startTone(ToneGenerator.TONE_PROP_BEEP, BEEP_MS) }
             delay(BEEP_MS + 150L)
+        } finally {
             tone.release()
         }
     }
