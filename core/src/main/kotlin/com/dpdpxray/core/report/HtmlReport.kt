@@ -756,6 +756,7 @@ object HtmlReport {
         ConsentKind.SETTINGS -> "Settings or Manage opened"
         ConsentKind.MANUAL_MARK -> "Consent moment marked by hand"
         ConsentKind.PERMISSION_DIALOG -> "Android permission dialog shown"
+        ConsentKind.REPROMPT -> "Consent screen shown again after the choice"
     }
 
     private fun relationClass(r: LawRelation) = when (r) {
