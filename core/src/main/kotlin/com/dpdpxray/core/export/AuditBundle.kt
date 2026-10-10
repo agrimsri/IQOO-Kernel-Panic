@@ -29,7 +29,8 @@ import java.time.temporal.ChronoUnit
  * Sessions, result and report are written by the same kotlinx serialization settings as the files saved on the phone,
  * so a bundle holds exactly the evidence the app scored. Readers ignore fields they do not know. A missing optional
  * part (meta, networkReadings) reads as unknown, never as zero. Fixtures may add a top-level "note"; it is omitted
- * when unset.
+ * when unset. "legalProfile" names the legal lens selected when the bundle was exported (a core LegalProfile name such
+ * as "EU"); it is omitted when unset and never changes the evidence or the stored result.
  */
 
 /** The audited app named at the top of a bundle. */
@@ -54,6 +55,8 @@ data class AuditBundleV1(
     val tool: BundleTool,
     /** Free text for fixtures and samples (e.g. "synthetic"). Not written when null. */
     val note: String? = null,
+    /** The legal lens selected at export (LegalProfile name). Not written when null; readers fall back to their default. */
+    val legalProfile: String? = null,
 )
 
 @Serializable
@@ -107,9 +110,10 @@ object AuditBundles {
         toolVersion: String,
         exportedAt: String = now(),
         note: String? = null,
+        legalProfile: String? = null,
     ) = AuditBundleV1(
         exportedAt = exportedAt, app = app, meta = meta, sessions = sessions, result = result,
-        networkReadings = networkReadings, tool = BundleTool(TOOL_NAME, toolVersion), note = note,
+        networkReadings = networkReadings, tool = BundleTool(TOOL_NAME, toolVersion), note = note, legalProfile = legalProfile,
     )
 
     fun quarantine(report: QuarantineReport, exportedAt: String = now(), note: String? = null) =
@@ -140,12 +144,14 @@ object AuditBundles {
     fun metaOf(bundle: AuditBundleV1): BundleMeta =
         runCatching { lenientMeta.decodeFromJsonElement(BundleMeta.serializer(), bundle.meta) }.getOrElse { BundleMeta() }
 
-    /** Optional "note" is dropped when null so the top level stays exactly the shared shape. */
+    /** Optional "note" and "legalProfile" are dropped when null so the top level stays exactly the shared shape. */
     private fun write(element: JsonElement): String {
         val obj = element as JsonObject
-        val trimmed = if (obj["note"] == JsonNull) JsonObject(obj - "note") else obj
+        val trimmed = JsonObject(obj.filterNot { (k, v) -> k in OPTIONAL_TOP_LEVEL && v == JsonNull })
         return json.encodeToString(JsonObject.serializer(), trimmed)
     }
+
+    private val OPTIONAL_TOP_LEVEL = setOf("note", "legalProfile")
 
     private fun expectSchema(text: String, expected: String): JsonObject {
         val parsed = try {

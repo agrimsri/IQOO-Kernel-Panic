@@ -3,6 +3,13 @@ package com.dpdpxray.core.report
 import com.dpdpxray.core.audit.PhaseAssigner
 import com.dpdpxray.core.dpdp.CitationService
 import com.dpdpxray.core.fixes.FixTemplate
+import com.dpdpxray.core.law.LawRelation
+import com.dpdpxray.core.law.LegalLens
+import com.dpdpxray.core.law.LegalProfile
+import com.dpdpxray.core.law.LensFinding
+import com.dpdpxray.core.law.LensText
+import com.dpdpxray.core.law.LensView
+import com.dpdpxray.core.law.PassageKind
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
@@ -63,6 +70,9 @@ object HtmlReport {
     const val LEGAL_NOTE = "Legal text is context for review, not a verdict. The DPDP Act's main provisions are scheduled to " +
         "commence on 13 May 2027; read these passages as readiness guidance and confirm applicability with a qualified reviewer."
 
+    /** The legal note for lenses other than India. */
+    const val LENS_NOTE = "Legal text is context for review, not a verdict. Confirm applicability with a qualified reviewer."
+
     /** Findings that rest on DNS lookups, where the upload of personal data itself is not established. */
     private val NETWORK_CHECKS = setOf(CheckId.C1, CheckId.C2, CheckId.C9, CheckId.C10, CheckId.NC)
 
@@ -79,7 +89,11 @@ object HtmlReport {
         catalog: TrackerCatalog,
         coverage: HtmlCoverage,
         zone: ZoneId = ZoneId.systemDefault(),
+        /** The legal lens; India (the default for existing callers) keeps the DPDP citations. */
+        profile: LegalProfile = LegalProfile.INDIA,
+        lens: LegalLens = LegalLens.default,
     ): String {
+        val view = lens.view(result, profile)
         val attempts = sessions.groupBy { it.plan }
         val seen = HashMap<AuditPlan, Int>()
         val lanes = sessions.mapIndexed { i, s ->
@@ -103,12 +117,12 @@ object HtmlReport {
             topbar()
             append("<main id=\"main\">\n")
             coverageBox(coverage)
-            hero(result, sessions, coverage, zone)
+            hero(result, sessions, coverage, zone, view)
             timelineSection(lanes)
             constellationSection(lanes)
-            findingsSection(result, fixes, citations, catalog, lanes)
+            findingsSection(result, fixes, citations, catalog, lanes, view, lens)
             networkSection(lanes)
-            methodSection()
+            methodSection(view)
             append("<footer class=\"foot\"><p class=\"disclaimer\">").append(esc(MarkdownReport.DISCLAIMER)).append("</p>")
             append("<p>Generated on the phone by TraceVeil. This file makes no network requests: its Content-Security-Policy blocks every fetch. ")
             append("Links to cited sources open only when you click them.</p></footer>\n")
@@ -150,7 +164,7 @@ object HtmlReport {
         append("<p class=\"cov-scope\">").append(esc(c.scope)).append("</p></section>\n")
     }
 
-    private fun StringBuilder.hero(result: AuditResult, sessions: List<AuditSession>, c: HtmlCoverage, zone: ZoneId) {
+    private fun StringBuilder.hero(result: AuditResult, sessions: List<AuditSession>, c: HtmlCoverage, zone: ZoneId, view: LensView) {
         val first = sessions.firstOrNull()
         val lookups = sessions.sumOf { it.netEvents.size }
         val band = bandClass(result.band)
@@ -164,6 +178,7 @@ object HtmlReport {
         }
         meta("Plans", sessions.joinToString { it.plan.label }.ifEmpty { "None recorded" })
         meta("Lookups", "$lookups DNS ${if (lookups == 1) "lookup" else "lookups"} across ${sessions.size} ${if (sessions.size == 1) "session" else "sessions"}")
+        meta("Legal lens", "${view.profile.title} (${view.id.name})")
         append("</dl><div class=\"sevstrip\" aria-label=\"Findings by severity\">")
         val bySeverity = result.findings.groupBy { it.severity }
         if (result.findings.isEmpty()) append("<span class=\"sevcount\">No findings raised</span>")
@@ -185,7 +200,9 @@ object HtmlReport {
         }
         append("</svg><span class=\"dial-num\">").append(if (inconclusive) "?" else score.toString()).append("</span></div>")
         append("<p class=\"band\">").append(esc(result.band.label)).append("</p>")
-        append("<p class=\"dim small\">DPDP readiness out of 100 · not a safety or compliance certificate</p>")
+        append("<p class=\"dim small\">Consent readiness out of 100 · not a safety or compliance certificate</p>")
+        append("<p class=\"lens-score small\" data-lens=\"").append(view.id.name).append("\"><strong>").append(esc(view.scoreLine)).append("</strong> ")
+            .append(esc(view.scoreNote)).append("</p>")
         if (c.sample) append("<p class=\"conf\"><span class=\"chip ev-unknown\">Confidence not measured</span> Synthetic sample: capture confidence was not measured.</p>")
         else {
             val g = ConfidenceGrader.gradeAudit(sessions)
@@ -443,9 +460,11 @@ object HtmlReport {
         append("<p class=\"dim small\">Select a node to see its lookups, phases and alias trail.</p></div></aside></div></section>\n")
     }
 
-    private fun StringBuilder.findingsSection(result: AuditResult, fixes: List<FixTemplate>, citations: CitationService, catalog: TrackerCatalog, lanes: List<Lane>) {
+    private fun StringBuilder.findingsSection(
+        result: AuditResult, fixes: List<FixTemplate>, citations: CitationService, catalog: TrackerCatalog, lanes: List<Lane>, view: LensView, lens: LegalLens,
+    ) {
         sectionHead("findings", "03", "Findings",
-            "Each finding names its evidence type, the cited legal passages and a developer fix you can copy. Observed means seen on this device; inferred means derived from SDK documentation or on-device AI.")
+            "Each finding names its evidence type, how it relates to the ${view.profile.name} lens, the cited legal passages and a developer fix you can copy. Observed means seen on this device; inferred means derived from SDK documentation or on-device AI.")
         if (result.findings.isEmpty()) {
             append("<div class=\"plate empty\"><p>No finding was raised from the captured evidence.</p><p class=\"dim\">")
             append("A missing finding is not proof of compliance or safety. Check the coverage statements at the top.</p></div>")
@@ -455,7 +474,7 @@ object HtmlReport {
         for (f in result.findings) {
             val keys = f.entities.mapNotNull { catalog.sdkKeyFor(it) }.toSet()
             val own = fixes.filter { fix -> f.checkId in fix.appliesTo && (fix.kind != "sdk" || fix.id in keys) }
-            finding(f, own, shown, citations, lanes, codeIds)
+            finding(view.of(f.checkId) ?: LensFinding(f, lens.mapping(view.id, f.checkId), false), own, shown, citations, lanes, codeIds, view, lens)
         }
         val rest = fixes.filter { it.id !in shown }
         if (rest.isNotEmpty()) {
@@ -466,7 +485,12 @@ object HtmlReport {
         append("</section>\n")
     }
 
-    private fun StringBuilder.finding(f: Finding, fixes: List<FixTemplate>, shown: MutableSet<String>, citations: CitationService, lanes: List<Lane>, codeIds: IntArray) {
+    private fun StringBuilder.finding(
+        lf: LensFinding, fixes: List<FixTemplate>, shown: MutableSet<String>, citations: CitationService, lanes: List<Lane>, codeIds: IntArray,
+        view: LensView, lens: LegalLens,
+    ) {
+        val f = lf.finding
+        val p = view.profile
         val sev = f.severity.name.lowercase()
         append("<article class=\"finding plate sev-").append(sev).append("\" id=\"finding-").append(esc(f.checkId.code)).append("\" data-check=\"")
             .append(esc(f.checkId.code)).append("\"><header class=\"f-head\">")
@@ -475,8 +499,12 @@ object HtmlReport {
         if (f.evidenceType == EvidenceType.OBSERVED) append("<span class=\"chip ev-observed\">Observed</span>")
         else append("<span class=\"chip ev-inferred\">Inferred</span>")
         if (f.checkId in NETWORK_CHECKS) append("<span class=\"chip ev-unknown\" title=\"").append(esc(LOOKUP_CAVEAT)).append("\">Data sent · not established</span>")
+        append("<span class=\"chip ").append(relationClass(lf.relation)).append("\" title=\"").append(esc("Under the ${p.name} lens")).append("\">")
+            .append(esc(p.relationLabel(lf.relation))).append("</span>")
         append("<span class=\"f-meta\">Confidence ").append((f.confidence * 100).toInt()).append("% · ").append(esc(f.plans.joinToString { it.label })).append("</span>")
-        append("</header><h3>").append(esc(f.title)).append("</h3><p>").append(esc(f.explanation)).append("</p>")
+        val explained = LensText.explanation(f, view.id)
+        append("</header><h3>").append(esc(f.title)).append("</h3><p>").append(esc(explained.text)).append("</p>")
+        if (explained.citesIndia) append("<p class=\"dim small\">").append(esc(LensText.INDIA_WORDING_NOTE)).append("</p>")
         if (f.entities.isNotEmpty()) {
             append("<p class=\"ents\">")
             f.entities.forEach { append("<span class=\"ent\">").append(esc(it)).append("</span>") }
@@ -493,15 +521,29 @@ object HtmlReport {
             aliases.forEach { append("<li>").append(esc(it)).append("</li>") }
             append("</ul><p class=\"dim small\">A recorded CNAME links these names. Not every alias is a disguise, and an alias is not payload evidence.</p></div>")
         }
-        val cites = citations.cite(f)
-        if (cites.isNotEmpty()) {
-            append("<details class=\"law\"><summary>Legal context · ").append(esc(cites.joinToString { it.source })).append("</summary>")
-            for (p in cites) {
-                append("<blockquote><p>").append(esc(p.text)).append("</p><footer>— ").append(esc(p.source))
-                    .append(if (p.verbatim) " · verbatim" else " · summary").append("</footer></blockquote>")
-            }
-            append("<p class=\"dim small\">").append(esc(LEGAL_NOTE)).append("</p></details>")
+        val cites = lens.passagesFor(view.id, f, citations)
+        append("<details class=\"law\"><summary>Legal context · ").append(esc(p.name)).append(" · ").append(esc(p.relationLabel(lf.relation)))
+        if (cites.isNotEmpty()) append(" · ").append(esc(cites.joinToString { it.source }))
+        append("</summary><p class=\"lens-note\">").append(esc(lf.mapping.note)).append("</p>")
+        for (c in cites) {
+            append("<blockquote")
+            if (c.language != "en") append(" lang=\"").append(esc(c.language)).append("\"")
+            append("><p>").append(esc(c.text)).append("</p>")
+            c.englishSummary?.let { append("<p class=\"small\" lang=\"en\"><em>English summary, not an official translation:</em> ").append(esc(it)).append("</p>") }
+            append("<footer>— ").append(esc(c.source)).append(" · ").append(esc(c.wording))
+            if (c.kind != PassageKind.LAW) append(" · ").append(esc(c.kind.label))
+            c.retrieved?.let { append(" · read ").append(esc(it)) }
+            c.url?.let { append(" · ").append(link(it)) }
+            append("</footer></blockquote>")
         }
+        append("<p class=\"dim small\">").append(esc(if (view.id == LegalProfile.INDIA) LEGAL_NOTE else LENS_NOTE)).append("</p></details>")
+        append("<details class=\"law compare\"><summary>Compare laws</summary><ul class=\"compare-list\">")
+        for ((id, m) in lens.compare(f.checkId.code)) {
+            val other = lens.profile(id)
+            append("<li><span class=\"chip ").append(relationClass(m.relation)).append("\">").append(esc(other.relationLabel(m.relation))).append("</span> <strong>")
+                .append(esc(other.name)).append("</strong> ").append(esc(m.note)).append("</li>")
+        }
+        append("</ul></details>")
         var opened = false
         for (fix in fixes) {
             if (shown.add(fix.id)) { fix(fix, codeIds, open = !opened); opened = true }
@@ -560,7 +602,7 @@ object HtmlReport {
         append("</div></section>\n")
     }
 
-    private fun StringBuilder.methodSection() {
+    private fun StringBuilder.methodSection(view: LensView) {
         sectionHead("method", "05", "Method and limitations", "What this evidence can and cannot show.")
         append("<div class=\"plate\"><ul class=\"method\">")
         listOf(
@@ -568,7 +610,8 @@ object HtmlReport {
             "Observed findings come from captured traffic or the screen's accessibility tree. Inferred findings come from SDK documentation or the on-device AI's reading of the screen, and count half in the score.",
             "Hosts are labelled with a bundled tracker catalogue (domain suffix match, plus recorded CNAME aliases). Hosts the catalogue does not cover are shown as unclassified, not as harmless.",
             "Private DNS, encrypted DNS, cached lookups and shared Google Play services traffic can hide lookups from this capture. Unknown values stay unknown, never zero.",
-            "Some processing may rely on a legitimate use (DPDP s.7) rather than consent; review findings in that light.",
+            MarkdownReport.LENS_METHOD,
+        ).plus(view.profile.limitations).plus(
             "The timelines and the constellation are drawn only from this audit's recorded lookups and consent events. A missing finding is not proof of compliance or safety.",
         ).forEach { append("<li>").append(esc(it)).append("</li>") }
         append("</ul><div class=\"chips-key\"><span class=\"chip ev-observed\">Observed</span> seen on this device <span class=\"chip ev-inferred\">Inferred</span> derived from documentation or AI ")
@@ -711,6 +754,12 @@ object HtmlReport {
         ConsentKind.REJECT -> "Reject recorded"
         ConsentKind.SETTINGS -> "Settings or Manage opened"
         ConsentKind.MANUAL_MARK -> "Consent moment marked by hand"
+    }
+
+    private fun relationClass(r: LawRelation) = when (r) {
+        LawRelation.REQUIRED -> "rel-required"
+        LawRelation.CONTEXT -> "rel-context"
+        LawRelation.NOT_APPLICABLE -> "rel-na"
     }
 
     private fun bandClass(b: ScoreBand) = when (b) {
