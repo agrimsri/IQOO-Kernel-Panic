@@ -1,6 +1,6 @@
 """Traceveil developer CLI: drives an iQOO/Android device over adb and reports network-environment signals."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # Process exit codes, also reported in the JSON verdict.
 EXIT_PASS = 0

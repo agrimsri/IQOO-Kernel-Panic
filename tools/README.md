@@ -21,7 +21,7 @@ This is what `final.bash` does, as plain commands. You need Python 3.11+ and `ad
 # 1. Install the CLI in a clean virtual environment
 python3 -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install traceveil==0.1.0         # or: pipx install traceveil
+pip install traceveil==0.2.0         # or: pipx install traceveil
 traceveil --version
 
 # 2. Check the phone (USB debugging on, Traceveil debug APK installed)

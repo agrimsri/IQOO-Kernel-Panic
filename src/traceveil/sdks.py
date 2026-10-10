@@ -146,10 +146,11 @@ def build(apk: Path, signatures: list[dict], rep: dict | None = None, permission
             evidence = ("Inferred: hosts of this tracker were looked up, but no bundled SDK with a known package name matched "
                         "(WebView, custom HTTP code, a renamed SDK, or another library).")
             actions.append("Find what calls these hosts: check WebViews, HTTP clients and obfuscated libraries.")
+        what = "this SDK" if s else "whatever calls these hosts"
         if phases & PRE_CONSENT:
-            actions.append("Looked up before any consent choice: initialise this SDK only after the user accepts.")
+            actions.append(f"Looked up before any consent choice: start {what} only after the user accepts.")
         if "AFTER_REJECT" in phases:
-            actions.append("Looked up after the user refused: make sure Reject turns this SDK off.")
+            actions.append(f"Looked up after the user refused: make sure Reject turns {what} off.")
         if category == "ADVERTISING" and s and wants_location:
             actions.append("The app requests location permission: review this ad SDK's location-collection defaults.")
         rows.append({"entity": entity, "category": category, "status": status,
@@ -195,7 +196,7 @@ def summary(inv: dict) -> str:
         live = "-"
         if r["observed"]:
             n = r["observed"]["lookups"]
-            live = (f"{n} lookups" if n is not None else "named in findings") + (f": {', '.join(r['observed']['phases'])}" if r["observed"]["phases"] else "")
+            live = (f"{n} lookup{'' if n == 1 else 's'}" if n is not None else "named in findings") + (f": {', '.join(r['observed']['phases'])}" if r["observed"]["phases"] else "")
         elif inv["audit"]:
             live = "not looked up in this audit"
         lines.append(f"  {_LABEL[r['status']]:<14} {r['entity']:<30} {r['category']:<15} {live}")
