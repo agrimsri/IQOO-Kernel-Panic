@@ -10,7 +10,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -18,12 +17,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -37,7 +39,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
@@ -66,7 +67,19 @@ import com.dpdpxray.app.netproof.NetworkProofCard
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.EndpointMapIntegration
 import com.dpdpxray.app.ui.screens.map.EndpointMapCard
+import com.dpdpxray.app.ui.components.BreathingDot
 import com.dpdpxray.app.ui.components.Callout
+import com.dpdpxray.app.ui.components.EmptyHint
+import com.dpdpxray.app.ui.components.FoldText
+import com.dpdpxray.app.ui.components.GradientRule
+import com.dpdpxray.app.ui.components.IconBadge
+import com.dpdpxray.app.ui.components.KeyCaveat
+import com.dpdpxray.app.ui.components.ScoreRing
+import com.dpdpxray.app.ui.components.SkeletonCard
+import com.dpdpxray.app.ui.components.SkeletonLines
+import com.dpdpxray.app.ui.components.pressClickable
+import com.dpdpxray.app.ui.components.reveal
+import com.dpdpxray.app.ui.components.shimmer
 import com.dpdpxray.app.ui.components.ChipFlow
 import com.dpdpxray.app.ui.components.CodeBlock
 import com.dpdpxray.app.ui.components.CollapsibleCard
@@ -88,7 +101,9 @@ import com.dpdpxray.app.ui.guide.NextAction
 import com.dpdpxray.app.ui.guide.Panel
 import com.dpdpxray.app.ui.guide.ResultFacts
 import com.dpdpxray.app.ui.guide.ResultGuide
+import com.dpdpxray.app.ui.guide.GuideLang
 import com.dpdpxray.app.ui.guide.guideLang
+import com.dpdpxray.app.ui.guide.lessLabel
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
@@ -120,10 +135,12 @@ private fun WithBundle(vm: XrayViewModel, id: String, content: @Composable (Audi
     val bundle by vm.bundle.collectAsState()
     val b = bundle
     if (b == null || b.meta.id != id) {
-        Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-            CircularProgressIndicator(Modifier.size(20.dp), color = Film.scan, strokeWidth = 2.dp)
-            Spacer(Modifier.width(12.dp))
-            Note("Opening audit…")
+        // A skeleton shaped like the result, instead of a blank screen, while the audit opens.
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Box(Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(18.dp)).background(Film.raised).shimmer().semantics { contentDescription = "Opening audit" })
+            SkeletonLines(3)
+            SkeletonCard()
+            SkeletonCard()
         }
     } else content(b)
 }
@@ -143,15 +160,18 @@ fun ResultsScreen(
                 val lensSettings by vm.settings.collectAsState()
                 val choice = remember(lensSettings.legalProfile) { vm.lensChoice(lensSettings.legalProfile) }
                 val view = remember(b.meta.id, choice.profile) { vm.legal.view(r, choice.profile) }
-                ScorePanel(b, grade, view, choice)
-                Text(headline(r.findings), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 16.dp))
-                // Coverage caveats stay in view, above anything the reader might act on.
+                ScorePanel(b, grade, view, choice, Modifier.reveal(0))
+                FoldText(
+                    headline(r.findings), Modifier.padding(top = 16.dp).reveal(1),
+                    style = MaterialTheme.typography.bodyLarge, color = Film.bone, maxLines = 3,
+                )
+                // Coverage caveats stay in view, above anything the reader might act on (first sentence; the rest folds).
                 val gaps = AuditPlanCoverage.gaps(b.sessions)
                 val freshHint = AuditPlanCoverage.freshStateHint(b.sessions)
                 if (gaps.isNotEmpty() || freshHint != null) {
-                    Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        gaps.forEach { Callout(it) }
-                        freshHint?.let { Callout(it) }
+                    Column(Modifier.padding(top = 12.dp).reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        gaps.forEach { Callout(it, fold = true) }
+                        freshHint?.let { Callout(it, fold = true) }
                     }
                 }
 
@@ -162,7 +182,7 @@ fun ResultsScreen(
                     fastPreview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW, sample = b.meta.sample,
                     inconclusiveReason = com.dpdpxray.core.rules.Inconclusive.reason(r.findings),
                 )
-                GuideBanner(ResultGuide.step(facts), Modifier.padding(top = 18.dp))
+                GuideBanner(ResultGuide.step(facts), Modifier.padding(top = 18.dp).reveal(2))
                 ResultGuidePanel(facts) { action ->
                     when (action) {
                         NextAction.SEE_EVIDENCE -> r.findings.firstOrNull()?.let { onFinding(it.checkId) }
@@ -176,15 +196,9 @@ fun ResultsScreen(
                 GroupHeader("Findings") {
                     if (r.findings.isNotEmpty()) Text("${r.findings.size}", style = MaterialTheme.typography.labelLarge, color = Film.boneDim)
                 }
-                if (r.findings.isEmpty()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        GlyphIcon(Glyph.CHECK, Film.clear, size = 20.dp)
-                        Spacer(Modifier.width(10.dp))
-                        Note("No consent problems in the captured evidence.", Film.clear)
-                    }
-                }
+                if (r.findings.isEmpty()) EmptyHint("No consent problems in the captured evidence.", glyph = Glyph.CHECK, color = Film.clear)
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    r.findings.forEach { f -> FindingRow(f, ResultSources.of(f, b.sessions), view) { onFinding(f.checkId) } }
+                    r.findings.forEachIndexed { i, f -> FindingRow(f, ResultSources.of(f, b.sessions), view, Modifier.reveal(5 + i)) { onFinding(f.checkId) } }
                 }
 
                 GroupHeader("Evidence and limits")
@@ -225,7 +239,7 @@ fun ResultsScreen(
                         glyph = Glyph.RESET,
                     ) {
                         when (change) {
-                            null -> Note("Checking earlier saved audits…")
+                            null -> SkeletonLines(2, label = "Checking earlier saved audits")
                             is AuditComparisonResult.Unavailable -> Note(change.reason)
                             is AuditComparisonResult.Available -> {
                                 val delta = if (change.scoreDelta > 0) "+${change.scoreDelta}" else change.scoreDelta.toString()
@@ -234,7 +248,7 @@ fun ResultsScreen(
                                 Note("${change.noLongerRecorded.size} findings no longer recorded" +
                                     change.noLongerRecorded.takeIf { it.isNotEmpty() }?.joinToString(prefix = ": ") { it.code }.orEmpty())
                                 if (change.newlyRecorded.isNotEmpty()) Note("New findings: ${change.newlyRecorded.joinToString { it.code }}", Film.warn)
-                                Note("Capture coverage can differ. A finding not repeated is not proof it was fixed or that the app is safe.")
+                                KeyCaveat("Capture coverage can differ. A finding not repeated is not proof it was fixed or that the app is safe.")
                             }
                         }
                     }
@@ -285,37 +299,29 @@ private fun headline(findings: List<Finding>): String {
 }
 
 /**
- * The score hero: big number in its band colour, a meter, chips for sample data, evidence confidence and capture
- * timing, then the severity summary. Inconclusive shows "?" and a dashed track, never a zero.
+ * The score hero: a ring that fills to the score in its band gradient while the number counts up, the band and
+ * "Consent readiness" under it, then chips for sample data, evidence confidence and capture timing, the legal lens
+ * and the severity summary. Inconclusive shows "?" in a dashed ring, never a zero. The card glows in its band colour.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ScorePanel(b: AuditBundle, grade: ConfidenceGrade?, view: LensView, choice: LensChoice) {
+private fun ScorePanel(b: AuditBundle, grade: ConfidenceGrade?, view: LensView, choice: LensChoice, modifier: Modifier = Modifier) {
     val r = b.result
     val color = bandColor(r.band)
     val inconclusive = r.band == ScoreBand.INCONCLUSIVE
-    Panel(Modifier.padding(top = 4.dp)) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(if (inconclusive) "?" else r.score.toString(), style = MaterialTheme.typography.displayLarge, color = color)
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.padding(bottom = 8.dp).weight(1f)) {
-                Text(r.band.label, style = MaterialTheme.typography.titleLarge, color = color)
-                Text("Consent readiness out of 100", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
-            }
-        }
-        var shown by remember(b.meta.id) { mutableStateOf(false) }
-        LaunchedEffect(b.meta.id) { shown = true }
-        val fill by animateFloatAsState(if (shown && !inconclusive) (r.score ?: 0) / 100f else 0f, tween(700), label = "score-meter")
-        Canvas(Modifier.fillMaxWidth().padding(top = 10.dp).height(6.dp)) {
-            val h = size.height
-            if (inconclusive) {
-                drawLine(Film.line, Offset(0f, h / 2), Offset(size.width, h / 2), h, StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(10.dp.toPx(), 8.dp.toPx())))
-            } else {
-                drawLine(Film.line, Offset(h / 2, h / 2), Offset(size.width - h / 2, h / 2), h, StrokeCap.Round)
-                if (fill > 0f) drawLine(color, Offset(h / 2, h / 2), Offset(h / 2 + (size.width - h) * fill, h / 2), h, StrokeCap.Round)
-            }
+    Panel(modifier.padding(top = 4.dp), glow = color) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            ScoreRing(if (inconclusive) null else r.score, r.band, key = b.meta.id)
+            Text(r.band.label, style = MaterialTheme.typography.titleLarge, color = color, modifier = Modifier.padding(top = 10.dp))
+            Text("Consent readiness", style = MaterialTheme.typography.labelLarge, color = Film.boneDim)
         }
         val preview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW
-        ChipFlow(Modifier.padding(top = 14.dp)) {
+        val rejectTested = b.sessions.any { it.plan == AuditPlan.REJECT }
+        FlowRow(
+            Modifier.fillMaxWidth().padding(top = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             if (b.meta.sample) Tag("Sample data", Film.warn)
             if (grade != null) Tag("Evidence confidence: ${grade.level.label}", confidenceColor(grade.level))
             else if (b.meta.sample) Tag("Confidence not measured", Film.boneDim)
@@ -324,14 +330,14 @@ private fun ScorePanel(b: AuditBundle, grade: ConfidenceGrade?, view: LensView, 
                     if (preview) "Fast Preview · limited evidence" else if (b.meta.timingProfile == AuditTimingPolicy.NORMAL) "Normal capture" else "Timing unknown",
                     if (preview) Film.warn else Film.boneDim,
                 )
+                if (!preview && !rejectTested) Tag("Reject not tested", Film.warn)
             }
         }
         if (!b.meta.sample) {
             if (b.meta.timingProfile == AuditTimingPolicy.NORMAL) {
-                LearnMore(label = "About this capture") { Note(AuditTimingPolicy.coverageHint(b.meta.timingProfile)) }
+                LearnMore(Modifier.padding(top = 4.dp), label = "About this capture") { Note(AuditTimingPolicy.coverageHint(b.meta.timingProfile)) }
             } else {
-                Spacer(Modifier.height(10.dp))
-                Note(AuditTimingPolicy.coverageHint(b.meta.timingProfile), if (preview) Film.warn else Film.boneDim)
+                FoldText(AuditTimingPolicy.coverageHint(b.meta.timingProfile), Modifier.padding(top = 10.dp), color = if (preview) Film.warn else Film.boneDim)
             }
         }
         LensSummary(view, choice)
@@ -382,48 +388,72 @@ private fun nextGlyph(a: NextAction) = when (a) {
     NextAction.REPORT -> Glyph.SAMPLE
 }
 
-/** "What this means" in plain language, then "What you can do next" as tappable rows for the existing actions. */
+/**
+ * "What this means": the main sentence and, when there are findings, the one-line lookup caveat stay visible; the
+ * other notes (coverage, preview, sample) fold behind "More about this result". "What you can do next" as tappable
+ * rows for the existing actions: the first, recommended one carries its reason and a brand-gradient edge.
+ */
 @Composable
 private fun ResultGuidePanel(facts: ResultFacts, onAction: (NextAction) -> Unit) {
     val lang = guideLang()
     val e = remember(facts) { ResultGuide.explain(facts) }
-    Panel(Modifier.padding(top = 12.dp)) {
+    Panel(Modifier.padding(top = 12.dp).reveal(3)) {
         Text(ResultGuide.meaningTitle.pick(lang), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
-        e.meaning.forEach { line ->
-            Row(Modifier.padding(top = 8.dp)) {
-                Box(Modifier.padding(top = 9.dp).size(6.dp).clip(CircleShape).background(Film.scan))
-                Spacer(Modifier.width(10.dp))
-                Text(line.pick(lang), style = MaterialTheme.typography.bodyLarge, color = Film.bone)
+        GradientRule(Modifier.padding(top = 6.dp))
+        e.meaning.firstOrNull()?.let { Text(it.pick(lang), style = MaterialTheme.typography.bodyLarge, color = Film.bone, modifier = Modifier.padding(top = 10.dp)) }
+        // With findings, the second line is the lookup caveat ("an attempt to reach an address, not proof...").
+        val caveat = if (facts.findingCount > 0) e.meaning.getOrNull(1) else null
+        caveat?.let { KeyCaveat(it.pick(lang), Modifier.padding(top = 6.dp), color = Film.scan) }
+        val rest = e.meaning.drop(if (caveat != null) 2 else 1)
+        if (rest.isNotEmpty()) {
+            LearnMore(
+                label = if (lang == GuideLang.HI) "इस नतीजे के बारे में और (${rest.size})" else "More about this result (${rest.size})",
+                openLabel = lang.lessLabel,
+            ) {
+                rest.forEach { line ->
+                    Row {
+                        Box(Modifier.padding(top = 9.dp).size(6.dp).clip(CircleShape).background(Film.scan))
+                        Spacer(Modifier.width(10.dp))
+                        Text(line.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.bone)
+                    }
+                }
             }
         }
     }
-    Text(
-        ResultGuide.nextTitle.pick(lang), style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier.padding(top = 18.dp, bottom = 8.dp).semantics { heading() },
-    )
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.padding(top = 20.dp, bottom = 8.dp).reveal(4)) {
+        Text(ResultGuide.nextTitle.pick(lang), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+        GradientRule(Modifier.padding(top = 6.dp))
+    }
+    Column(Modifier.reveal(4), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         e.next.forEachIndexed { i, step ->
             val shape = RoundedCornerShape(16.dp)
             val first = i == 0
             Row(
-                Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(shape).background(Film.raised)
-                    .border(if (first) 1.5.dp else 1.dp, if (first) Brand.horizontal else SolidColor(FilmExtra.hairline), shape)
-                    .clickable(role = Role.Button) { onAction(step.action) }.padding(horizontal = 14.dp, vertical = 10.dp),
+                Modifier.fillMaxWidth().heightIn(min = 64.dp)
+                    .pressClickable(shape = shape) { onAction(step.action) }
+                    .background(if (first) FirstStepFill else FilmExtra.card)
+                    .border(if (first) 1.5.dp else 1.dp, if (first) Brand.horizontal else FilmExtra.cardEdge, shape)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val accent = if (first) Brand.coral else Film.scan
-                Box(Modifier.size(36.dp).clip(CircleShape).background(accent.copy(alpha = 0.13f)), contentAlignment = Alignment.Center) {
-                    GlyphIcon(nextGlyph(step.action), accent, size = 20.dp)
-                }
+                IconBadge(nextGlyph(step.action), accent, size = 36.dp)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(step.title.pick(lang), style = MaterialTheme.typography.titleMedium, color = Film.bone)
-                    Text(step.reason.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                    Text(
+                        step.reason.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim,
+                        maxLines = if (first) 3 else 1, overflow = TextOverflow.Ellipsis,
+                    )
                 }
+                GlyphIcon(Glyph.CHEVRON_RIGHT, Film.boneDim, size = 18.dp)
             }
         }
     }
 }
+
+/** The recommended next step: a faint brand wash over the card surface. */
+private val FirstStepFill = Brush.linearGradient(listOf(Brand.coral.copy(alpha = 0.14f), Film.raised, Film.raised))
 
 /** Severity summary inside the score card: a proportional strip, then one chip per severity present. */
 @Composable
@@ -443,9 +473,9 @@ private fun SeverityStrip(findings: List<Finding>) {
 
 /** A finding as a card: severity and evidence chips, the title, who was contacted. Tapping opens the evidence. */
 @Composable
-private fun FindingRow(f: Finding, source: ResultSource, view: LensView, onClick: () -> Unit) {
+private fun FindingRow(f: Finding, source: ResultSource, view: LensView, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val relation = view.of(f.checkId)?.relation
-    RuleRow(severityColor(f.severity), onClick = onClick) {
+    RuleRow(severityColor(f.severity), modifier, onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             ChipFlow(Modifier.weight(1f)) {
                 Tag(f.severity.label, severityColor(f.severity))
@@ -455,7 +485,10 @@ private fun FindingRow(f: Finding, source: ResultSource, view: LensView, onClick
             GlyphIcon(Glyph.CHEVRON_RIGHT, Film.boneDim, size = 18.dp)
         }
         Text(f.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 10.dp))
-        if (f.entities.isNotEmpty()) Text(f.entities.joinToString(), style = MaterialTheme.typography.bodyMedium, color = severityColor(f.severity), modifier = Modifier.padding(top = 2.dp))
+        if (f.entities.isNotEmpty()) Text(
+            f.entities.joinToString(), style = MaterialTheme.typography.bodyMedium, color = severityColor(f.severity),
+            maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp),
+        )
         Text(
             (if (f.evidenceType == EvidenceType.OBSERVED) "Observed on device" else "Inferred") +
                 (if (view.profile.penaltyFigures && f.penaltyBand.name != "NONE") " · ${f.penaltyBand.label.substringBefore(" (")}" else ""),
@@ -531,13 +564,13 @@ fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: ()
                     Tag(relationTag(lensProfile, mapping.relation), relationColor(mapping.relation))
                 }
                 val explained = remember(f, profile) { LensText.explanation(f, profile) }
-                Text(explained.text, style = MaterialTheme.typography.bodyLarge)
-                if (explained.citesIndia) Note(LensText.INDIA_WORDING_NOTE)
+                FoldText(explained.text, style = MaterialTheme.typography.bodyLarge, color = Film.bone, maxLines = 3)
+                if (explained.citesIndia) LearnMore(label = "About the wording") { Note(LensText.INDIA_WORDING_NOTE) }
 
                 val aliases = remember(b, f) { vm.findingAliases(f, b) }
                 if (aliases.isNotEmpty()) {
                     SectionTitle("Observed tracker aliases")
-                    aliases.forEach { Tag(it, Film.warn); Spacer(Modifier.height(6.dp)) }
+                    ChipFlow { aliases.forEach { Tag(it, Film.warn) } }
                     Note("The DNS reply revealed an alias to a catalogue tracker. This does not show what data was sent.")
                 }
 
@@ -546,7 +579,7 @@ fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: ()
                 if (notice != null) {
                     SectionTitle("Ask the developer to investigate")
                     SecondaryAction("Draft notice to developer", { showNotice = true }, Modifier.fillMaxWidth())
-                    Note("Review before sharing. The cited rights relate to India's DPDP framework; this is not a legal finding.")
+                    FoldText("Review before sharing. The cited rights relate to India's DPDP framework; this is not a legal finding.", Modifier.padding(top = 8.dp))
                     if (showNotice) AlertDialog(
                         onDismissRequest = { showNotice = false },
                         title = { Text("Review developer notice") },
@@ -571,7 +604,10 @@ fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: ()
                 screenshotFor(b, f)?.let { path ->
                     SectionTitle("Consent screen as captured")
                     val bmp = remember(path) { BitmapFactory.decodeFile(path)?.asImageBitmap() }
-                    if (bmp != null) Image(bmp, contentDescription = "Captured consent screen", contentScale = ContentScale.FillWidth, modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp))
+                    if (bmp != null) Image(
+                        bmp, contentDescription = "Captured consent screen", contentScale = ContentScale.FillWidth,
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).clip(RoundedCornerShape(16.dp)).border(1.dp, FilmExtra.cardEdge, RoundedCornerShape(16.dp)),
+                    )
                 }
 
                 if (f.evidence.isNotEmpty()) {
@@ -581,14 +617,20 @@ fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: ()
 
                 SectionTitle("What the law says · ${lensProfile.name}")
                 ChipFlow(Modifier.padding(bottom = 8.dp)) { Tag(lensProfile.relationLabel(mapping.relation), relationColor(mapping.relation)) }
-                Text(mapping.note, style = MaterialTheme.typography.bodyMedium, color = Film.bone, modifier = Modifier.padding(bottom = 10.dp))
+                FoldText(mapping.note, Modifier.padding(bottom = 6.dp), color = Film.bone)
                 var loaded by remember(f, profile) { mutableStateOf(false) }
                 val cites by produceState(initialValue = emptyList<LensPassage>(), f, profile) { value = vm.lensPassagesFor(f, profile); loaded = true }
-                if (!loaded) Note("Finding the relevant sections…")
+                if (!loaded) SkeletonLines(3, label = "Finding the relevant sections")
                 else if (cites.isEmpty()) Note("No legal passage is cited for this finding under this lens.")
-                cites.forEach { p -> LawPassage(p) }
-                Note(if (profile == LegalProfile.INDIA) "Legal text is context, not a verdict. The DPDP Act's main provisions commence on 13 May 2027, so this describes readiness."
-                    else "Legal text is context, not a verdict. Confirm applicability with a qualified reviewer.")
+                // The passages are long legal text: they fold behind one line that says how many there are.
+                if (cites.isNotEmpty()) LearnMore(label = if (cites.size == 1) "Read the cited passage" else "Read the ${cites.size} cited passages", openLabel = "Hide passages") {
+                    cites.forEach { p -> LawPassage(p) }
+                }
+                FoldText(
+                    if (profile == LegalProfile.INDIA) "Legal text is context, not a verdict. The DPDP Act's main provisions commence on 13 May 2027, so this describes readiness."
+                    else "Legal text is context, not a verdict. Confirm applicability with a qualified reviewer.",
+                    color = Film.warn,
+                )
                 LearnMore(label = "Compare laws") {
                     vm.legal.compare(f.checkId.code).forEach { (id, m) -> CompareRow(vm.legal, id, m.relation, m.note) }
                 }
@@ -600,13 +642,20 @@ fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: ()
                 }
                 listOf("en", "hi").forEach { lang ->
                     val key = "${f.checkId}-$lang"
-                    if (explaining == key) Note("Gemma is writing on this phone…", Film.scan)
+                    if (explaining == key) {
+                        Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            BreathingDot(Film.scan)
+                            Spacer(Modifier.width(10.dp))
+                            Note("Gemma is writing on this phone…", Film.scan)
+                        }
+                        SkeletonLines(3, Modifier.padding(top = 8.dp), label = "Writing the explanation")
+                    }
                     explanations[key]?.let { e ->
                         Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Tag(e.source.label, sourceColor(e.source))
                             Text(if (lang == "hi") "हिन्दी" else "English", style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
                         }
-                        Text(e.text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 6.dp))
+                        FoldText(e.text, Modifier.padding(top = 6.dp), style = MaterialTheme.typography.bodyLarge, color = Film.bone, maxLines = 4)
                         Text(e.detail, style = MaterialTheme.typography.bodySmall, color = Film.boneDim, modifier = Modifier.padding(top = 4.dp))
                     }
                 }
@@ -665,9 +714,14 @@ fun FixesScreen(vm: XrayViewModel, id: String, onBack: () -> Unit) {
         Column(Modifier.fillMaxSize()) {
             TopBar("How to fix", onBack)
             Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Note("Copy a fix and paste it into your project (with clipboard sync, straight into Android Studio on your laptop). Then rebuild and audit again.")
-                fixes.forEach { fix ->
-                    SectionCard(title = fix.title, glyph = Glyph.BOOK) {
+                FoldText("Copy a fix and paste it into your project (with clipboard sync, straight into Android Studio on your laptop). Then rebuild and audit again.")
+                if (fixes.isEmpty()) EmptyHint("No code fixes for this check.", glyph = Glyph.BOOK)
+                fixes.forEachIndexed { i, fix ->
+                    CollapsibleCard(
+                        fix.title, Modifier.reveal(i),
+                        summary = listOfNotNull(fix.manifest?.let { "Manifest" }, fix.code?.let { "Code" }, fix.steps.takeIf { it.isNotEmpty() }?.let { "${it.size} steps" }).joinToString(" · "),
+                        glyph = Glyph.BOOK, initiallyOpen = i == 0,
+                    ) {
                         if (!fix.verified) Callout("Check the exact API for your SDK version in the vendor docs.", Modifier.padding(bottom = 8.dp))
                         fix.manifest?.let { m ->
                             Text("AndroidManifest.xml", style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
@@ -695,7 +749,7 @@ fun ReportScreen(vm: XrayViewModel, id: String, onBack: () -> Unit) {
         Column(Modifier.fillMaxSize()) {
             TopBar("Report", onBack)
             Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                SectionCard(title = "Save to this phone", glyph = Glyph.SAMPLE) {
+                SectionCard(Modifier.reveal(0), title = "Save to this phone", glyph = Glyph.SAMPLE) {
                     PrimaryAction("Save PDF to Downloads", { vm.exportPdf(b, share = false) })
                     Spacer(Modifier.height(10.dp))
                     SecondaryAction("Save Markdown", { vm.saveMarkdown(b) }, Modifier.fillMaxWidth())
@@ -704,16 +758,19 @@ fun ReportScreen(vm: XrayViewModel, id: String, onBack: () -> Unit) {
                     Spacer(Modifier.height(10.dp))
                     SecondaryAction("Export audit data (JSON)", { vm.exportAuditJson(b, share = false) }, Modifier.fillMaxWidth())
                     Spacer(Modifier.height(10.dp))
-                    Note("Saved files land in Downloads/TraceVeil, ready to share or move to your laptop. The HTML report opens offline in any browser.")
+                    FoldText("Saved files land in Downloads/TraceVeil, ready to share or move to your laptop. The HTML report opens offline in any browser.")
                 }
-                SectionCard(title = "Share", glyph = Glyph.ASK) {
+                SectionCard(Modifier.reveal(1), title = "Share", glyph = Glyph.ASK) {
                     SecondaryAction("Share PDF", { vm.exportPdf(b, share = true) }, Modifier.fillMaxWidth())
                     Spacer(Modifier.height(10.dp))
                     SecondaryAction("Share interactive report", { vm.exportHtml(b, share = true) }, Modifier.fillMaxWidth())
                     Spacer(Modifier.height(10.dp))
                     SecondaryAction("Share audit data (JSON)", { vm.exportAuditJson(b, share = true) }, Modifier.fillMaxWidth())
                     Spacer(Modifier.height(10.dp))
-                    Callout("Audit data (JSON) is this audit's full evidence (lookups, consent-screen text, device model) for TraceVeil CI on a laptop or build server. Review it before sharing it or committing it to a repository.")
+                    Callout(
+                        "Review audit data (JSON) before sharing it or committing it to a repository.",
+                        detail = "Audit data (JSON) is this audit's full evidence (lookups, consent-screen text, device model) for TraceVeil CI on a laptop or build server.",
+                    )
                 }
                 val lensSettings by vm.settings.collectAsState()
                 val profile = remember(lensSettings.legalProfile) { vm.lensProfile() }
@@ -721,7 +778,7 @@ fun ReportScreen(vm: XrayViewModel, id: String, onBack: () -> Unit) {
                     val preview by produceState("", b.meta.id, profile) {
                         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { vm.markdown(b, profile) }
                     }
-                    if (preview.isEmpty()) Note("Building the report…")
+                    if (preview.isEmpty()) SkeletonLines(5, label = "Building the report")
                     else Text(preview, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
                 }
                 Spacer(Modifier.height(16.dp))
