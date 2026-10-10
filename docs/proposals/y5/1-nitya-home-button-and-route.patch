@@ -1,0 +1,52 @@
+diff --git a/app/src/main/java/com/dpdpxray/app/MainActivity.kt b/app/src/main/java/com/dpdpxray/app/MainActivity.kt
+index 12b5833..c40a5ef 100644
+--- a/app/src/main/java/com/dpdpxray/app/MainActivity.kt
++++ b/app/src/main/java/com/dpdpxray/app/MainActivity.kt
+@@ -24,7 +24,6 @@ import com.dpdpxray.app.audit.AuditProgress
+ import com.dpdpxray.app.ui.XrayViewModel
+ import com.dpdpxray.app.ui.screens.AiLabScreen
+ import com.dpdpxray.app.ui.screens.AppPickerScreen
+-import com.dpdpxray.app.ui.screens.CameraCheckScreen
+ import com.dpdpxray.app.ui.screens.FindingDetailScreen
+ import com.dpdpxray.app.ui.screens.FixesScreen
+ import com.dpdpxray.app.ui.screens.HomeScreen
+@@ -69,7 +68,6 @@ class MainActivity : ComponentActivity() {
+                                 onAudit = { nav.navigate("pick") },
+                                 onOpen = { nav.navigate("results/$it") },
+                                 onLab = { nav.navigate("lab") },
+-                                onCamera = { nav.navigate("camera") },
+                                 onSettings = { nav.navigate("settings") },
+                             )
+                         }
+@@ -97,7 +95,6 @@ class MainActivity : ComponentActivity() {
+                         composable("fixes/{id}") { e -> FixesScreen(vm, e.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() }) }
+                         composable("report/{id}") { e -> ReportScreen(vm, e.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() }) }
+                         composable("lab") { AiLabScreen(vm, onBack = { nav.popBackStack() }) }
+-                        composable("camera") { CameraCheckScreen(vm, onBack = { nav.popBackStack() }) }
+                         composable("settings") { SettingsScreen(vm, onBack = { nav.popBackStack() }) }
+                     }
+                 }
+diff --git a/app/src/main/java/com/dpdpxray/app/ui/screens/HomeScreen.kt b/app/src/main/java/com/dpdpxray/app/ui/screens/HomeScreen.kt
+index 1d27aab..af8cbbf 100644
+--- a/app/src/main/java/com/dpdpxray/app/ui/screens/HomeScreen.kt
++++ b/app/src/main/java/com/dpdpxray/app/ui/screens/HomeScreen.kt
+@@ -47,7 +47,6 @@ fun HomeScreen(
+     onAudit: () -> Unit,
+     onOpen: (String) -> Unit,
+     onLab: () -> Unit,
+-    onCamera: () -> Unit,
+     onSettings: () -> Unit,
+ ) {
+     val ctx = LocalContext.current
+@@ -108,10 +107,7 @@ fun HomeScreen(
+         Spacer(Modifier.height(24.dp))
+         PrimaryAction("Audit an app", onAudit, enabled = pf.canAudit)
+         if (!pf.canAudit) Note("Allow the VPN and turn on the consent watcher to run a live audit.", Film.warn)
+-        Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+-            SecondaryAction("Open sample audit", { vm.openSample(onOpen) }, Modifier.weight(1f))
+-            SecondaryAction("Camera check", onCamera, Modifier.weight(1f))
+-        }
++        SecondaryAction("Open sample audit", { vm.openSample(onOpen) }, Modifier.fillMaxWidth().padding(top = 10.dp))
+ 
+         SectionTitle("Recent audits")
+         if (audits.isEmpty()) Note("No audits yet. Run one, or open the sample to see what a report looks like.")

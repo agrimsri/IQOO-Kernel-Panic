@@ -1,0 +1,63 @@
+diff --git a/app/src/main/java/com/dpdpxray/app/ui/XrayViewModel.kt b/app/src/main/java/com/dpdpxray/app/ui/XrayViewModel.kt
+index f801134..4a6aabe 100644
+--- a/app/src/main/java/com/dpdpxray/app/ui/XrayViewModel.kt
++++ b/app/src/main/java/com/dpdpxray/app/ui/XrayViewModel.kt
+@@ -1,7 +1,6 @@
+ package com.dpdpxray.app.ui
+ 
+ import android.app.Application
+-import android.graphics.Bitmap
+ import androidx.lifecycle.AndroidViewModel
+ import androidx.lifecycle.viewModelScope
+ import com.dpdpxray.app.ai.BackendKind
+@@ -27,7 +26,6 @@ import com.dpdpxray.core.fixes.FixTemplate
+ import com.dpdpxray.core.model.AuditSession
+ import com.dpdpxray.core.model.Finding
+ import com.dpdpxray.core.model.NetEvent
+-import com.dpdpxray.core.model.ScreenAudit
+ import com.dpdpxray.core.report.MarkdownReport
+ import com.dpdpxray.core.rules.RulesEngine
+ import kotlinx.coroutines.Dispatchers
+@@ -69,9 +67,6 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
+     private val _benchRunning = MutableStateFlow<BackendKind?>(null)
+     val benchRunning = _benchRunning.asStateFlow()
+ 
+-    private val _cameraResult = MutableStateFlow<CameraCheckState>(CameraCheckState.Idle)
+-    val cameraResult = _cameraResult.asStateFlow()
+-
+     private val _toast = MutableStateFlow<String?>(null)
+     val toast = _toast.asStateFlow()
+     fun toastShown() { _toast.value = null }
+@@ -181,21 +176,6 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
+ 
+     fun thermalHeadroom() = graph.llm.thermalHeadroom()
+ 
+-    fun cameraCheck(bitmap: Bitmap) = viewModelScope.launch {
+-        _cameraResult.value = CameraCheckState.Working
+-        if (!graph.llm.isReady && !graph.llm.load(BackendKind.GPU)) {
+-            _cameraResult.value = CameraCheckState.Error("The on-device model is not loaded. Push a Gemma model and open AI lab.")
+-            return@launch
+-        }
+-        val file = File(ctx.cacheDir, "camera_check.jpg")
+-        withContext(Dispatchers.IO) { file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 92, it) } }
+-        val audit = graph.llm.auditConsentScreen(file, "(photo of a screen; no accessibility tree)")
+-        _cameraResult.value = audit?.let { CameraCheckState.Done(it, file.absolutePath) }
+-            ?: CameraCheckState.Error("Could not read a consent screen in that photo. Hold the phone closer and keep the whole dialog in frame.")
+-    }
+-
+-    fun resetCamera() { _cameraResult.value = CameraCheckState.Idle }
+-
+     fun exportPdf(bundle: AuditBundle, share: Boolean) = viewModelScope.launch {
+         val md = withContext(Dispatchers.IO) { graph.repository.markdownFile(bundle.meta.id).readText() }
+         val pdf = withContext(Dispatchers.IO) { PdfExporter.render(md, File(bundle.dir, "TraceVeil-${bundle.meta.targetLabel.filter { it.isLetterOrDigit() }}.pdf")) }
+@@ -221,10 +201,3 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
+ 
+     fun updateSettings(transform: (com.dpdpxray.app.data.XraySettings) -> com.dpdpxray.app.data.XraySettings) = graph.settings.update(transform)
+ }
+-
+-sealed interface CameraCheckState {
+-    data object Idle : CameraCheckState
+-    data object Working : CameraCheckState
+-    data class Done(val audit: ScreenAudit, val imagePath: String) : CameraCheckState
+-    data class Error(val message: String) : CameraCheckState
+-}
