@@ -69,16 +69,21 @@ object TrustReader {
 
     fun identity(context: Context): OwnIdentity {
         val info = packageInfo(context, PackageManager.GET_SIGNING_CERTIFICATES)
-        val signers = info?.signingInfo?.apkContentsSigners.orEmpty().map { sig ->
-            val subject = runCatching {
-                (CertificateFactory.getInstance("X.509").generateCertificate(ByteArrayInputStream(sig.toByteArray())) as X509Certificate)
-                    .subjectX500Principal.name
-            }.getOrNull()
-            SignerCert(ApkFactsMapper.sha256Hex(sig.toByteArray()).lowercase(), subject)
-        }
+        val signers = info?.signingInfo?.apkContentsSigners.orEmpty().map { sig -> signer(sig.toByteArray()) }
         val ai = context.applicationInfo
         val files = (listOfNotNull(ai.sourceDir) + ai.splitSourceDirs.orEmpty()).map(::File)
         return OwnIdentity(info?.versionName, info?.longVersionCode ?: 0L, signers, files)
+    }
+
+    /**
+     * One signer from Android's certificate bytes (DER): the SHA-256 of those bytes in lower-case hex, which is what
+     * `apksigner verify --print-certs` prints as the certificate SHA-256 digest, and the subject, or null if unreadable.
+     */
+    fun signer(der: ByteArray): SignerCert {
+        val subject = runCatching {
+            (CertificateFactory.getInstance("X.509").generateCertificate(ByteArrayInputStream(der)) as X509Certificate).subjectX500Principal.name
+        }.getOrNull()
+        return SignerCert(ApkFactsMapper.sha256Hex(der).lowercase(), subject)
     }
 
     /** Streams the file through SHA-256; null when it cannot be read. Blocking: call from Dispatchers.IO. */
