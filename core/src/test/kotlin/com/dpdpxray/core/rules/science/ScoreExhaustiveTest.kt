@@ -161,6 +161,54 @@ class ScoreExhaustiveTest {
     }
 
     @Test
+    fun `robustness interval on every scored assignment - sandwich, stable band iff both ends agree, midpoint`() {
+        var movable = 0
+        var bandCouldChange = 0
+        var readyCouldLeave = 0
+        var readyWithInferred = 0
+        val width = IntArray(101)
+        for (i in 0 until space.size) {
+            val fs = space.findings(i)
+            val r = ScoreCalculator.robustness(fs)!!
+            val s = t.score[i]
+            assertTrue("#$i", r.score == s && ScienceReport.rank(r.band) == t.band[i].toInt())
+            assertTrue("#$i sandwich", r.worstCase <= s && s <= r.bestCase)
+            assertTrue("#$i bands", ScienceReport.rank(r.worstBand) <= t.band[i] && t.band[i] <= ScienceReport.rank(r.bestBand))
+            assertEquals("#$i stable", r.worstBand == r.bestBand, r.bandStable)
+            if (r.worstCase > 0) assertEquals("#$i midpoint", (r.worstCase + r.bestCase + 1) / 2, s)
+            // Both ends are whole numbers: observed and fully counted weights are integers, so no rounding happens there.
+            val pObserved = fs.filter { it.evidenceType == EvidenceType.OBSERVED }.sumOf { it.severity.weight }
+            val pInferred = fs.filter { it.evidenceType == EvidenceType.INFERRED }.sumOf { it.severity.weight }
+            assertEquals("#$i best", maxOf(0, 100 - pObserved), r.bestCase)
+            assertEquals("#$i worst", maxOf(0, 100 - pObserved - pInferred), r.worstCase)
+            if (r.movable) movable++
+            if (!r.bandStable) bandCouldChange++
+            if (r.band == ScoreBand.READY && r.inferred.isNotEmpty()) readyWithInferred++
+            if (r.band == ScoreBand.READY && r.worstBand != ScoreBand.READY) readyCouldLeave++
+            width[r.bestCase - r.worstCase]++
+        }
+        report["robustness"] = mapOf(
+            "movable" to movable, "bandCouldChange" to bandCouldChange, "readyWithInferred" to readyWithInferred,
+            "readyCouldLeaveReady" to readyCouldLeave, "widthHistogram" to width,
+        )
+    }
+
+    @Test
+    fun `corollary - a legal lens score is never below the headline score and its band never worse`() {
+        val lens = com.dpdpxray.core.law.LegalLens.default
+        var views = 0L
+        for (i in 0 until space.size) {
+            val result = com.dpdpxray.core.model.AuditResult(space.findings(i), t.score[i], ScoreBand.entries.first { ScienceReport.rank(it) == t.band[i].toInt() && it != ScoreBand.INCONCLUSIVE })
+            for (p in lens.profiles) {
+                val v = lens.view(result, p)
+                assertTrue("#$i $p", v.score!! >= t.score[i] && ScienceReport.rank(v.band) >= t.band[i])
+                views++
+            }
+        }
+        report["lensViewsChecked"] = views
+    }
+
+    @Test
     fun `band distribution and gate effect are written to the report`() {
         val n = space.size
         val count = IntArray(3)
@@ -170,6 +218,8 @@ class ScoreExhaustiveTest {
         var gateMoved = 0
         var clampedAtZero = 0
         var halfPoint = 0
+        var roundedIntoReady = 0
+        var roundedIntoNeedsWork = 0
         for (i in 0 until n) {
             val b = t.band[i].toInt()
             val s = t.score[i]
@@ -179,6 +229,9 @@ class ScoreExhaustiveTest {
             if (s >= 85 && t.serious[i]) gateMoved++
             if (t.p2[i] >= 200) clampedAtZero++
             if (t.p2[i] % 2 == 1 && t.p2[i] < 200) halfPoint++
+            // Bands are decided on the shown (rounded) score: 84.5 shows as 85 and 59.5 as 60.
+            if (t.p2[i] == 31 && !t.serious[i]) roundedIntoReady++
+            if (t.p2[i] == 81) roundedIntoNeedsWork++
         }
         // The gate only matters when exactly one observed High is the sole finding that carries points: 100 - 15 = 85.
         val gateCases = (0 until n).filter { t.score[it] >= 85 && t.serious[it] }
@@ -191,6 +244,8 @@ class ScoreExhaustiveTest {
         report["gateMovedExamples"] = gateCases.map { i -> space.findings(i).joinToString(" ") { "${it.checkId.code}:${it.severity.label}/${it.evidenceType.name.lowercase()}" } }
         report["clampedAtZero"] = clampedAtZero
         report["halfPointRoundedUp"] = halfPoint
+        report["roundedFrom84_5IntoReady"] = roundedIntoReady
+        report["roundedFrom59_5IntoNeedsWork"] = roundedIntoNeedsWork
         report["distinctScores"] = hist.count { it > 0 }
         report["scoreHistogram"] = hist
         report["checks"] = space.checks.indices.map { k -> mapOf("check" to space.checks[k].code, "variants" to space.variants[k].map { it.code }) }
@@ -223,7 +278,11 @@ class ScoreExhaustiveTest {
                     appendLine()
                     appendLine("Gate moved from Ready to Needs work: ${report["gateMovedReadyToNeedsWork"]} (${report["gateMovedExamples"]})")
                     appendLine("Lattice edges checked: ${report["latticeEdgesChecked"]}; zero-weight check: ${report["zeroWeightSetsEvaluated"]} sets, ${report["zeroWeightMode"]}, ${report["zeroWeightSeconds"]} s")
-                    appendLine("Clamped at 0: ${report["clampedAtZero"]}; half-point scores rounded up: ${report["halfPointRoundedUp"]}; distinct scores: ${report["distinctScores"]}")
+                    (report["robustness"] as? Map<*, *>)?.let { r ->
+                        appendLine("Robustness: movable ${r["movable"]}; band could change ${r["bandCouldChange"]}; Ready with an inferred finding ${r["readyWithInferred"]}, of which could leave Ready ${r["readyCouldLeaveReady"]}")
+                    }
+                    appendLine("Clamped at 0: ${report["clampedAtZero"]}; half-point scores rounded up: ${report["halfPointRoundedUp"]} (84.5 -> 85 Ready: ${report["roundedFrom84_5IntoReady"]}; 59.5 -> 60 Needs work: ${report["roundedFrom59_5IntoNeedsWork"]}); distinct scores: ${report["distinctScores"]}")
+                    appendLine("Legal lens views checked (score never below the headline): ${report["lensViewsChecked"]}")
                 },
             )
         }
