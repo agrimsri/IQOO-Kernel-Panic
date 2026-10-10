@@ -1,0 +1,823 @@
+{
+ "model": "apk_permission_risk",
+ "version": "1.0.0",
+ "tolerance": 1e-06,
+ "samples": [
+  {
+   "source": "held-out test row 4011",
+   "permissions": [
+    "android.permission.GET_ACCOUNTS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 4.1319625906838855,
+   "probability": 0.9842022298023244
+  },
+  {
+   "source": "held-out test row 3298",
+   "permissions": [
+    "android.permission.GET_ACCOUNTS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 4.1319625906838855,
+   "probability": 0.9842022298023244
+  },
+  {
+   "source": "held-out test row 5385",
+   "permissions": [
+    "android.permission.RECEIVE_SMS",
+    "android.permission.GET_TASKS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "com.android.launcher.permission.INSTALL_SHORTCUT",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.CALL_PHONE",
+    "android.permission.WRITE_CONTACTS",
+    "android.permission.MODIFY_AUDIO_SETTINGS",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.KILL_BACKGROUND_PROCESSES",
+    "android.permission.SEND_SMS",
+    "android.permission.RESTART_PACKAGES",
+    "android.permission.READ_LOGS",
+    "android.permission.SYSTEM_ALERT_WINDOW",
+    "android.permission.CHANGE_WIFI_STATE",
+    "android.permission.READ_CONTACTS",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.WAKE_LOCK",
+    "android.permission.VIBRATE",
+    "com.android.launcher.permission.UNINSTALL_SHORTCUT",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 8.867087492422971,
+   "probability": 0.9998590673491162
+  },
+  {
+   "source": "held-out test row 3198",
+   "permissions": [
+    "android.permission.GET_ACCOUNTS",
+    "com.android.launcher.permission.INSTALL_SHORTCUT",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 5.836996019124557,
+   "probability": 0.9970908937195183
+  },
+  {
+   "source": "held-out test row 4203",
+   "permissions": [
+    "android.permission.GET_ACCOUNTS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 4.1319625906838855,
+   "probability": 0.9842022298023244
+  },
+  {
+   "source": "held-out test row 5777",
+   "permissions": [
+    "android.permission.GET_TASKS",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.KILL_BACKGROUND_PROCESSES",
+    "android.permission.CHANGE_WIFI_STATE",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.WAKE_LOCK"
+   ],
+   "logit": 1.5433797630716692,
+   "probability": 0.8239555063044672
+  },
+  {
+   "source": "held-out test row 5430",
+   "permissions": [
+    "android.permission.GET_ACCOUNTS",
+    "android.permission.GET_TASKS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.SYSTEM_ALERT_WINDOW",
+    "android.permission.WAKE_LOCK",
+    "android.permission.VIBRATE",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 3.5434090651108634,
+   "probability": 0.9718979713934501
+  },
+  {
+   "source": "held-out test row 4462",
+   "permissions": [
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.GET_TASKS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.CHANGE_NETWORK_STATE",
+    "com.android.launcher.permission.INSTALL_SHORTCUT",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.ACCESS_LOCATION_EXTRA_COMMANDS",
+    "android.permission.INTERNET",
+    "android.permission.MOUNT_UNMOUNT_FILESYSTEMS",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.RESTART_PACKAGES",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.SYSTEM_ALERT_WINDOW",
+    "android.permission.DISABLE_KEYGUARD",
+    "android.permission.CHANGE_WIFI_STATE",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.WAKE_LOCK",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.VIBRATE",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 8.088020527444872,
+   "probability": 0.999692897096969
+  },
+  {
+   "source": "held-out test row 3183",
+   "permissions": [
+    "android.permission.GET_ACCOUNTS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 4.1319625906838855,
+   "probability": 0.9842022298023244
+  },
+  {
+   "source": "held-out test row 4391",
+   "permissions": [
+    "android.permission.GET_TASKS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.KILL_BACKGROUND_PROCESSES",
+    "android.permission.SYSTEM_ALERT_WINDOW",
+    "android.permission.WAKE_LOCK",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 3.049743805924702,
+   "probability": 0.9547714645986206
+  },
+  {
+   "source": "held-out test row 4427",
+   "permissions": [
+    "android.permission.GET_TASKS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.RECORD_AUDIO",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.SYSTEM_ALERT_WINDOW",
+    "android.permission.WAKE_LOCK",
+    "android.permission.VIBRATE",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 1.8427240360700852,
+   "probability": 0.8632705559587903
+  },
+  {
+   "source": "held-out test row 5179",
+   "permissions": [
+    "android.permission.RECEIVE_SMS",
+    "android.permission.WRITE_SETTINGS",
+    "android.permission.GET_TASKS",
+    "android.permission.CHANGE_NETWORK_STATE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.CALL_PHONE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.SEND_SMS",
+    "android.permission.CHANGE_WIFI_STATE",
+    "android.permission.READ_CONTACTS",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.WAKE_LOCK",
+    "android.permission.VIBRATE",
+    "android.permission.ACCESS_NETWORK_STATE",
+    "android.permission.READ_SMS"
+   ],
+   "logit": 4.723552428028393,
+   "probability": 0.9911946586102142
+  },
+  {
+   "source": "held-out test row 4832",
+   "permissions": [
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.CHANGE_WIFI_STATE",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 2.4321943746280086,
+   "probability": 0.9192495706966738
+  },
+  {
+   "source": "held-out test row 5024",
+   "permissions": [
+    "android.permission.GET_ACCOUNTS",
+    "android.permission.MANAGE_ACCOUNTS",
+    "android.permission.RECEIVE_SMS",
+    "android.permission.WRITE_SETTINGS",
+    "android.permission.GET_TASKS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.CHANGE_NETWORK_STATE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.CALL_PHONE",
+    "android.permission.INTERNET",
+    "android.permission.AUTHENTICATE_ACCOUNTS",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.USE_CREDENTIALS",
+    "android.permission.KILL_BACKGROUND_PROCESSES",
+    "android.permission.SEND_SMS",
+    "android.permission.RESTART_PACKAGES",
+    "android.permission.SYSTEM_ALERT_WINDOW",
+    "android.permission.DISABLE_KEYGUARD",
+    "android.permission.CHANGE_WIFI_STATE",
+    "android.permission.READ_CONTACTS",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.WAKE_LOCK",
+    "android.permission.ACCESS_NETWORK_STATE",
+    "android.permission.READ_SMS",
+    "android.permission.PROCESS_INCOMING_CALLS"
+   ],
+   "logit": 3.9767130406940843,
+   "probability": 0.9815978291044113
+  },
+  {
+   "source": "held-out test row 3174",
+   "permissions": [
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.GET_TASKS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "com.android.launcher.permission.INSTALL_SHORTCUT",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.ACCESS_LOCATION_EXTRA_COMMANDS",
+    "android.permission.INTERNET",
+    "com.htc.launcher.permission.READ_SETTINGS",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.FLASHLIGHT",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.WAKE_LOCK",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.CAMERA",
+    "android.permission.VIBRATE",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 5.5473461902960075,
+   "probability": 0.9961173462428858
+  },
+  {
+   "source": "held-out test row 3511",
+   "permissions": [
+    "android.permission.GET_ACCOUNTS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 4.1319625906838855,
+   "probability": 0.9842022298023244
+  },
+  {
+   "source": "held-out test row 5151",
+   "permissions": [
+    "android.permission.RECEIVE_SMS",
+    "android.permission.WRITE_SETTINGS",
+    "android.permission.GET_TASKS",
+    "android.permission.CHANGE_NETWORK_STATE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.CALL_PHONE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.SEND_SMS",
+    "android.permission.CHANGE_WIFI_STATE",
+    "android.permission.READ_CONTACTS",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.WAKE_LOCK",
+    "android.permission.VIBRATE",
+    "android.permission.ACCESS_NETWORK_STATE",
+    "android.permission.READ_SMS"
+   ],
+   "logit": 4.723552428028393,
+   "probability": 0.9911946586102142
+  },
+  {
+   "source": "held-out test row 4960",
+   "permissions": [
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.CALL_PHONE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -0.1458154455307381,
+   "probability": 0.463610592183327
+  },
+  {
+   "source": "held-out test row 5076",
+   "permissions": [
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.RECEIVE_SMS",
+    "android.permission.GET_TASKS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.RECORD_AUDIO",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.CALL_PHONE",
+    "android.permission.INTERNET",
+    "android.permission.KILL_BACKGROUND_PROCESSES",
+    "android.permission.SEND_SMS",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.SYSTEM_ALERT_WINDOW",
+    "android.permission.READ_CONTACTS",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.WAKE_LOCK",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.CAMERA",
+    "android.permission.ACCESS_NETWORK_STATE",
+    "android.permission.READ_SMS"
+   ],
+   "logit": 2.733367747217915,
+   "probability": 0.9389671211431067
+  },
+  {
+   "source": "held-out test row 5226",
+   "permissions": [
+    "android.permission.RECEIVE_SMS",
+    "android.permission.WRITE_SETTINGS",
+    "android.permission.GET_TASKS",
+    "android.permission.CHANGE_NETWORK_STATE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.CALL_PHONE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.SEND_SMS",
+    "android.permission.CHANGE_WIFI_STATE",
+    "android.permission.READ_CONTACTS",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.WAKE_LOCK",
+    "android.permission.VIBRATE",
+    "android.permission.ACCESS_NETWORK_STATE",
+    "android.permission.READ_SMS"
+   ],
+   "logit": 4.723552428028393,
+   "probability": 0.9911946586102142
+  },
+  {
+   "source": "held-out test row 4244",
+   "permissions": [
+    "android.permission.GET_ACCOUNTS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 4.1319625906838855,
+   "probability": 0.9842022298023244
+  },
+  {
+   "source": "held-out test row 4186",
+   "permissions": [
+    "com.android.launcher.permission.INSTALL_SHORTCUT",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "android.permission.SEND_SMS",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.VIBRATE",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 7.2446555418024765,
+   "probability": 0.9992865293570949
+  },
+  {
+   "source": "held-out test row 2595",
+   "permissions": [
+    "android.permission.GET_TASKS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.INTERNET",
+    "android.permission.KILL_BACKGROUND_PROCESSES",
+    "android.permission.READ_LOGS",
+    "android.permission.SYSTEM_ALERT_WINDOW",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.VIBRATE",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": 0.652377567836623,
+   "probability": 0.6575460419661491
+  },
+  {
+   "source": "held-out test row 2827",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "held-out test row 1993",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "held-out test row 1359",
+   "permissions": [
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.ACCESS_LOCATION_EXTRA_COMMANDS",
+    "android.permission.INTERNET",
+    "com.google.android.c2dm.permission.RECEIVE",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.WAKE_LOCK",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.CAMERA",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -8.594753661354321,
+   "probability": 0.000185039966988455
+  },
+  {
+   "source": "held-out test row 1028",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "held-out test row 1059",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "held-out test row 449",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "held-out test row 127",
+   "permissions": [
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "com.android.vending.BILLING",
+    "android.permission.VIBRATE",
+    "com.sec.android.iap.permission.BILLING",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -2.1841757100970947,
+   "probability": 0.10118054320095539
+  },
+  {
+   "source": "held-out test row 1450",
+   "permissions": [
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.GET_TASKS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "com.google.android.c2dm.permission.RECEIVE",
+    "android.permission.SET_WALLPAPER",
+    "android.permission.SYSTEM_ALERT_WINDOW",
+    "android.permission.DISABLE_KEYGUARD",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.WAKE_LOCK",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -2.9431700590913916,
+   "probability": 0.05006030813226255
+  },
+  {
+   "source": "held-out test row 2818",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "held-out test row 2168",
+   "permissions": [
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.CALL_PHONE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.BLUETOOTH",
+    "android.permission.BLUETOOTH_ADMIN",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -2.3596642505068317,
+   "probability": 0.08630066562687343
+  },
+  {
+   "source": "held-out test row 1970",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "held-out test row 2692",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "held-out test row 2174",
+   "permissions": [
+    "android.permission.GET_ACCOUNTS",
+    "android.permission.GET_TASKS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "com.google.android.c2dm.permission.RECEIVE",
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.SYSTEM_ALERT_WINDOW",
+    "com.android.vending.BILLING",
+    "android.permission.WAKE_LOCK",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "com.android.vending.CHECK_LICENSE",
+    "android.permission.VIBRATE",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -0.8428363874734477,
+   "probability": 0.3009377445007639
+  },
+  {
+   "source": "held-out test row 2263",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "held-out test row 1294",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "held-out test row 1593",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "held-out test row 566",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "held-out test row 197",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "held-out test row 1200",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "held-out test row 1070",
+   "permissions": [
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_WIFI_STATE",
+    "com.android.vending.BILLING",
+    "com.android.vending.CHECK_LICENSE",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -7.160433995720906,
+   "probability": 0.0007761145663571922
+  },
+  {
+   "source": "held-out test row 2210",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE"
+   ],
+   "logit": -3.568438358698662,
+   "probability": 0.027426435796582074
+  },
+  {
+   "source": "empty",
+   "permissions": [],
+   "logit": -1.2265268490072807,
+   "probability": 0.2267898864282085
+  },
+  {
+   "source": "only unknown names (ignored)",
+   "permissions": [
+    "com.example.app.permission.C2D_MESSAGE",
+    "android.permission.NOT_A_REAL_ONE"
+   ],
+   "logit": -1.2265268490072807,
+   "probability": 0.2267898864282085
+  },
+  {
+   "source": "doubled prefix alias",
+   "permissions": [
+    "android.permission.android.permission.READ_PHONE_STATE",
+    "android.permission.INTERNET"
+   ],
+   "logit": 1.8829495251989545,
+   "probability": 0.8679495478091684
+  },
+  {
+   "source": "duplicates and unknowns mixed in",
+   "permissions": [
+    "android.permission.SEND_SMS",
+    "android.permission.SEND_SMS",
+    "android.permission.RECEIVE_SMS",
+    "com.example.UNKNOWN"
+   ],
+   "logit": 1.631456618295597,
+   "probability": 0.8363690831816568
+  },
+  {
+   "source": "every vocabulary permission",
+   "permissions": [
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_LOCATION_EXTRA_COMMANDS",
+    "android.permission.ACCESS_MOCK_LOCATION",
+    "android.permission.ACCESS_NETWORK_STATE",
+    "android.permission.ACCESS_WIFI_STATE",
+    "android.permission.AUTHENTICATE_ACCOUNTS",
+    "android.permission.BLUETOOTH",
+    "android.permission.BLUETOOTH_ADMIN",
+    "android.permission.BROADCAST_STICKY",
+    "android.permission.CALL_PHONE",
+    "android.permission.CAMERA",
+    "android.permission.CHANGE_CONFIGURATION",
+    "android.permission.CHANGE_NETWORK_STATE",
+    "android.permission.CHANGE_WIFI_STATE",
+    "android.permission.CLEAR_APP_CACHE",
+    "android.permission.DISABLE_KEYGUARD",
+    "android.permission.DOWNLOAD_WITHOUT_NOTIFICATION",
+    "android.permission.FLASHLIGHT",
+    "android.permission.FOREGROUND_SERVICE",
+    "android.permission.GET_ACCOUNTS",
+    "android.permission.GET_TASKS",
+    "android.permission.INTERNET",
+    "android.permission.KILL_BACKGROUND_PROCESSES",
+    "android.permission.MANAGE_ACCOUNTS",
+    "android.permission.MODIFY_AUDIO_SETTINGS",
+    "android.permission.MOUNT_UNMOUNT_FILESYSTEMS",
+    "android.permission.NFC",
+    "android.permission.PROCESS_INCOMING_CALLS",
+    "android.permission.READ_APP_BADGE",
+    "android.permission.READ_CALENDAR",
+    "android.permission.READ_CONTACTS",
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.READ_LOGS",
+    "android.permission.READ_PHONE_STATE",
+    "android.permission.READ_PROFILE",
+    "android.permission.READ_SMS",
+    "android.permission.READ_SYNC_SETTINGS",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.RECEIVE_SMS",
+    "android.permission.RECEIVE_USER_PRESENT",
+    "android.permission.RECORD_AUDIO",
+    "android.permission.REQUEST_INSTALL_PACKAGES",
+    "android.permission.RESTART_PACKAGES",
+    "android.permission.SEND_SMS",
+    "android.permission.SET_WALLPAPER",
+    "android.permission.SET_WALLPAPER_HINTS",
+    "android.permission.SYSTEM_ALERT_WINDOW",
+    "android.permission.USE_CREDENTIALS",
+    "android.permission.USE_FINGERPRINT",
+    "android.permission.VIBRATE",
+    "android.permission.WAKE_LOCK",
+    "android.permission.WRITE_CALENDAR",
+    "android.permission.WRITE_CONTACTS",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.WRITE_SETTINGS",
+    "android.permission.WRITE_SYNC_SETTINGS",
+    "com.amazon.device.messaging.permission.RECEIVE",
+    "com.anddoes.launcher.permission.UPDATE_COUNT",
+    "com.android.alarm.permission.SET_ALARM",
+    "com.android.launcher.permission.INSTALL_SHORTCUT",
+    "com.android.launcher.permission.READ_SETTINGS",
+    "com.android.launcher.permission.UNINSTALL_SHORTCUT",
+    "com.android.vending.BILLING",
+    "com.android.vending.CHECK_LICENSE",
+    "com.google.android.c2dm.permission.RECEIVE",
+    "com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE",
+    "com.google.android.gms.permission.ACTIVITY_RECOGNITION",
+    "com.google.android.providers.gsf.permission.READ_GSERVICES",
+    "com.htc.launcher.permission.READ_SETTINGS",
+    "com.htc.launcher.permission.UPDATE_SHORTCUT",
+    "com.huawei.android.launcher.permission.CHANGE_BADGE",
+    "com.huawei.android.launcher.permission.READ_SETTINGS",
+    "com.huawei.android.launcher.permission.WRITE_SETTINGS",
+    "com.majeur.launcher.permission.UPDATE_BADGE",
+    "com.oppo.launcher.permission.READ_SETTINGS",
+    "com.oppo.launcher.permission.WRITE_SETTINGS",
+    "com.samsung.android.providers.context.permission.WRITE_USE_APP_FEATURE_SURVEY",
+    "com.sec.android.iap.permission.BILLING",
+    "com.sec.android.provider.badge.permission.READ",
+    "com.sec.android.provider.badge.permission.WRITE",
+    "com.sonyericsson.home.permission.BROADCAST_BADGE",
+    "com.sonymobile.home.permission.PROVIDER_INSERT_BADGE",
+    "me.everything.badger.permission.BADGE_COUNT_READ",
+    "me.everything.badger.permission.BADGE_COUNT_WRITE"
+   ],
+   "logit": -34.97618363664884,
+   "probability": 6.45708418440662e-16
+  },
+  {
+   "source": "common benign-looking set",
+   "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE",
+    "android.permission.WAKE_LOCK",
+    "com.google.android.c2dm.permission.RECEIVE"
+   ],
+   "logit": -7.872997936362129,
+   "probability": 0.00038074574003473465
+  }
+ ]
+}
