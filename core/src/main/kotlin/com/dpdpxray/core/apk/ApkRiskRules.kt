@@ -518,9 +518,9 @@ object ApkRiskRules {
 
         if (facts.hasLauncherIcon == false && facts.origin.source != InstallSource.PREINSTALLED && !f.isFile) add(ApkSignal(
             "no_launcher_icon", ApkSeverity.WORTH_KNOWING, ApkEvidence.OBSERVED,
-            bi("No icon in your app list", "ऐप लिस्ट में इसका आइकन नहीं"),
-            bi("This app has no launcher icon, so you may not see it in your app drawer. Keyboards, plug-ins and companion apps often work this way, but an app you did not expect is easy to miss.",
-                "इस ऐप का लॉन्चर आइकन नहीं है, इसलिए यह आपकी ऐप लिस्ट में शायद न दिखे। कीबोर्ड, प्लग-इन और साथी ऐप अक्सर ऐसे ही होते हैं, पर जिस ऐप की आपको उम्मीद नहीं थी, वह आसानी से छूट सकता है।"),
+            bi("Has no screen to open from your app list", "ऐप लिस्ट से खोलने के लिए इसकी कोई स्क्रीन नहीं"),
+            bi("This app declares no launcher screen. Depending on the phone, your app list shows no icon for it or a placeholder that only opens app info. Keyboards, plug-ins and companion apps often work this way, but an app you did not expect is easy to miss.",
+                "यह ऐप कोई लॉन्चर स्क्रीन घोषित नहीं करता। फ़ोन के हिसाब से, ऐप लिस्ट में इसका आइकन नहीं दिखता या ऐसा आइकन दिखता है जो सिर्फ़ ऐप की जानकारी खोलता है। कीबोर्ड, प्लग-इन और साथी ऐप अक्सर ऐसे ही होते हैं, पर जिस ऐप की आपको उम्मीद नहीं थी, वह आसानी से छूट सकता है।"),
             bi("If you do not recognise it, open its Android app settings and uninstall it.", "अगर आप इसे नहीं पहचानते, तो इसकी Android ऐप सेटिंग खोलकर इसे अनइंस्टॉल करें।"),
         ))
 
