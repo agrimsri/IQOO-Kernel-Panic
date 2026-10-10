@@ -141,6 +141,7 @@ The pairing token is never written to it.
 - **Nothing is granted for you.** The Runner never allows the VPN, never switches on the accessibility service, never grants a permission and never taps Android permission dialogs. If something is missing, the phone refuses and says what to do. The agent taps only Accept and Reject in the app under test's consent screen, as **Let the agent tap Accept and Reject** does.
 - **Plain values, no paths or commands.** The request carries strings and booleans only. The run id must match `[A-Za-z0-9_-]{1,40}`; it is the only value that becomes part of a file path, and files are written only under TraceVeil's own `Android/data/com.dpdpxray.app/files/automation/`. An already used run id is refused rather than overwritten. The 20 most recent runs are kept.
 - **Nothing leaves the phone except over your own USB/adb connection.** TraceVeil uploads nothing and opens no network service for the Runner; the laptop reads `status.json` and copies `bundle.json` over adb. The bundle holds the evidence (looked-up hosts, consent-screen text, device model); treat CI artifacts that contain it accordingly.
+- **Where the files sit.** `Android/data/com.dpdpxray.app/files/automation/` is TraceVeil's app-specific folder: from Android 11 on, other apps cannot read it, but adb can. On Android 10, apps holding the storage permission may be able to read it, so use a test phone without other untrusted apps.
 
 ## Limits
 
