@@ -64,7 +64,7 @@ object MapColors {
     const val LAND = 0xFF2A4558L           // Film.line
     val LOCATED = Brand.LightBlue.argb      // a country where lookups were answered (inferred)
     val UNCERTAIN = Brand.LavenderGrey.argb // answered there, but CDN or several countries
-    val HEADQUARTERS = Brand.TangerineDream.argb
+    val COMPANY_LOCATION = Brand.TangerineDream.argb
 
     /** (name, text, background) pairs that must reach 4.5:1. */
     fun textPairs(raised: Long, base: Long, bone: Long): List<Triple<String, Long, Long>> = buildList {
@@ -80,7 +80,7 @@ object MapColors {
     fun graphicPairs(raised: Long): List<Triple<String, Long, Long>> = listOf(
         Triple("located vs land", LOCATED, LAND),
         Triple("uncertain vs land", UNCERTAIN, LAND),
-        Triple("headquarters vs land", HEADQUARTERS, LAND),
+        Triple("company location vs land", COMPANY_LOCATION, LAND),
         Triple("row rule: source mode", accent(MapMode.SOURCE_DNS), raised),
         Triple("row rule: owner mode", Brand.BlushRose.argb, raised),
     )

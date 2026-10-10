@@ -182,7 +182,8 @@ object MapPresenter {
                 where,
                 Fact("Domain registration", "Not looked up", Evidence.UNKNOWN,
                     "TraceVeil has no domain-registration data. A domain's registration country is not the server's or the owner's country."),
-                location(owners.find(entity)),
+                companyLocation(owners.find(entity)),
+                incorporation(owners.find(entity)),
                 Fact(legal.label, legal.name, Evidence.SOURCED, "\"${legal.quotes.joinToString("; ")}.\" ${legal.caveat}"),
             )
             MapRow(entity, Evidence.INFERRED, null, facts)
@@ -193,28 +194,29 @@ object MapPresenter {
         return MapView(
             MapMode.OWNER_LEGAL, "Who runs it, and the legal context",
             "Each vendor is matched from its domain name in TraceVeil's tracker catalogue. Server location, domain registration, " +
-                "the company's own stated location and legal context are different things, so they are shown separately.",
+                "the company's location, where it is incorporated and legal context are different things, so they are shown separately.",
             rows, if (m.hosts.isEmpty()) "No tracker lookups were recorded in this audit, so there is no vendor to show." else null,
             listOf(
-                "A company location appears only when TraceVeil's owner registry cites a source for it; an address a company gives for contracts is not necessarily its headquarters. Parent-company ownership is not established.",
+                "A company location appears only when TraceVeil's tracker catalogue cites a source for it; an address a company gives for contracts is not necessarily its headquarters. A parent company is named only where the cited source names it.",
                 "Nothing here says a vendor or app broke a law; it shows which facts are known and which are not.",
             ),
         )
     }
 
-    private fun location(f: OwnerFacts?): Fact {
-        val label = "Company location (as stated)"
-        val loc = f?.location
-        val inc = f?.incorporation
-        if (loc == null && inc == null) {
-            return Fact(label, "Not established", Evidence.UNKNOWN, f?.note ?: "No cited source in TraceVeil's owner registry.")
-        }
-        fun cite(c: SourcedCountry) = "${c.sourceUrl} (${c.kind.label}, as of ${c.asOf}). Quote: \"${c.quote}\""
-        val note = listOfNotNull(
-            loc?.let { "${it.basis!!.phrase}. Source: ${cite(it)}" },
-            inc?.let { "Incorporated in ${name(it.iso)}. Source: ${cite(it)}" },
-            f.note,
-        ).joinToString(" ")
-        return if (loc != null) Fact(label, name(loc.iso), Evidence.SOURCED, note) else Fact(label, "Not established", Evidence.UNKNOWN, note)
+    private fun cite(c: SourcedCountry) = "Source: ${c.sourceUrl} (${c.kind.label}, as of ${c.asOf}). Quote: \"${c.quote}\""
+
+    /** The company's location, labelled for what the source actually says: a headquarters or a stated address. */
+    private fun companyLocation(f: OwnerFacts?): Fact {
+        val label = "Company location"
+        val loc = f?.location ?: return Fact(label, "Not established", Evidence.UNKNOWN, f?.note ?: "No cited source in TraceVeil's tracker catalogue.")
+        val kind = if (loc.basis == LocationBasis.HEADQUARTERS) "headquarters" else "stated address"
+        return Fact(label, "${name(loc.iso)} ($kind)", Evidence.SOURCED, listOfNotNull("${loc.basis!!.phrase}. ${cite(loc)}", f.note).joinToString(" "))
+    }
+
+    /** Where a source says the company is incorporated; a different fact from where it is located. */
+    private fun incorporation(f: OwnerFacts?): Fact {
+        val label = "Incorporation"
+        val inc = f?.incorporation ?: return Fact(label, "Not established", Evidence.UNKNOWN, "No cited source in TraceVeil's tracker catalogue.")
+        return Fact(label, name(inc.iso), Evidence.SOURCED, cite(inc))
     }
 }

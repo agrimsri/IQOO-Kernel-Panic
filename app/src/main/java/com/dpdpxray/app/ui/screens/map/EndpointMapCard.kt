@@ -64,7 +64,7 @@ fun EndpointMapCard(
     sessions: List<AuditSession>,
     catalog: TrackerCatalog,
     modifier: Modifier = Modifier,
-    owners: OwnerRegistry = remember { runCatching { OwnerRegistry.loadDefault() }.getOrDefault(OwnerRegistry.EMPTY) },
+    owners: OwnerRegistry = remember(catalog) { OwnerRegistry.fromCatalog(catalog) },
 ) {
     val ctx = LocalContext.current
     val geo by produceState<GeoSource?>(null) { value = GeoTableLoader.load(ctx) }
@@ -105,7 +105,7 @@ fun EndpointMapCardContent(
                 if (mode == MapMode.SOURCE_DNS) model.countries.filter { it.allUncertain }.map { it.iso }.toSet() else emptySet()
             }
             if (highlighted.isNotEmpty()) {
-                val fill = if (mode == MapMode.SOURCE_DNS) c(MapColors.LOCATED) else c(MapColors.HEADQUARTERS)
+                val fill = if (mode == MapMode.SOURCE_DNS) c(MapColors.LOCATED) else c(MapColors.COMPANY_LOCATION)
                 WorldMapCanvas(highlighted - uncertain, uncertain, fill)
             }
             if (mode == MapMode.SOURCE_DNS && model.source !is GeoSource.Loaded) {

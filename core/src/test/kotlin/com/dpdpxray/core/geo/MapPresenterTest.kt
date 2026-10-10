@@ -43,12 +43,18 @@ class MapPresenterTest {
     )
     private val model = EndpointGeoAggregator.build(listOf(session), catalog, loaded)
 
-    private val owners = OwnerRegistry.parse(
-        """[{"entity":"AppsFlyer","location":{"country":"IL","basis":"STATED_ADDRESS","source":"https://example.org/appsflyer","kind":"COMPANY_DOCUMENT",
-            "asOf":"2026-10-10","quote":"AppsFlyer Ltd., located at 14 Maskit St. Herzliya, Israel"},
-            "incorporation":{"country":"IE","source":"https://example.org/reg","kind":"PUBLIC_REGISTRY","asOf":"2026-10-10","quote":"registered in Ireland"}},
-           {"entity":"CleverTap","note":"Lists entities in three countries and names no headquarters."}]""",
-    )
+    private fun sc(iso: String, basis: LocationBasis?, url: String, quote: String, kind: SourceKind = SourceKind.COMPANY_DOCUMENT) =
+        SourcedCountry(iso, url, kind, "2026-10-10", quote, basis)
+
+    private val owners = OwnerRegistry.of(listOf(
+        OwnerFacts(
+            "AppsFlyer",
+            location = sc("IL", LocationBasis.STATED_ADDRESS, "https://example.org/appsflyer", "AppsFlyer Ltd., located at 14 Maskit St. Herzliya, Israel"),
+            incorporation = sc("IE", null, "https://example.org/reg", "incorporated in Ireland", SourceKind.PUBLIC_REGISTRY),
+            note = null,
+        ),
+        OwnerFacts("CleverTap", null, null, "Lists entities in three countries and names no headquarters."),
+    ))
 
     private fun view(m: EndpointMapModel = model, mode: MapMode = MapMode.SOURCE_DNS, owners: OwnerRegistry = this.owners) = MapPresenter.view(m, owners, mode, nowEpochSeconds = now)
 
@@ -114,7 +120,7 @@ class MapPresenterTest {
     fun `ip country, registered country and owner location stay in separate facts`() {
         val owner = view(mode = MapMode.OWNER_LEGAL).rows.first { it.title == "AppsFlyer" }.facts.associateBy { it.label }
         assertEquals("India", owner.getValue("Where its lookups were answered").value)
-        assertEquals("Israel", owner.getValue("Company location (as stated)").value)
+        assertEquals("Israel (stated address)", owner.getValue("Company location").value)
         val source = view().rows.first { it.iso == "IN" }.facts.associateBy { it.label }
         assertEquals("Singapore", source.getValue("Address block registered in").value)
     }
@@ -209,45 +215,71 @@ class MapPresenterTest {
 
     @Test
     fun `owner mode shows the same four separate facts in the same order`() {
-        val expected = listOf("Where its lookups were answered", "Domain registration", "Company location (as stated)", "Legal context")
+        val expected = listOf("Where its lookups were answered", "Domain registration", "Company location", "Incorporation", "Legal context")
         val rows = view(mode = MapMode.OWNER_LEGAL).rows
         assertTrue(rows.size >= 3)
         rows.filter { it.title != "Owner not identified" }.forEach { assertEquals(it.title, expected, it.facts.map { f -> f.label }) }
     }
 
     @Test
-    fun `a stated location is sourced with its basis, quote and incorporation kept apart`() {
-        val fact = view(mode = MapMode.OWNER_LEGAL).rows.first { it.title == "AppsFlyer" }.facts.first { it.label == "Company location (as stated)" }
-        assertEquals(Evidence.SOURCED, fact.evidence)
-        assertEquals("Israel", fact.value)
-        val note = fact.note!!
-        assertTrue(note, note.contains("https://example.org/appsflyer"))
-        assertTrue(note, note.contains("AppsFlyer Ltd., located at 14 Maskit St. Herzliya, Israel"))
-        assertTrue(note, note.contains("not described as headquarters"))
-        assertTrue(note, note.contains("Incorporated in Ireland"))
+    fun `a stated address is labelled as one, with its source and quote, and incorporation is its own fact`() {
+        val facts = view(mode = MapMode.OWNER_LEGAL).rows.first { it.title == "AppsFlyer" }.facts.associateBy { it.label }
+        val loc = facts.getValue("Company location")
+        assertEquals(Evidence.SOURCED, loc.evidence)
+        assertEquals("Israel (stated address)", loc.value)
+        assertTrue(loc.note!!, loc.note!!.contains("https://example.org/appsflyer"))
+        assertTrue(loc.note!!, loc.note!!.contains("AppsFlyer Ltd., located at 14 Maskit St. Herzliya, Israel"))
+        assertTrue(loc.note!!, loc.note!!.contains("not described as headquarters"))
+        val inc = facts.getValue("Incorporation")
+        assertEquals(Evidence.SOURCED, inc.evidence)
+        assertEquals("Ireland", inc.value)
+        assertTrue(inc.note!!.contains("https://example.org/reg"))
     }
 
     @Test
-    fun `a location the source calls headquarters says so`() {
-        val hq = OwnerRegistry.parse(
-            """[{"entity":"AppsFlyer","location":{"country":"IL","basis":"HEADQUARTERS","source":"https://example.org/x","kind":"PUBLIC_REGISTRY","asOf":"2026-10-10","quote":"principal executive offices: Herzliya"}}]""",
-        )
-        val note = view(mode = MapMode.OWNER_LEGAL, owners = hq).rows.first { it.title == "AppsFlyer" }.facts.first { it.label == "Company location (as stated)" }.note!!
-        assertTrue(note, note.contains("Described as headquarters"))
+    fun `a location the source calls headquarters is labelled headquarters`() {
+        val hq = OwnerRegistry.of(listOf(OwnerFacts("AppsFlyer", sc("IL", LocationBasis.HEADQUARTERS, "https://example.org/x", "principal executive offices: Herzliya", SourceKind.PUBLIC_REGISTRY), null, null)))
+        val fact = view(mode = MapMode.OWNER_LEGAL, owners = hq).rows.first { it.title == "AppsFlyer" }.facts.first { it.label == "Company location" }
+        assertEquals("Israel (headquarters)", fact.value)
+        assertEquals(Evidence.SOURCED, fact.evidence)
+    }
+
+    @Test
+    fun `a company is never described as registered in a country`() {
+        MapMode.entries.forEach { mode ->
+            val v = view(mode = mode, owners = owners)
+            val shown = v.rows.filter { it.title != "Country unknown" && mode == MapMode.OWNER_LEGAL }.flatMap { r -> listOf(r.title) + r.facts.flatMap { listOf(it.label, it.value) } }
+            shown.forEach { assertFalse("$mode: $it", it.contains("registered in", ignoreCase = true)) }
+        }
+        // the one place "registered" is right is an IP address block, and it says so
+        assertTrue(view().rows.first { it.iso == "IN" }.facts.any { it.label == "Address block registered in" })
     }
 
     @Test
     fun `unknown owners stay unknown, with the research note when there is one`() {
         val rows = view(mode = MapMode.OWNER_LEGAL).rows
-        val meta = rows.first { it.title == "Meta (Facebook SDK)" }.facts.first { it.label == "Company location (as stated)" }
-        assertEquals("Not established", meta.value)
-        assertEquals(Evidence.UNKNOWN, meta.evidence)
-        assertTrue(meta.note!!.contains("No cited source"))
-        val clever = OwnerRegistry.parse("""[{"entity":"Meta (Facebook SDK)","note":"Lists entities in three countries and names no headquarters."}]""")
-        val noted = view(mode = MapMode.OWNER_LEGAL, owners = clever).rows.first { it.title == "Meta (Facebook SDK)" }.facts.first { it.label == "Company location (as stated)" }
-        assertEquals("Not established", noted.value)
-        assertEquals(Evidence.UNKNOWN, noted.evidence)
-        assertTrue(noted.note!!.contains("names no headquarters"))
+        val meta = rows.first { it.title == "Meta (Facebook SDK)" }.facts.associateBy { it.label }
+        assertEquals("Not established", meta.getValue("Company location").value)
+        assertEquals(Evidence.UNKNOWN, meta.getValue("Company location").evidence)
+        assertEquals("Not established", meta.getValue("Incorporation").value)
+        assertEquals(Evidence.UNKNOWN, meta.getValue("Incorporation").evidence)
+        assertTrue(meta.getValue("Company location").note!!.contains("No cited source"))
+        val clever = view(mode = MapMode.OWNER_LEGAL).rows.firstOrNull { it.title == "CleverTap" }
+        assertNull("CleverTap has no lookups in this fixture", clever)
+        val noted = OwnerRegistry.of(listOf(OwnerFacts("Meta (Facebook SDK)", null, null, "Lists entities in three countries and names no headquarters.")))
+        val fact = view(mode = MapMode.OWNER_LEGAL, owners = noted).rows.first { it.title == "Meta (Facebook SDK)" }.facts.first { it.label == "Company location" }
+        assertEquals("Not established", fact.value)
+        assertEquals(Evidence.UNKNOWN, fact.evidence)
+        assertTrue(fact.note!!.contains("names no headquarters"))
+    }
+
+    @Test
+    fun `the footer names a parent company only where a source does`() {
+        val footer = view(mode = MapMode.OWNER_LEGAL).footer.joinToString("\n")
+        assertTrue(footer, footer.contains("A parent company is named only where the cited source names it."))
+        assertFalse(footer, footer.contains("Parent-company ownership is not established"))
+        assertTrue(footer, footer.contains("not necessarily its headquarters"))
+        assertTrue(footer, footer.contains("tracker catalogue"))
     }
 
     @Test
@@ -348,6 +380,28 @@ class MapPresenterTest {
         v.rows.forEachIndexed { r, row -> row.facts.forEachIndexed { f, fact ->
             if ((r to f) in repeats) assertFalse("${row.title}/${fact.label}", fact.note!!.contains("https://example.org/appsflyer"))
         } }
+    }
+
+    @Test
+    fun `the demo vendors read correctly from the real catalogue`() {
+        val demo = sessionOf(
+            ev(1.0, "graph.facebook.com", listOf("8.8.8.8"), status = AnswerStatus.COMPLETE, rcode = 0),
+            ev(9.0, "launches.appsflyersdk.com", listOf("103.5.5.5"), status = AnswerStatus.COMPLETE, rcode = 0),
+            ev(9.1, "app-measurement.com", listOf("8.8.4.4"), status = AnswerStatus.COMPLETE, rcode = 0),
+            ev(9.2, "in1.clevertap-prod.com", listOf("8.8.8.9"), status = AnswerStatus.COMPLETE, rcode = 0),
+            ev(9.3, "an.facebook.com", listOf("9.9.9.9"), status = AnswerStatus.COMPLETE, rcode = 0),
+        )
+        val rows = view(EndpointGeoAggregator.build(listOf(demo), catalog, loaded), MapMode.OWNER_LEGAL, OwnerRegistry.fromCatalog(catalog)).rows
+        fun fact(entity: String, label: String) = rows.first { it.title == entity }.facts.first { it.label == label }
+        assertEquals("United States (headquarters)", fact("Meta (Facebook SDK)", "Company location").value)
+        assertEquals("United States (headquarters)", fact("Google Analytics for Firebase", "Company location").value)
+        assertEquals("United States", fact("Google Analytics for Firebase", "Incorporation").value)
+        assertEquals(Evidence.SOURCED, fact("Google Analytics for Firebase", "Incorporation").evidence)
+        assertEquals("Israel (stated address)", fact("AppsFlyer", "Company location").value)
+        assertEquals("Not established", fact("AppsFlyer", "Incorporation").value)
+        assertEquals("Not established", fact("CleverTap", "Company location").value)
+        assertTrue(fact("CleverTap", "Company location").note!!.isNotBlank())
+        assertEquals(setOf("US", "IL"), MapPresenter.highlight(EndpointGeoAggregator.build(listOf(demo), catalog, loaded), OwnerRegistry.fromCatalog(catalog), MapMode.OWNER_LEGAL))
     }
 
     // ---- wording ---------------------------------------------------------------------------------------------------------

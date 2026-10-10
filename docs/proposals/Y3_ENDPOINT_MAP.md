@@ -9,7 +9,7 @@ One card, two modes, the same row layout in both (title, evidence chip, labelled
 | Mode | Question it answers | Facts |
 | --- | --- | --- |
 | **Source country / DNS** | Where were this audit's tracker lookups answered? | Hosts by consent phase (Observed); DNS answers and alias chains (Observed); the country the IP table places the returned address in (Inferred); the country the address block is registered in, when different (Inferred); hosts with no country, with the reason and the resolver's actual replies (Unknown / Observed) |
-| **Owner / legal authority** | Who runs it, and what is the legal context? | Where its lookups were answered (Inferred); domain registration (always "Not looked up", Unknown); company location as stated by the company (Sourced only with a cited source, else "Not established"); legal context: DPDP Act section 3, quoted (Sourced) |
+| **Owner / legal authority** | Who runs it, and what is the legal context? | Where its lookups were answered (Inferred); domain registration (always "Not looked up", Unknown); company location, labelled headquarters or stated address (Sourced only with a cited source, else "Not established"); incorporation (its own fact); legal context: DPDP Act section 3, quoted (Sourced) |
 
 Four evidence classes, shown by label and by shape (Unknown is hollow), never by colour alone: **Observed** (seen in this audit's DNS), **Inferred** (derived by a lookup or catalogue match), **Sourced** (a cited document), **Unknown** (no evidence; never filled with a default).
 
@@ -36,7 +36,7 @@ When one name has several lookups (A and AAAA), a failed one never erases a succ
 ## Data it depends on
 
 - **IP to country:** the GeoLite2-Country file on the phone (`files/geo/`, pushed with `adb`); see `docs/ATTRIBUTION.md` for the terms, version, update duty and the decision to keep it out of Git. Without it the card still lists every lookup, with "No IP table available". `country` (placed) and `registered_country` stay separate; anycast addresses often have only a registration, shown as a registration, not a location. The card prints MaxMind's attribution and the database build date, and notes when the file is more than 30 days old.
-- **Company locations:** `core/src/main/resources/geo/owners.json`. It holds researched entries for the four demo companies only: Google, Meta, AppsFlyer (with its three-entity caveat) and CleverTap (unresolved, with the reason). Each location carries a cited https source, a source kind, a date, the source's own quote and a basis ("stated address" or "described as headquarters"). A bad entry fails the whole load (tested). Everything else shows "Not established".
+- **Company facts:** the tracker catalogue (A5: `location`, `incorporation`, `note`). `OwnerRegistry.fromCatalog(catalog)` is a view over it; there is no second data file. Each location shows its basis (`headquarters` or `stated address`), source URL, kind, date and the source's own quote; incorporation is a separate fact; a note explains caveats (for example that a parent company's filing was cited). Entities with no facts show "Not established".
 - **Legal context:** `LegalContext.DPDP_INDIA` quotes section 3 and says it is not a finding. It is India-specific by design; `MapPresenter.view(..., legal = ...)` accepts another jurisdiction's context without changing anything else, so the same evidence interface can serve international users.
 
 ## For Nitya (mount and theme)
@@ -50,7 +50,7 @@ When one name has several lookups (A and AAAA), a failed one never erases a succ
 
 ## For Agrim (A5)
 
-One ownership mapping, not two. See "Coordination with A5" in `docs/ATTRIBUTION.md`. In short: when `hqCountry` and `hqSource` land in `trackers.json`, keep this file's rules (https source, kind, date, quote, and a basis that separates "described as headquarters" from "stated address") and the registry loader will read them.
+Done: the map reads A5's catalogue facts and the second file is deleted. Nothing further is needed from A5 for the map.
 
 ## Network Proof wording (Y2), preserved
 

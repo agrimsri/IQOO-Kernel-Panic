@@ -1,140 +1,158 @@
 package com.dpdpxray.core.geo
 
+import com.dpdpxray.core.model.Category
+import com.dpdpxray.core.trackers.CompanyBasis
+import com.dpdpxray.core.trackers.CompanyCountry
+import com.dpdpxray.core.trackers.CompanySourceKind
+import com.dpdpxray.core.trackers.TrackerCatalog
 import com.dpdpxray.core.trackers.TrackerEntry
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Test
 
+/** The owner registry is a view over the tracker catalogue: one mapping, validated by the catalogue, never a second file. */
 class OwnerRegistryTest {
-    private fun place(
-        country: String = "US", source: String = "https://example.org/terms", kind: String = "COMPANY_DOCUMENT", asOf: String = "2026-10-10",
-        quote: String = "Acme Inc., 1 Main St, Springfield, USA", basis: String? = "STATED_ADDRESS",
-    ) = """{"country":"$country","source":"$source","kind":"$kind","asOf":"$asOf","quote":"$quote"${basis?.let { ""","basis":"$it"""" } ?: ""}}"""
+    private fun country(
+        iso: String = "US", basis: CompanyBasis? = CompanyBasis.HEADQUARTERS, kind: CompanySourceKind = CompanySourceKind.PUBLIC_REGISTRY,
+        source: String = "https://example.org/filing", quote: String = "principal executive offices: Springfield",
+    ) = CompanyCountry(iso, source, kind, "2026-10-10", quote, basis)
 
-    private fun entry(location: String = place()) = """[{"entity":"Acme Analytics","location":$location}]"""
+    private fun entry(name: String, location: CompanyCountry? = null, incorporation: CompanyCountry? = null, note: String? = null) =
+        TrackerEntry(name, Category.ANALYTICS, listOf("${name.lowercase().replace(" ", "")}.example"), location = location, incorporation = incorporation, note = note)
 
-    private fun rejects(json: String) = try { OwnerRegistry.parse(json); fail("accepted: $json") } catch (_: OwnerRegistryException) {}
+    private fun registry(vararg e: TrackerEntry) = OwnerRegistry.fromCatalog(TrackerCatalog(e.toList()))
 
     @Test
-    fun `a sourced location keeps its source, quote and basis`() {
-        val f = OwnerRegistry.parse(entry()).find("Acme Analytics")!!
+    fun `a catalogue location maps one to one, keeping source, quote, kind and basis`() {
+        val f = registry(entry("Acme", location = country())).find("Acme")!!
         val l = f.location!!
         assertEquals("US", l.iso)
-        assertEquals("https://example.org/terms", l.sourceUrl)
-        assertEquals(SourceKind.COMPANY_DOCUMENT, l.kind)
-        assertEquals(LocationBasis.STATED_ADDRESS, l.basis)
-        assertEquals("Acme Inc., 1 Main St, Springfield, USA", l.quote)
+        assertEquals("https://example.org/filing", l.sourceUrl)
+        assertEquals(SourceKind.PUBLIC_REGISTRY, l.kind)
+        assertEquals(LocationBasis.HEADQUARTERS, l.basis)
+        assertEquals("principal executive offices: Springfield", l.quote)
+        assertEquals("2026-10-10", l.asOf)
         assertNull(f.incorporation)
     }
 
     @Test
-    fun `incorporation is separate from the stated location and needs no basis`() {
-        val j = """[{"entity":"A","location":${place(country = "US")},"incorporation":${place(country = "IE", basis = null, quote = "a company registered in Ireland")}}]"""
-        val f = OwnerRegistry.parse(j).find("A")!!
+    fun `every source kind and basis maps by name, so none can drift`() {
+        CompanySourceKind.entries.forEach { assertEquals(it.name, SourceKind.valueOf(it.name).name) }
+        CompanyBasis.entries.forEach { assertEquals(it.name, LocationBasis.valueOf(it.name).name) }
+        assertEquals(CompanySourceKind.entries.size, SourceKind.entries.size)
+        assertEquals(CompanyBasis.entries.size, LocationBasis.entries.size)
+        CompanySourceKind.entries.forEach { k ->
+            assertEquals(k.name, registry(entry("A", location = country(kind = k))).find("A")!!.location!!.kind.name)
+        }
+    }
+
+    @Test
+    fun `incorporation is separate from location and carries no basis`() {
+        val f = registry(entry("A", location = country("US"), incorporation = country("IE", basis = null, quote = "a company registered in Ireland"))).find("A")!!
         assertEquals("US", f.location!!.iso)
         assertEquals("IE", f.incorporation!!.iso)
         assertNull(f.incorporation!!.basis)
     }
 
     @Test
-    fun `an entry may record that research found nothing usable`() {
-        val f = OwnerRegistry.parse("""[{"entity":"A","note":"Lists entities in three countries and names no headquarters."}]""").find("A")!!
+    fun `a stated address stays a stated address and is never promoted to headquarters`() {
+        val f = registry(entry("A", location = country(basis = CompanyBasis.STATED_ADDRESS))).find("A")!!
+        assertEquals(LocationBasis.STATED_ADDRESS, f.location!!.basis)
+    }
+
+    @Test
+    fun `an entry that only records why research was inconclusive is kept`() {
+        val f = registry(entry("A", note = "Lists entities in three countries and names no headquarters.")).find("A")!!
         assertNull(f.location)
         assertNull(f.incorporation)
         assertEquals("Lists entities in three countries and names no headquarters.", f.note)
     }
 
     @Test
-    fun `an entry with no location and no note says nothing and is rejected`() = rejects("""[{"entity":"A"}]""")
-
-    @Test
-    fun `every country claim needs a valid https source, kind, date, quote and basis`() {
-        rejects(entry("""{"country":"US","kind":"COMPANY_DOCUMENT","asOf":"2026-10-10","quote":"q","basis":"STATED_ADDRESS"}"""))        // no source
-        rejects(entry(place(source = "")))
-        rejects(entry(place(source = "http://insecure.example")))
-        rejects(entry(place(kind = "GUESS")))
-        rejects(entry("""{"country":"US","source":"https://a.example","kind":"COMPANY_DOCUMENT","quote":"q","basis":"STATED_ADDRESS"}""")) // no date
-        rejects(entry(place(asOf = "yesterday")))
-        rejects(entry(place(quote = "")))                                                                                              // nothing to verify
-        rejects(entry(place(quote = "x".repeat(401))))
-        rejects(entry(place(basis = null)))                                                                                            // a location needs its basis
-        rejects(entry(place(basis = "GUESS")))
+    fun `entities with no facts at all have no entry, so they read as not established`() {
+        val r = registry(entry("Researched", location = country()), entry("Untouched"))
+        assertNull(r.find("Untouched"))
+        assertEquals(setOf("Researched"), r.entities())
+        assertNull(r.find("Somebody Else"))
     }
 
     @Test
-    fun `country codes must be real ISO 3166 codes`() {
-        rejects(entry(place(country = "ZZ")))
-        rejects(entry(place(country = "usa")))
-        assertNotNull(OwnerRegistry.parse(entry(place(country = "XK"))).find("Acme Analytics"))
+    fun `an empty catalogue gives an empty registry`() {
+        assertTrue(registry().isEmpty)
+        assertTrue(OwnerRegistry.EMPTY.isEmpty)
+    }
+
+    // ---- the real catalogue ---------------------------------------------------------------------------------------------
+
+    private val real = OwnerRegistry.loadDefault()
+    private val catalog = TrackerCatalog.loadDefault()
+
+    @Test
+    fun `there is one ownership mapping and the second file is gone`() {
+        assertNull(OwnerRegistry::class.java.getResource("/geo/owners.json"))
     }
 
     @Test
-    fun `duplicate entities and garbage are rejected`() {
-        rejects("""[{"entity":"A","note":"n"},{"entity":"A","note":"n"}]""")
-        rejects("not json")
-        rejects("""[{"note":"n"}]""")
+    fun `the registry is exactly the catalogue entities that carry facts`() {
+        val withFacts = catalog.entries().filter { it.location != null || it.incorporation != null || it.note != null }.map { it.entity }.toSet()
+        assertEquals(withFacts, real.entities())
+        assertTrue(real.entities().isNotEmpty())
     }
 
     @Test
-    fun `an entity with no entry is null, never a guess`() = assertNull(OwnerRegistry.parse(entry()).find("Somebody Else"))
-
-    @Test
-    fun `an empty registry is valid`() = assertTrue(OwnerRegistry.parse("[]").isEmpty)
-
-    // ---- the bundled research ----------------------------------------------------------------------------------------
-
-    private val registry = OwnerRegistry.loadDefault()
-
-    @Test
-    fun `the bundled registry only names catalogue entities`() {
-        val entities = Json { ignoreUnknownKeys = true }.decodeFromString(
-            ListSerializer(TrackerEntry.serializer()),
-            TrackerEntry::class.java.getResourceAsStream("/trackers/trackers.json")!!.bufferedReader().readText(),
-        ).map { it.entity }.toSet()
-        assertTrue(registry.entities().all { it in entities })
-    }
-
-    @Test
-    fun `every bundled location is a company document or registry with a quote that contains its own country evidence`() {
-        registry.entities().map { registry.find(it)!! }.forEach { f ->
-            listOfNotNull(f.location, f.incorporation).forEach { c ->
-                assertTrue("${f.entity}: ${c.kind}", c.kind != SourceKind.COMMUNITY_DATABASE || c.sourceUrl.contains("wikidata.org"))
-                assertTrue("${f.entity} quote", c.quote!!.length in 10..400)
-                assertEquals("2026-10-10", c.asOf)
-            }
+    fun `every catalogue fact reaches the registry unchanged`() {
+        catalog.entries().forEach { e ->
+            val f = real.find(e.entity)
+            e.location?.let { c ->
+                val l = f!!.location!!
+                assertEquals(e.entity, c.country, l.iso)
+                assertEquals(e.entity, c.source, l.sourceUrl)
+                assertEquals(e.entity, c.quote, l.quote)
+                assertEquals(e.entity, c.asOf, l.asOf)
+                assertEquals(e.entity, c.kind.name, l.kind.name)
+                assertEquals(e.entity, c.basis!!.name, l.basis!!.name)
+            } ?: assertNull(e.entity, f?.location)
+            e.incorporation?.let { c -> assertEquals(e.entity, c.country, f!!.incorporation!!.iso) } ?: assertNull(e.entity, f?.incorporation)
+            assertEquals(e.entity, e.note, f?.note)
         }
     }
 
     @Test
-    fun `the researched demo companies resolve exactly as their documents say`() {
-        val google = registry.find("Google Analytics for Firebase")!!
+    fun `headquarters appears only where the catalogue says the source calls it headquarters`() {
+        catalog.entries().forEach { e ->
+            val basis = real.find(e.entity)?.location?.basis
+            assertEquals(e.entity, e.hqCountry != null, basis == LocationBasis.HEADQUARTERS)
+            if (e.hqCountry != null) assertEquals(e.hqCountry, real.find(e.entity)!!.location!!.iso)
+        }
+    }
+
+    @Test
+    fun `the demo companies resolve as the cited A5 facts say`() {
+        val google = real.find("Google Analytics for Firebase")!!
         assertEquals("US", google.location!!.iso)
+        assertEquals(LocationBasis.HEADQUARTERS, google.location!!.basis)
         assertEquals("US", google.incorporation!!.iso)
-        assertTrue(google.location!!.quote!!.contains("1600 Amphitheatre Parkway"))
-        assertTrue(google.incorporation!!.quote!!.contains("State of Delaware"))
-        assertEquals(google.location, registry.find("Google Ads / AdMob")!!.location)
-        assertEquals(google.location, registry.find("Firebase Crashlytics")!!.location)
-        assertEquals("US", registry.find("Meta (Facebook SDK)")!!.location!!.iso)
-        assertEquals("IL", registry.find("AppsFlyer")!!.location!!.iso)
-        assertNull("incorporation is not stated by that document", registry.find("AppsFlyer")!!.incorporation)
-        assertNull("incorporation is not stated by that document", registry.find("Meta (Facebook SDK)")!!.incorporation)
+        assertEquals(google.location, real.find("Google Ads / AdMob")!!.location)
+        assertEquals(google.location, real.find("Firebase Crashlytics")!!.location)
+        assertEquals(LocationBasis.HEADQUARTERS, real.find("Meta (Facebook SDK)")!!.location!!.basis)
+        assertEquals("IL", real.find("AppsFlyer")!!.location!!.iso)
+        assertEquals(LocationBasis.STATED_ADDRESS, real.find("AppsFlyer")!!.location!!.basis)
     }
 
     @Test
     fun `CleverTap stays unresolved with the reason recorded`() {
-        val f = registry.find("CleverTap")!!
+        val f = real.find("CleverTap")!!
         assertNull(f.location)
-        assertTrue(f.note!!.contains("three"))
+        assertNotNull(f.note)
     }
 
     @Test
-    fun `entities that were not researched have no entry`() {
-        listOf("Mixpanel", "Braze", "Meta Audience Network", "InMobi").forEach { assertFalse(it, it in registry.entities()) }
+    fun `entities that were not researched are not in the registry`() {
+        val unresearched = catalog.entries().filter { it.location == null && it.incorporation == null && it.note == null }.map { it.entity }
+        assertTrue(unresearched.isNotEmpty())
+        unresearched.forEach { assertFalse(it, it in real.entities()) }
     }
 }
