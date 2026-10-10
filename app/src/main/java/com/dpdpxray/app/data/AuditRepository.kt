@@ -28,6 +28,13 @@ data class AuditMeta(
     val timingProfile: String? = null,
     /** Why an inconclusive result has no score (core Inconclusive.Reason name); null when conclusive or not recorded. */
     val inconclusiveReason: String? = null,
+    /**
+     * The audited app's versionName and versionCode, read from its installed manifest when the audit started (the same
+     * values the sessions' manifest facts hold). Both null = not recorded (audits saved before these fields existed,
+     * samples, or an unreadable manifest); [CheckedApps] then falls back to the sessions.
+     */
+    val targetVersionName: String? = null,
+    val targetVersionCode: Long? = null,
 )
 
 data class AuditBundle(
@@ -44,11 +51,16 @@ class AuditRepository(private val context: Context) {
 
     fun newAuditDir(id: String): File = File(root, id).apply { mkdirs() }
 
-    suspend fun refresh() = withContext(Dispatchers.IO) {
-        _audits.value = root.listFiles { f -> f.isDirectory }.orEmpty()
-            .mapNotNull { dir -> runCatching { AuditJson.json.decodeFromString<AuditMeta>(File(dir, META).readText()) }.getOrNull() }
-            .sortedByDescending { it.createdAtMs }
-    }
+    suspend fun refresh() = withContext(Dispatchers.IO) { _audits.value = listNow() }
+
+    /** Every saved audit's meta, newest first, read from disk now (blocking; for callers already off the main thread). */
+    fun listNow(): List<AuditMeta> = root.listFiles { f -> f.isDirectory }.orEmpty()
+        .mapNotNull { dir -> runCatching { AuditJson.json.decodeFromString<AuditMeta>(File(dir, META).readText()) }.getOrNull() }
+        .sortedByDescending { it.createdAtMs }
+
+    /** One saved audit's sessions (blocking); null when unreadable. */
+    fun sessionsNow(id: String): List<com.dpdpxray.core.model.AuditSession>? =
+        runCatching { AuditJson.decodeSessions(File(File(root, id), SESSIONS).readText()) }.getOrNull()
 
     suspend fun save(
         meta: AuditMeta, sessions: List<AuditSession>, result: AuditResult, markdown: String,
