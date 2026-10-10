@@ -21,6 +21,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dpdpxray.app.audit.AuditProgress
+import com.dpdpxray.app.quarantine.QuarantineRoutes
+import com.dpdpxray.app.quarantine.QuarantineScreen
+import com.dpdpxray.app.quarantine.navigateToQuarantine
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.AuditRoutes
 import com.dpdpxray.app.voice.VoiceCopilotScreen
@@ -76,7 +79,15 @@ class MainActivity : ComponentActivity() {
                                 onVoice = { nav.navigate(AuditRoutes.voice(it)) },
                             )
                         }
-                        composable("pick") { AppPickerScreen(vm, onBack = { nav.popBackStack() }, onStarted = { nav.navigate("live") { popUpTo("home") } }) }
+                        composable("pick") {
+                            AppPickerScreen(
+                                vm, onBack = { nav.popBackStack() }, onStarted = { nav.navigate("live") { popUpTo("home") } },
+                                onQuarantine = { nav.navigateToQuarantine(it) },
+                            )
+                        }
+                        composable(QuarantineRoutes.ROUTE) { e ->
+                            QuarantineScreen(vm, e.arguments?.getString(QuarantineRoutes.ARG).orEmpty(), onBack = { nav.popBackStack() })
+                        }
                         composable("live") {
                             LiveAuditScreen(
                                 vm,

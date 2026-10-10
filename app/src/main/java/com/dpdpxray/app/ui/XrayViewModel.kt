@@ -110,6 +110,8 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startAudit(config: AuditConfig): Boolean {
+        // One tunnel at a time: an audit would replace a running quarantine run's tunnel.
+        if (com.dpdpxray.app.quarantine.QuarantineController.isActive) { _toast.value = "Stop the quarantine run before starting an audit."; return false }
         if (!prepareAudit()) return false
         graph.orchestrator.start(config)
         return true
