@@ -113,6 +113,17 @@ class DemoScoreRegressionTest {
         assertEquals(Triple(100, ScoreBand.READY, emptySet<CheckId>()), summary(engine.evaluate(deviceFixed)))
     }
 
+    /** The controlled demo runs after an approved reset; recording that fresh state must not move the demo scores. */
+    @Test
+    fun `recording an approved fresh reset keeps 21 and 100`() {
+        assertEquals(
+            Triple(21, ScoreBand.AT_RISK, setOf(CheckId.C1, CheckId.C2, CheckId.C3, CheckId.C4, CheckId.C10)),
+            summary(engine.evaluate(deviceLeaky.map { it.copy(freshState = true) })),
+        )
+        assertEquals(Triple(100, ScoreBand.READY, emptySet<CheckId>()), summary(engine.evaluate(deviceFixed.map { it.copy(freshState = true) })))
+        assertEquals(8, engine.evaluate(leaky.map { it.copy(freshState = true) }).score)
+    }
+
     @Test
     fun `fixed counterpart keeps 100 with no findings`() {
         assertEquals(Triple(100, ScoreBand.READY, emptySet<CheckId>()), summary(engine.evaluate(fixed)))
