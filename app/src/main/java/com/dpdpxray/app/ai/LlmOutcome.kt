@@ -2,28 +2,57 @@ package com.dpdpxray.app.ai
 
 import kotlinx.coroutines.CancellationException
 
-/** What one model call actually produced. Descriptions name error classes and channel names only, never prompt text. */
+/**
+ * What one model call actually produced. Descriptions name error classes, channel names and character counts only,
+ * never prompt text and never the model's thinking text.
+ */
 sealed interface LlmOutcome {
-    data class Text(val text: String) : LlmOutcome
-    /** The model answered but put nothing in the visible reply; [channels] are the names of any side channels it filled. */
-    data class Empty(val channels: Set<String>) : LlmOutcome
+    /**
+     * A usable answer. [source] is [FROM_CONTENTS] for the normal visible reply, or `channel:<name>` when the visible
+     * reply was empty and the text came from an answer channel. [hiddenThinkingChars] counts thinking text that was
+     * removed; it is never part of [text].
+     */
+    data class Text(val text: String, val source: String = FROM_CONTENTS, val hiddenThinkingChars: Int = 0) : LlmOutcome
+
+    /**
+     * The model answered but put nothing usable in the reply. [channels] are the names of any side channels it filled;
+     * [thinkingChars] counts thinking-only text, which is deliberately not used as an answer.
+     */
+    data class Empty(val channels: Set<String>, val thinkingChars: Int = 0) : LlmOutcome
     data class Failed(val errorClass: String, val message: String) : LlmOutcome
+
+    /** The call was not made because the loaded model cannot take this input (for example an image for a text-only model). */
+    data class Skipped(val reason: String) : LlmOutcome
     data object NotLoaded : LlmOutcome
 
     val textOrNull: String? get() = (this as? Text)?.text
 
     fun describe(): String = when (this) {
-        is Text -> "Text (${text.length} chars)"
-        is Empty -> "Empty reply" + if (channels.isEmpty()) "" else " (channels: ${channels.sorted().joinToString()})"
+        is Text -> buildString {
+            append("Text (${text.length} chars")
+            if (source != FROM_CONTENTS) append(", from $source")
+            append(")")
+            if (hiddenThinkingChars > 0) append("; thinking text hidden ($hiddenThinkingChars chars)")
+        }
+        is Empty -> "Empty reply" +
+            (if (channels.isEmpty()) "" else " (channels: ${channels.sorted().joinToString()})") +
+            (if (thinkingChars > 0) "; only thinking text ($thinkingChars chars), not used as an answer" else "")
         is Failed -> "Failed: $errorClass: $message"
+        is Skipped -> "Not sent: $reason"
         NotLoaded -> "Model not loaded"
     }
 
     companion object {
         const val MAX_MESSAGE = 300
+        const val FROM_CONTENTS = "contents"
 
+        /** Compatibility form: channel names only, without their text. */
         fun fromReply(textParts: List<String>, channelNames: Set<String>): LlmOutcome =
-            textParts.joinToString("").trim().let { if (it.isEmpty()) Empty(channelNames) else Text(it) }
+            fromReply(textParts, channelNames.associateWith { "" })
+
+        /** [textParts] are the reply's `Content.Text` parts; [channels] is `Message.channels` (name to text). */
+        fun fromReply(textParts: List<String>, channels: Map<String, String>): LlmOutcome =
+            ReplyExtraction.extract(textParts, channels)
 
         fun failed(t: Throwable): LlmOutcome =
             Failed(t.javaClass.name, (t.message ?: "(no message)").take(MAX_MESSAGE))
