@@ -12,10 +12,19 @@ object AutoGuardRoutes {
     const val ACTION_OPEN_CHECKUP = "com.dpdpxray.app.autoguard.OPEN_CHECKUP"
     const val ACTION_OPEN_APK_GUARD = "com.dpdpxray.app.autoguard.OPEN_APK_GUARD"
 
-    /** The route a tapped Auto-guard notification opens, or null for every other action. */
-    fun route(action: String?): String? = when (action) {
+    /** A tapped "<app> updated" alert (Update Watch); the package travels in [EXTRA_PACKAGE]. */
+    const val ACTION_RECHECK = "com.dpdpxray.app.autoguard.RECHECK"
+    const val EXTRA_PACKAGE = "com.dpdpxray.app.autoguard.PACKAGE"
+
+    /**
+     * The route a tapped Auto-guard notification opens, or null for every other action. A re-check opens the app
+     * picker with that app already selected, so its check sheet is open; nothing starts until the person taps Start.
+     * A missing or malformed package opens nothing.
+     */
+    fun route(action: String?, pkg: String? = null): String? = when (action) {
         ACTION_OPEN_CHECKUP -> CHECKUP
         ACTION_OPEN_APK_GUARD -> ApkGuardRoutes.HUB
+        ACTION_RECHECK -> pkg?.takeIf { ApkGuardRoutes.isPackageName(it) }?.let(ApkGuardRoutes::recheckPicker)
         else -> null
     }
 

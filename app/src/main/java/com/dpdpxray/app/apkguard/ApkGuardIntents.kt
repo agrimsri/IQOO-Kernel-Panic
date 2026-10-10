@@ -11,8 +11,9 @@ object ApkGuardIntents {
     fun route(context: Context, intent: Intent?): String? = runCatching {
         if (intent == null) return null
         IncomingApk.installedRoute(intent.action, intent.getStringExtra(IncomingApk.EXTRA_PACKAGE))?.let { return it }
-        // A tapped Auto-guard notification: the weekly phone checkup, or APK Guard for several new apps at once.
-        AutoGuardRoutes.route(intent.action)?.let { return it }
+        // A tapped Auto-guard notification: the weekly phone checkup, APK Guard for several new apps at once, or a
+        // re-check of an updated app (picker with that app selected).
+        AutoGuardRoutes.route(intent.action, intent.getStringExtra(AutoGuardRoutes.EXTRA_PACKAGE))?.let { return it }
         val stream = if (intent.action == Intent.ACTION_SEND) streamUri(intent) else null
         val type = intent.type ?: intent.data?.let { context.contentResolver.getType(it) }
         val picked = IncomingApk.pickUri(intent.action, type, intent.dataString, stream?.toString()) ?: return null

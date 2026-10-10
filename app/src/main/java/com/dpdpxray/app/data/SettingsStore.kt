@@ -29,6 +29,11 @@ data class XraySettings(
     /** Auto-guard: weekly phone checkup notification. On by default. */
     val weeklyCheckup: Boolean = true,
     /**
+     * Auto-guard (Update Watch): notify when an app the person checked is updated, offering a re-check. Runs with the
+     * new-app check (same job and live receiver), so it needs that switch on too. On by default; it never starts a check.
+     */
+    val alertCheckedAppUpdates: Boolean = true,
+    /**
      * The legal lens (a core LegalProfile name such as "EU"). Empty means automatic: picked from the device region, else
      * the global baseline. It changes which law results quote, never the evidence or the consent-first score.
      */
@@ -66,6 +71,7 @@ internal object SettingsCodec {
         audience = Audience.of(kv.getString("audience", defaults.audience.code)),
         autoCheckNewApps = kv.getBoolean("auto_check_new_apps", defaults.autoCheckNewApps),
         weeklyCheckup = kv.getBoolean("weekly_checkup", defaults.weeklyCheckup),
+        alertCheckedAppUpdates = kv.getBoolean("alert_checked_app_updates", defaults.alertCheckedAppUpdates),
         legalProfile = kv.getString("legal_profile", defaults.legalProfile),
     )
 
@@ -82,6 +88,7 @@ internal object SettingsCodec {
         sink.putString("audience", s.audience.code)
         sink.putBoolean("auto_check_new_apps", s.autoCheckNewApps)
         sink.putBoolean("weekly_checkup", s.weeklyCheckup)
+        sink.putBoolean("alert_checked_app_updates", s.alertCheckedAppUpdates)
         sink.putString("legal_profile", s.legalProfile)
     }
 }
