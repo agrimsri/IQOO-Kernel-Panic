@@ -7,6 +7,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Words APK Guard never uses about an app (shared with the model-card wording test). */
+internal val APK_FORBIDDEN_EN = listOf("malicious", "malware", "safe app", "is safe", "app is safe", "fraudulent", "scam", "virus-free", "certified", "harmless", "dangerous app", "trojan")
+internal val APK_FORBIDDEN_HI = listOf("सुरक्षित है", "सुरक्षित ऐप", "खतरनाक ऐप", "ख़तरनाक ऐप", "धोखेबाज़ ऐप", "नकली ऐप है")
+
 class ApkRiskRulesTest {
     private val play = InstallOrigin(InstallSource.PLAY_STORE, "com.android.vending", "Google Play")
     private val file = InstallOrigin(InstallSource.FILE, "com.google.android.packageinstaller")
@@ -331,11 +335,9 @@ class ApkRiskRulesTest {
     }
 
     @Test fun `no text calls an app malicious safe or fraudulent`() {
-        val forbiddenEn = listOf("malicious", "malware", "safe app", "is safe", "app is safe", "fraudulent", "scam", "virus-free", "certified", "harmless", "dangerous app", "trojan")
-        val forbiddenHi = listOf("सुरक्षित है", "सुरक्षित ऐप", "खतरनाक ऐप", "ख़तरनाक ऐप", "धोखेबाज़ ऐप", "नकली ऐप है")
         allReports.flatMap { it.texts() }.forEach { t ->
-            forbiddenEn.forEach { w -> assertFalse("'$w' in: ${t.en}", t.en.lowercase().contains(w)) }
-            forbiddenHi.forEach { w -> assertFalse("'$w' in: ${t.hi}", t.hi.contains(w)) }
+            APK_FORBIDDEN_EN.forEach { w -> assertFalse("'$w' in: ${t.en}", t.en.lowercase().contains(w)) }
+            APK_FORBIDDEN_HI.forEach { w -> assertFalse("'$w' in: ${t.hi}", t.hi.contains(w)) }
         }
     }
 
