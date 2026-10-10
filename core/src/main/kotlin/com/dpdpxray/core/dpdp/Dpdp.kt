@@ -1,6 +1,7 @@
 package com.dpdpxray.core.dpdp
 
 import com.dpdpxray.core.model.Finding
+import com.dpdpxray.core.model.Severity
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.math.ln
@@ -70,6 +71,9 @@ class Bm25Retriever(private val passages: List<Passage>, private val k1: Double 
 /** Finds the legal text behind a finding: its own references first, then the best search matches. */
 class CitationService(private val corpus: DpdpCorpus, private val retriever: PassageRetriever = Bm25Retriever(corpus.passages)) {
     fun cite(finding: Finding, k: Int = 3): List<Passage> {
+        // Info findings (consent history unknown, same-company servers, low visibility) make no legal claim, so a keyword
+        // search must not attach law to them (it put children's-data sections under a Facebook "history unknown" note).
+        if (finding.severity == Severity.INFO && finding.dpdpRefs.isEmpty()) return emptyList()
         val own = finding.dpdpRefs.mapNotNull { corpus.byId(it) }
         // A finding's own references are authoritative; padding them with search hits produced irrelevant citations.
         if (own.isNotEmpty()) return own.take(k)

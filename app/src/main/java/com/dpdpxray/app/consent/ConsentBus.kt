@@ -68,14 +68,20 @@ object ConsentBus {
         if (_armed.value != null && !_targetSeen.value) _targetSeen.value = true
     }
 
-    /** Drops duplicates: the same kind within 1.5 s (e.g. our own programmatic tap plus the app's click event). */
+    /**
+     * Drops duplicates: the same kind within 1.5 s (e.g. our own programmatic tap plus the app's click event). Two
+     * different permission dialogs in quick succession are both kept; only a repeat of the same dialog text is dropped.
+     */
     fun emit(event: ConsentEvent) = synchronized(lock) {
         if (_armed.value != null) append(event)
     }
 
     private fun append(event: ConsentEvent) {
         val list = _events.value
-        val dup = list.any { it.kind == event.kind && kotlin.math.abs(it.tNanos - event.tNanos) < 1_500_000_000L }
+        val dup = list.any {
+            it.kind == event.kind && kotlin.math.abs(it.tNanos - event.tNanos) < 1_500_000_000L &&
+                (event.kind != ConsentKind.PERMISSION_DIALOG || it.nodeText == event.nodeText)
+        }
         if (!dup) _events.value = list + event
     }
 }

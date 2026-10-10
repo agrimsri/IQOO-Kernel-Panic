@@ -42,6 +42,19 @@ class GroundedAnswerTest {
 
     private val live = leaky.copy(label = "LeakyShop", sample = false)
 
+    @Test fun `unknown consent history is never called low visibility or Ready, even for an old Ready save`() {
+        val u1 = finding(CheckId.U1, listOf("AppsFlyer")).copy(severity = Severity.INFO, penaltyBand = PenaltyBand.NONE)
+        val oldReady = live.copy(result = AuditResult(findings = listOf(u1), score = 100, band = ScoreBand.READY))
+        val en = answerer.answer(CopilotIntent.SCORE, "score", oldReady, CopilotLanguage.EN).text
+        assertTrue(en, en.contains("consent history is unknown"))
+        assertFalse(en, en.contains("Network visibility"))
+        assertFalse(en, en.contains("100 out of 100"))
+        assertFalse(en, en.contains("(Ready)"))
+        val hi = answerer.answer(CopilotIntent.SCORE, "स्कोर", oldReady, CopilotLanguage.HI).text
+        assertTrue(hi, hi.contains("सहमति का इतिहास"))
+        assertFalse(hi, hi.contains("100/100"))
+    }
+
     @Test fun `missed refusal is not described as a completed clean refusal test`() {
         val missed = live.copy(result = AuditResult(emptyList(), 51, ScoreBand.AT_RISK),
             plans = setOf(AuditPlan.REJECT), completedPlans = emptySet())

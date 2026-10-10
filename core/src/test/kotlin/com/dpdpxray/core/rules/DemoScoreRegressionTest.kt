@@ -1,5 +1,6 @@
 package com.dpdpxray.core.rules
 
+import com.dpdpxray.core.model.AppManifestFacts
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
@@ -11,6 +12,8 @@ import com.dpdpxray.core.model.NetEvent
 import com.dpdpxray.core.model.RejectOption
 import com.dpdpxray.core.model.ScoreBand
 import com.dpdpxray.core.model.ScreenAudit
+import com.dpdpxray.core.model.UiNode
+import com.dpdpxray.core.screen.Fixtures
 import com.dpdpxray.core.trackers.TrackerCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -85,7 +88,7 @@ class DemoScoreRegressionTest {
 
     /**
      * Shaped like the recorded iQOO full audits (audit-1791570081266: 21 / At risk with C2, C1, C3, C4, C10;
-     * audit-1791570260617: 100 / DPDP-ready): only the tree-observed screen fields are known. Test data, not a replay.
+     * audit-1791570260617: 100 / Ready, shown then as "DPDP-ready"): only the tree-observed screen fields are known. Test data, not a replay.
      */
     private val deviceScreen = ScreenAudit(
         isConsentScreen = true, preTicked = true, rejectOption = RejectOption.HIDDEN,
@@ -111,6 +114,41 @@ class DemoScoreRegressionTest {
     @Test
     fun `device-shaped fixed audit scores 100`() {
         assertEquals(Triple(100, ScoreBand.READY, emptySet<CheckId>()), summary(engine.evaluate(deviceFixed)))
+    }
+
+    /** The controlled demo runs after an approved reset; recording that fresh state must not move the demo scores. */
+    @Test
+    fun `recording an approved fresh reset keeps 21 and 100`() {
+        assertEquals(
+            Triple(21, ScoreBand.AT_RISK, setOf(CheckId.C1, CheckId.C2, CheckId.C3, CheckId.C4, CheckId.C10)),
+            summary(engine.evaluate(deviceLeaky.map { it.copy(freshState = true) })),
+        )
+        assertEquals(Triple(100, ScoreBand.READY, emptySet<CheckId>()), summary(engine.evaluate(deviceFixed.map { it.copy(freshState = true) })))
+        assertEquals(8, engine.evaluate(leaky.map { it.copy(freshState = true) }).score)
+    }
+
+    /**
+     * What the next phone run records on top of the device-shaped sessions: the consent-screen tree (only the fixed
+     * LeakyShop build links a privacy policy, see leakyshop/Shop.kt), permission dialogs watched (LeakyShop asks for
+     * none), the installed manifest (no SDK is bundled: LeakyShop only resolves the SDK hosts) and a background window
+     * with no lookups. The leaky build adds only C15 (info); the scores stay 21 and 100.
+     */
+    @Test
+    fun `new evidence adds only C15 info to the leaky build and keeps 21 and 100`() {
+        val noSdk = AppManifestFacts(versionName = "1.0", versionCode = 1, partsRead = listOf("meta-data", "services", "receivers", "providers"))
+        fun phone(sessions: List<AuditSession>, tree: UiNode) = sessions.map { s ->
+            s.copy(
+                freshState = true, permissionDialogsWatched = true, manifestFacts = noSdk, endedAtNanos = s.endedAtNanos + 10 * S,
+                backgroundStartedNanos = s.endedAtNanos,
+                consentEvents = s.consentEvents.map { if (it.kind == ConsentKind.SCREEN_APPEARED) it.copy(tree = tree) else it },
+            )
+        }
+        assertEquals(
+            Triple(21, ScoreBand.AT_RISK, setOf(CheckId.C1, CheckId.C2, CheckId.C3, CheckId.C4, CheckId.C10, CheckId.C15)),
+            summary(engine.evaluate(phone(deviceLeaky, Fixtures.leakyDialog))),
+        )
+        // The fixed build links its privacy policy from the dialog (leakyshop Shop.kt), so C15 does not appear.
+        assertEquals(Triple(100, ScoreBand.READY, emptySet<CheckId>()), summary(engine.evaluate(phone(deviceFixed, Fixtures.fixedDialog))))
     }
 
     @Test

@@ -1,0 +1,772 @@
+{
+ "generated": "2026-10-10T07:56:03",
+ "seed": 42,
+ "data": {
+  "naticusdroid": {
+   "features": 85,
+   "rows": 29332,
+   "unique_vectors": 7368,
+   "rows_that_duplicate_another_row": 21964,
+   "vectors_with_both_labels": 97,
+   "malware_share": 0.5011591435974363
+  },
+  "tuandromd": {
+   "permission_columns": 214,
+   "mapped_features": 163,
+   "dropped_columns": [
+    "ACCESS_COARSE_UPDATES",
+    "ACCESS_MTK_MMHW",
+    "ACCESS_PROVIDER",
+    "ACCESS_SERVICE",
+    "ACCESS_SHARED_DATA",
+    "ACCESS_SUPERUSER",
+    "activityCalled",
+    "ACTIVITY_RECOGNITION",
+    "ANT",
+    "ANT_ADMIN",
+    "AUTORUN_MANAGER_LICENSE_MANAGER",
+    "AUTORUN_MANAGER_LICENSE_SERVICE(.autorun)",
+    "C2D_MESSAGE",
+    "CHANGE_DISPLAY_MODE",
+    "DATABASE_INTERFACE_SERVICE",
+    "DOWNLOAD_SERVICE",
+    "EXTENSION_PERMISSION",
+    "FULLSCREEN.FULL",
+    "GOOGLE_AUTH",
+    "GOOGLE_PHOTOS",
+    "JPUSH_MESSAGE",
+    "MAPS_RECEIVE",
+    "MEDIA_BUTTON",
+    "MESSAGE",
+    "PERMISSION",
+    "PERMISSION_RUN_TASKS",
+    "PLUGIN",
+    "READ",
+    "READ_ATTACHMENT",
+    "READ_AVESTTINGS",
+    "READ_CONTENT_PROVIDER",
+    "READ_DATA",
+    "READ_DATABASES",
+    "READ_GMAIL",
+    "READ_MESSAGES",
+    "READ_OWNER_DATA",
+    "READ_SETTINGS",
+    "RECEIVE",
+    "RECEIVE_SIGNED_DATA_RESULT",
+    "RESPOND",
+    "REQUEST",
+    "SDCARD_WRITE",
+    "SEND",
+    "STORAGE",
+    "USES_POLICY_FORCE_LOCK",
+    "WRITE",
+    "WRITE_AVSETTING",
+    "WRITE_DATA",
+    "WRITE_DATABASES",
+    "WRITE_INTERNAL_STORAGE",
+    "WRITE_OWNER_DATA"
+   ],
+   "api_columns_ignored": 27,
+   "rows": 4464,
+   "unique_vectors": 474,
+   "rows_that_duplicate_another_row": 3990,
+   "vectors_with_both_labels": 3,
+   "malware_share": 0.7986111111111112
+  }
+ },
+ "dangerous_reference": "protectionLevel=dangerous in AOSP android-14.0.0_r1",
+ "split": {
+  "type": "stratified group split by identical permission vector",
+  "train_rows": 23473,
+  "test_rows": 5859,
+  "test_rows_whose_vector_is_in_train": 0
+ },
+ "cv5_group_on_train": {
+  "lr_c_grid_mean_log_loss": {
+   "0.01": 0.19140834680856414,
+   "0.03": 0.16787828831569626,
+   "0.1": 0.15585517311273017,
+   "0.3": 0.1526427625265693,
+   "1.0": 0.15124401514082159,
+   "3.0": 0.1513739768563553,
+   "10.0": 0.15105748469286398
+  },
+  "lr_best_c": 1.0,
+  "lr_c_rule": "smallest C whose mean out-of-fold log loss is within 1% of the best C in the grid",
+  "baseline_dangerous_count": {
+   "roc_auc": {
+    "mean": 0.7604884968161458,
+    "sd": 0.052324748865514345,
+    "folds": [
+     0.8142425271277824,
+     0.7044224646157616,
+     0.8024609754092069,
+     0.7750853986913304,
+     0.7062311182366477
+    ]
+   },
+   "pr_auc": {
+    "mean": 0.691463840464502,
+    "sd": 0.07134419394018097,
+    "folds": [
+     0.788363050398527,
+     0.6106250518601873,
+     0.7266542324131283,
+     0.696529823421619,
+     0.6351470442290489
+    ]
+   }
+  },
+  "logistic_regression": {
+   "roc_auc": {
+    "mean": 0.9847988865983298,
+    "sd": 0.008902083733606425,
+    "folds": [
+     0.9955167746345615,
+     0.9908025228407739,
+     0.986066207846614,
+     0.9746498595153952,
+     0.9769590681543043
+    ]
+   },
+   "pr_auc": {
+    "mean": 0.984713367969136,
+    "sd": 0.010440878573593137,
+    "folds": [
+     0.9955332542331174,
+     0.9918840719630101,
+     0.9879784266494734,
+     0.9701487343261714,
+     0.9780223526739071
+    ]
+   },
+   "brier": {
+    "mean": 0.04293526806952925,
+    "sd": 0.017750435474336405,
+    "folds": [
+     0.023007745738121206,
+     0.033243909350898805,
+     0.03519699349104294,
+     0.06402463685911716,
+     0.05920305490846614
+    ]
+   }
+  },
+  "lightgbm": {
+   "roc_auc": {
+    "mean": 0.9899910377891169,
+    "sd": 0.004956491903151607,
+    "folds": [
+     0.9953862172304991,
+     0.9945179772642412,
+     0.9899306081617316,
+     0.9851943500870233,
+     0.984926036202089
+    ]
+   },
+   "pr_auc": {
+    "mean": 0.9901598950861279,
+    "sd": 0.006175688533263133,
+    "folds": [
+     0.9958224319182075,
+     0.9953725046499114,
+     0.9923367876797906,
+     0.9823292355367887,
+     0.9849385156459411
+    ]
+   },
+   "brier": {
+    "mean": 0.036539786623546434,
+    "sd": 0.01844637557265081,
+    "folds": [
+     0.02239823688553042,
+     0.021934584844169065,
+     0.02511149817763295,
+     0.05888086426259338,
+     0.05437374894780635
+    ]
+   }
+  },
+  "thresholds": {
+   "baseline_dangerous_count": 2.0,
+   "logistic_regression": 0.5390634931093171,
+   "lightgbm": 0.4480525337683939
+  }
+ },
+ "held_out_test": {
+  "baseline_dangerous_count": {
+   "n": 5859,
+   "positives": 2936,
+   "prevalence": 0.5011094043352108,
+   "roc_auc": 0.8008236028081335,
+   "pr_auc": 0.7419897462740921,
+   "precision_at_recall_0.90": 0.5011094043352108,
+   "at_threshold": {
+    "threshold": 2.0,
+    "tp": 2434,
+    "fp": 843,
+    "tn": 2080,
+    "fn": 502,
+    "precision": 0.7427525175465365,
+    "recall": 0.8290190735694822,
+    "f1": 0.7835184291002736,
+    "fpr": 0.2884023263770099,
+    "accuracy": 0.7704386414063833
+   },
+   "precision_if_prevalence": {
+    "0.01": 0.028216307252020182,
+    "0.05": 0.13140962474409634,
+    "0.1": 0.24207480813040783
+   },
+   "ci95": {
+    "roc_auc": [
+     0.47244680672450357,
+     0.8889296527025146
+    ],
+    "pr_auc": [
+     0.6107558438682223,
+     0.8365500122164469
+    ],
+    "precision": [
+     0.66,
+     0.8088251206549613
+    ],
+    "recall": [
+     0.6324481779688201,
+     0.9807944191343962
+    ],
+    "f1": [
+     0.663892410737155,
+     0.863125089603399
+    ],
+    "fpr": [
+     0.12221410487999575,
+     0.841393512545696
+    ]
+   },
+   "model": "dangerous-permission count"
+  },
+  "logistic_regression": {
+   "n": 5859,
+   "positives": 2936,
+   "prevalence": 0.5011094043352108,
+   "roc_auc": 0.9783473480551225,
+   "pr_auc": 0.9785491909809743,
+   "precision_at_recall_0.90": 0.9858893427404382,
+   "brier": 0.03923469042356278,
+   "at_threshold": {
+    "threshold": 0.5390634931093171,
+    "tp": 2687,
+    "fp": 62,
+    "tn": 2861,
+    "fn": 249,
+    "precision": 0.9774463441251364,
+    "recall": 0.9151907356948229,
+    "f1": 0.9452946350043976,
+    "fpr": 0.021211084502223743,
+    "accuracy": 0.9469192694999147
+   },
+   "precision_if_prevalence": {
+    "0.01": 0.30353697965420184,
+    "0.05": 0.6942723444932598,
+    "0.1": 0.8274103600263327
+   },
+   "ci95": {
+    "roc_auc": [
+     0.9382529552897431,
+     0.9933481935397551
+    ],
+    "pr_auc": [
+     0.9083986583200473,
+     0.997577280688273
+    ],
+    "precision": [
+     0.9625030441445024,
+     0.9858112402614726
+    ],
+    "recall": [
+     0.8219716185343565,
+     0.981055956708045
+    ],
+    "f1": [
+     0.8914592280066915,
+     0.9810376003373801
+    ],
+    "fpr": [
+     0.008096862908881727,
+     0.07157378615849831
+    ],
+    "brier": [
+     0.024587508289839754,
+     0.04895300182375531
+    ]
+   },
+   "model": "L2 logistic regression"
+  },
+  "lightgbm": {
+   "n": 5859,
+   "positives": 2936,
+   "prevalence": 0.5011094043352108,
+   "roc_auc": 0.9816262149950457,
+   "pr_auc": 0.9806818701136797,
+   "precision_at_recall_0.90": 0.9872680974899963,
+   "brier": 0.039442820734827175,
+   "at_threshold": {
+    "threshold": 0.4480525337683939,
+    "tp": 2775,
+    "fp": 54,
+    "tn": 2869,
+    "fn": 161,
+    "precision": 0.9809119830328739,
+    "recall": 0.9451634877384196,
+    "f1": 0.9627059843885516,
+    "fpr": 0.01847417037290455,
+    "accuracy": 0.9633043181430279
+   },
+   "precision_if_prevalence": {
+    "0.01": 0.3407091751014117,
+    "0.05": 0.7291956308269373,
+    "0.1": 0.8504022919997346
+   },
+   "ci95": {
+    "roc_auc": [
+     0.9414787306341703,
+     0.9962050578522439
+    ],
+    "pr_auc": [
+     0.9112027709483994,
+     0.998659908176387
+    ],
+    "precision": [
+     0.9688442666396452,
+     0.988337921863425
+    ],
+    "recall": [
+     0.8587970030844813,
+     0.9885161671239395
+    ],
+    "f1": [
+     0.913263576160613,
+     0.986928281498887
+    ],
+    "fpr": [
+     0.006962334445353373,
+     0.06455239742691685
+    ],
+    "brier": [
+     0.019501273944929128,
+     0.05201601172893432
+    ]
+   },
+   "model": "LightGBM"
+  }
+ },
+ "naive_row_split_for_comparison": {
+  "test_rows_whose_vector_is_in_train": 4691,
+  "test_rows": 5867,
+  "logistic_regression": {
+   "roc_auc": 0.9879107604777476,
+   "pr_auc": 0.9889688247093433
+  },
+  "lightgbm": {
+   "roc_auc": 0.9940851537061698,
+   "pr_auc": 0.9945010964399265
+  }
+ },
+ "tuandromd_within_dataset_cv5_group": {
+  "logistic_regression": {
+   "roc_auc": {
+    "mean": 0.9655296389257744,
+    "sd": 0.031223184703525565,
+    "folds": [
+     0.9648362235067437,
+     0.991148094548963,
+     0.9829255843547451,
+     0.9763426595915742,
+     0.9123956326268464
+    ]
+   },
+   "pr_auc": {
+    "mean": 0.991963359484273,
+    "sd": 0.006614989942577933,
+    "folds": [
+     0.9921685768090214,
+     0.9977974183657414,
+     0.9961805002465203,
+     0.9927753820500383,
+     0.9808949199500436
+    ]
+   },
+   "brier": {
+    "mean": 0.04750560214966702,
+    "sd": 0.02948540912236268,
+    "folds": [
+     0.04741911001624542,
+     0.03570721352208346,
+     0.013641074442010688,
+     0.04645294208204265,
+     0.09430767068595292
+    ]
+   }
+  }
+ },
+ "cross_dataset": {
+  "shared_features": 60,
+  "shared_feature_names": [
+   "android.permission.ACCESS_COARSE_LOCATION",
+   "android.permission.ACCESS_FINE_LOCATION",
+   "android.permission.ACCESS_LOCATION_EXTRA_COMMANDS",
+   "android.permission.ACCESS_MOCK_LOCATION",
+   "android.permission.ACCESS_NETWORK_STATE",
+   "android.permission.ACCESS_WIFI_STATE",
+   "android.permission.AUTHENTICATE_ACCOUNTS",
+   "android.permission.BLUETOOTH",
+   "android.permission.BLUETOOTH_ADMIN",
+   "android.permission.BROADCAST_STICKY",
+   "android.permission.CALL_PHONE",
+   "android.permission.CAMERA",
+   "android.permission.CHANGE_CONFIGURATION",
+   "android.permission.CHANGE_NETWORK_STATE",
+   "android.permission.CHANGE_WIFI_STATE",
+   "android.permission.CLEAR_APP_CACHE",
+   "android.permission.DISABLE_KEYGUARD",
+   "android.permission.DOWNLOAD_WITHOUT_NOTIFICATION",
+   "android.permission.FLASHLIGHT",
+   "android.permission.GET_ACCOUNTS",
+   "android.permission.GET_TASKS",
+   "android.permission.INTERNET",
+   "android.permission.KILL_BACKGROUND_PROCESSES",
+   "android.permission.MANAGE_ACCOUNTS",
+   "android.permission.MODIFY_AUDIO_SETTINGS",
+   "android.permission.MOUNT_UNMOUNT_FILESYSTEMS",
+   "android.permission.NFC",
+   "android.permission.READ_CALENDAR",
+   "android.permission.READ_CONTACTS",
+   "android.permission.READ_EXTERNAL_STORAGE",
+   "android.permission.READ_LOGS",
+   "android.permission.READ_PHONE_STATE",
+   "android.permission.READ_PROFILE",
+   "android.permission.READ_SMS",
+   "android.permission.READ_SYNC_SETTINGS",
+   "android.permission.RECEIVE_BOOT_COMPLETED",
+   "android.permission.RECEIVE_SMS",
+   "android.permission.RECEIVE_USER_PRESENT",
+   "android.permission.RECORD_AUDIO",
+   "android.permission.RESTART_PACKAGES",
+   "android.permission.SEND_SMS",
+   "android.permission.SET_WALLPAPER",
+   "android.permission.SET_WALLPAPER_HINTS",
+   "android.permission.SYSTEM_ALERT_WINDOW",
+   "android.permission.USE_CREDENTIALS",
+   "android.permission.USE_FINGERPRINT",
+   "android.permission.VIBRATE",
+   "android.permission.WAKE_LOCK",
+   "android.permission.WRITE_CALENDAR",
+   "android.permission.WRITE_CONTACTS",
+   "android.permission.WRITE_EXTERNAL_STORAGE",
+   "android.permission.WRITE_SETTINGS",
+   "android.permission.WRITE_SYNC_SETTINGS",
+   "com.android.alarm.permission.SET_ALARM",
+   "com.android.launcher.permission.INSTALL_SHORTCUT",
+   "com.android.launcher.permission.UNINSTALL_SHORTCUT",
+   "com.android.vending.BILLING",
+   "com.android.vending.CHECK_LICENSE",
+   "com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE",
+   "com.google.android.providers.gsf.permission.READ_GSERVICES"
+  ],
+  "naticusdroid_to_tuandromd": {
+   "logistic_regression": {
+    "n": 4464,
+    "positives": 3565,
+    "prevalence": 0.7986111111111112,
+    "roc_auc": 0.8507832452140215,
+    "pr_auc": 0.9515217894537887,
+    "precision_at_recall_0.90": 0.910964550700742,
+    "brier": 0.18912572489626533,
+    "at_threshold": {
+     "threshold": 0.33410878288385604,
+     "tp": 2760,
+     "fp": 202,
+     "tn": 697,
+     "fn": 805,
+     "precision": 0.9318028359216746,
+     "recall": 0.7741935483870968,
+     "f1": 0.8457177876512946,
+     "fpr": 0.22469410456062291,
+     "accuracy": 0.7744175627240143
+    },
+    "precision_if_prevalence": {
+     "0.01": 0.03363293708321253,
+     "0.05": 0.15350683722981914,
+     "0.1": 0.27684964200477324
+    },
+    "ci95": {
+     "roc_auc": [
+      0.7570952254118791,
+      0.9147012830898817
+     ],
+     "pr_auc": [
+      0.8622856442532129,
+      0.9801634888926452
+     ],
+     "precision": [
+      0.8314275804728385,
+      0.9637074434324601
+     ],
+     "recall": [
+      0.5260390614120596,
+      0.9207791404160061
+     ],
+     "f1": [
+      0.6470790732308045,
+      0.9346199727374873
+     ],
+     "fpr": [
+      0.17098659114452858,
+      0.28556492245575316
+     ],
+     "brier": [
+      0.10243846907536586,
+      0.30740663626460374
+     ]
+    },
+    "model": "LR (shared permissions)"
+   },
+   "lightgbm": {
+    "roc_auc": 0.8540781638317159,
+    "pr_auc": 0.9558095334518912
+   },
+   "baseline_dangerous_count": {
+    "n": 4464,
+    "positives": 3565,
+    "prevalence": 0.7986111111111112,
+    "roc_auc": 0.4463376012306022,
+    "pr_auc": 0.809816454490551,
+    "precision_at_recall_0.90": 0.7986111111111112,
+    "at_threshold": {
+     "threshold": 2.0,
+     "tp": 1511,
+     "fp": 511,
+     "tn": 388,
+     "fn": 2054,
+     "precision": 0.7472799208704253,
+     "recall": 0.4238429172510519,
+     "f1": 0.5408985144084482,
+     "fpr": 0.5684093437152391,
+     "accuracy": 0.4254032258064516
+    },
+    "precision_if_prevalence": {
+     "0.01": 0.0074756625973248746,
+     "0.05": 0.03776347562898909,
+     "0.1": 0.07651247415768007
+    },
+    "ci95": {
+     "roc_auc": [
+      0.27064693724295497,
+      0.7099288754379696
+     ],
+     "pr_auc": [
+      0.6993076771219531,
+      0.8840446512027891
+     ],
+     "precision": [
+      0.5865446313965768,
+      0.8349761343804278
+     ],
+     "recall": [
+      0.2030822522081764,
+      0.7911232801483741
+     ],
+     "f1": [
+      0.30348645541414093,
+      0.7900627763137836
+     ],
+     "fpr": [
+      0.4568566264102972,
+      0.6791349376488239
+     ]
+    },
+    "model": "dangerous count"
+   }
+  },
+  "tuandromd_to_naticusdroid": {
+   "logistic_regression": {
+    "n": 29332,
+    "positives": 14700,
+    "prevalence": 0.5011591435974363,
+    "roc_auc": 0.7808323477012457,
+    "pr_auc": 0.8041055357606279,
+    "precision_at_recall_0.90": 0.5719903590003805,
+    "brier": 0.2838867886824449,
+    "at_threshold": {
+     "threshold": 0.48039225100220906,
+     "tp": 5432,
+     "fp": 664,
+     "tn": 13968,
+     "fn": 9268,
+     "precision": 0.8910761154855643,
+     "recall": 0.36952380952380953,
+     "f1": 0.5224081554145028,
+     "fpr": 0.045379989065062874,
+     "accuracy": 0.6613936997136234
+    },
+    "precision_if_prevalence": {
+     "0.01": 0.0760001979116042,
+     "0.05": 0.300000591840548,
+     "0.1": 0.47500070281030415
+    },
+    "ci95": {
+     "roc_auc": [
+      0.729295590478443,
+      0.8279923988530561
+     ],
+     "pr_auc": [
+      0.7155005361410873,
+      0.8717359338806734
+     ],
+     "precision": [
+      0.8252465096623703,
+      0.9295520091615266
+     ],
+     "recall": [
+      0.24980396010420075,
+      0.49345405701042994
+     ],
+     "f1": [
+      0.38379174723169884,
+      0.6420711278342067
+     ],
+     "fpr": [
+      0.031910213340751566,
+      0.061002059248519855
+     ],
+     "brier": [
+      0.2293880102364141,
+      0.34317221191404784
+     ]
+    },
+    "model": "LR (shared permissions)"
+   },
+   "lightgbm": {
+    "roc_auc": 0.749835552865214,
+    "pr_auc": 0.7751790807519544
+   },
+   "baseline_dangerous_count": {
+    "n": 29332,
+    "positives": 14700,
+    "prevalence": 0.5011591435974363,
+    "roc_auc": 0.7649705054246958,
+    "pr_auc": 0.6916151704058245,
+    "precision_at_recall_0.90": 0.6369136960600376,
+    "at_threshold": {
+     "threshold": 0.0,
+     "tp": 14700,
+     "fp": 14632,
+     "tn": 0,
+     "fn": 0,
+     "precision": 0.5011591435974363,
+     "recall": 1.0,
+     "f1": 0.6676962209302326,
+     "fpr": 1.0,
+     "accuracy": 0.5011591435974363
+    },
+    "precision_if_prevalence": {
+     "0.01": 0.01,
+     "0.05": 0.05,
+     "0.1": 0.1
+    },
+    "ci95": {
+     "roc_auc": [
+      0.6944764420793681,
+      0.8205116093944601
+     ],
+     "pr_auc": [
+      0.6092132654606445,
+      0.7751407263593677
+     ],
+     "precision": [
+      0.4159077820850871,
+      0.5835277760840895
+     ],
+     "recall": [
+      1.0,
+      1.0
+     ],
+     "f1": [
+      0.587478629776817,
+      0.7369972064082995
+     ],
+     "fpr": [
+      1.0,
+      1.0
+     ]
+    },
+    "model": "dangerous count"
+   }
+  },
+  "exported_model_on_tuandromd": {
+   "note": "25 of the model's 85 permissions are not recorded by TUANDROMD and are treated as absent.",
+   "n": 4464,
+   "positives": 3565,
+   "prevalence": 0.7986111111111112,
+   "roc_auc": 0.8421228511654683,
+   "pr_auc": 0.9329273977263222,
+   "precision_at_recall_0.90": 0.9268027210884354,
+   "brier": 0.12933587470242877,
+   "at_threshold": {
+    "threshold": 0.5390634931093171,
+    "tp": 2917,
+    "fp": 222,
+    "tn": 677,
+    "fn": 648,
+    "precision": 0.9292768397578847,
+    "recall": 0.8182328190743338,
+    "f1": 0.8702267303102624,
+    "fpr": 0.24694104560622915,
+    "accuracy": 0.8051075268817204
+   },
+   "precision_if_prevalence": {
+    "0.01": 0.032385512906847956,
+    "0.05": 0.14849656726871852,
+    "0.1": 0.26909337294783414
+   },
+   "ci95": {
+    "roc_auc": [
+     0.7775938597573918,
+     0.8933339825747245
+    ],
+    "pr_auc": [
+     0.8711162106879551,
+     0.9640811190774911
+    ],
+    "precision": [
+     0.8499083710577912,
+     0.961229191622089
+    ],
+    "recall": [
+     0.5851918264107588,
+     0.9729991412194542
+    ],
+    "f1": [
+     0.6985605136258224,
+     0.9601938762388356
+    ],
+    "fpr": [
+     0.18595764080175434,
+     0.3122242647058823
+    ],
+    "brier": [
+     0.07029083554827428,
+     0.2087619702165889
+    ]
+   },
+   "model": "exported LR"
+  }
+ },
+ "export": {
+  "path": "core/src/main/resources/ml/apk_permission_risk.json",
+  "bytes": 8713,
+  "max_abs_diff_sklearn_vs_exported_on_test": 3.3306690738754696e-16,
+  "golden_samples": 50
+ }
+}

@@ -9,6 +9,10 @@ import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dpdpxray.app.graph
+import com.dpdpxray.app.voice.assistant.VoiceAssistant
+import com.dpdpxray.core.assistant.AppCandidate
+import com.dpdpxray.core.assistant.VoiceCommand
+import com.dpdpxray.core.assistant.VoiceCommandParser
 import com.dpdpxray.core.copilot.AuditEvidence
 import com.dpdpxray.core.copilot.CopilotLanguage
 import com.dpdpxray.core.copilot.CopilotIntent
@@ -36,12 +40,19 @@ data class VoiceUiState(
     val micMessage: String? = null,
     val answering: Boolean = false,
     val answer: GroundedAnswer? = null,
-    val speakAnswers: Boolean = true,
+    /** Speak answers to typed or tapped questions too. Off by default: a question asked by voice is always answered aloud. */
+    val speakAnswers: Boolean = false,
     val speaking: Boolean = false,
     val voiceNote: String? = null,
     val cloudVoice: Boolean = false,
     val canDownloadPack: Boolean = false,
     val packNote: String? = null,
+    /** The assistant's reply to a command (check an app, open a screen, read the result...), when it was one. */
+    val commandReply: String? = null,
+    /** Two apps offered after an unclear name; tapping or saying one answers "Which one?". */
+    val choices: List<AppCandidate> = emptyList(),
+    /** The assistant's own offline voice is reading a command reply. */
+    val assistantSpeaking: Boolean = false,
 )
 
 /** State for [VoiceCopilotScreen]. Reads one saved audit; answers come from [GroundedAnswerer], never from a model. */
@@ -56,6 +67,8 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
     private val answerGate = VoiceAnswerGate()
     private val checkThrottle = CheckThrottle(CHECK_GAP_MS)
     private var answerJob: Job? = null
+    private var auditId: String? = null
+    private val assistant = VoiceAssistant.get(app)
 
     private val _state = MutableStateFlow(VoiceUiState(cloudVoice = SpeechOutputChoice.choose(apiConfig) == SpeechOutputChoice.ONLINE))
     val state: StateFlow<VoiceUiState> = _state.asStateFlow()
@@ -67,8 +80,13 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
         if (SpeechOutputChoice.choose(apiConfig) == SpeechOutputChoice.ONLINE && key != null) CloudSpeechOutput(app, key, local, report) else local
     }
 
+    init {
+        viewModelScope.launch { assistant.voice.speaking.collect { on -> _state.update { it.copy(assistantSpeaking = on) } } }
+    }
+
     fun load(auditId: String) {
         if (evidence != null) return
+        this.auditId = auditId
         viewModelScope.launch {
             val bundle = graph.repository.load(auditId)
             if (bundle == null) {
@@ -177,7 +195,7 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
             override fun onPartial(text: String) = _state.update { it.copy(transcript = text) }
             override fun onFinal(text: String) {
                 _state.update { it.copy(transcript = text) }
-                ask(text)
+                ask(text, byVoice = true)
             }
             override fun onError(code: Int) = _state.update { it.copy(
                 micMessage = MicAvailability.errorReason(code),
@@ -191,6 +209,18 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Typed text or a command chip: the same path as speech. */
+    fun askText(text: String) {
+        val t = text.trim()
+        if (t.isEmpty()) return
+        cancelListening()
+        _state.update { it.copy(transcript = t) }
+        ask(t)
+    }
+
+    /** Answers "Which one?" by tapping one of the offered apps. */
+    fun pickChoice(app: AppCandidate) = askText(app.label)
+
     fun askChip(q: CopilotQuestion) {
         cancelListening()
         val text = if (_state.value.language == CopilotLanguage.HI) q.hi else q.en
@@ -198,7 +228,11 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
         ask(text, q.intent)
     }
 
-    private fun ask(question: String, intent: CopilotIntent? = null) {
+    private fun ask(question: String, intent: CopilotIntent? = null, byVoice: Boolean = false) {
+        // A command ("check Instagram", "open reports", "what did you find") is carried out, never just answered.
+        if (intent == null && (assistant.hasPendingChoice || VoiceCommandParser.parse(question).command !is VoiceCommand.Question)) {
+            return command(question, byVoice)
+        }
         val e = evidence ?: return
         val language = _state.value.language
         val request = answerGate.begin()
@@ -212,12 +246,34 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
                 if (intent == null) answerer.answer(question, e, language) else answerer.answer(intent, question, e, language)
             }
             if (!answerGate.isCurrent(request)) return@launch
-            _state.update { it.copy(answering = false, answer = answer, voiceNote = null) }
-            if (_state.value.speakAnswers) voice.speak(answer.spokenText, language)
+            _state.update { it.copy(answering = false, answer = answer, voiceNote = null, commandReply = null, choices = emptyList()) }
+            if (_state.value.speakAnswers || byVoice) voice.speak(answer.spokenText, language)
         }
     }
 
-    fun stopSpeaking() = voice.stop()
+    private fun command(text: String, byVoice: Boolean = false) {
+        val request = answerGate.begin()
+        answerJob?.cancel()
+        voice.stop()
+        _state.update { it.copy(answering = true, answer = null, commandReply = null, choices = emptyList()) }
+        assistant.submit(text, preferHindi = _state.value.language == CopilotLanguage.HI, focusAuditId = auditId, speak = _state.value.speakAnswers || byVoice) { turn ->
+            if (!answerGate.isCurrent(request)) return@submit
+            _state.update {
+                it.copy(
+                    answering = false,
+                    answer = turn.answer,
+                    commandReply = if (turn.answer == null) turn.text else null,
+                    choices = turn.choices,
+                    voiceNote = null,
+                )
+            }
+        }
+    }
+
+    fun stopSpeaking() {
+        voice.stop()
+        assistant.voice.stop()
+    }
 
     /** Called when the screen pauses or leaves: no listening or speech continues in the background. */
     fun pause() {

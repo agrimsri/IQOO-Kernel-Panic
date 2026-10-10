@@ -1,0 +1,83 @@
+[
+    {
+        "id": "audit-1791603680860-ACCEPT",
+        "targetPackage": "com.facebook.katana",
+        "targetLabel": "Facebook",
+        "plan": "ACCEPT",
+        "childFacing": false,
+        "startedAtNanos": 370488734378580,
+        "endedAtNanos": 370524076035285,
+        "startedAtEpochMs": 1791603680906,
+        "netEvents": [
+            {
+                "tNanos": 370488796500924,
+                "hostname": "gateway.facebook.com",
+                "queryType": 1,
+                "entity": null,
+                "category": "UNKNOWN",
+                "phase": "NO_CONSENT_SEEN",
+                "viaPackage": null,
+                "cnameChain": [
+                    "gateway.facebook.com",
+                    "dgw.c10r.facebook.com"
+                ],
+                "answerIps": [
+                    "57.144.42.145"
+                ],
+                "disguisedVia": null,
+                "answerStatus": "COMPLETE",
+                "rcode": 0
+            },
+            {
+                "tNanos": 370488918380247,
+                "hostname": "b-graph.facebook.com",
+                "queryType": 1,
+                "entity": null,
+                "category": "UNKNOWN",
+                "phase": "NO_CONSENT_SEEN",
+                "viaPackage": null,
+                "cnameChain": [
+                    "b-graph.facebook.com",
+                    "star-mini.c10r.facebook.com"
+                ],
+                "answerIps": [
+                    "57.144.42.1"
+                ],
+                "disguisedVia": null,
+                "answerStatus": "COMPLETE",
+                "rcode": 0
+            }
+        ],
+        "consentEvents": [],
+        "screenAudit": null,
+        "deviceModel": "vivo I2501",
+        "androidVersion": "16",
+        "privateDnsActive": false,
+        "notes": [
+            "App data was not cleared (reset not approved or Shizuku not authorised) — results reflect the app's current state.",
+            "No consent screen detected within 20 s."
+        ],
+        "captureHealth": {
+            "schemaVersion": 1,
+            "captureStartedNanos": 370488733926601,
+            "captureEndedNanos": 370524076035285,
+            "dnsQueriesParsed": 2,
+            "malformedPackets": 6,
+            "dnsResponsesRelayed": 2,
+            "dnsRelayFailures": 0,
+            "malformedResponses": 0,
+            "eventsRecorded": 2,
+            "eventsDropped": 0,
+            "eventBufferCapacity": 5000,
+            "firstLookupNanos": 370488796500924,
+            "lastLookupNanos": 370488918380247,
+            "dnsUpstreamPayloadBytesSent": 76,
+            "dnsUpstreamDatagramsSent": 2,
+            "dnsUpstreamPayloadBytesReceived": 160,
+            "dnsUpstreamDatagramsReceived": 2,
+            "notes": [],
+            "hiddenDnsPackets": 0,
+            "nonDnsPackets": 6
+        }
+    }
+]

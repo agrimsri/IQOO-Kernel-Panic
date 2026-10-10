@@ -9,7 +9,11 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Opt-in "Hey TraceVeil" (off by default): only while the user has started it, with a visible notification. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Auto-guard: keeps the background new-app check and weekly checkup jobs scheduled after a restart. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Needed to list installed apps that can be audited. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
@@ -24,6 +28,7 @@
         android:name=".XrayApp"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.Xray">
@@ -41,7 +46,42 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- APK Guard: offered when the user opens or shares an .apk file (WhatsApp, Files).
+                 TraceVeil only reads the file to explain it; it never installs anything. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/vnd.android.package-archive" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/vnd.android.package-archive" />
+            </intent-filter>
+            <!-- Launcher shortcuts and "Hey Google, open TraceVeil …" features; Google stays the default assistant. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- Developer automation (TraceVeil Runner, off by default in Settings): `traceveil-ci run` starts a check from a
+             laptop over adb. Only callers holding DUMP (the adb shell and the system) can open it, by explicit
+             component; it then checks that automation is on and the pairing token matches. Its own task (empty
+             affinity) keeps TraceVeil's main task, and the live check in it, independent of runner requests. -->
+        <activity
+            android:name=".automation.AutomationActivity"
+            android:exported="true"
+            android:permission="android.permission.DUMP"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:launchMode="standard" />
+
+        <!-- Started only from the Settings button while TraceVeil is on screen; never exported, never on boot. -->
+        <service
+            android:name=".voice.wake.HeyTraceVeilService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <service
             android:name=".capture.XrayVpnService"
@@ -68,6 +108,26 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/consent_accessibility" />
         </service>
+
+        <!-- Auto-guard background checks (platform JobScheduler). Only Android's job scheduler may bind them. -->
+        <service
+            android:name=".autoguard.NewAppCheckJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service
+            android:name=".autoguard.PhoneCheckupJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <!-- Re-checks the Auto-guard jobs after a restart or an update of TraceVeil. It starts no microphone,
+             VPN or audit. -->
+        <receiver
+            android:name=".autoguard.AutoGuardBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
