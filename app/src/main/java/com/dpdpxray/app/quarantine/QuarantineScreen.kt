@@ -204,6 +204,21 @@ private fun LiveView(run: QuarantineRunState.Running, live: QuarantineObservatio
                 style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 8.dp),
             )
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (live.permissionDialogs.isNotEmpty()) {
+                    item { SectionTitle("Permission dialogs (${live.permissionDialogs.size})") }
+                    items(live.permissionDialogs, key = { "p-" + it.text }) { d ->
+                        RuleRow(Film.warn) {
+                            Text("\"${d.text}\"", style = MaterialTheme.typography.bodyMedium)
+                            if (!d.namesTarget) Note("Does not name this app; it may belong to another app.")
+                        }
+                    }
+                }
+                if (live.settingsScreens.isNotEmpty()) {
+                    item { SectionTitle("Settings screens opened") }
+                    items(live.settingsScreens, key = { "s-" + it.kind }) { st ->
+                        RuleRow(Film.leak) { Text(st.kind.title, style = MaterialTheme.typography.bodyMedium); Note("By the app or by you; TraceVeil cannot tell which.") }
+                    }
+                }
                 observationItems(live)
                 if (live.domains.isEmpty() && live.blocked.isEmpty() && live.permissionDialogs.isEmpty() && live.settingsScreens.isEmpty()) {
                     item { Note("Nothing yet. Use the app; what it tries appears here.") }
