@@ -118,7 +118,7 @@ function Lane({ s, x, range, laneW, narrow, show, hide, sel, setSel }) {
 
   const consentTip = (c) => (
     <>
-      <div className="tt">{c.kind === "SCREEN_APPEARED" ? "Consent screen appeared" : c.kind === "SETTINGS" ? `Opened "${c.nodeText || "settings"}"` : c.kind === "MANUAL_MARK" ? "Marked by the tester" : `Tapped "${c.nodeText || c.kind}"`}</div>
+      <div className="tt">{c.kind === "SCREEN_APPEARED" ? "Consent screen appeared" : c.kind === "SETTINGS" ? `Opened "${c.nodeText || "settings"}"` : c.kind === "MANUAL_MARK" ? "Marked by the tester" : c.kind === "PERMISSION_DIALOG" ? `Android permission dialog: "${c.nodeText || "text not read"}"` : `Tapped "${c.nodeText || c.kind}"`}</div>
       <div className="tr"><span>Time</span><b>{fmtS(c.t)} after launch</b></div>
       <div className="tr"><span>Plan</span><b>{s.planLabel}</b></div>
       {(c.kind === "ACCEPT" || c.kind === "REJECT") && <div className="tr"><span>Recorded</span><b>exact tap, {c.kind.toLowerCase()}</b></div>}
@@ -157,7 +157,8 @@ function Lane({ s, x, range, laneW, narrow, show, hide, sel, setSel }) {
         {s.consent.filter((c) => c.t <= range).map((c, i) => {
           const cx = x(c.t);
           const isChoice = c === choice;
-          const cls = isChoice ? `choice-line ${c.kind === "ACCEPT" ? "accept" : "reject"}` : c.kind === "SETTINGS" ? "settings-line" : "screen-line";
+          // An Android permission dialog is drawn like a settings step, never as the app's consent screen.
+          const cls = isChoice ? `choice-line ${c.kind === "ACCEPT" ? "accept" : "reject"}` : c.kind === "SETTINGS" || c.kind === "PERMISSION_DIALOG" ? "settings-line" : "screen-line";
           return (
             <g key={`c${i}`} className="mk" tabIndex={0} aria-label={`${c.kind} at ${fmtS(c.t)}`}
               onMouseEnter={(ev) => show(ev, consentTip(c))} onFocus={(ev) => show(ev, consentTip(c))} onBlur={hide}

@@ -48,6 +48,12 @@ export const CHECKS = {
   V0: "Low network visibility — result inconclusive",
   U1: "Consent history unknown — app kept its data",
   S1: "Same-company servers contacted (first-party data collection)",
+  C11: "Tracker reached through an alias name (CNAME cloaking pattern)",
+  C12: "Tracker hosts looked up while the app was in the background",
+  C13: "SDK data collection on by default in the app's manifest",
+  C14: "Android permission requested before any consent screen or notice",
+  C15: "Consent screen shows no privacy-policy link or text",
+  V1: "Some lookups may be hidden from TraceVeil",
 };
 export const CHECK_ORDER = Object.keys(CHECKS);
 
@@ -107,7 +113,7 @@ const info = (e, via = null) => ({ entity: e.entity, company: e.company || e.ent
 export const companyOfEntity = (entity) => byEntity.get(entity)?.company || entity;
 
 // ---------- fix templates (same selection as core FixCatalog.fixesFor) ----------
-const SDK_CHECKS = new Set(["C1", "C2", "C9", "C10"]);
+const SDK_CHECKS = new Set(["C1", "C2", "C9", "C10", "C13"]);
 const fixById = new Map(fixTemplates.map((t) => [t.id, t]));
 export function fixesForFinding(finding) {
   const out = [];

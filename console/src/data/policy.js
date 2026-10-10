@@ -60,6 +60,21 @@ export function untested(id, sessions) {
     case "C9":
       return !sessions.some((s) => s.childFacing) && reviewedScreen(sessions)?.childAudienceSignals == null
         ? "the app was not declared child-facing in this capture and no consent screen was reviewed for child-audience signals" : null;
+    // C11–C15 and V1 need evidence older builds did not record (mirrors Gate.kt).
+    case "C11":
+      return sessions.every((s) => arr(s.netEvents).every((e) => e.answerStatus == null && e.rcode == null && !arr(e.cnameChain).length))
+        ? "no DNS replies were recorded, so aliases (CNAME chains) could not be read" : null;
+    case "C12":
+      return sessions.some((s) => s.backgroundStartedNanos != null) ? null : "no background step was recorded (older build, Fast Preview, or the app was not confirmed off screen)";
+    case "C13":
+      return sessions.some((s) => arr(s.manifestFacts?.partsRead).includes("meta-data")) ? null : "the app's installed manifest was not read in this capture";
+    case "C14":
+      return sessions.some((s) => s.permissionDialogsWatched === true) ? null : "Android permission dialogs were not watched in this capture (older build)";
+    case "C15":
+      return sessions.some((s) => arr(s.consentEvents).some((c) => c.tree && (c.kind === "SCREEN_APPEARED" || c.kind === "MANUAL_MARK")))
+        ? null : "no consent-screen accessibility tree was captured";
+    case "V1":
+      return sessions.every((s) => s.captureHealth == null && s.privateDnsActive == null) ? "capture health and the Private DNS setting were not recorded" : null;
     default:
       return null;
   }
