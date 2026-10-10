@@ -20,7 +20,7 @@ import java.nio.ByteOrder
 import java.util.Locale
 
 /**
- * ConsentLens-1 on this phone: a 50 KB full-INT8 TFLite model (assets/consentlens) run by LiteRT.
+ * ConsentLens-1 on this phone: a 146 KB (145,816-byte) full-INT8 TFLite model (assets/consentlens) run by LiteRT.
  *
  * Load order: the Qualcomm QNN delegate on the Hexagon HTP (NPU) when [NpuBackendPolicy] allows it for this SoC,
  * otherwise, or if the delegate fails, LiteRT on the CPU with XNNPACK. The reason for any fallback is kept and shown.
