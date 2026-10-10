@@ -354,9 +354,14 @@ private fun ReadyResult(
     SectionTitle(if (hindi) "आगे क्या करें" else "What next")
     if (!isFile) {
         val launchable = facts.hasLauncherIcon == true
-        // Opens the audit picker already searched for this app; the audit is set up and started there.
-        PrimaryAction("Run a privacy audit of this app", { onAudit(facts.packageName) }, enabled = launchable)
-        if (!launchable) Note("This app has no launcher screen, so TraceVeil cannot start it for an audit.")
+        if (facts.packageName == ctx.packageName) {
+            // The self-check from "Why you can trust TraceVeil": the audit picker leaves TraceVeil out.
+            Note("This is TraceVeil itself. It cannot audit its own traffic, because its VPN carries every audit; its own network use is shown under More › Why you can trust TraceVeil.")
+        } else {
+            // Opens the audit picker already searched for this app; the audit is set up and started there.
+            PrimaryAction("Run a privacy audit of this app", { onAudit(facts.packageName) }, enabled = launchable)
+            if (!launchable) Note("This app has no launcher screen, so TraceVeil cannot start it for an audit.")
+        }
         if (onQuarantine != null && ApkGuardRoutes.quarantineOffered(installed = true, packageName = facts.packageName, ownPackage = ctx.packageName)) {
             // Opens the quarantine explainer only; nothing is blocked until Start is tapped there.
             Spacer(Modifier.height(10.dp))
