@@ -131,7 +131,7 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         val catalog = graph.catalog()
         val result = RulesEngine(catalog).evaluate(sessions)
         val fixes = graph.fixCatalog.fixesFor(result, catalog)
-        val md = EvidenceReport.annotate(SampleReport.annotate(MarkdownReport.build(result, sessions, fixes, graph.citations()), sessions), sessions)
+        val md = EvidenceReport.annotate(SampleReport.annotate(MarkdownReport.build(result, sessions, fixes, graph.citations()), sessions), sessions, sample = true)
         graph.repository.save(
             AuditMeta(id, sessions.first().targetPackage, sessions.first().targetLabel, System.currentTimeMillis(), result.score, result.band,
                 result.findings.size, sessions.map { it.plan.label }, sample = true),
@@ -257,7 +257,7 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun markdown(bundle: AuditBundle): String = EvidenceReport.annotate(
-        graph.repository.markdownFile(bundle.meta.id).takeIf { it.exists() }?.readText().orEmpty(), bundle.sessions)
+        graph.repository.markdownFile(bundle.meta.id).takeIf { it.exists() }?.readText().orEmpty(), bundle.sessions, bundle.meta.timingProfile, sample = bundle.meta.sample)
 
     fun copy(label: String, text: String) {
         ExportManager.copy(ctx, label, text)

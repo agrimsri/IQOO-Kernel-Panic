@@ -47,7 +47,14 @@ data class AuditConfig(
     val autoDrive: Boolean = false,
     /** Explicit developer-test approval; never inferred from Shizuku being available. */
     val resetAppData: Boolean = false,
-)
+    val fastPreview: Boolean = false,
+) {
+    init {
+        require(!fastPreview || plans == listOf(AuditPlan.ACCEPT)) {
+            "Fast Preview is a single Accept-plan check, not a Full audit."
+        }
+    }
+}
 
 sealed interface AuditProgress {
     data object Idle : AuditProgress
@@ -75,11 +82,6 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
     private val planCapture = PlanCaptureRecorder(UidTx::now, CaptureBus::reset, CaptureBus::snapshot, SystemClock::elapsedRealtimeNanos)
 
     private data class CapturedPlan(val session: AuditSession, val upload: SessionNetworkReadings)
-
-    private data class Timing(val waitConsentMs: Long, val dwellMs: Long, val observeMs: Long, val silentMs: Long)
-
-    private fun timing() = if (graph.settings.settings.value.fastDemo) Timing(12_000, 1_500, 8_000, 12_000)
-    else Timing(20_000, 2_500, 15_000, 25_000)
 
     @Synchronized
     fun start(config: AuditConfig) {
@@ -142,11 +144,13 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         val catalog = graph.catalog()
         val result = RulesEngine(catalog).evaluate(sessions)
         val fixes = graph.fixCatalog.fixesFor(result, catalog)
-        val markdown = EvidenceReport.annotate(MarkdownReport.build(result, sessions, fixes, graph.citations()), sessions)
+        val timingProfile = AuditTimingPolicy.profile(config)
+        val markdown = EvidenceReport.annotate(MarkdownReport.build(result, sessions, fixes, graph.citations()), sessions, timingProfile)
         val meta = AuditMeta(
             id = auditId, targetPackage = config.targetPackage, targetLabel = config.targetLabel,
             createdAtMs = System.currentTimeMillis(), score = result.score, band = result.band,
             findingCount = result.findings.size, plans = config.plans.map { it.label },
+            timingProfile = timingProfile,
         )
         graph.repository.save(meta, sessions, result, markdown, capturedPlans.map { it.upload })
         _progress.value = AuditProgress.Done(auditId)
@@ -154,10 +158,11 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
     }
 
     private suspend fun runPlan(config: AuditConfig, plan: AuditPlan, index: Int, auditId: String, dir: File, attempt: Int = 0): CapturedPlan = coroutineScope {
-        val t = timing()
+        val t = AuditTimingPolicy.forAudit(config)
         val pkg = config.targetPackage
         val sessionId = "$auditId-${plan.name}" + if (attempt == 0) "" else "-retry-$attempt"
         val notes = mutableListOf<String>()
+        if (config.fastPreview) notes += AuditTimingPolicy.coverageHint(AuditTimingPolicy.FAST_PREVIEW)
         fun step(s: String, start: Long = 0) {
             _progress.value = AuditProgress.Running(config, index, plan, s, start)
         }
@@ -221,12 +226,12 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
                     ).await(45_000)
                     if (chosen == null) notes += "No consent choice was recorded within 45 s."
                 }
-                step("Observing traffic after the choice", t0)
-                delay(t.observeMs)
+                step(if (ConsentBus.choiceMade) "Observing traffic after the recorded choice" else "Observing traffic without a verified consent choice", t0)
+                t.observe(plan)
             }
             AuditPlan.SILENT -> {
                 step("Observing without touching the app", t0)
-                delay(t.silentMs)
+                t.observe(plan)
             }
         }
 

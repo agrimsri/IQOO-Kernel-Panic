@@ -39,6 +39,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.data.AuditBundle
 import com.dpdpxray.app.audit.AuditPlanCoverage
+import com.dpdpxray.app.audit.AuditTimingPolicy
 import com.dpdpxray.app.data.AuditNetworkReadings
 import com.dpdpxray.app.data.AuditComparisonResult
 import com.dpdpxray.app.netproof.NetworkProofCard
@@ -93,6 +94,11 @@ fun ResultsScreen(vm: XrayViewModel, id: String, onBack: () -> Unit, onFinding: 
                     }
                     Spacer(Modifier.weight(1f))
                     if (b.meta.sample) Tag("Sample data", Film.boneDim)
+                }
+                if (!b.meta.sample) {
+                    val preview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW
+                    Tag(if (preview) "Fast Preview · limited evidence" else if (b.meta.timingProfile == AuditTimingPolicy.NORMAL) "Normal capture" else "Timing unknown", if (preview) Film.warn else Film.boneDim)
+                    Note(AuditTimingPolicy.coverageHint(b.meta.timingProfile), if (preview) Film.warn else Film.boneDim)
                 }
                 AuditPlanCoverage.gaps(b.sessions).forEach { Note(it, Film.warn) }
                 AuditPlanCoverage.freshStateHint(b.sessions)?.let { Note(it, Film.warn) }

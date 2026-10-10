@@ -68,4 +68,5 @@ dependencies {
     implementation(libs.litertlm.android)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

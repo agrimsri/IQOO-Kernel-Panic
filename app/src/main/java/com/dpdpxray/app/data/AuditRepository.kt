@@ -24,6 +24,8 @@ data class AuditMeta(
     val findingCount: Int,
     val plans: List<String>,
     val sample: Boolean = false,
+    /** Null means this older audit did not record its timing profile. */
+    val timingProfile: String? = null,
 )
 
 data class AuditBundle(
