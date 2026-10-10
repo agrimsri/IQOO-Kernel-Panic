@@ -5,15 +5,21 @@
 //   traceveil.backup.v1      the phone's "Back up my checks" file: each item of "audits" is a traceveil.audit.v1 bundle.
 //                            Its sha256 is checked by the phone on restore, not here; each audit gets the same checks as
 //                            a single export.
+//   traceveil.signature.v1   the phone's hardware signature next to an export (<file>.sig.json). It is paired with the
+//                            export imported in the same batch and only noted as present: the console never verifies
+//                            it (that needs the exact file bytes and the attestation chain; use traceveil-ci verify).
 // A bare QuarantineReport (the phone's saved report JSON) is accepted too. Unknown fields are kept and ignored.
-import { AUDIT_SCHEMA, QUARANTINE_SCHEMA, BACKUP_SCHEMA, PHONE_BACKUP_SCHEMA, PLAN } from "./model";
+import { AUDIT_SCHEMA, QUARANTINE_SCHEMA, BACKUP_SCHEMA, PHONE_BACKUP_SCHEMA, SIGNATURE_SCHEMA, PLAN } from "./model";
 
 export class ImportError extends Error {}
 
 const isObj = (x) => x && typeof x === "object" && !Array.isArray(x);
 const arr = (x) => (Array.isArray(x) ? x : []);
 
-/** Returns a list of records ready to store: { id, kind: "audit"|"quarantine", sample, importedAt, fileName, bundle }. */
+/**
+ * Returns a list of records ready to store: { id, kind: "audit"|"quarantine", sample, importedAt, fileName, bundle }. A
+ * signature file gives one { kind: "signature", fileName, signedFile } item, which readFiles pairs with its export.
+ */
 export function parseExportText(text, fileName = "file") {
   let data;
   try {
@@ -31,6 +37,9 @@ export function parseExportText(text, fileName = "file") {
   if (schema === PHONE_BACKUP_SCHEMA) return arr(data.audits).map((b) => auditRecord(b, fileName, importedAt));
   if (schema === AUDIT_SCHEMA) return [auditRecord(data, fileName, importedAt)];
   if (schema === QUARANTINE_SCHEMA) return [quarantineRecord(data, fileName, importedAt)];
+  if (schema === SIGNATURE_SCHEMA) {
+    return [{ kind: "signature", fileName, signedFile: typeof data.signedFile === "string" ? data.signedFile : null, appVersion: data.appVersion ?? null, createdAt: data.createdAt ?? null }];
+  }
   if (!schema && isObj(data.observations) && typeof data.targetPackage === "string") {
     return [quarantineRecord({ schema: QUARANTINE_SCHEMA, exportedAt: null, report: data, rawReport: true }, fileName, importedAt)];
   }
@@ -75,18 +84,51 @@ function quarantineRecord(b, fileName, importedAt) {
   return { id: r.id, kind: "quarantine", sample: !!b.sample, importedAt, fileName, bundle: b };
 }
 
+/** Names of the export a signature file belongs to: "<x>.json.sig.json" -> "<x>.json", "<x>.sig.json" -> "<x>.json". */
+export function signedFileNames(sigFileName, signedFile = null) {
+  const names = [];
+  if (sigFileName.endsWith(".sig.json")) {
+    const base = sigFileName.slice(0, -".sig.json".length);
+    names.push(base, `${base}.json`);
+  }
+  if (signedFile) names.push(signedFile);
+  return names;
+}
+
+/**
+ * Attaches each signature item to the one audit export of the same batch it names (by file name, then by its signedFile
+ * field). The record keeps only that a signature file was present; an unpaired signature file is reported, not stored.
+ */
+export function pairSignatures(items) {
+  const records = items.filter((r) => r.kind !== "signature");
+  const errors = [];
+  for (const sig of items.filter((r) => r.kind === "signature")) {
+    const names = signedFileNames(sig.fileName, sig.signedFile);
+    const target = names.map((n) => records.filter((r) => r.fileName === n)).find((list) => list.length > 0) || [];
+    if (target.length === 1 && target[0].kind === "audit") {
+      target[0].signatureFile = { fileName: sig.fileName, signedFile: sig.signedFile, appVersion: sig.appVersion, createdAt: sig.createdAt };
+    } else if (target.length) {
+      errors.push(`${sig.fileName}: a TraceVeil signature file for ${target[0].fileName}, which is not a single audit export; check it with traceveil-ci verify.`);
+    } else {
+      errors.push(`${sig.fileName}: a TraceVeil signature file (${SIGNATURE_SCHEMA}). Import it together with the export it signs (${names[0] || sig.signedFile || "the signed file"}), then verify it with traceveil-ci verify.`);
+    }
+  }
+  return { records, errors };
+}
+
 /** Reads dropped or picked files. Returns { records, errors }. */
 export async function readFiles(fileList) {
-  const records = [];
+  const items = [];
   const errors = [];
   for (const file of Array.from(fileList || [])) {
     if (file.size > 25 * 1024 * 1024) { errors.push(`${file.name}: larger than 25 MB, skipped.`); continue; }
     try {
       const text = await file.text();
-      records.push(...parseExportText(text, file.name));
+      items.push(...parseExportText(text, file.name));
     } catch (e) {
       errors.push(e instanceof ImportError ? e.message : `${file.name}: ${e?.message || "could not be read"}`);
     }
   }
-  return { records, errors };
+  const paired = pairSignatures(items);
+  return { records: paired.records, errors: [...errors, ...paired.errors] };
 }

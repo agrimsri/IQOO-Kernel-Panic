@@ -21,8 +21,11 @@ import com.dpdpxray.core.rules.RulesEngine
 import com.dpdpxray.core.trackers.TrackerCatalog
 import java.io.File
 
-/** A bundle file read from disk. [displayPath] is relative to the working directory when the file is inside it. */
-class LoadedBundle(val displayPath: String, val text: String, val bundle: AuditBundleV1, val uri: String = displayPath) {
+/**
+ * A bundle file read from disk. [displayPath] is relative to the working directory when the file is inside it; [file] is
+ * where it was read from (its exact bytes are what a hardware signature covers).
+ */
+class LoadedBundle(val displayPath: String, val text: String, val bundle: AuditBundleV1, val uri: String = displayPath, val file: File? = null) {
     val meta: BundleMeta = AuditBundles.metaOf(bundle)
 
     /** Synthetic data: the app's sample flag, or a fixture note. */
@@ -40,7 +43,7 @@ class LoadedBundle(val displayPath: String, val text: String, val bundle: AuditB
             } catch (e: BundleFormatException) {
                 throw UsageException("$shown: ${e.message}")
             }
-            return LoadedBundle(shown, text, bundle, artifactUri(file, cwd))
+            return LoadedBundle(shown, text, bundle, artifactUri(file, cwd), file)
         }
 
         /** SARIF artifact location: relative to the working directory (the repository root in CI), else a file URI. */
@@ -116,6 +119,8 @@ enum class LensSource(val text: String) { OPTION("from --profile"), BUNDLE("from
 /**
  * One bundle checked against a policy: both the result stored in the bundle and the re-evaluated one. [lens] reads the
  * re-evaluated findings under a legal lens; it never changes the policy outcome, which stays on the consent-first result.
+ * [signature] is the hardware signature next to the bundle (null when it was not looked for); it gates only with
+ * requireSignature.
  */
 class BundleCheck(
     val source: LoadedBundle,
@@ -126,6 +131,7 @@ class BundleCheck(
     val warnings: List<String>,
     val lens: LensView,
     val lensSource: LensSource,
+    val signature: SignatureStatus? = null,
 ) {
     val passed: Boolean get() = outcomes.none { it.status == RuleStatus.FAIL }
     val violations: List<RuleOutcome> get() = outcomes.filter { it.status == RuleStatus.FAIL }
@@ -148,8 +154,11 @@ class Gate(
 
     fun reevaluate(bundle: AuditBundleV1): AuditResult = engine.evaluate(bundle.sessions)
 
-    /** [profile] (from --profile) wins; else the bundle's legalProfile; else the global baseline. */
-    fun check(source: LoadedBundle, policy: Policy, profile: LegalProfile? = null): BundleCheck {
+    /**
+     * [profile] (from --profile) wins; else the bundle's legalProfile; else the global baseline. [signature] is the
+     * bundle's hardware signature as the caller found and verified it; null means it was not looked for.
+     */
+    fun check(source: LoadedBundle, policy: Policy, profile: LegalProfile? = null, signature: SignatureStatus? = null): BundleCheck {
         val b = source.bundle
         val current = reevaluate(b)
         val named = LegalProfile.parse(b.legalProfile)
@@ -166,11 +175,12 @@ class Gate(
             add(maxHigh(current, policy))
             add(freshState(coverage, policy))
             add(requirePlans(coverage, policy))
+            add(requireSignature(signature, policy))
         }
         val warnings = warnings(source) + listOfNotNull(
             b.legalProfile?.takeIf { named == null }?.let { "the bundle names legal lens \"$it\", which this version does not know; using ${lensId.name}" },
         )
-        return BundleCheck(source, b.result, current, coverage, outcomes, warnings, legal.view(current, lensId), lensSource)
+        return BundleCheck(source, b.result, current, coverage, outcomes, warnings, legal.view(current, lensId), lensSource, signature)
     }
 
     private fun inconclusive(r: AuditResult, p: Policy): RuleOutcome = when {
@@ -252,6 +262,13 @@ class Gate(
         val names = p.requirePlans.joinToString { it.label }
         return if (problems.isEmpty()) RuleOutcome("requirePlans", RuleStatus.PASS, "captured: $names")
         else RuleOutcome("requirePlans", RuleStatus.FAIL, problems.joinToString("; "))
+    }
+
+    /** A missing or unverified signature fails only when the policy asks for one; a gate never assumes a signature. */
+    private fun requireSignature(s: SignatureStatus?, p: Policy): RuleOutcome = when {
+        !p.requireSignature -> RuleOutcome("requireSignature", RuleStatus.OFF, "not required")
+        s == null -> RuleOutcome("requireSignature", RuleStatus.FAIL, "the signature was not checked")
+        else -> RuleOutcome("requireSignature", if (s.verified) RuleStatus.PASS else RuleStatus.FAIL, s.ruleMessage)
     }
 
     private fun warnings(source: LoadedBundle): List<String> = buildList {

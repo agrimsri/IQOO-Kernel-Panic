@@ -77,7 +77,13 @@ shown with a tick.
   ends with the same line.
 - **Share** sends both files together.
 - **Runner** writes `bundle.json.sig.json` next to `bundle.json` in
-  `/sdcard/Android/data/com.dpdpxray.app/files/automation/<run id>/`.
+  `/sdcard/Android/data/com.dpdpxray.app/files/automation/<run id>/`. `traceveil-ci run` copies it to
+  `<out>/<run id>/bundle.json.sig.json` on the laptop.
+- **`traceveil-ci check` and `run`** verify the signature next to each bundle and print one line:
+  `Signature: verified (StrongBox, chain ends at <root>)`, `Signature: NOT verified (<failed checks>)` or
+  `Signature: absent (…)`, plus a `signature` object in JSON and the status in SARIF properties. The policy key
+  `requireSignature` (or `--require-signature`) fails a bundle that is not verified; it is off by default. See
+  [CI_MODE.md](CI_MODE.md#signed-evidence-the-signature-line-and-requiresignature).
 - **Trust screen**, "What stays on this phone": "Signing key for exports".
 
 ## Format: `traceveil.signature.v1`
@@ -183,6 +189,11 @@ The attestation extension schema is at https://source.android.com/docs/security/
     the RSA root, a preproduction Pixel 9a TEE chain to Key Attestation CA1, and a 2018 Pixel 3 factory-key chain.
     They verify and decode to the values upstream published. A dropped or mixed intermediate fails.
 - `cli/src/test/kotlin/com/dpdpxray/cli/VerifyCommandTest.kt`: exit codes, text and JSON output.
+- `cli/src/test/kotlin/com/dpdpxray/cli/CheckSignatureTest.kt`: the `Signature:` line in `check` (absent, verified,
+  changed after signing, unreadable, self-made chain against the built-in roots), JSON and SARIF, `--sig`, and
+  `requireSignature` / `--require-signature`.
+- `cli/src/test/kotlin/com/dpdpxray/cli/RunCommandTest.kt`: `run` copies `bundle.json.sig.json` from a scripted phone,
+  verifies it before gating, and fails with `--require-signature` when it is missing or made for other bytes.
 - `app/src/test/java/com/dpdpxray/app/evidence/EvidenceFilesTest.kt`: file placement, round trip, graceful failure,
   Keystore level mapping and the trust-screen text.
 
@@ -201,3 +212,10 @@ No real *TraceVeil* signature from a phone exists in the repository yet. That ne
 4. On the laptop, run `traceveil-ci verify TraceVeil-<audit id>.json`. Expect exit 0, with ✓ on every check. The Root
    line should name one of the two Google roots above, and the App line should say `com.dpdpxray.app`.
 5. Change one character in the JSON and run it again. Expect exit 1 with `✗ Bundle unchanged` and `✗ Signature`.
+6. Runner with the phone connected (one-time Runner setup in `docs/ci/RUNNER.md`, LeakyShop fixed on the reset
+   allowlist): `traceveil-ci run --package com.leakyshop.demo.fixed --policy docs/ci/traceveil-policy.json
+   --require-signature`. Expect `Saved:` to list `traceveil-out/<run id>/bundle.json.sig.json`, the report to show
+   `Signature: verified (StrongBox, chain ends at Google …)` (or `TEE`), and `PASS  requireSignature`. If the phone
+   cannot sign, the log says `Signature: none on the phone` and the run fails `requireSignature` (exit 1).
+7. `traceveil-ci check traceveil-out/<run id>/bundle.json --policy docs/ci/traceveil-policy.json --require-signature`
+   shows the same `Signature:` line; `traceveil-ci verify traceveil-out/<run id>/bundle.json` lists every check.

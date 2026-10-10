@@ -7,5 +7,7 @@
     "requireFreshState": true,
     "allowInconclusive": false,
     "allowNotEstablished": false,
-    "requirePlans": ["ACCEPT", "REJECT", "SILENT"]
+    "requirePlans": ["ACCEPT", "REJECT", "SILENT"],
+    "_requireSignature": "The hardware signature next to each bundle (<bundle>.sig.json) is always reported. Set true to also fail a bundle whose signature is missing or does not verify; phones that cannot sign in secure hardware write none (docs/SIGNED_EVIDENCE.md).",
+    "requireSignature": false
 }

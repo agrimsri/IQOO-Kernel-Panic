@@ -40,7 +40,7 @@ What it is not: a pass is not a compliance certificate, and a failure is not a l
 3. **The phone decides.** TraceVeil checks that Developer automation is on, the token matches, the app is installed (and is not TraceVeil), a full run's app is on the reset allowlist with Shizuku ready, the VPN is allowed and the consent watcher is on, and no other check is running. If anything is missing it refuses, shows why on screen and writes the reason and the fix for the laptop.
 4. **The normal audit runs.** An accepted request starts the same audit as **Start check** in the app (same plans, timing, agent taps, reset and saving) and shows the normal live screen.
 5. **Progress:** the phone keeps `Android/data/com.dpdpxray.app/files/automation/<run id>/status.json` up to date; the laptop reads it every 2 seconds and prints each step.
-6. **Result:** when the audit is saved, the phone writes `bundle.json` (the standard `traceveil.audit.v1` export, the same as **Export audit data (JSON)**), then marks the status `done` with a signature of the bundle (HMAC-SHA256 keyed with the run's pairing token). The laptop copies both with adb, checks the signature, re-checks the bundle with the current rules and applies the policy exactly like `traceveil-ci check`.
+6. **Result:** when the audit is saved, the phone writes `bundle.json` (the standard `traceveil.audit.v1` export, the same as **Export audit data (JSON)**), then marks the status `done` with a signature of the bundle (HMAC-SHA256 keyed with the run's pairing token). When the phone can sign in secure hardware, it also writes `bundle.json.sig.json` (the hardware signature, see [SIGNED_EVIDENCE.md](../SIGNED_EVIDENCE.md)) before marking the run done. The laptop copies the bundle and, when present, its hardware signature with adb, checks the HMAC, verifies the hardware signature offline, re-checks the bundle with the current rules and applies the policy exactly like `traceveil-ci check` (including the `Signature:` line and the `requireSignature` rule).
 
 ## One-time phone setup
 
@@ -87,7 +87,7 @@ The log shows the preflight, the start command (with the token hidden), one line
 ```text
 traceveil-ci run --package <pkg> [--device SERIAL] [--apk file.apk] [--mode full|quick] [--token T]
                  [--policy policy.json] [--timeout 300] [--out traceveil-out] [--adb path]
-                 [--format text|json] [--sarif file] [--child-facing]
+                 [--format text|json] [--sarif file] [--child-facing] [--require-signature]
 ```
 
 | Option | Meaning |
@@ -99,23 +99,24 @@ traceveil-ci run --package <pkg> [--device SERIAL] [--apk file.apk] [--mode full
 | `--token` | Pairing token. Default: `TRACEVEIL_TOKEN`. Never printed. |
 | `--policy` | Policy file, same keys and defaults as `check` (see [CI mode](../CI_MODE.md#policy-reference)). A quick run cannot pass the default policy, which requires all three plans; the log says so. |
 | `--timeout` | Seconds to wait for the phone after the start (default 300). |
-| `--out` | Folder for the evidence (default `traceveil-out`); each run writes `<out>/<run id>/bundle.json` and `status.json`. |
+| `--out` | Folder for the evidence (default `traceveil-out`); each run writes `<out>/<run id>/bundle.json` and `status.json`, plus `bundle.json.sig.json` when the phone signed the bundle. |
 | `--adb` | adb executable. Default: `ADB`, else `adb` on `PATH`. |
 | `--format` | `text` (default) or `json`. With `json`, stdout holds one `traceveil.ci.run.v1` document for every run that gets past the option checks (option errors are printed to stderr with exit 2, as for `check`), and the progress log goes to stderr. |
 | `--sarif` | Also write the findings as SARIF 2.1.0 for code scanning (only when a bundle was checked). |
 | `--child-facing` | Declare the app child-facing, so C9 can be tested instead of being NOT ESTABLISHED. |
+| `--require-signature` | Fail the run (exit 1) unless `bundle.json.sig.json` was copied from the phone and verifies against a Google hardware attestation root. Same as `"requireSignature": true` in the policy. Without it, the signature is checked and reported but does not gate. |
 
 | Exit code | Meaning |
 | --- | --- |
 | 0 | The audit finished and its bundle passes the policy. |
-| 1 | The audit finished and its bundle violates the policy (the report lists each violation). |
+| 1 | The audit finished and its bundle violates the policy (the report lists each violation), including `requireSignature` when the phone wrote no hardware signature or it does not verify. |
 | 2 | Anything that stopped the run before a policy result: bad options or policy, adb missing, no phone, several phones without `--device`, an unauthorised or offline phone, TraceVeil or the app not installed, a failed `--apk` install or one that did not update the package, a refusal or failure on the phone (with its reason and fix), lost contact, `--timeout`, or a bundle that is not signed for this run or does not match it. |
 
 A timeout does not stop the check on the phone; it finishes there and stays in TraceVeil's Reports.
 
 ### JSON output (`traceveil.ci.run.v1`)
 
-`schema`, `tool`, `exitCode`, `passed`, `error` and `fix` (null when the run finished), `device`, `package`, `mode`, `runId`, `status` (the phone's last status, below), `bundle` (path of the saved bundle) and `check` (the `traceveil.ci.check.v1` report of `check --format json`, or null).
+`schema`, `tool`, `exitCode`, `passed`, `error` and `fix` (null when the run finished), `device`, `package`, `mode`, `runId`, `status` (the phone's last status, below), `bundle` (path of the saved bundle), `signatureFile` (path of the copied `bundle.json.sig.json`, or null when the phone wrote none) and `check` (the `traceveil.ci.check.v1` report of `check --format json`, or null).
 
 ### The phone's status file (`traceveil.automation.status.v1`)
 
@@ -142,7 +143,7 @@ The pairing token is never written to it.
 - **Nothing is granted for you.** The Runner never allows the VPN, never switches on the accessibility service, never grants a permission and never taps Android permission dialogs. If something is missing, the phone refuses and says what to do. The agent taps only Accept and Reject in the app under test's consent screen, as **Let the agent tap Accept and Reject** does.
 - **Plain values, no paths or commands.** The request carries strings and booleans only. The run id must match `[A-Za-z0-9_-]{1,40}`; it is the only value that becomes part of a file path, and files are written only under TraceVeil's own `Android/data/com.dpdpxray.app/files/automation/`. An already used run id is refused rather than overwritten. The 20 most recent runs are kept.
 - **Signed evidence.** The `done` status carries an HMAC-SHA256 of `bundle.json`'s exact bytes, keyed with the pairing token that started the run; traceveil-ci recomputes it and refuses (exit 2) to gate a bundle that does not match. A bundle written or changed by anything that does not know the token, such as another app with shell rights, is therefore never gated. It does not protect against someone who has the token, and on a debuggable TraceVeil build adb itself can read the token (`run-as`).
-- **Hardware signature (optional, phone-side).** When the phone can, it also writes `bundle.json.sig.json` next to `bundle.json`: an ECDSA signature by a key in the phone's secure hardware, with its Android Key Attestation chain. `traceveil-ci run` does not copy it yet; `adb pull` the run folder and check it with `traceveil-ci verify bundle.json` (see [SIGNED_EVIDENCE.md](../SIGNED_EVIDENCE.md)). It needs no shared token and shows that the key lives in StrongBox or the TEE and was made for TraceVeil.
+- **Hardware signature (optional, phone-side).** When the phone can, it also writes `bundle.json.sig.json` next to `bundle.json`: an ECDSA signature by a key in the phone's secure hardware, with its Android Key Attestation chain. `traceveil-ci run` copies it next to `bundle.json` in `<out>/<run id>/`, verifies it offline and prints `Signature: verified (StrongBox, chain ends at <Google root>)`, `NOT verified (…)` or `absent (…)`; `--require-signature` makes anything but verified fail the run. A missing file on the phone means the phone could not sign (or an older TraceVeil build) and is reported as absent, not as an error. `traceveil-ci verify <out>/<run id>/bundle.json` prints every check (see [SIGNED_EVIDENCE.md](../SIGNED_EVIDENCE.md)). It needs no shared token and shows that the key lives in StrongBox or the TEE and was made for TraceVeil.
 - **Nothing leaves the phone except over your own USB/adb connection.** TraceVeil uploads nothing and opens no network service for the Runner; the laptop reads `status.json` and copies `bundle.json` over adb. The bundle holds the evidence (looked-up hosts, consent-screen text, device model); treat CI artifacts that contain it accordingly.
 - **Where the files sit.** `Android/data/com.dpdpxray.app/files/automation/` is TraceVeil's app-specific folder: from Android 11 on, other apps cannot read it, but adb can. On Android 10, apps holding the storage permission may be able to read and write it, so use a test phone without other untrusted apps.
 
@@ -172,5 +173,7 @@ The pairing token is never written to it.
 | `Timed out after … s` | The check may still be finishing on the phone; raise `--timeout` and watch the phone's live screen. |
 | `Android brought an earlier TraceVeil screen to the front` | Close TraceVeil's runner screen on the phone (or force-stop TraceVeil) and run again; use matching TraceVeil and traceveil-ci builds. |
 | `bundle.json is not signed with this run's pairing token` | Run again; if it repeats, check which apps on the phone have shell rights through Shizuku. |
+| `Signature: none on the phone` / `Signature: absent` | The phone wrote no `bundle.json.sig.json`: it has no secure-hardware key or attestation, or TraceVeil is older than signed evidence. Without `--require-signature` the run is gated as before. |
+| `Signature: NOT verified (…)` | Run `traceveil-ci verify <out>/<run id>/bundle.json` for every check. `Root` failing means the chain does not end at a Google hardware attestation root. |
 
 See also: [CI mode](../CI_MODE.md) for `check`, `diff`, policies and bundle formats, and [github-runner-example.yml](github-runner-example.yml) for a self-hosted CI runner with a USB test phone.

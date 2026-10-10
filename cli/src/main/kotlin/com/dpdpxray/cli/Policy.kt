@@ -25,6 +25,8 @@ import kotlinx.serialization.json.put
  * - allowInconclusive false: an inconclusive result (low network visibility) cannot pass.
  * - requirePlans ["ACCEPT", "REJECT", "SILENT"]: these plans must be captured, and an Accept or Reject plan counts only
  *   when that choice was recorded (with no consent screen, or no recorded choice, behaviour after it was not tested).
+ * - requireSignature false: the hardware signature next to a bundle (<bundle>.sig.json, traceveil.signature.v1) is
+ *   always reported; set true to fail a bundle whose signature is missing or does not verify.
  *
  * Unknown keys are an error, so a typo cannot silently weaken the gate. Keys starting with "_" or "$" are comments.
  */
@@ -36,6 +38,7 @@ data class Policy(
     val allowInconclusive: Boolean = false,
     val requirePlans: List<AuditPlan> = AuditPlan.entries.toList(),
     val allowNotEstablished: Boolean = false,
+    val requireSignature: Boolean = false,
 ) {
     fun toJson(): JsonObject = buildJsonObject {
         put("failOn", JsonArray(failOn.map { JsonPrimitive(it.code) }))
@@ -45,11 +48,12 @@ data class Policy(
         put("allowInconclusive", allowInconclusive)
         put("allowNotEstablished", allowNotEstablished)
         put("requirePlans", JsonArray(requirePlans.map { JsonPrimitive(it.name) }))
+        put("requireSignature", requireSignature)
     }
 
     companion object {
         val DEFAULT_FAIL_ON = listOf(CheckId.C2, CheckId.C9)
-        val KEYS = listOf("failOn", "minScore", "maxHigh", "requireFreshState", "allowInconclusive", "allowNotEstablished", "requirePlans")
+        val KEYS = listOf("failOn", "minScore", "maxHigh", "requireFreshState", "allowInconclusive", "allowNotEstablished", "requirePlans", "requireSignature")
 
         /** Throws [UsageException] with a plain reason when the policy cannot be used. */
         fun parse(text: String): Policy {
@@ -68,6 +72,7 @@ data class Policy(
             root["allowInconclusive"]?.let { p = p.copy(allowInconclusive = bool(it, "allowInconclusive")) }
             root["allowNotEstablished"]?.let { p = p.copy(allowNotEstablished = bool(it, "allowNotEstablished")) }
             root["requirePlans"]?.let { p = p.copy(requirePlans = strings(it, "requirePlans").map(::plan).distinct()) }
+            root["requireSignature"]?.let { p = p.copy(requireSignature = bool(it, "requireSignature")) }
             return p
         }
 
