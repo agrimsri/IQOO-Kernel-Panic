@@ -22,6 +22,8 @@ data class XraySettings(
     val spokenGuidance: Boolean = false,
     /** "en" or "hi": language of guidance text and speech. */
     val guideLanguage: String = "en",
+    /** Everyday (USER) or Developer Home; a missing value reads as DEVELOPER so existing installs see no change. */
+    val audience: Audience = Audience.DEFAULT,
 )
 
 /** Read side of the stored settings, so the mapping can be tested without Android. */
@@ -52,6 +54,7 @@ internal object SettingsCodec {
         onboardingDone = kv.getBoolean("onboarding_done", defaults.onboardingDone),
         spokenGuidance = kv.getBoolean("spoken_guidance", defaults.spokenGuidance),
         guideLanguage = kv.getString("guide_language", defaults.guideLanguage),
+        audience = Audience.of(kv.getString("audience", defaults.audience.code)),
     )
 
     fun write(s: XraySettings, sink: SettingsSink) {
@@ -64,6 +67,7 @@ internal object SettingsCodec {
         sink.putBoolean("onboarding_done", s.onboardingDone)
         sink.putBoolean("spoken_guidance", s.spokenGuidance)
         sink.putString("guide_language", s.guideLanguage)
+        sink.putString("audience", s.audience.code)
     }
 }
 

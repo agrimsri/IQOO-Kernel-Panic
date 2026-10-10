@@ -38,4 +38,23 @@ class SettingsCodecTest {
         assertEquals(true, kv.map["spoken_guidance"])
         assertEquals("hi", kv.map["guide_language"])
     }
+
+    @Test fun `installs from before modes existed read as developer mode`() {
+        val old = MapKv(mutableMapOf("onboarding_done" to true, "stage_mode" to true, "guide_language" to "hi"))
+        assertEquals(Audience.DEVELOPER, SettingsCodec.read(old).audience)
+        assertEquals(Audience.DEVELOPER, SettingsCodec.read(MapKv()).audience)
+        assertEquals(Audience.DEVELOPER, XraySettings().audience)
+    }
+
+    @Test fun `audience round trips and an unknown value falls back to developer`() {
+        val kv = MapKv()
+        SettingsCodec.write(XraySettings(audience = Audience.USER), kv)
+        assertEquals("user", kv.map["audience"])
+        assertEquals(Audience.USER, SettingsCodec.read(kv).audience)
+        SettingsCodec.write(XraySettings(audience = Audience.DEVELOPER), kv)
+        assertEquals("developer", kv.map["audience"])
+        assertEquals(Audience.DEVELOPER, SettingsCodec.read(kv).audience)
+        kv.map["audience"] = "somebody-else"
+        assertEquals(Audience.DEVELOPER, SettingsCodec.read(kv).audience)
+    }
 }
