@@ -14,6 +14,8 @@ import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.SecureRandom
 import java.security.Signature
+import java.security.cert.Certificate
+import java.security.cert.X509Certificate
 import java.security.spec.ECGenParameterSpec
 
 /**
@@ -37,13 +39,25 @@ class AndroidEvidenceKey(private val context: Context) : EvidenceKey {
         return HardwareSignature(signature, chain.map { it.encoded }, levelOf(key))
     }
 
-    private fun entry(): Pair<PrivateKey, List<java.security.cert.Certificate>> {
+    /**
+     * The key and the attestation chain stored with it. Remotely provisioned attestation certificates live only days or
+     * weeks, and the stored chain is the one from the day the key was made, so a chain with an expired certificate is
+     * replaced once by a new key (a new attestation); if the new chain is still out of date it is used as it is.
+     */
+    private fun entry(): Pair<PrivateKey, List<Certificate>> {
         val ks = KeyStore.getInstance(KEYSTORE).apply { load(null) }
         if (!ks.containsAlias(ALIAS)) generate()
+        else if (outOfDate(ks.getCertificateChain(ALIAS)?.toList().orEmpty())) {
+            synchronized(LOCK) { runCatching { ks.deleteEntry(ALIAS) } }
+            generate()
+        }
         val key = ks.getKey(ALIAS, null) as? PrivateKey ?: error("the evidence key could not be read from Android Keystore")
         val chain = ks.getCertificateChain(ALIAS)?.toList().orEmpty()
         return key to chain
     }
+
+    private fun outOfDate(chain: List<Certificate>): Boolean =
+        chain.any { c -> c is X509Certificate && runCatching { c.checkValidity() }.isFailure }
 
     /** One key per install, even if an export and a Runner bundle are signed at the same moment. */
     private fun generate() {
