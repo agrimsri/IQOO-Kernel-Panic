@@ -33,7 +33,7 @@ data class QuarantineSummary(
     val permissionDialogs: Int,
     val settingsScreens: List<SensitiveSettings>,
     val appCameToScreen: Boolean,
-    /** No lookups, connection attempts, dialogs or settings screens were seen. Not proof the app does nothing. */
+    /** No lookups, blocked packets, dialogs or settings screens were seen. Not proof the app does nothing. */
     val nothingObserved: Boolean,
 ) {
     companion object {
@@ -73,7 +73,7 @@ data class QuarantineSummary(
                 permissionDialogs = observations.permissionDialogs.size,
                 settingsScreens = observations.settingsScreens.map { it.kind },
                 appCameToScreen = observations.targetOnScreenNanos != null,
-                nothingObserved = observations.dnsQueries == 0L && appRows.isEmpty() &&
+                nothingObserved = observations.dnsQueries == 0L && observations.blocked.isEmpty() &&
                     observations.permissionDialogs.isEmpty() && observations.settingsScreens.isEmpty(),
             )
         }

@@ -72,6 +72,7 @@ class QuarantineRecorderTest {
         val s = QuarantineSummary.of(r.snapshot(), resolvers)
         assertTrue(s.ipsAttempted.isEmpty())
         assertEquals(listOf("10.111.0.53:853 (TCP SYN)"), s.encryptedDnsDestinations)
+        assertFalse(s.nothingObserved) // blocked DNS is still something observed
     }
 
     @Test
