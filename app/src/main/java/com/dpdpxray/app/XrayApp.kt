@@ -9,6 +9,8 @@ import com.dpdpxray.app.ai.LlmEngine
 import com.dpdpxray.app.audit.AuditOrchestrator
 import com.dpdpxray.app.data.AuditRepository
 import com.dpdpxray.app.data.SettingsStore
+import com.dpdpxray.app.npu.ConsentLensEngine
+import com.dpdpxray.core.consentlens.ConsentLensAugmenter
 import com.dpdpxray.core.dpdp.Bm25Retriever
 import com.dpdpxray.core.dpdp.CitationService
 import com.dpdpxray.core.dpdp.DpdpCorpus
@@ -41,7 +43,11 @@ class AppGraph(val app: Application) {
     val settings = SettingsStore(app)
     val repository = AuditRepository(app)
     val llm = LlmEngine(app)
-    val screenAuditor = AiScreenAuditor(llm)
+    /** ConsentLens-1, TraceVeil's own string-role model on the NPU (CPU fallback); loads on first use. */
+    val consentLens = ConsentLensEngine(app)
+    val screenAuditor = AiScreenAuditor(llm, consentLens) {
+        runCatching { consentLens.meta.defaultThreshold }.getOrDefault(ConsentLensAugmenter.DEFAULT_THRESHOLD)
+    }
     val explainer = FindingExplainer(llm)
     val orchestrator = AuditOrchestrator(app, this)
 
