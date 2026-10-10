@@ -61,6 +61,7 @@ import com.dpdpxray.app.audit.AuditPlanCoverage
 import com.dpdpxray.app.audit.AuditTimingPolicy
 import com.dpdpxray.app.data.AuditNetworkReadings
 import com.dpdpxray.app.data.AuditComparisonResult
+import com.dpdpxray.app.data.LensChoice
 import com.dpdpxray.app.netproof.NetworkProofCard
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.EndpointMapIntegration
@@ -93,6 +94,14 @@ import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
 import com.dpdpxray.app.ui.theme.bandColor
 import com.dpdpxray.app.ui.theme.severityColor
+import com.dpdpxray.core.law.LawRelation
+import com.dpdpxray.core.law.LegalLens
+import com.dpdpxray.core.law.LegalProfile
+import com.dpdpxray.core.law.LensPassage
+import com.dpdpxray.core.law.LensProfile
+import com.dpdpxray.core.law.LensText
+import com.dpdpxray.core.law.LensView
+import com.dpdpxray.core.law.PassageKind
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.CheckId
 import com.dpdpxray.core.model.ConsentKind
@@ -131,7 +140,10 @@ fun ResultsScreen(
             TopBar(b.meta.targetLabel, onBack)
             Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
                 val grade = remember(b.meta.id) { if (b.meta.sample) null else ConfidenceGrader.gradeAudit(b.sessions) }
-                ScorePanel(b, grade)
+                val lensSettings by vm.settings.collectAsState()
+                val choice = remember(lensSettings.legalProfile) { vm.lensChoice(lensSettings.legalProfile) }
+                val view = remember(b.meta.id, choice.profile) { vm.legal.view(r, choice.profile) }
+                ScorePanel(b, grade, view, choice)
                 Text(headline(r.findings), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 16.dp))
                 // Coverage caveats stay in view, above anything the reader might act on.
                 val gaps = AuditPlanCoverage.gaps(b.sessions)
@@ -171,7 +183,7 @@ fun ResultsScreen(
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    r.findings.forEach { f -> FindingRow(f, ResultSources.of(f, b.sessions)) { onFinding(f.checkId) } }
+                    r.findings.forEach { f -> FindingRow(f, ResultSources.of(f, b.sessions), view) { onFinding(f.checkId) } }
                 }
 
                 GroupHeader("Evidence and limits")
@@ -269,7 +281,7 @@ private fun headline(findings: List<Finding>): String {
  * timing, then the severity summary. Inconclusive shows "?" and a dashed track, never a zero.
  */
 @Composable
-private fun ScorePanel(b: AuditBundle, grade: ConfidenceGrade?) {
+private fun ScorePanel(b: AuditBundle, grade: ConfidenceGrade?, view: LensView, choice: LensChoice) {
     val r = b.result
     val color = bandColor(r.band)
     val inconclusive = r.band == ScoreBand.INCONCLUSIVE
@@ -279,7 +291,7 @@ private fun ScorePanel(b: AuditBundle, grade: ConfidenceGrade?) {
             Spacer(Modifier.width(14.dp))
             Column(Modifier.padding(bottom = 8.dp).weight(1f)) {
                 Text(r.band.label, style = MaterialTheme.typography.titleLarge, color = color)
-                Text("DPDP readiness out of 100", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                Text("Consent readiness out of 100", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
             }
         }
         var shown by remember(b.meta.id) { mutableStateOf(false) }
@@ -314,9 +326,38 @@ private fun ScorePanel(b: AuditBundle, grade: ConfidenceGrade?) {
                 Note(AuditTimingPolicy.coverageHint(b.meta.timingProfile), if (preview) Film.warn else Film.boneDim)
             }
         }
+        LensSummary(view, choice)
         SeverityStrip(r.findings)
     }
 }
+
+/**
+ * The selected legal lens under the score: its name, the score under it (not-applicable findings skipped) and, behind a
+ * fold, what the lens is and that it is not a verdict. The headline score above stays the consent-first standard.
+ */
+@Composable
+private fun LensSummary(view: LensView, choice: LensChoice) {
+    Spacer(Modifier.height(14.dp))
+    Box(Modifier.fillMaxWidth().height(1.dp).background(FilmExtra.hairline))
+    Text("Legal lens · ${view.profile.name}", style = MaterialTheme.typography.labelLarge, color = Film.scan, modifier = Modifier.padding(top = 12.dp))
+    Text(view.scoreLine, style = MaterialTheme.typography.bodyMedium, color = Film.bone, modifier = Modifier.padding(top = 2.dp))
+    LearnMore(label = "About this lens") {
+        Note("${choice.describe()}. Change it in Settings.")
+        Note(view.profile.laws)
+        Note(view.profile.status)
+        Note(view.scoreNote)
+        choice.hint?.let { Note(it, Film.warn) }
+    }
+}
+
+/** Relation chips keep one colour each: required (or good practice) warm, context and not applicable muted. */
+private fun relationColor(r: LawRelation) = when (r) {
+    LawRelation.REQUIRED -> Brand.peach
+    LawRelation.CONTEXT -> Film.scan
+    LawRelation.NOT_APPLICABLE -> Film.boneDim
+}
+
+private fun relationTag(p: LensProfile, r: LawRelation) = "${p.name}: ${p.relationLabel(r)}"
 
 private fun confidenceColor(level: ConfidenceLevel) = when (level) {
     ConfidenceLevel.HIGH -> Film.clear
@@ -394,12 +435,14 @@ private fun SeverityStrip(findings: List<Finding>) {
 
 /** A finding as a card: severity and evidence chips, the title, who was contacted. Tapping opens the evidence. */
 @Composable
-private fun FindingRow(f: Finding, source: ResultSource, onClick: () -> Unit) {
+private fun FindingRow(f: Finding, source: ResultSource, view: LensView, onClick: () -> Unit) {
+    val relation = view.of(f.checkId)?.relation
     RuleRow(severityColor(f.severity), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             ChipFlow(Modifier.weight(1f)) {
                 Tag(f.severity.label, severityColor(f.severity))
                 Tag(source.label, sourceColor(source))
+                relation?.let { Tag(relationTag(view.profile, it), relationColor(it)) }
             }
             GlyphIcon(Glyph.CHEVRON_RIGHT, Film.boneDim, size = 18.dp)
         }
@@ -407,7 +450,7 @@ private fun FindingRow(f: Finding, source: ResultSource, onClick: () -> Unit) {
         if (f.entities.isNotEmpty()) Text(f.entities.joinToString(), style = MaterialTheme.typography.bodyMedium, color = severityColor(f.severity), modifier = Modifier.padding(top = 2.dp))
         Text(
             (if (f.evidenceType == EvidenceType.OBSERVED) "Observed on device" else "Inferred") +
-                (if (f.penaltyBand.name != "NONE") " · ${f.penaltyBand.label.substringBefore(" (")}" else ""),
+                (if (view.profile.penaltyFigures && f.penaltyBand.name != "NONE") " · ${f.penaltyBand.label.substringBefore(" (")}" else ""),
             style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.padding(top = 4.dp),
         )
     }
@@ -463,6 +506,10 @@ private fun choiceLabel(kind: ConsentKind, at: String) = if (kind == ConsentKind
 fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: () -> Unit, onFixes: () -> Unit) {
     WithBundle(vm, id) { b ->
         val f = b.result.findings.firstOrNull { it.checkId.name == check } ?: return@WithBundle
+        val lensSettings by vm.settings.collectAsState()
+        val profile = remember(lensSettings.legalProfile) { vm.lensProfile() }
+        val lensProfile = vm.legal.profile(profile)
+        val mapping = remember(profile, f.checkId) { vm.legal.mapping(profile, f.checkId) }
         val explanations by vm.explanations.collectAsState()
         val explaining by vm.explaining.collectAsState()
         Column(Modifier.fillMaxSize()) {
@@ -472,9 +519,12 @@ fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: ()
                 ChipFlow(Modifier.padding(vertical = 12.dp)) {
                     Tag(f.severity.label, severityColor(f.severity))
                     Tag(ResultSources.of(f, b.sessions).label, sourceColor(ResultSources.of(f, b.sessions)))
-                    if (f.penaltyBand.name != "NONE") Tag(f.penaltyBand.label.substringBefore(" ("), Film.boneDim)
+                    if (lensProfile.penaltyFigures && f.penaltyBand.name != "NONE") Tag(f.penaltyBand.label.substringBefore(" ("), Film.boneDim)
+                    Tag(relationTag(lensProfile, mapping.relation), relationColor(mapping.relation))
                 }
-                Text(f.explanation, style = MaterialTheme.typography.bodyLarge)
+                val explained = remember(f, profile) { LensText.explanation(f, profile) }
+                Text(explained.text, style = MaterialTheme.typography.bodyLarge)
+                if (explained.citesIndia) Note(LensText.INDIA_WORDING_NOTE)
 
                 val aliases = remember(b, f) { vm.findingAliases(f, b) }
                 if (aliases.isNotEmpty()) {
@@ -521,15 +571,18 @@ fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: ()
                     f.evidence.forEach { CodeBlock(it, Modifier.padding(bottom = 6.dp)) }
                 }
 
-                SectionTitle("What the law says")
-                val cites by produceState(initialValue = emptyList<com.dpdpxray.core.dpdp.Passage>(), f) { value = vm.citationsFor(f) }
-                if (cites.isEmpty()) Note("Finding the relevant sections…")
-                cites.forEach { p ->
-                    RuleRow(Film.scan) {
-                        Text(p.text, style = MaterialTheme.typography.bodyMedium)
-                        Text(p.source + if (p.verbatim) "" else " (summary)", style = MaterialTheme.typography.labelMedium, color = Film.scan, modifier = Modifier.padding(top = 6.dp))
-                    }
-                    Spacer(Modifier.height(8.dp))
+                SectionTitle("What the law says · ${lensProfile.name}")
+                ChipFlow(Modifier.padding(bottom = 8.dp)) { Tag(lensProfile.relationLabel(mapping.relation), relationColor(mapping.relation)) }
+                Text(mapping.note, style = MaterialTheme.typography.bodyMedium, color = Film.bone, modifier = Modifier.padding(bottom = 10.dp))
+                var loaded by remember(f, profile) { mutableStateOf(false) }
+                val cites by produceState(initialValue = emptyList<LensPassage>(), f, profile) { value = vm.lensPassagesFor(f, profile); loaded = true }
+                if (!loaded) Note("Finding the relevant sections…")
+                else if (cites.isEmpty()) Note("No legal passage is cited for this finding under this lens.")
+                cites.forEach { p -> LawPassage(p) }
+                Note(if (profile == LegalProfile.INDIA) "Legal text is context, not a verdict. The DPDP Act's main provisions commence on 13 May 2027, so this describes readiness."
+                    else "Legal text is context, not a verdict. Confirm applicability with a qualified reviewer.")
+                LearnMore(label = "Compare laws") {
+                    vm.legal.compare(f.checkId.code).forEach { (id, m) -> CompareRow(vm.legal, id, m.relation, m.note) }
                 }
 
                 SectionTitle("Explain with on-device AI")
@@ -554,6 +607,32 @@ fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: ()
                 Spacer(Modifier.height(32.dp))
             }
         }
+    }
+}
+
+/** One cited passage: the text, an English summary for a non-English original, then source, wording and where it was read. */
+@Composable
+private fun LawPassage(p: LensPassage) {
+    RuleRow(Film.scan) {
+        Text(p.text, style = MaterialTheme.typography.bodyMedium)
+        p.englishSummary?.let {
+            Text("English summary, not an official translation: $it", style = MaterialTheme.typography.bodySmall, color = Film.boneDim, modifier = Modifier.padding(top = 6.dp))
+        }
+        val kind = if (p.kind == PassageKind.LAW) "" else " · ${p.kind.label}"
+        Text("${p.source} · ${p.wording}$kind", style = MaterialTheme.typography.labelMedium, color = Film.scan, modifier = Modifier.padding(top = 6.dp))
+        val where = listOfNotNull(p.url, p.retrieved?.let { "read $it" }).joinToString(" · ")
+        if (where.isNotEmpty()) Text(where, style = MaterialTheme.typography.labelSmall, color = Film.boneDim, modifier = Modifier.padding(top = 2.dp))
+    }
+    Spacer(Modifier.height(8.dp))
+}
+
+/** A "Compare laws" line: the relation chip, the law's name and its note for this check. */
+@Composable
+private fun CompareRow(lens: LegalLens, id: LegalProfile, relation: LawRelation, note: String) {
+    val p = lens.profile(id)
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        ChipFlow { Tag(p.relationLabel(relation), relationColor(relation)); Text(p.name, style = MaterialTheme.typography.titleSmall, color = Film.bone) }
+        Text(note, style = MaterialTheme.typography.bodySmall, color = Film.boneDim, modifier = Modifier.padding(top = 4.dp))
     }
 }
 
@@ -628,8 +707,14 @@ fun ReportScreen(vm: XrayViewModel, id: String, onBack: () -> Unit) {
                     Spacer(Modifier.height(10.dp))
                     Callout("Audit data (JSON) is this audit's full evidence (lookups, consent-screen text, device model) for TraceVeil CI on a laptop or build server. Review it before sharing it or committing it to a repository.")
                 }
-                CollapsibleCard("Report preview", summary = "The Markdown report, limits included", glyph = Glyph.REPORTS) {
-                    Text(vm.markdown(b), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                val lensSettings by vm.settings.collectAsState()
+                val profile = remember(lensSettings.legalProfile) { vm.lensProfile() }
+                CollapsibleCard("Report preview", summary = "The Markdown report under the ${vm.legal.profile(profile).name} lens, limits included", glyph = Glyph.REPORTS) {
+                    val preview by produceState("", b.meta.id, profile) {
+                        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { vm.markdown(b, profile) }
+                    }
+                    if (preview.isEmpty()) Note("Building the report…")
+                    else Text(preview, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
                 }
                 Spacer(Modifier.height(16.dp))
             }
