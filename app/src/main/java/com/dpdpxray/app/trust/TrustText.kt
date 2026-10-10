@@ -30,6 +30,8 @@ object TrustText {
     fun purpose(permission: String, ownPackage: String): Pair<String, String>? = when (permission) {
         "android.permission.INTERNET" -> "Internet" to
             "Relays the checked app's DNS lookups during a check. The optional online voice and wake-word model download also use it, only if you turn them on."
+        "android.permission.RECEIVE_BOOT_COMPLETED" -> "Resume after a restart" to
+            "Lets Auto-guard reschedule its new-app check and weekly phone checkup after the phone restarts. Both run on this phone only and can be switched off in Settings."
         "android.permission.ACCESS_NETWORK_STATE" -> "Network state" to
             "Finds this network's DNS servers for the relay and checks whether Private DNS is on."
         "android.permission.RECORD_AUDIO" -> "Microphone" to
