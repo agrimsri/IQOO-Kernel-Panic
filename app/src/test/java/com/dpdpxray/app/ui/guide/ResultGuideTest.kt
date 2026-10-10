@@ -89,6 +89,12 @@ class ResultGuideTest {
         assertTrue(ResultGuide.step(facts(sample = true)).spoken.en.contains("sample"))
     }
 
+    @Test fun `a ready result is never read aloud without its caveat`() {
+        val step = ResultGuide.step(facts(ScoreBand.READY, 100, findings = 0, fixes = 0))
+        assertTrue(step.spoken.en, step.spoken.en.contains("not a safety certificate"))
+        assertTrue(step.spoken.hi, step.spoken.hi.contains("प्रमाणपत्र नहीं"))
+    }
+
     @Test fun `singular finding reads naturally`() {
         assertTrue(ResultGuide.step(facts(findings = 1)).spoken.en.endsWith("1 finding."))
         assertTrue(ResultGuide.explain(facts(ScoreBand.NEEDS_WORK, 80, findings = 1)).meaning.first().en.contains("1 finding "))

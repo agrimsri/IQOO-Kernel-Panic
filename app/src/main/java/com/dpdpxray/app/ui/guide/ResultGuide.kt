@@ -116,11 +116,13 @@ object ResultGuide {
             else "स्कोर 100 में से ${f.score}: ${bandHi(f.band)}।"
         val extraEn = buildString {
             if (f.findingCount > 0 || f.band != ScoreBand.INCONCLUSIVE) append(" ${findings(f.findingCount)}.")
+            if (f.band == ScoreBand.READY) append(" It covers only what was captured; it is not a safety certificate.")
             if (f.coverageGaps) append(" Part of the check didn't finish.")
             if (f.sample) append(" This is sample data.")
         }
         val extraHi = buildString {
             if (f.findingCount > 0 || f.band != ScoreBand.INCONCLUSIVE) append(" ${f.findingCount} फ़ाइंडिंग।")
+            if (f.band == ScoreBand.READY) append(" यह सिर्फ़ दर्ज सबूतों पर आधारित है; यह सुरक्षा प्रमाणपत्र नहीं है।")
             if (f.coverageGaps) append(" जाँच का कुछ हिस्सा पूरा नहीं हुआ।")
             if (f.sample) append(" यह नमूना डेटा है।")
         }

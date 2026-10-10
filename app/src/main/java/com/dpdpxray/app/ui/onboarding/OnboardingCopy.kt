@@ -39,7 +39,7 @@ object OnboardingCopy {
             "try",
             Bi("Try it safely", "सुरक्षित तरीके से आज़माएँ"),
             Bi("Start with a sample or the demo app. Avoid banking, payment and chat apps.", "नमूने या डेमो ऐप से शुरू करें। बैंकिंग, पेमेंट और चैट ऐप से बचें।"),
-            Bi("Try it safely. See a sample, or check the LeakyShop demo app.", "सुरक्षित तरीके से आज़माएँ। नमूना देखें, या डेमो ऐप LeakyShop की जाँच करें।"),
+            Bi("Try it safely. See a sample, or check the demo app.", "सुरक्षित तरीके से आज़माएँ। नमूना देखें, या डेमो ऐप की जाँच करें।"),
         ),
     )
 

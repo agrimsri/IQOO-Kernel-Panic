@@ -18,6 +18,7 @@ class OnboardingCopyTest {
         OnboardingCopy.pages.forEach { p ->
             listOf(p.title, p.body, p.spoken).forEach { assertTrue(p.key, it.en.isNotBlank() && hasHindi(it)) }
             assertTrue("${p.key} spoken is too long", p.spoken.en.length <= 160)
+            assertFalse("${p.key} spoken names an app", p.spoken.en.contains("LeakyShop") || p.spoken.hi.contains("LeakyShop"))
         }
         (OnboardingCopy.needs.map { it.body } + OnboardingCopy.privacy + OnboardingCopy.exampleCaption +
             listOf(OnboardingCopy.sample, OnboardingCopy.demo, OnboardingCopy.apk).flatMap { listOf(it.title, it.detail) } +
