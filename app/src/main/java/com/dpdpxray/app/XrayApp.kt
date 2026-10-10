@@ -29,6 +29,8 @@ class XrayApp : Application() {
         graph = AppGraph(this)
         // APK Guard new-install alerts; lives only while this process lives.
         com.dpdpxray.app.apkguard.ApkInstallWatcher.register(this)
+        // Auto-guard: background new-app check and weekly checkup jobs, following their Settings switches.
+        com.dpdpxray.app.autoguard.AutoGuard.start(this)
     }
 }
 

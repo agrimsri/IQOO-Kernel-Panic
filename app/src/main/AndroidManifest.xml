@@ -12,6 +12,8 @@
     <!-- Opt-in "Hey TraceVeil" (off by default): only while the user has started it, with a visible notification. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Auto-guard: keeps the background new-app check and weekly checkup jobs scheduled after a restart. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Needed to list installed apps that can be audited. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
@@ -92,6 +94,26 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/consent_accessibility" />
         </service>
+
+        <!-- Auto-guard background checks (platform JobScheduler). Only Android's job scheduler may bind them. -->
+        <service
+            android:name=".autoguard.NewAppCheckJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service
+            android:name=".autoguard.PhoneCheckupJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <!-- Re-checks the Auto-guard jobs after a restart or an update of TraceVeil. It starts no microphone,
+             VPN or audit. -->
+        <receiver
+            android:name=".autoguard.AutoGuardBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
