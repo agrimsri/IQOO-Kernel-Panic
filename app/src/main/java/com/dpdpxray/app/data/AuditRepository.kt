@@ -1,6 +1,7 @@
 package com.dpdpxray.app.data
 
 import android.content.Context
+import com.dpdpxray.core.datasafety.PlayLabelRecord
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.ScoreBand
@@ -45,6 +46,8 @@ data class AuditMeta(
 data class AuditBundle(
     val meta: AuditMeta, val sessions: List<AuditSession>, val result: AuditResult, val dir: File,
     val networkReadings: List<SessionNetworkReadings> = emptyList(),
+    /** The Play Data safety text attached to this check ("Play label vs what we saw"); null = none attached. */
+    val playLabel: PlayLabelRecord? = null,
 )
 
 /** Stores each audit as plain JSON + Markdown under filesDir/audits/<id>/ (nothing leaves the device). */
@@ -92,9 +95,16 @@ class AuditRepository(private val context: Context) {
                 result = AuditJson.json.decodeFromString(AuditResult.serializer(), File(dir, RESULT).readText()),
                 dir = dir,
                 networkReadings = AuditNetworkReadings.load(dir),
+                playLabel = PlayLabelFiles.load(dir),
             )
         }.getOrNull()
     }
+
+    /** Attaches (or replaces) the Play label of a saved check. Blocking; call off the main thread. */
+    fun savePlayLabel(id: String, record: PlayLabelRecord) = PlayLabelFiles.save(File(root, id), record)
+
+    /** Removes the Play label of a saved check. Blocking; call off the main thread. */
+    fun deletePlayLabel(id: String): Boolean = PlayLabelFiles.delete(File(root, id))
 
     fun markdownFile(id: String) = File(File(root, id), REPORT_MD)
 
