@@ -76,6 +76,9 @@ class SdkManifestCatalog(val entries: List<SdkManifestEntry>) {
 
     fun isSdkComponent(name: String): Boolean = name in componentNames || componentPrefixes.any { name.startsWith(it) }
 
+    /** True for a documented collection switch; the phone reads only these values from the app's meta-data. */
+    fun isCollectionFlag(key: String): Boolean = key in flagKeys
+
     /**
      * Keeps only allow-listed facts. [metaData] is the application's meta-data (null = not read); [components] maps
      * each manifest part ([AppManifestFacts.COMPONENT_PARTS]) to the names found there (null = that part not read).
