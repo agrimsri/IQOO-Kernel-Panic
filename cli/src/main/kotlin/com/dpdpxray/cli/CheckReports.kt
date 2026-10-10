@@ -7,7 +7,10 @@ import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.EvidenceType
 import com.dpdpxray.core.model.Finding
 import com.dpdpxray.core.model.ScoreBand
+import com.dpdpxray.core.rules.ScoreCalculator
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -35,6 +38,26 @@ object Wording {
     }
 
     fun evidence(t: EvidenceType): String = t.name
+
+    /**
+     * How far AI and documentation readings (INFERRED findings) could move the result: worst case every one confirmed,
+     * best case every one wrong. Computed from the findings by the core calculator; the score itself never changes.
+     */
+    fun robustness(r: AuditResult): String {
+        val rob = ScoreCalculator.robustness(r.findings) ?: return "not established (the result is inconclusive)"
+        val codes = rob.inferred.joinToString { it.code }
+        return when {
+            rob.movable -> "AI and documentation readings (INFERRED: $codes) can move this between ${rob.worstCase} and ${rob.bestCase} · " +
+                if (rob.bandStable) "the band stays ${band(rob.band, rob.score)}"
+                else "the band could change (worst case: ${band(rob.worstBand, rob.worstCase)}; best case: ${band(rob.bestBand, rob.bestCase)})"
+            rob.inferred.isEmpty() -> "fixed: no INFERRED finding carries points, so AI and documentation readings cannot move this score"
+            else -> "fixed at ${rob.score}: the OBSERVED findings alone give ${rob.bestCase}, so the INFERRED findings ($codes) cannot move it"
+        }
+    }
+
+    const val ROBUSTNESS_MEANING = "worstCase: every INFERRED finding (AI screen review or SDK documentation) confirmed, at full weight, " +
+        "and an inferred High or Critical then closes the 85-100 band like an observed one; bestCase: every INFERRED finding wrong " +
+        "and dropped. Computed from the current result's findings; it never changes the score."
 
     fun evidenceMeaning(t: EvidenceType): String = when (t) {
         EvidenceType.OBSERVED -> "OBSERVED evidence"
@@ -110,6 +133,7 @@ object CheckText {
         } else {
             appendLine("Score:    ${Wording.score(c.current)} (re-evaluated; same as stored in the bundle)")
         }
+        appendLine("Range:    ${Wording.robustness(c.current)}")
         lens(c)
         appendLine()
         findingsTable(c.current.findings)
@@ -173,6 +197,7 @@ object CheckJson {
         put("note", b.note)
         put("storedResult", result(c.stored))
         put("currentResult", result(c.current))
+        put("robustness", robustness(c.current))
         put("resultChanged", c.resultChanged)
         put("plans", buildJsonArray {
             c.coverage.forEach { p ->
@@ -217,6 +242,24 @@ object CheckJson {
             }
         })
         put("caveat", Wording.LENS_CAVEAT)
+    }
+
+    /** The robustness interval of [r] (null when inconclusive); see Wording.robustness. */
+    private fun robustness(r: AuditResult): JsonElement {
+        val rob = ScoreCalculator.robustness(r.findings) ?: return JsonNull
+        return buildJsonObject {
+            put("score", rob.score)
+            put("worstCase", rob.worstCase)
+            put("bestCase", rob.bestCase)
+            put("band", rob.band.name)
+            put("worstBand", rob.worstBand.name)
+            put("bestBand", rob.bestBand.name)
+            put("bandStable", rob.bandStable)
+            put("movable", rob.movable)
+            put("inferred", JsonArray(rob.inferred.map { JsonPrimitive(it.code) }))
+            put("text", Wording.robustness(r))
+            put("meaning", Wording.ROBUSTNESS_MEANING)
+        }
     }
 
     private fun result(r: AuditResult) = buildJsonObject {

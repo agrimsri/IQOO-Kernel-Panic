@@ -372,6 +372,24 @@ object ScoreCalculator {
         }
         return score to band
     }
+
+    /**
+     * How far AI or documentation readings could move this result, without changing it: the worst case counts every
+     * INFERRED finding at full weight as if seen on the phone (so an inferred High or Critical also closes the Ready
+     * gate), the best case drops every INFERRED finding as if it were wrong. Both ends use [compute] itself. Null when the
+     * result is inconclusive (V0 and U1 are OBSERVED, so neither end can change that).
+     */
+    fun robustness(findings: List<Finding>): ScoreRobustness? {
+        val (score, band) = compute(findings)
+        if (score == null) return null
+        val confirmed = findings.map { if (it.evidenceType == EvidenceType.INFERRED) it.copy(evidenceType = EvidenceType.OBSERVED) else it }
+        val (worst, worstBand) = compute(confirmed)
+        val (best, bestBand) = compute(findings.filter { it.evidenceType == EvidenceType.OBSERVED })
+        if (worst == null || best == null) return null
+        val inferred = findings.filter { it.evidenceType == EvidenceType.INFERRED && it.severity.weight > 0 }
+            .map { it.checkId }.distinct().sortedBy { it.ordinal }
+        return ScoreRobustness(score, band, worst, worstBand, best, bestBand, inferred)
+    }
 }
 
 /** Why a result has no score. Screens, reports and spoken summaries word "Inconclusive" by this reason. */
