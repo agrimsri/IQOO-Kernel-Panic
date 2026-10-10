@@ -36,7 +36,8 @@ object AuditJsonExport {
             note = SAMPLE_NOTE.takeIf { bundle.meta.sample },
         )
 
-    fun fileName(meta: AuditMeta) = "TraceVeil-audit-${safe(meta.id)}.json"
+    /** Audit ids already say what they are ("audit-<ms>", "sample-<ms>"): TraceVeil-audit-1791595268053.json. */
+    fun fileName(meta: AuditMeta) = "TraceVeil-${safe(meta.id)}.json"
 
     fun write(bundle: AuditBundle, versionName: String): File =
         File(bundle.dir, fileName(bundle.meta)).apply { writeText(AuditBundles.encode(build(bundle, versionName)), Charsets.UTF_8) }
@@ -44,7 +45,8 @@ object AuditJsonExport {
 
 /** "Export report (JSON)" on the quarantine behaviour report: the saved report wrapped as traceveil.quarantine.v1. */
 object QuarantineJsonExport {
-    fun fileName(report: QuarantineReport) = "TraceVeil-quarantine-${safe(report.id)}.json"
+    /** Run ids are "quarantine-<ms>": TraceVeil-quarantine-1791600000000.json. */
+    fun fileName(report: QuarantineReport) = "TraceVeil-${safe(report.id)}.json"
 
     /** Writes into [dir] (the app uses cacheDir/exports, which the share sheet can read). */
     fun write(dir: File, report: QuarantineReport): File {

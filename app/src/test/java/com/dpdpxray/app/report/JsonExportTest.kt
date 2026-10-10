@@ -87,7 +87,7 @@ class JsonExportTest {
     fun `audit export file is written next to the audit and decodes`() {
         val file = AuditJsonExport.write(bundle(), "1.1.0")
         assertEquals(temp.root, file.parentFile)
-        assertEquals("TraceVeil-audit-audit-1791590915883.json", file.name)
+        assertEquals("TraceVeil-audit-1791590915883.json", file.name)
         assertEquals(sessions, AuditBundles.decode(file.readText()).sessions)
     }
 
@@ -102,7 +102,7 @@ class JsonExportTest {
             observations = recorder.snapshot(),
         )
         val file = QuarantineJsonExport.write(temp.root, report)
-        assertEquals("TraceVeil-quarantine-quarantine-1791600000000.json", file.name)
+        assertEquals("TraceVeil-quarantine-1791600000000.json", file.name)
         val decoded = AuditBundles.decodeQuarantine(file.readText())
         assertEquals("traceveil.quarantine.v1", decoded.schema)
         assertEquals(report, decoded.report)
