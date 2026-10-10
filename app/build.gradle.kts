@@ -1,7 +1,38 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+}
+
+/**
+ * Release signing (docs/RELEASE.md). Read from the gitignored `keystore.properties` at the repository root, or else from
+ * TRACEVEIL_KEYSTORE, TRACEVEIL_KEYSTORE_TYPE, TRACEVEIL_KEYSTORE_PASSWORD, TRACEVEIL_KEY_ALIAS and
+ * TRACEVEIL_KEY_PASSWORD. Without a keystore path, both passwords and an alias, release builds are left unsigned; debug
+ * builds always use the Android debug key.
+ */
+val releaseSigning: Map<String, String?>? = run {
+    val file = rootProject.file("keystore.properties")
+    val props = Properties().apply { if (file.isFile) file.inputStream().use { load(it) } }
+    fun value(key: String, env: String): String? =
+        props.getProperty(key)?.trim()?.takeIf { it.isNotEmpty() } ?: providers.environmentVariable(env).orNull?.takeIf { it.isNotBlank() }
+    val found = mapOf(
+        "storeFile" to value("storeFile", "TRACEVEIL_KEYSTORE"),
+        "storeType" to value("storeType", "TRACEVEIL_KEYSTORE_TYPE"),
+        "storePassword" to value("storePassword", "TRACEVEIL_KEYSTORE_PASSWORD"),
+        "keyAlias" to value("keyAlias", "TRACEVEIL_KEY_ALIAS"),
+        "keyPassword" to value("keyPassword", "TRACEVEIL_KEY_PASSWORD"),
+    )
+    val required = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+    when {
+        required.all { found[it] != null } -> found
+        required.any { found[it] != null } -> {
+            logger.warn("Release signing: incomplete settings (missing ${required.filter { found[it] == null }}); release builds stay unsigned.")
+            null
+        }
+        else -> null
+    }
 }
 
 android {
@@ -18,6 +49,18 @@ android {
         ndk { abiFilters += "arm64-v8a" }
     }
 
+    signingConfigs {
+        releaseSigning?.let { s ->
+            create("release") {
+                storeFile = file(s.getValue("storeFile")!!)
+                s["storeType"]?.let { storeType = it }
+                storePassword = s.getValue("storePassword")
+                keyAlias = s.getValue("keyAlias")
+                keyPassword = s.getValue("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             // Debug builds also run on the x86_64 emulator; release stays arm64-only.
@@ -25,7 +68,8 @@ android {
         }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            // Signed with the TraceVeil release key when one is configured (see releaseSigning above), else unsigned.
+            signingConfig = if (releaseSigning != null) signingConfigs.getByName("release") else null
         }
     }
 
