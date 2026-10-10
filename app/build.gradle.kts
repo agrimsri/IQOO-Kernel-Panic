@@ -35,6 +35,15 @@ val releaseSigning: Map<String, String?>? = run {
     }
 }
 
+/**
+ * Optional online voice (Sarvam text to speech, docs/RELEASE.md). Built into debug builds, so the demo build is
+ * unchanged; left out of release builds, the build that is sold. `-Ptraceveil.onlineVoice=true|false` overrides both.
+ * Without it the app never reads `api.env`, never speaks through Sarvam, and its trust screen does not list it.
+ */
+val onlineVoiceOverride: Boolean? = providers.gradleProperty("traceveil.onlineVoice").orNull?.trim()?.let { value ->
+    value.lowercase().toBooleanStrictOrNull() ?: throw GradleException("traceveil.onlineVoice must be true or false, not '$value'")
+}
+
 android {
     namespace = "com.dpdpxray.app"
     compileSdk = 37
@@ -65,8 +74,10 @@ android {
         debug {
             // Debug builds also run on the x86_64 emulator; release stays arm64-only.
             ndk { abiFilters += "x86_64" }
+            buildConfigField("boolean", "ONLINE_VOICE_AVAILABLE", (onlineVoiceOverride ?: true).toString())
         }
         release {
+            buildConfigField("boolean", "ONLINE_VOICE_AVAILABLE", (onlineVoiceOverride ?: false).toString())
             isMinifyEnabled = false
             // Signed with the TraceVeil release key when one is configured (see releaseSigning above), else unsigned.
             signingConfig = if (releaseSigning != null) signingConfigs.getByName("release") else null

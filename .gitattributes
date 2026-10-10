@@ -7,3 +7,5 @@ gradlew text eol=lf
 tools/*.sh text eol=lf
 tools/tests/*.py text eol=lf
 .github/workflows/*.yml text eol=lf
+# Licence and notice texts ship in the APK byte for byte as published (tests check their SHA-256).
+app/src/main/assets/licenses/** -text

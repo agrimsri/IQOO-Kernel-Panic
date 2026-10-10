@@ -40,6 +40,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.dpdpxray.app.capture.DnsForwarder
 import com.dpdpxray.app.control.DeviceChecks
+import com.dpdpxray.app.notices.OpenSourceNotices
 import com.dpdpxray.app.report.ExportManager
 import com.dpdpxray.app.ui.components.BreathingDot
 import com.dpdpxray.app.ui.components.Callout
@@ -49,6 +50,7 @@ import com.dpdpxray.app.ui.components.EmptyHint
 import com.dpdpxray.app.ui.components.Hairline
 import com.dpdpxray.app.ui.components.IconBadge
 import com.dpdpxray.app.ui.components.LearnMore
+import com.dpdpxray.app.ui.components.NavRow
 import com.dpdpxray.app.ui.components.Note
 import com.dpdpxray.app.ui.components.SectionCard
 import com.dpdpxray.app.ui.components.SkeletonBar
@@ -79,7 +81,7 @@ import kotlinx.coroutines.withContext
  * network counters). Permissions, identity and method fold behind cards whose summaries show the live numbers.
  */
 @Composable
-fun TrustScreen(onBack: () -> Unit, onSelfCheck: () -> Unit) {
+fun TrustScreen(onBack: () -> Unit, onSelfCheck: () -> Unit, onNotices: (() -> Unit)? = null) {
     val ctx = LocalContext.current
     // Re-read on return from Android settings, so a changed permission or switch shows at once.
     var resumes by remember { mutableIntStateOf(0) }
@@ -120,6 +122,10 @@ fun TrustScreen(onBack: () -> Unit, onSelfCheck: () -> Unit) {
                 summary = TrustText.findings.joinToString(" · ") { it.title }, glyph = Glyph.BOOK,
             ) {
                 ClaimList(TrustText.findings)
+            }
+            // The licences and credits of everything inside the app, read from the APK itself.
+            if (onNotices != null) SectionCard(Modifier.reveal(6)) {
+                NavRow(OpenSourceNotices.TITLE, OpenSourceNotices.ROW_DETAIL, onNotices, glyph = Glyph.BOOK)
             }
         }
     }

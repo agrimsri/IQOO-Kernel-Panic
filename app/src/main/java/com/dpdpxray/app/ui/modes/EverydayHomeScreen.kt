@@ -71,6 +71,7 @@ import com.dpdpxray.app.ui.components.DisclosureRow
 import com.dpdpxray.app.ui.components.FoldText
 import com.dpdpxray.app.ui.components.GroupHeader
 import com.dpdpxray.app.ui.components.Hairline
+import com.dpdpxray.app.ui.components.IconBadge
 import com.dpdpxray.app.ui.components.Tag
 import com.dpdpxray.app.ui.components.cardSurface
 import com.dpdpxray.app.ui.components.foldSpec
@@ -85,6 +86,7 @@ import com.dpdpxray.app.ui.guide.GuideLang
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.guide.LinkAction
+import com.dpdpxray.app.ui.guide.PillButton
 import com.dpdpxray.app.ui.guide.RecentChecks
 import com.dpdpxray.app.ui.guide.ScoreChip
 import com.dpdpxray.app.ui.guide.SetupKind
@@ -125,6 +127,8 @@ fun EverydayHomeScreen(
     onCheckup: (() -> Unit)? = null,
     /** "Why you can trust TraceVeil"; null hides the card. */
     onTrust: (() -> Unit)? = null,
+    /** Update Watch "Check again": the same re-check route as Developer Home and Reports; null hides the card. */
+    onRecheck: ((String) -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
     val lang = guideLang()
@@ -132,6 +136,9 @@ fun EverydayHomeScreen(
     val audits by vm.audits.collectAsState()
     val progress by vm.progress.collectAsState()
     val settings by vm.settings.collectAsState()
+    // Update Watch: the same list Developer Home and Reports show; the card appears only when it is not empty.
+    val updated by vm.updatedApps.collectAsState()
+    val updateCard = EverydayUpdates.card(updated)
 
     // Readiness and notification state can change in system settings; re-read them whenever Home comes back.
     var resumes by remember { mutableIntStateOf(0) }
@@ -209,6 +216,11 @@ fun EverydayHomeScreen(
         if (running != null) {
             Spacer(Modifier.height(16.dp))
             GuideBanner(GuideFlow.homeRunning(running.config.targetLabel), speak = false, action = EverydayCopy.running.pick(lang) to onLive)
+        }
+
+        if (onRecheck != null && updateCard != null) {
+            Spacer(Modifier.height(16.dp))
+            UpdatedAppsCard(updateCard, updated.size, lang, onRecheck, onAllReports, Modifier.reveal(1))
         }
 
         Spacer(Modifier.height(16.dp))
@@ -383,6 +395,48 @@ private fun FrontCard(
         }
         Spacer(Modifier.width(8.dp))
         GlyphIcon(Glyph.CHEVRON_RIGHT, Film.boneDim, size = 20.dp)
+    }
+}
+
+/**
+ * The calm everyday Update Watch card: "An app you checked has updated", one line on what that means, then each app
+ * ("LeakyShop 1.0 → 1.1") with "Check again", which opens the check for that app; nothing starts until Start is
+ * tapped. Past [EverydayUpdates.MAX_ROWS] apps, "See all" opens Reports, which lists every one.
+ */
+@Composable
+private fun UpdatedAppsCard(
+    card: EverydayUpdateCard,
+    total: Int,
+    lang: GuideLang,
+    onRecheck: (String) -> Unit,
+    onAllReports: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxWidth().cardSurface().padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconBadge(Glyph.RESET, Film.scan, size = 40.dp)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                card.title.pick(lang), style = MaterialTheme.typography.titleMedium, color = Film.bone,
+                modifier = Modifier.weight(1f).semantics { heading() },
+            )
+        }
+        Text(
+            EverydayCopy.updatedNote.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        card.rows.forEach { row ->
+            Hairline(Modifier.padding(vertical = 4.dp))
+            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    row.line.pick(lang), style = MaterialTheme.typography.bodyLarge, color = Film.bone,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                PillButton(EverydayCopy.checkAgain.pick(lang), { onRecheck(row.packageName) })
+            }
+        }
+        if (card.more > 0) LinkAction("${EverydayCopy.seeAll.pick(lang)} ($total)", onAllReports)
     }
 }
 

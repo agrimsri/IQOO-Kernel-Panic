@@ -43,6 +43,7 @@ import com.dpdpxray.app.BuildConfig
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.data.SampleAudit
+import com.dpdpxray.app.notices.OpenSourceNotices
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.ChipFlow
 import com.dpdpxray.app.ui.components.FoldText
@@ -116,6 +117,8 @@ fun MoreScreen(
     onHowItWorks: () -> Unit,
     onOpen: (String) -> Unit,
     onTrust: (() -> Unit)? = null,
+    /** "Open-source notices"; null hides the row. */
+    onNotices: (() -> Unit)? = null,
 ) {
     val audits by vm.audits.collectAsState()
     val llm by vm.llmStatus.collectAsState()
@@ -152,6 +155,10 @@ fun MoreScreen(
                 if (onTrust != null) {
                     Hairline(Modifier.padding(vertical = 8.dp))
                     NavRow("Why you can trust TraceVeil", "What stays on the phone, its permissions, network use and identity", onTrust, glyph = Glyph.LOCK, accent = Film.clear)
+                }
+                if (onNotices != null) {
+                    Hairline(Modifier.padding(vertical = 8.dp))
+                    NavRow(OpenSourceNotices.TITLE, OpenSourceNotices.ROW_DETAIL, onNotices, glyph = Glyph.BOOK)
                 }
             }
         }

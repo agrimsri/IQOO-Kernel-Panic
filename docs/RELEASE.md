@@ -46,6 +46,19 @@ sha256sum TraceVeil-1.1.0-release.apk
 
 Without the settings, release builds are left **unsigned** (`app-release-unsigned.apk`); with only some of them, Gradle logs `Release signing: incomplete settings ...` and also leaves the build unsigned. Debug builds always use the Android debug key and are not affected. (Earlier, release builds were signed with the debug key.)
 
+## Optional online voice: left out of release builds
+
+The optional online voice (Sarvam text to speech, `ATTRIBUTIONS.md`) is a demo feature whose terms were never reviewed, so the build that is sold leaves it out. Gradle sets `BuildConfig.ONLINE_VOICE_AVAILABLE`:
+
+| Build | Default | Override |
+| --- | --- | --- |
+| Debug (`assembleDebug`, the demo build) | `true`: unchanged; the online voice works only after `api.env` is pushed with `USE_API=true` and a key | `-Ptraceveil.onlineVoice=false` builds a debug APK that behaves like the sold build |
+| Release (`assembleRelease`) | `false` | `-Ptraceveil.onlineVoice=true` puts it back (only after Sarvam's terms are read and a data-processing agreement exists, `docs/LICENSES_FOR_SALE.md` item 6) |
+
+Any other value of the property stops the build with an error. When the flag is `false`, TraceVeil never reads `api.env`, always speaks answers with the phone's own offline voice, shows no online-voice line in Settings or Ask this audit, and the trust screen lists neither the Sarvam network path nor the online voice under "What stays on this phone" or Internet. The Sarvam code is still compiled into the APK but nothing can reach it (`NetworkCodeScanTest` checks the one path to it). To check a build: `app/build/generated/source/buildConfig/<debug|release>/com/dpdpxray/app/BuildConfig.java` shows the value.
+
+Release APKs built before this switch (including `TraceVeil-1.1.0-release.apk` above) still contain the online voice, off unless `api.env` enables it.
+
 **Look after the key.** Keep an offline backup of `traceveil-release.jks` and its properties file somewhere other than this laptop. Android only installs an update signed with the same key, so if the key is lost, existing users cannot update and must uninstall. If the app is later published on Google Play, Play App Signing would add Google's own app-signing key; the published certificate digest would then change and this page must be updated.
 
 ## The demo phone runs a debug build: switching to the release build

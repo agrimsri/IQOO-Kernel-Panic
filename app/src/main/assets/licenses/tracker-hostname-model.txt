@@ -1,0 +1,25 @@
+TrackerLens hostname model (ml/tracker_hostname.json)
+
+This file holds model weights that TraceVeil trained from the lists below. It is shared under the
+Creative Commons Attribution-ShareAlike 3.0 Unported licence (CC BY-SA 3.0), not under
+TraceVeil's own MIT licence.
+
+Weights are derived from EasyPrivacy/EasyList (CC BY-SA 3.0) and Majestic Million (CC BY 3.0).
+
+EasyPrivacy and EasyList
+  Attribution: The EasyList authors (https://easylist.to/)
+  Lists: https://easylist.to/easylist/easyprivacy.txt (positive labels),
+         https://easylist.to/easylist/easylist.txt (used only to remove ad hosts from the negatives)
+  Licence: GPL-3.0-or-later or CC BY-SA 3.0 (or later), https://easylist.to/pages/licence.html;
+           used under CC BY-SA 3.0, https://creativecommons.org/licenses/by-sa/3.0/
+
+Majestic Million
+  Attribution: Majestic (https://majestic.com/)
+  Data: https://majestic.com/reports/majestic-million (negative labels: popular domains)
+  Licence: Creative Commons Attribution 3.0 Unported (CC BY 3.0),
+           https://creativecommons.org/licenses/by/3.0/
+
+Changes: the lists were reduced to registrable sites, labelled and used to train a hashed
+character n-gram logistic regression; only the trained weights are in this app, not the lists.
+
+The full texts of CC BY-SA 3.0 and CC BY 3.0 are included in this app.

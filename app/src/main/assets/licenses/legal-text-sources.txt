@@ -1,0 +1,24 @@
+Legal text excerpts: sources
+
+TraceVeil's legal lens shows short excerpts of laws, regulations and regulator guidance as
+context for a finding, never as a verdict. Each excerpt is stored with the name of its source and,
+where it has one, the web address it was quoted from. Quoting them here does not mean that any
+publisher has endorsed TraceVeil.
+
+law/passages.json
+  European Union: GDPR (EU) 2016/679 and the ePrivacy Directive 2002/58/EC, from EUR-Lex
+    (eur-lex.europa.eu); EDPB Guidelines 05/2020 on consent (www.edpb.europa.eu)
+  United Kingdom: Information Commissioner's Office guidance, including the guidance on storage
+    and access technologies (PECR) and the Age appropriate design code (ico.org.uk)
+  California, United States: California Civil Code (CCPA) and the CCPA Regulations
+    (Cal. Code Regs. tit. 11), as published by the California Privacy Protection Agency (cppa.ca.gov)
+  United States (children): the COPPA Rule, 16 CFR Part 312, from the Electronic Code of Federal
+    Regulations (www.ecfr.gov)
+  Brazil: Lei n. 13.709/2018 (LGPD) and Lei n. 15.211/2025, from www.planalto.gov.br
+  Singapore: Personal Data Protection Act 2012, from Singapore Statutes Online (sso.agc.gov.sg);
+    PDPC Advisory Guidelines on children's personal data (www.pdpc.gov.sg)
+  Global baseline: good-practice statements written by TraceVeil (not law)
+
+dpdp/passages.json
+  India: Digital Personal Data Protection Act, 2023 and Digital Personal Data Protection Rules, 2025
+    (Government of India publications)
