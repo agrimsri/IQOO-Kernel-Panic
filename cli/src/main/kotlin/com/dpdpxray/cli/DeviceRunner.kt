@@ -67,13 +67,19 @@ class DeviceRunner(
             throw RunFailure("TraceVeil (${AutomationContract.APP_PACKAGE}) is not installed on $s.", "Install TraceVeil on the test phone and do the one-time setup in docs/ci/RUNNER.md.")
         }
         log("TraceVeil: installed")
+        val before = p.apk?.let { apkPaths(s, p.packageName) }
         p.apk?.let { install(s, it) }
-        if (!installed(s, p.packageName)) {
+        val after = apkPaths(s, p.packageName)
+        if (after.isEmpty()) {
             val fix = if (p.apk != null) "The APK passed with --apk installed, but it is not ${p.packageName}; check --package."
             else "Install the test build first, or pass --apk <file.apk> to install it with adb install -r."
             throw RunFailure("${p.packageName} is not installed on $s.", fix)
         }
         log("Target:   ${p.packageName} (installed)")
+        // Android gives every install a new folder, so an unchanged one means the APK did not update this package.
+        if (!before.isNullOrEmpty() && before == after) {
+            log("Warning:  ${p.packageName} looks unchanged after adb install -r; the APK may be a different app. Check --package.")
+        }
 
         val start = AdbCommands.startRun(s, StartRequest(p.token, p.packageName, p.mode.wire, autoTap = true, childFacing = p.childFacing, runId = p.runId))
         log("Start:    ${AdbCommands.display(adbName, start)}")
@@ -132,10 +138,12 @@ class DeviceRunner(
         return target.serial
     }
 
-    private fun installed(serial: String, pkg: String): Boolean {
+    private fun installed(serial: String, pkg: String): Boolean = apkPaths(serial, pkg).isNotEmpty()
+
+    private fun apkPaths(serial: String, pkg: String): List<String> {
         val r = call(AdbCommands.packagePath(serial, pkg), SHORT_MS)
         AdbOutput.transportProblem(r)?.let { throw RunFailure("Lost contact with $serial: $it.", FIX_USB) }
-        return AdbOutput.installedPaths(r).isNotEmpty()
+        return AdbOutput.installedPaths(r)
     }
 
     private fun install(serial: String, apk: File) {

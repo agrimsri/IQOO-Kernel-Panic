@@ -228,13 +228,19 @@ class RunCommandTest {
         val install = phone.callsStartingWith("install")
         assertEquals(listOf(listOf("-s", SERIAL, "install", "-r", apk.absolutePath)), install)
         val installAt = phone.calls.indexOfFirst { it.getOrNull(2) == "install" }
-        val targetCheckAt = phone.calls.indexOf(AdbCommands.packagePath(SERIAL, "com.example.newbuild"))
+        val targetCheckAt = phone.calls.lastIndexOf(AdbCommands.packagePath(SERIAL, "com.example.newbuild"))
         assertTrue(phone.calls.toString(), installAt in 0 until targetCheckAt)
 
         phone.installResult = ExecResult(1, "Performing Streamed Install\n", "adb: failed to install builds/app debug.apk: Failure [INSTALL_FAILED_VERSION_DOWNGRADE]\n")
         run("run", "--package", "com.example.newbuild", "--apk", "builds/app debug.apk").let {
             assertEquals(Exit.USAGE, it.exit)
             assertTrue(it.err, it.err.contains("INSTALL_FAILED_VERSION_DOWNGRADE"))
+        }
+        // The fake phone keeps the same install folder: an APK that did not update the package is flagged.
+        phone.installResult = ExecResult(0, "Performing Streamed Install\nSuccess\n")
+        phone.statuses = listOf(running("Starting"))
+        run("run", "--package", LEAKY, "--apk", "builds/app debug.apk", "--timeout", "2").let {
+            assertTrue(it.out, it.out.contains("Warning:  $LEAKY looks unchanged after adb install -r; the APK may be a different app."))
         }
         run("run", "--package", LEAKY, "--apk", "missing.apk").let {
             assertEquals(Exit.USAGE, it.exit)
