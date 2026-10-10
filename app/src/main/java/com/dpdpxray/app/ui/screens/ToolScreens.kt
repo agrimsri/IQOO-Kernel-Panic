@@ -61,6 +61,8 @@ import com.dpdpxray.app.ui.components.RuleRow
 import com.dpdpxray.app.ui.components.SecondaryAction
 import com.dpdpxray.app.ui.components.SectionTitle
 import com.dpdpxray.app.ui.components.TopBar
+import com.dpdpxray.app.ui.modes.ModeCopy
+import com.dpdpxray.app.ui.modes.ModeSwitch
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.voice.ApiEnv
 import com.dpdpxray.app.voice.SpeechOutputChoice
@@ -271,6 +273,9 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         TopBar("Settings", onBack)
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            SectionCard(title = ModeCopy.title(s.audience).en, glyph = Glyph.HOME) {
+                ModeSwitch(s.audience, { a -> vm.updateSettings { it.copy(audience = a) } })
+            }
             SectionCard(title = "Display", glyph = Glyph.WATCHER) {
                 SwitchRow("Presentation mode", "Larger text for projectors and screen sharing.", s.stageMode, { v -> vm.updateSettings { it.copy(stageMode = v) } })
             }

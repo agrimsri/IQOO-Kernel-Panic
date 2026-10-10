@@ -55,6 +55,8 @@ import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.guide.RecentChecks
 import com.dpdpxray.app.ui.guide.ScoreChip
+import com.dpdpxray.app.ui.modes.ModeCopy
+import com.dpdpxray.app.ui.modes.ModeSwitch
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
 import com.dpdpxray.app.ui.theme.Radii
@@ -106,11 +108,15 @@ fun MoreScreen(
 ) {
     val audits by vm.audits.collectAsState()
     val llm by vm.llmStatus.collectAsState()
+    val settings by vm.settings.collectAsState()
     var showSamples by remember { mutableStateOf(false) }
     val latest = audits.firstOrNull()
     Column(Modifier.fillMaxSize()) {
         TopBar("More", onBack = null)
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            SectionCard(title = ModeCopy.title(settings.audience).en, glyph = Glyph.HOME) {
+                ModeSwitch(settings.audience, { a -> vm.updateSettings { it.copy(audience = a) } })
+            }
             SectionCard(title = "Tools") {
                 NavRow("Camera check", "Review a photo of a consent screen", onCamera, glyph = Glyph.CAMERA)
                 if (latest != null) {
