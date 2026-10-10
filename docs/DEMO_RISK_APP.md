@@ -9,7 +9,7 @@
 ## Before the demo
 
 - **Build the APK.** Run `:riskdemo:assembleDebug` with the locked build runner. The output is `riskdemo/build/outputs/apk/debug/riskdemo-debug.apk`. Record its SHA-256 for the demo notes.
-- **Install TraceVeil.** Install the build that contains **APK Guard** and **Quarantine**. Both are on separate branches at the time of writing and are not yet merged or phone-tested together.
+- **Install TraceVeil.** Install the build that contains **APK Guard** and **Quarantine** (both are merged on `nitya/next-integration`; not yet phone-tested together).
 - **Remove any old copy.** If RiskDemo (`com.traceveil.riskdemo`) is already on the phone, uninstall it so the "before install" step is real.
 - **Rehearse once on the demo phone.** Play Protect and Android's restricted settings can change the flow (see step 3).
 
@@ -38,7 +38,7 @@
    - Never switch off Play Protect for the demo.
 
 4. **Run TraceVeil Quarantine on RiskDemo.**
-   - Start a Quarantine run for `com.traceveil.riskdemo`, then open RiskDemo. The red TEST banner stays on screen the whole time.
+   - Start a Quarantine run for `com.traceveil.riskdemo`: in APK Guard open the installed **TEST Challan** result and tap **Run in quarantine (network blocked)** (or pick it in Check an app and use the same button at the end of its setup sheet), then tap **Start quarantine run**. TraceVeil opens RiskDemo once the tunnel is up. The red TEST banner stays on screen the whole time.
    - On launch, RiskDemo makes:
      - three DNS lookups: `c2.traceveil-demo.invalid`, `pay-challan-update.invalid` and `otp-relay.example`;
      - one TCP connection attempt to `203.0.113.10:443`.
