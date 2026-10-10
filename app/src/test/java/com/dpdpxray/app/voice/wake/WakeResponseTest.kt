@@ -6,24 +6,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Arming rules and stop explanations. */
 class WakeResponseTest {
-    @Test fun `a visible app opens the copilot directly, otherwise the user taps a notification`() {
-        assertEquals(WakeLaunch.DIRECT, WakeResponse.launch(appVisible = true, notificationsAllowed = true))
-        assertEquals(WakeLaunch.DIRECT, WakeResponse.launch(appVisible = true, notificationsAllowed = false))
-        assertEquals(WakeLaunch.NOTIFICATION, WakeResponse.launch(appVisible = false, notificationsAllowed = true))
-        assertEquals(WakeLaunch.NONE, WakeResponse.launch(appVisible = false, notificationsAllowed = false))
-    }
-
-    @Test fun `the spoken reply only promises what will actually happen`() {
-        assertEquals("Yes? Opening your last check.", WakeResponse.reply(WakeLaunch.DIRECT, hasLatestCheck = true))
-        val viaNotification = WakeResponse.reply(WakeLaunch.NOTIFICATION, hasLatestCheck = true)
-        assertTrue(viaNotification.contains("notification"))
-        assertFalse(viaNotification.contains("Opening"))
-        assertTrue(WakeResponse.reply(WakeLaunch.DIRECT, hasLatestCheck = false).contains("no saved checks"))
-        assertTrue(WakeResponse.reply(WakeLaunch.NOTIFICATION, hasLatestCheck = false).contains("no saved checks"))
-        assertFalse(WakeResponse.reply(WakeLaunch.NONE, hasLatestCheck = true).contains("Opening"))
-    }
-
     private val ok = BatteryReading(70, charging = false, systemLow = false)
 
     @Test fun `arming needs the model, the microphone, a visible notification and battery`() {
@@ -37,6 +21,6 @@ class WakeResponseTest {
 
     @Test fun `every stop reason has a plain explanation`() {
         WakeStopReason.entries.forEach { assertTrue(it.name, WakeStopReason.explain(it).isNotBlank()) }
-        assertTrue(WakeStopReason.explain(WakeStopReason.TIMEOUT).contains("15 minutes"))
+        assertTrue(WakeStopReason.explain(WakeStopReason.TIMEOUT, WakeDuration.MIN_15).contains("15 minutes"))
     }
 }

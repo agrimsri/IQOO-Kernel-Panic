@@ -15,6 +15,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
+import android.speech.SpeechRecognizer
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -22,15 +23,28 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.dpdpxray.app.MainActivity
 import com.dpdpxray.app.R
+import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.graph
-import com.dpdpxray.app.voice.AnswerVoice
+import com.dpdpxray.app.voice.OnDeviceRecognizer
+import com.dpdpxray.app.voice.assistant.AssistantAction
+import com.dpdpxray.app.voice.assistant.AssistantCopy
+import com.dpdpxray.app.voice.assistant.AssistantSource
+import com.dpdpxray.app.voice.assistant.Said
+import com.dpdpxray.app.voice.assistant.VoiceAssistant
 import com.dpdpxray.core.copilot.CopilotLanguage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
 
 /**
  * EXPERIMENTAL, opt-in "Hey TraceVeil" listener.
@@ -39,23 +53,30 @@ import kotlinx.coroutines.launch
  *   restarted by the system (START_NOT_STICKY), never exported.
  * - A microphone foreground service with a persistent notification for the whole session; tapping it stops listening.
  * - Offline keyword spotting only ([VoskWakeEngine]); audio is never stored or uploaded.
- * - Stops after 15 minutes, on low battery, when the voice copilot opens (so only one recogniser uses the mic), when
- *   the user stops it, or when TraceVeil is swiped away from recent apps.
- * - On a detection it speaks a short offline reply and opens the copilot directly only while TraceVeil is visible;
- *   otherwise it posts a high-priority notification the user taps (Android blocks background activity starts).
+ * - Runs for the length chosen in Settings (15 minutes, 1 hour, or until the user stops it). Stops on low battery,
+ *   when the user stops it, or when TraceVeil is swiped away from recent apps. It keeps running with the screen off.
+ * - Lets go of the microphone while the voice copilot is open or a voice-started check runs, then resumes by itself.
+ * - On a detection it says "Yes?", releases the microphone, hears ONE command with the phone's on-device speech
+ *   recogniser ([OnDeviceRecognizer]), acts on it through [VoiceAssistant], replies aloud and resumes listening.
+ *   Screen work happens on TraceVeil's screen; from the background TraceVeil asks to come forward, and if Android
+ *   does not allow it, a notification asks the user to tap to continue.
  */
 class HeyTraceVeilService : Service() {
     private val main = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var engine: VoskWakeEngine? = null
-    private var voice: AnswerVoice? = null
+    private var recognizer: OnDeviceRecognizer? = null
     private var batteryLowSignal = false
     private var batteryReceiver: BroadcastReceiver? = null
     private var running = false
     private var stopRequests: Job? = null
+    private var holdWatch: Job? = null
+    private var command: Job? = null
+    private var duration: WakeDuration = WakeDuration.HOUR_1
+    private var lastTitle: String? = null
+    private var externalHolds: Set<WakeHold> = emptySet()
 
     private val tickRunnable = Runnable { tick() }
-    private val resumeRunnable = Runnable { tick() }
     private val startTimeout = Runnable {
         if (WakeRuntime.state.value == WakeState.Starting) transition(WakeEvent.EngineFailed("the offline recogniser did not start within 60 seconds"))
     }
@@ -64,14 +85,14 @@ class HeyTraceVeilService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START -> begin()
+            ACTION_START -> begin(intent)
             ACTION_STOP -> finish(intent.getStringExtra(EXTRA_REASON)?.let { runCatching { WakeStopReason.valueOf(it) }.getOrNull() } ?: WakeStopReason.USER)
             else -> if (!running) stopSelf() // a null intent would mean a system restart: never resume listening on our own
         }
         return START_NOT_STICKY
     }
 
-    private fun begin() {
+    private fun begin(intent: Intent?) {
         if (running || WakeRuntime.state.value.active) return
         val models = WakeModelManager.get(this)
         val modelDir = models.modelDir
@@ -88,9 +109,11 @@ class HeyTraceVeilService : Service() {
             return
         }
         createChannels()
-        val endsAt = System.currentTimeMillis() + WakeSessionPolicy.MAX_SESSION_MS
+        duration = WakeDuration.fromName(intent?.getStringExtra(EXTRA_DURATION))
+            ?: WakeDuration.effective(WakePreferences.get(this).state.value.duration, WakeController.battery(this).charging)
+        val endsAt = duration.limitMs?.let { System.currentTimeMillis() + it }
         try {
-            ServiceCompat.startForeground(this, NOTIFICATION_LISTENING, listeningNotification(endsAt), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+            ServiceCompat.startForeground(this, NOTIFICATION_LISTENING, listeningNotification(endsAt, WakeCopy.notificationTitle(paused = false)), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
         } catch (e: Exception) {
             // SecurityException or ForegroundServiceStartNotAllowedException: e.g. the app was no longer in the foreground.
             Log.i(TAG, "microphone foreground service refused: ${e.javaClass.simpleName}")
@@ -101,32 +124,45 @@ class HeyTraceVeilService : Service() {
         running = true
         WakeRuntime.apply(WakeEvent.Arm)
         WakeRuntime.setEndsAt(endsAt)
+        WakeRuntime.setDuration(duration)
         registerBattery()
-        voice = AnswerVoice(this) { } // the phone's offline text-to-speech; no network voice is used here
+        val assistant = VoiceAssistant.get(this).also { it.warmUp() }
+        recognizer = OnDeviceRecognizer(this).also { r ->
+            // Learn which on-device language packs are installed, so a command uses the right one.
+            r.checkLanguageSupport(commandLanguage()) {}
+        }
         stopRequests = scope.launch { WakeRuntime.stopRequests.collect { finish(it) } }
         engine = VoskWakeEngine(modelDir, WakePhrase.grammarJson(), engineListener).also { it.start() }
         main.postDelayed(startTimeout, START_TIMEOUT_MS)
+        holdWatch = scope.launch {
+            combine(WakeRuntime.copilotOpenFlow, WakeRuntime.uiVisibleFlow, graph.orchestrator.progress, assistant.busy) { copilot, visible, progress, busy ->
+                buildSet {
+                    // Only while the copilot is on screen: it releases the microphone as soon as it is paused.
+                    if (copilot && visible) add(WakeHold.COPILOT)
+                    if (progress is AuditProgress.Running || busy) add(WakeHold.ASSISTANT)
+                }
+            }.distinctUntilChanged().collect { externalHolds = it; applyHolds() }
+        }
         scheduleTick()
     }
 
     private val engineListener = object : VoskWakeEngine.Listener {
         override fun onReady() {
             transition(WakeEvent.EngineReady(SystemClock.elapsedRealtime()))
+            applyHolds() // the copilot may have opened while the model was loading
             scheduleTick()
         }
 
         override fun onResult(json: String) {
             if (!WakeRuntime.state.value.processesAudio) return
-            val heard = WakePhrase.detect(json)
+            val sensitivity = WakePreferences.get(this@HeyTraceVeilService).state.value.sensitivity
+            val heard = WakePhrase.detect(json, sensitivity)
             // Calibration aid: the outcome and confidence only, never what was said.
-            if (heard.reason != WakeHeard.Reason.NO_MATCH) Log.i(TAG, "wake ${heard.reason} conf=${heard.confidence}")
+            if (heard.reason != WakeHeard.Reason.NO_MATCH) Log.i(TAG, "wake ${heard.reason} conf=${heard.confidence} mode=$sensitivity")
+            WakeRuntime.record(heard, sensitivity, System.currentTimeMillis())
             if (!heard.accepted) return
             val state = transition(WakeEvent.Heard(SystemClock.elapsedRealtime()))
-            if (state is WakeState.Responding) {
-                respond()
-                main.removeCallbacks(resumeRunnable)
-                main.postDelayed(resumeRunnable, WakeMachine.REPLY_PAUSE_MS)
-            }
+            if (state is WakeState.Paused && WakeHold.COMMAND in state.holds) startCommand()
         }
 
         override fun onError(detail: String) {
@@ -137,57 +173,128 @@ class HeyTraceVeilService : Service() {
 
     /** Applies one event and makes the engine and service follow the resulting state. */
     private fun transition(event: WakeEvent): WakeState {
+        val before = WakeRuntime.state.value
         val state = WakeRuntime.apply(event)
         engine?.setPaused(!state.processesAudio)
-        if (state is WakeState.Stopped) teardown()
+        engine?.setMicrophone(state.micOpen)
+        // The watchdog (or a stop) ended the command: stop hearing it and free the speech recogniser.
+        if (before is WakeState.Paused && WakeHold.COMMAND in before.holds && !(state is WakeState.Paused && WakeHold.COMMAND in state.holds)) {
+            command?.takeIf { it.isActive && event !is WakeEvent.CommandDone }?.cancel()
+        }
+        if (state is WakeState.Stopped) teardown() else updateNotification(state)
         return state
     }
 
-    private fun tick() {
+    private fun applyHolds() {
         if (!running) return
-        val battery = WakeController.battery(this).let { if (batteryLowSignal) it.copy(systemLow = true) else it }
-        transition(WakeEvent.Tick(SystemClock.elapsedRealtime(), battery))
-        scheduleTick()
+        transition(WakeEvent.Holds(externalHolds, SystemClock.elapsedRealtime()))
+        scheduleTick() // a released hold resumes listening after a short pause
     }
 
-    private fun scheduleTick() {
-        main.removeCallbacks(tickRunnable)
-        if (!running) return
-        val state = WakeRuntime.state.value
-        val startedAt = when (state) {
-            is WakeState.Listening -> state.startedAtMs
-            is WakeState.Responding -> state.startedAtMs
-            else -> null
-        }
-        val untilLimit = startedAt?.let { WakeSessionPolicy.remainingMs(it, SystemClock.elapsedRealtime()) } ?: TICK_MS
-        main.postDelayed(tickRunnable, minOf(TICK_MS, untilLimit).coerceAtLeast(MIN_TICK_MS))
-    }
+    // --- one command after the wake phrase ---------------------------------------------------------------------------
 
-    private fun respond() {
-        val latest = runCatching { graph.repository.audits.value.firstOrNull() }.getOrNull()
-        val launch = WakeResponse.launch(WakeRuntime.uiVisible, WakeController.notificationsAllowed(this))
-        val reply = WakeResponse.reply(launch, hasLatestCheck = latest != null)
-        voice?.let { v -> scope.launch { v.speak(reply, CopilotLanguage.EN) } }
-        when (launch) {
-            WakeLaunch.DIRECT -> runCatching { startActivity(copilotIntent()) }.onFailure { postHeardNotification(latest != null) }
-            WakeLaunch.NOTIFICATION -> postHeardNotification(latest != null)
-            WakeLaunch.NONE -> Unit
+    private fun commandLanguage(): CopilotLanguage =
+        if (runCatching { graph.settings.settings.value.guideLanguage }.getOrNull() == "hi") CopilotLanguage.HI else CopilotLanguage.EN
+
+    private fun startCommand() {
+        command?.cancel()
+        command = scope.launch {
+            try {
+                runCommand()
+            } finally {
+                withContext(NonCancellable) {
+                    recognizer?.release()
+                    if (running) {
+                        transition(WakeEvent.CommandDone(SystemClock.elapsedRealtime()))
+                        scheduleTick()
+                    }
+                }
+            }
         }
     }
 
-    private fun copilotIntent(): Intent = Intent(this, MainActivity::class.java)
-        .setAction(Intent.ACTION_VIEW)
-        .putExtra(AssistantFeatures.EXTRA_FEATURE, AssistantFeature.ASK_LAST_CHECK.id)
+    private suspend fun runCommand() {
+        val assistant = VoiceAssistant.get(this)
+        val hindiUi = commandLanguage() == CopilotLanguage.HI
+        assistant.cue(hindiUi)
+        // The command, plus at most one answer to "Which one?".
+        repeat(MAX_TURNS) {
+            val heard = listen(hindiUi)
+            val text = (heard as? Heard.Text)?.text
+            if (text == null) {
+                Log.i(TAG, "command not heard: ${(heard as Heard.Failed).why}")
+                assistant.say(heard.reply, hindiUi)
+                return
+            }
+            val turn = assistant.handle(text, AssistantSource.WAKE, preferHindi = hindiUi)
+            turn.waiting?.let(::postContinueNotification)
+            assistant.say(turn.reply, turn.hindi)
+            if (turn.stopListening) {
+                finish(WakeStopReason.USER)
+                return
+            }
+            if (turn.choices.isEmpty()) return
+        }
+    }
+
+    private sealed interface Heard {
+        data class Text(val text: String) : Heard
+        data class Failed(val reply: Said, val why: String) : Heard
+    }
+
+    /** Hears one utterance in the UI language; a missing Hindi pack falls back to English. */
+    private suspend fun listen(hindi: Boolean): Heard {
+        val r = recognizer ?: return Heard.Failed(AssistantCopy.noRecognizer, "no recogniser")
+        if (!r.onDeviceAvailable) return Heard.Failed(AssistantCopy.noRecognizer, "no on-device recogniser")
+        val first = listenOnce(r, if (hindi) CopilotLanguage.HI else CopilotLanguage.EN)
+        if (hindi && first is Heard.Failed && first.why in LANGUAGE_ERRORS) return listenOnce(r, CopilotLanguage.EN)
+        return first
+    }
+
+    private suspend fun listenOnce(r: OnDeviceRecognizer, language: CopilotLanguage): Heard =
+        withTimeoutOrNull(LISTEN_TIMEOUT_MS) {
+            suspendCancellableCoroutine { cont ->
+                val started = r.start(language, object : OnDeviceRecognizer.Listener {
+                    override fun onPartial(text: String) = Unit
+                    override fun onFinal(text: String) {
+                        if (cont.isActive) cont.resume(Heard.Text(text))
+                    }
+                    override fun onError(code: Int) {
+                        if (cont.isActive) cont.resume(failure(code))
+                    }
+                    override fun onEnd() {
+                        if (cont.isActive) cont.resume(Heard.Failed(AssistantCopy.notCaught, "ended"))
+                    }
+                })
+                if (!started && cont.isActive) cont.resume(Heard.Failed(AssistantCopy.micUnavailable, "start failed"))
+                cont.invokeOnCancellation { main.post { r.release() } }
+            }
+        } ?: run {
+            r.release()
+            Heard.Failed(AssistantCopy.notCaught, "timeout")
+        }
+
+    private fun failure(code: Int): Heard.Failed = when (code) {
+        SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> Heard.Failed(AssistantCopy.notCaught, "code $code")
+        SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE, SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ->
+            Heard.Failed(PACK_MISSING, LANGUAGE_ERROR_PREFIX + code)
+        else -> Heard.Failed(AssistantCopy.micUnavailable, "code $code")
+    }
+
+    private fun continueIntent(): Intent = Intent(this, MainActivity::class.java)
+        .setAction(Intent.ACTION_MAIN)
+        .addCategory(Intent.CATEGORY_LAUNCHER)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
 
+    /** The command needs TraceVeil's screen and Android did not let it come forward: the user taps to continue. */
     @SuppressLint("MissingPermission") // checked by notificationsAllowed() just below; a late revocation is caught
-    private fun postHeardNotification(hasLatest: Boolean) {
+    private fun postContinueNotification(action: AssistantAction) {
         if (!WakeController.notificationsAllowed(this)) return
-        val open = PendingIntent.getActivity(this, REQUEST_OPEN, copilotIntent(), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val open = PendingIntent.getActivity(this, REQUEST_OPEN, continueIntent(), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val n = NotificationCompat.Builder(this, CHANNEL_HEARD)
             .setSmallIcon(R.drawable.ic_wake_mic)
             .setContentTitle("Hey TraceVeil heard you")
-            .setContentText(if (hasLatest) "Tap to open your last check." else "Tap to open TraceVeil. You have no saved checks yet.")
+            .setContentText(AssistantCopy.continueTitle(action))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setAutoCancel(true)
@@ -201,27 +308,69 @@ class HeyTraceVeilService : Service() {
         }
     }
 
-    private fun listeningNotification(endsAtWallMs: Long): Notification {
+    // --- session upkeep ----------------------------------------------------------------------------------------------
+
+    private fun tick() {
+        if (!running) return
+        val battery = WakeController.battery(this).let { if (batteryLowSignal) it.copy(systemLow = true) else it }
+        transition(WakeEvent.Tick(SystemClock.elapsedRealtime(), battery, duration.limitMs))
+        scheduleTick()
+    }
+
+    private fun scheduleTick() {
+        main.removeCallbacks(tickRunnable)
+        if (!running) return
+        val state = WakeRuntime.state.value
+        val startedAt = when (state) {
+            is WakeState.Listening -> state.startedAtMs
+            is WakeState.Responding -> state.startedAtMs
+            is WakeState.Paused -> state.startedAtMs
+            else -> null
+        }
+        val now = SystemClock.elapsedRealtime()
+        val untilLimit = startedAt?.let { WakeSessionPolicy.remainingMs(it, now, duration.limitMs) } ?: TICK_MS
+        val untilResume = (state as? WakeState.Responding)?.let { it.resumeAtMs - now } ?: TICK_MS
+        main.postDelayed(tickRunnable, minOf(TICK_MS, untilLimit, untilResume).coerceAtLeast(MIN_TICK_MS))
+    }
+
+    /** Re-posts the listening notification only when its title changes (listening, hearing a command, paused). */
+    @SuppressLint("MissingPermission") // notificationsAllowed() was checked when arming; a late revocation is caught
+    private fun updateNotification(state: WakeState) {
+        if (!running) return
+        val title = when {
+            state is WakeState.Paused && WakeHold.COMMAND in state.holds -> WakeCopy.HEARING_TITLE
+            else -> WakeCopy.notificationTitle(paused = state is WakeState.Paused)
+        }
+        if (lastTitle == title) return
+        lastTitle = title
+        try {
+            NotificationManagerCompat.from(this).notify(NOTIFICATION_LISTENING, listeningNotification(WakeRuntime.endsAtWallMs.value, title))
+        } catch (_: SecurityException) {
+        }
+    }
+
+    private fun listeningNotification(endsAtWallMs: Long?, title: String): Notification {
         val stop = PendingIntent.getService(
             this, REQUEST_STOP,
             Intent(this, HeyTraceVeilService::class.java).setAction(ACTION_STOP).putExtra(EXTRA_REASON, WakeStopReason.USER.name),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        return NotificationCompat.Builder(this, CHANNEL_LISTENING)
+        val builder = NotificationCompat.Builder(this, CHANNEL_LISTENING)
             .setSmallIcon(R.drawable.ic_wake_mic)
-            .setContentTitle("Listening for “Hey TraceVeil” — tap to stop")
-            .setContentText("Offline, on this phone only. Audio is never saved or sent. Stops by itself in 15 minutes.")
+            .setContentTitle(title)
+            .setContentText(WakeCopy.notificationText(limited = endsAtWallMs != null))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .setWhen(endsAtWallMs)
-            .setShowWhen(true)
-            .setUsesChronometer(true)
-            .setChronometerCountDown(true)
             .setContentIntent(stop)
             .addAction(0, "Stop listening", stop)
-            .build()
+        if (endsAtWallMs != null) {
+            builder.setWhen(endsAtWallMs).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true)
+        } else {
+            builder.setShowWhen(false)
+        }
+        return builder.build()
     }
 
     private fun createChannels() {
@@ -259,16 +408,19 @@ class HeyTraceVeilService : Service() {
     private fun teardown() {
         engine?.stop()
         engine = null
+        command?.cancel()
+        command = null
+        recognizer?.release()
+        recognizer = null
         main.removeCallbacks(tickRunnable)
-        main.removeCallbacks(resumeRunnable)
         main.removeCallbacks(startTimeout)
         stopRequests?.cancel()
         stopRequests = null
+        holdWatch?.cancel()
+        holdWatch = null
+        lastTitle = null
         batteryReceiver?.let { runCatching { unregisterReceiver(it) } }
         batteryReceiver = null
-        // Let a reply that is already being spoken finish, then free the text-to-speech engine.
-        voice?.let { v -> main.postDelayed({ v.release() }, WakeMachine.REPLY_PAUSE_MS) }
-        voice = null
         WakeRuntime.setEndsAt(null)
         if (running) {
             running = false
@@ -293,6 +445,7 @@ class HeyTraceVeilService : Service() {
         const val ACTION_START = "com.dpdpxray.app.wake.START"
         const val ACTION_STOP = "com.dpdpxray.app.wake.STOP"
         const val EXTRA_REASON = "reason"
+        const val EXTRA_DURATION = "duration"
         private const val TAG = "HeyTraceVeil"
         private const val CHANNEL_LISTENING = "hey_traceveil_listening"
         private const val CHANNEL_HEARD = "hey_traceveil_heard"
@@ -304,5 +457,16 @@ class HeyTraceVeilService : Service() {
         private const val MIN_TICK_MS = 500L
         private const val START_TIMEOUT_MS = 60_000L
         private const val HEARD_TIMEOUT_MS = 2 * 60_000L
+        private const val LISTEN_TIMEOUT_MS = 15_000L
+        private const val MAX_TURNS = 2
+        private const val LANGUAGE_ERROR_PREFIX = "language "
+        private val LANGUAGE_ERRORS = setOf(
+            LANGUAGE_ERROR_PREFIX + SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE,
+            LANGUAGE_ERROR_PREFIX + SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,
+        )
+        private val PACK_MISSING = Said(
+            "The phone's on-device speech pack for this language is missing. Open the voice copilot and tap Download speech pack.",
+            "इस भाषा का ऑन-डिवाइस स्पीच पैक फ़ोन में नहीं है। वॉइस कोपायलट खोलकर Download speech pack दबाइए।",
+        )
     }
 }

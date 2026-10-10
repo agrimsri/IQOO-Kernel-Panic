@@ -1,6 +1,6 @@
 # Hey TraceVeil and "Hey Google" shortcuts
 
-Status, 10 October 2026: **built and unit-tested, not yet tried on a phone.** The wake word is **experimental, opt-in and off by default.** Google stays the default assistant: TraceVeil does not request `ROLE_ASSISTANT`, declares no assist or voice-interaction component and never loops `SpeechRecognizer`.
+Status, 10 October 2026: **built and unit-tested; the command mode and session choices are not yet tried on a phone.** The wake word is **experimental, opt-in and off by default.** Google stays the default assistant: TraceVeil does not request `ROLE_ASSISTANT`, declares no assist or voice-interaction component and never loops `SpeechRecognizer`.
 
 ## 1. Assistant shortcuts (no TraceVeil microphone)
 
@@ -22,24 +22,42 @@ Limits: App Actions fulfilment for a sideloaded APK needs Google's App Actions T
 
 | Piece | File | Role |
 | --- | --- | --- |
-| Phrase and grammar | `voice/wake/WakePhrase.kt` | Grammar `["hey trace veil","hey traceveil","[unk]"]`; only **final** results count; every word of the phrase needs confidence ≥ 0.70 when Vosk reports it |
-| Session rules | `voice/wake/WakeSession.kt` | Pure state machine (Off, Starting, Listening, Responding, Stopped), 15-minute cap, low-battery stop, arming checks, launch route and spoken reply |
-| Engine | `voice/wake/VoskWakeEngine.kt` | Vosk `Model` + grammar `Recognizer` fed from our own `AudioRecord` loop (16 kHz mono, 100 ms buffers). Vosk's `SpeechService` is not used because its thread throws an uncaught exception on a failed read |
-| Service | `voice/wake/HeyTraceVeilService.kt` | Not exported; `foregroundServiceType="microphone"`; `START_NOT_STICKY` |
+| Phrase, sensitivity, event log | `voice/wake/WakePhrase.kt` | Grammar `["hey trace veil","hey traceveil","[unk]"]`; only **final** results count. **Strict** (default): every phrase word ≥ 0.90, word scores required, no speech straight before the phrase, phrase 0.35–2.5 s with no gap over 0.6 s. **Normal**: every phrase word ≥ 0.75. `WakeEventLog` counts accepted/rejected decisions (time, outcome, confidence, mode; no words, no audio) |
+| Session rules | `voice/wake/WakeSession.kt` | Pure state machine (Off, Starting, Listening, Responding, Paused, Stopped); session length 15 min / 1 hour / until stopped; low-battery stop; holds (COMMAND, COPILOT, ASSISTANT) that release the microphone and resume; arming checks |
+| Engine | `voice/wake/VoskWakeEngine.kt` | Vosk `Model` + grammar `Recognizer` fed from our own `AudioRecord` loop (16 kHz mono, 100 ms buffers). It can close the microphone while keeping the model loaded and reopen it (with short retries). Vosk's `SpeechService` is not used because its thread throws an uncaught exception on a failed read |
+| Service | `voice/wake/HeyTraceVeilService.kt` | Not exported; `foregroundServiceType="microphone"`; `START_NOT_STICKY`; command mode after a detection |
+| Choices | `voice/wake/WakePreferences.kt` | Session length and sensitivity, in their own preferences file (`hey_traceveil`), not the shared settings |
 | Model | `voice/wake/WakeModelFiles.kt`, `WakeModelManager.kt` | Download, checksum verification, safe unpacking |
-| UI and hooks | `voice/wake/HeyTraceVeilSection.kt`, `AssistantEntry.kt` | Settings section; copilot guard and visibility hook mounted in `MainActivity` |
+| UI and hooks | `voice/wake/HeyTraceVeilSection.kt`, `AssistantEntry.kt` | Settings card (length, sensitivity, Recent wake events, battery-settings hint); copilot/visibility hooks mounted in `MainActivity` |
+| Commands | `core/assistant/*` (pure), `voice/assistant/*` | Parser, app-name matcher and spoken summary in `:core`; planner, voice-safe audit options, executor, offline reply voice and the screen host in the app |
 
-Flow: Settings → switch on "Hands-free wake word" (only reveals the controls) → download the model → **Start listening (15 minutes)** → microphone and notification permission requests if needed → service starts.
+Flow: Settings → switch on "Hands-free wake word" (only reveals the controls) → download the model → choose **Listen for** (15 min / 1 hour / Until I turn it off) and **Wake sensitivity** (Strict / Normal) → **Start listening** → microphone and notification permission requests if needed → service starts.
 
 - **Start:** only from that button while TraceVeil is on screen. The UI starts a plain service, which promotes itself to a microphone foreground service after re-checking the model, the permissions, notifications and battery. A refused start therefore never leaves a pending `startForegroundService` obligation that could crash the app.
-- **While listening:** persistent notification "Listening for "Hey TraceVeil" — tap to stop" with a countdown. Tapping it, or its Stop action, stops it. Android also shows its own microphone indicator.
-- **Stops by itself:** after 15 minutes from the engine becoming ready (detections do not extend it); at ≤15% battery when not charging, or on Android's battery-low signal; when the voice copilot screen opens (only one recogniser may hold the microphone); when TraceVeil is swiped from recents; on any engine error, or if the recogniser has not started within 60 s. It is never restarted by the system or on boot.
-- **On detection:** audio is ignored for 6 s so the reply cannot re-trigger it, and the phone's offline text-to-speech (`AnswerVoice`, offline voices only) speaks a reply that matches what will actually happen:
-  - TraceVeil visible → it opens the copilot for the latest audit directly: "Yes? Opening your last check."
-  - Otherwise → a high-priority notification "Hey TraceVeil heard you — Tap to open your last check": "Yes? Tap the TraceVeil notification to see your last check."
-  - No saved audit → the reply says so.
+- **Session length:** without a saved choice it listens **until stopped while charging** (no battery cost; a plugged-in demo phone should not go deaf mid-presentation) and for **1 hour on battery** (covers a demo or meeting, bounds a forgotten session). The user's choice is kept.
+- **While listening:** persistent notification "Listening for "Hey TraceVeil" — tap to stop", with a countdown only when a limit was chosen. Tapping it, or its Stop action, stops it. Android also shows its own microphone indicator. It keeps running with the screen off (the foreground service was started from the foreground, so it keeps microphone access); phones that stop background apps to save power can be told to allow it from the card's **TraceVeil battery settings** button.
+- **Pauses and resumes by itself:** while the voice copilot is on screen (its Tap to speak needs the microphone), while a voice-started check runs and while TraceVeil is speaking a reply, the service closes its microphone ("Hey TraceVeil is paused") and reopens it afterwards, after a 1.5 s pause.
+- **Stops by itself:** at the end of the chosen length (detections do not extend it); at ≤15% battery when not charging, or on Android's battery-low signal; when TraceVeil is swiped from recents; on any engine error, or if the recogniser has not started within 60 s. It is never restarted by the system or on boot.
+- **On detection (command mode):** it says "Yes?" (Hindi "हाँ, बोलिए?" when the app language is Hindi; a beep when no offline voice exists), closes its microphone, hears **one** command with the phone's **on-device** `SpeechRecognizer` (`OnDeviceRecognizer`; Hindi pack when the app language is Hindi, English otherwise or when the Hindi pack is missing), acts, replies aloud with an offline voice and resumes. An unclear app name gets one follow-up "Which one?". A command that takes longer than 60 s is abandoned by a watchdog.
 
-Background activity starts: since Android 10 an app cannot start an activity from the background just because it has a foreground service. A full-screen intent would need `USE_FULL_SCREEN_INTENT`, which Android 14+ grants by default only to calling and alarm apps and Play restricts to those uses, so it is not requested. The existing accessibility service is not used to bypass this. The user taps the notification instead.
+### Commands (wake word, copilot Tap to speak, typed text and command chips)
+
+| Say (EN / Hinglish / Hindi) | What happens |
+| --- | --- |
+| "Check Instagram", "audit Instagram", "Instagram ko check karo", "इंस्टाग्राम की जाँच करो" | Finds the launcher app by label (case, spacing, small misspellings, Devanagari transliteration). Checks the VPN permission, the consent watcher and Private DNS first; if one is missing it says what to fix and opens the VPN request, Accessibility settings or network settings. Otherwise it starts a **normal Quick audit** (one Accept plan, data kept, no reset, not Fast Preview) through the same `XrayViewModel.startAudit` as the app picker, shows the live screen and says "Choose on the app's popup, I'm watching." When the check ends it speaks the saved result and opens it. |
+| "Check leaky shop" | Same, but the agent taps Accept on the LeakyShop demo apps only (or packages on a developer automation allowlist, once that feature is wired in). |
+| "Check insta" | "I found Instagram and Instagram Lite. Which one?" — answer "the first one", "Instagram Lite", "दूसरा" or "never mind". |
+| "Check Netflix" (not installed) | "I couldn't find an app called netflix on this phone." Nothing starts. |
+| "Run a full audit of Instagram", "reset and check …" | Voice never starts a Full audit or a reset: it runs the Quick check and says so. |
+| "Check a file", "check this APK" | Opens APK Guard's file picker. |
+| "Check my phone", "phone checkup", "mera phone check karo" | Opens the `checkup` route (My phone checkup) when it exists in the build; otherwise says it is not in this version. |
+| "What did you find?", "read my last result", "kya mila", "पिछला नतीजा बताओ" | Speaks the newest saved audit (or, in the copilot, that audit): score, band, headline, most serious finding, missing choices, "in this check"; never "safe". Opens its result screen only if TraceVeil is already on screen. |
+| "Which trackers did it contact?" and any other question | The existing grounded copilot answer (or its refusal plus a hint). |
+| "Open reports / settings / home / the trust map" | Opens that screen (`trust` only when the build has it). |
+| "What can you do?", "help", "tum kya kar sakte ho" | Lists the commands. |
+| "Stop listening", "band karo", "बंद करो" | Stops the wake word. |
+
+**Reaching the screen from the background.** Android 10+ blocks activity starts from the background. When TraceVeil is not on screen, the assistant asks it to come forward (`DeviceChecks.bringXrayToFront`, the same call the audit orchestrator already uses; Android allows it in some cases, such as while the consent watcher is bound). If TraceVeil is not on screen within 4 s, or the phone is locked, the request waits up to 2 minutes and a high-priority notification "Tap to continue: check Instagram" is posted; the spoken reply says to tap it (or to unlock first). `USE_FULL_SCREEN_INTENT` and overlays are still not requested. Commands that only speak (what did you find, questions, help, stop) work without the screen.
 
 ### Privacy
 
@@ -69,26 +87,31 @@ adb push vosk-model-small-en-us-0.15 /sdcard/Android/data/com.dpdpxray.app/files
 
 ### Known limits
 
-- Accuracy is **not measured**: no false-accept or false-reject rates, and the 0.70 confidence floor is not calibrated. A grammar-restricted recogniser can map similar speech onto the phrase.
+- Accuracy is **not measured**: no false-accept or false-reject rates; the Strict and Normal thresholds are reasoned starting values, not calibrated. A grammar-restricted recogniser can map similar speech onto the phrase. Use the Recent wake events counter and `adb logcat -s HeyTraceVeil` to measure.
 - "traceveil" is outside the small model's vocabulary. Vosk drops that word, so in practice only "hey trace veil" is produced.
-- English (US) model only, with Indian-English accents untested. A small Indian-English model (`vosk-model-small-en-in-0.4`) exists but is not wired in.
+- English (US) wake model only, with Indian-English accents untested. A small Indian-English model (`vosk-model-small-en-in-0.4`) exists but is not wired in.
+- Commands need Android's **on-device** recogniser (Android 12+) and its language pack (`en-US`/`en-IN`, and `hi-IN` for Hindi). Missing packs are downloaded only from the copilot's explicit Download button. Whether the phone's recognition service accepts a command while TraceVeil is in the background (it should, because the microphone foreground service is running) is **not verified on the iQOO**.
+- Whether Android lets TraceVeil come forward from the background on this phone is **not verified**; the notification fallback covers it.
+- Spoken replies need an installed offline voice; Hindi replies fall back to English when no offline Hindi voice is installed. Command replies never use the optional online voice.
 - CPU, battery and memory cost on our phones is not measured. OEM battery managers may stop the service early.
 - When another app records (for example, Google's own hotword or a call), Android may give that app the microphone and silence ours.
-- APK size: Vosk adds `libvosk.so` (10,042,800 bytes arm64-v8a; 10,335,120 bytes x86_64) and JNA's `libjnidispatch.so` (176,520 / 126,912 bytes), stored uncompressed. The debug APK (two ABIs) grew from 85,446,999 to 106,570,883 bytes; an arm64-only release grows by about 10.3 MB.
+- APK size: Vosk adds `libvosk.so` (10,042,800 bytes arm64-v8a; 10,335,120 bytes x86_64) and JNA's `libjnidispatch.so` (176,520 / 126,912 bytes), stored uncompressed.
 
 ## 3. Phone test checklist (human, not yet done)
 
-1. Install; long-press the icon: three shortcuts; each opens its screen ("Check APK" shows the not-available message until the APK screen is merged).
-2. Simulate the assistant: `adb shell am start -n com.dpdpxray.app/.MainActivity -a android.intent.action.VIEW --es feature "check an app"` (and "ask about my last check", "check an APK file"). Optionally use the App Actions Test Tool for a real "Hey Google" query.
-3. Settings → Hey TraceVeil: switch on, nothing listens yet. Download: system download notification, then "checksum verified". Try a corrupted zip via adb: rejected and deleted.
-4. Start listening: permission prompts, persistent notification with countdown, microphone indicator. Tap the notification: it stops.
-5. Start again, stay in TraceVeil, say "Hey TraceVeil": audible offline reply and the copilot opens; listening stops (copilot guard).
-6. Start again, go to the home screen, say it: reply plus heads-up notification; tap it: copilot opens.
-7. Leave it 15 minutes: it stops with "Stopped automatically after 15 minutes."
-8. Low battery: `adb shell dumpsys battery unplug` and `adb shell dumpsys battery set level 10`: it stops within about 15 s; then `adb shell dumpsys battery reset`.
-9. Swipe TraceVeil from recents while listening: it stops. Reboot: it does not start.
-10. Count false triggers during ordinary conversation and TV audio before calling it usable.
+1. Install; long-press the icon: three shortcuts; each opens its screen.
+2. Settings → Hey TraceVeil: switch on, nothing listens yet. Download the model (or push it), then "checksum verified".
+3. Choose **Until I turn it off** and **Strict**; Start listening: permission prompts, persistent notification without a countdown, microphone indicator.
+4. In TraceVeil, say "Hey TraceVeil", wait for "Yes?", say "What can you do?": the command list is spoken; listening resumes (notification title returns to "Listening…").
+5. Say "Hey TraceVeil" … "Check Instagram" (or another agreed non-sensitive app) with VPN, watcher on and Private DNS off: spoken "Starting a Quick check…", the live screen, the app opens; make the consent choice yourself; at the end the result is spoken and opened.
+6. Say "Hey TraceVeil" … "Check leaky shop": the agent taps Accept on LeakyShop; result spoken.
+7. Say "Hey TraceVeil" … "Check insta": "Which one?"; answer "the first one".
+8. Go to the home screen, lock nothing, say "Hey TraceVeil" … "Open reports": TraceVeil comes forward, or the notification "Tap to open TraceVeil" appears and the reply says to tap it.
+9. Screen off for 20+ minutes on battery with **1 hour** chosen: it still answers; after 1 hour it stops with "Stopped automatically after 1 hour, as you chose."
+10. Open the voice copilot: the notification says paused; Tap to speak works; leave the copilot: listening resumes.
+11. Low battery: `adb shell dumpsys battery unplug` and `adb shell dumpsys battery set level 10`: it stops within about 15 s; then `adb shell dumpsys battery reset`.
+12. Watch `adb logcat -s HeyTraceVeil` and the Recent wake events counter during ordinary conversation and hall noise in Strict, then Normal, before calling it usable.
 
 ## Tests
 
-JVM tests in `app/src/test/java/com/dpdpxray/app/voice/wake/`: `WakePhraseTest`, `WakeSessionPolicyTest`, `WakeMachineTest`, `WakeResponseTest`, `AssistantFeaturesTest`, `WakeModelFilesTest` (checksums, zip-slip, size limit, manual folder) and `HeyTraceVeilManifestTest` (private microphone service, no assist/voice-interaction/full-screen permissions, shortcuts wiring).
+JVM tests in `app/src/test/java/com/dpdpxray/app/voice/wake/`: `WakePhraseTest` (Strict/Normal decisions on sample Vosk results), `WakeEventLogTest`, `WakeSessionPolicyTest` (15 min / 1 hour / until stopped, charging default, battery), `WakeMachineTest` (command, copilot and check holds, watchdog, resume), `WakeResponseTest` (arming), `WakeCopyTest`, `AssistantFeaturesTest`, `WakeModelFilesTest` (checksums, zip-slip, size limit, manual folder) and `HeyTraceVeilManifestTest` (private microphone service, no assist/voice-interaction/full-screen permissions, shortcuts wiring). In `app/src/test/java/com/dpdpxray/app/voice/assistant/`: `AssistantPlannerTest` (readiness, ambiguity, not found, no Full/reset, routes, no safety claims) and `VoiceAuditOptionsTest` (Quick, no reset, auto-tap only for demo/allowlisted apps). In `core/src/test/kotlin/com/dpdpxray/core/assistant/`: `VoiceCommandParserTest` (EN, Hindi, Hinglish, every copilot chip stays a question), `AppNameMatcherTest` (exact, typos, multi-word, Devanagari, ambiguity, not found), `ChoiceReplyTest` and `AuditSpokenSummaryTest`.

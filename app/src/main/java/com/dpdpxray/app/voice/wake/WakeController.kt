@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 
 /** Process-wide wake-word state, written only by [HeyTraceVeilService] and read by Settings and the copilot guard. */
@@ -28,13 +29,37 @@ object WakeRuntime {
     private val _stopRequests = MutableSharedFlow<WakeStopReason>(extraBufferCapacity = 4)
     internal val stopRequests: SharedFlow<WakeStopReason> = _stopRequests.asSharedFlow()
 
-    /** True while a TraceVeil activity is started (visible); set by [HeyTraceVeilHooks]. */
-    @Volatile var uiVisible: Boolean = false
+    /** The length of the current or most recent session, or null before the first one. */
+    private val _duration = MutableStateFlow<WakeDuration?>(null)
+    val duration: StateFlow<WakeDuration?> = _duration.asStateFlow()
 
-    /** True while the voice copilot screen is the current destination; it may use the microphone. */
-    @Volatile var copilotOpen: Boolean = false
+    /** Accepted and rejected wake-phrase decisions since TraceVeil started: outcomes and confidences only. */
+    private val _events = MutableStateFlow(WakeEventLog())
+    val events: StateFlow<WakeEventLog> = _events.asStateFlow()
+
+    private val _uiVisible = MutableStateFlow(false)
+    /** True while a TraceVeil activity is started (visible); set by [HeyTraceVeilHooks]. */
+    val uiVisibleFlow: StateFlow<Boolean> = _uiVisible.asStateFlow()
+    var uiVisible: Boolean
+        get() = _uiVisible.value
+        set(value) { _uiVisible.value = value }
+
+    private val _copilotOpen = MutableStateFlow(false)
+    /** True while the voice copilot screen is the current destination; the wake word lets go of the microphone. */
+    val copilotOpenFlow: StateFlow<Boolean> = _copilotOpen.asStateFlow()
+    var copilotOpen: Boolean
+        get() = _copilotOpen.value
+        set(value) { _copilotOpen.value = value }
 
     internal fun apply(event: WakeEvent): WakeState = _state.updateAndGet { WakeMachine.next(it, event) }
+
+    internal fun record(heard: WakeHeard, sensitivity: WakeSensitivity, atWallMs: Long) {
+        _events.update { it.record(heard, sensitivity, atWallMs) }
+    }
+
+    internal fun setDuration(value: WakeDuration?) {
+        _duration.value = value
+    }
 
     /** Records why a start was refused, without touching an active session. */
     internal fun refuse(reason: WakeStopReason, detail: String? = null) {
@@ -93,13 +118,17 @@ object WakeController {
      * service is promoted to a microphone foreground service inside the service, so a refused start never leaves
      * a pending foreground-service obligation behind. Returns why it could not start, or null.
      */
-    fun start(context: Context): WakeStopReason? {
+    fun start(context: Context, duration: WakeDuration): WakeStopReason? {
         armProblem(context)?.let {
             WakeRuntime.refuse(it)
             return it
         }
         return runCatching {
-            context.startService(Intent(context, HeyTraceVeilService::class.java).setAction(HeyTraceVeilService.ACTION_START))
+            context.startService(
+                Intent(context, HeyTraceVeilService::class.java)
+                    .setAction(HeyTraceVeilService.ACTION_START)
+                    .putExtra(HeyTraceVeilService.EXTRA_DURATION, duration.name),
+            )
             null
         }.getOrElse {
             WakeRuntime.refuse(WakeStopReason.NOT_ALLOWED_NOW, it.message)

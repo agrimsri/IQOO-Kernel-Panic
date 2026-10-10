@@ -61,6 +61,7 @@ import com.dpdpxray.app.voice.VoiceCopilotScreen
 import com.dpdpxray.app.voice.wake.AssistantEntry
 import com.dpdpxray.app.voice.wake.AssistantFeature
 import com.dpdpxray.app.voice.wake.HeyTraceVeilHooks
+import com.dpdpxray.app.voice.assistant.VoiceAssistantHost
 import com.dpdpxray.app.ui.screens.AiLabScreen
 import com.dpdpxray.app.ui.screens.AppPickerScreen
 import com.dpdpxray.app.ui.screens.CameraCheckScreen
@@ -321,6 +322,7 @@ class MainActivity : ComponentActivity() {
                             if (vm.progress.value is AuditProgress.Running) nav.navigate("live") { launchSingleTop = true }
                         }
                     }
+                    VoiceAssistantHost(nav, vm)
                 }
                 }
                 }
