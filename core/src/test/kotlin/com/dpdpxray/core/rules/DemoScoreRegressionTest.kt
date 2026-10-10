@@ -1,5 +1,6 @@
 package com.dpdpxray.core.rules
 
+import com.dpdpxray.core.model.AppManifestFacts
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
@@ -11,6 +12,8 @@ import com.dpdpxray.core.model.NetEvent
 import com.dpdpxray.core.model.RejectOption
 import com.dpdpxray.core.model.ScoreBand
 import com.dpdpxray.core.model.ScreenAudit
+import com.dpdpxray.core.model.UiNode
+import com.dpdpxray.core.screen.Fixtures
 import com.dpdpxray.core.trackers.TrackerCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -122,6 +125,29 @@ class DemoScoreRegressionTest {
         )
         assertEquals(Triple(100, ScoreBand.READY, emptySet<CheckId>()), summary(engine.evaluate(deviceFixed.map { it.copy(freshState = true) })))
         assertEquals(8, engine.evaluate(leaky.map { it.copy(freshState = true) }).score)
+    }
+
+    /**
+     * What the next phone run records on top of the device-shaped sessions: the consent-screen tree (neither LeakyShop
+     * build links a privacy policy, see leakyshop/Shop.kt), permission dialogs watched (LeakyShop asks for none), the
+     * installed manifest (no SDK is bundled: LeakyShop only resolves the SDK hosts) and a background window with no
+     * lookups. Only C15 (info) is added; the scores stay 21 and 100.
+     */
+    @Test
+    fun `new evidence on the phone adds only C15 info and keeps 21 and 100`() {
+        val noSdk = AppManifestFacts(versionName = "1.0", versionCode = 1, partsRead = listOf("meta-data", "services", "receivers", "providers"))
+        fun phone(sessions: List<AuditSession>, tree: UiNode) = sessions.map { s ->
+            s.copy(
+                freshState = true, permissionDialogsWatched = true, manifestFacts = noSdk, endedAtNanos = s.endedAtNanos + 10 * S,
+                backgroundStartedNanos = s.endedAtNanos,
+                consentEvents = s.consentEvents.map { if (it.kind == ConsentKind.SCREEN_APPEARED) it.copy(tree = tree) else it },
+            )
+        }
+        assertEquals(
+            Triple(21, ScoreBand.AT_RISK, setOf(CheckId.C1, CheckId.C2, CheckId.C3, CheckId.C4, CheckId.C10, CheckId.C15)),
+            summary(engine.evaluate(phone(deviceLeaky, Fixtures.leakyDialog))),
+        )
+        assertEquals(Triple(100, ScoreBand.READY, setOf(CheckId.C15)), summary(engine.evaluate(phone(deviceFixed, Fixtures.fixedDialog))))
     }
 
     @Test
