@@ -98,6 +98,12 @@ fun VoiceCopilotScreen(auditId: String, onBack: () -> Unit, vm: VoiceViewModel =
             Note("Speech is recognised on this phone only. Nothing is recorded or kept.")
             if (s.transcript.isNotBlank()) Text("“${s.transcript}”", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 8.dp))
             s.micMessage?.let { Note(it, Film.high) }
+            s.packNote?.let { Note(it) }
+            if (s.canDownloadPack) {
+                SecondaryAction("Download speech pack", vm::downloadSpeechPack, Modifier.fillMaxWidth().padding(top = 8.dp))
+                Note("Downloads a recognition model through your phone's speech provider. No microphone audio is sent by TraceVeil.")
+            }
+            SecondaryAction("Check again", vm::refreshMic, Modifier.fillMaxWidth().padding(top = 8.dp), enabled = !s.listening)
 
             SectionTitle("Or tap a question")
             CopilotQuestions.chips.forEach { q ->
@@ -126,6 +132,8 @@ fun VoiceCopilotScreen(auditId: String, onBack: () -> Unit, vm: VoiceViewModel =
             }
             if (s.speaking) SecondaryAction("Stop speaking", { vm.stopSpeaking() }, Modifier.fillMaxWidth().padding(top = 8.dp))
             s.voiceNote?.let { Note(it, Film.high) }
+            SecondaryAction("Voice settings", vm::openVoiceSettings, Modifier.fillMaxWidth().padding(top = 8.dp))
+            Note("For a clearer voice, install a higher-quality offline voice in your phone's text-to-speech settings. Available voices depend on the engine.")
 
             Note("Answers use only this audit's findings and at most three passages of the DPDP Act and Rules, so they work without the AI model. Not legal advice.")
             Spacer(Modifier.height(32.dp))

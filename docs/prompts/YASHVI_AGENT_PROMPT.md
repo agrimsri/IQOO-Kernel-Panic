@@ -9,7 +9,8 @@ Repository: https://github.com/agrimsri/IQOO-Kernel-Panic.git. **`IMPLEMENTATION
 | Y1 Voice Copilot | On `main` (PR #4). Not yet mounted: Nitya adds the route and `RECORD_AUDIO`. |
 | Y2 Network Proof | Calculator and card on `main` (PR #4). Not yet mounted or fed: Nitya samples `UidTx` per plan. |
 | Y3 Endpoint map | On `yashvi/phone-experience` only (7 commits ahead, 4 behind `main`). Not on `main`. |
-| Y4, Y5, Y6 | Not started. |
+| Y4 | Done as the Owner / legal authority mode of the Y3 card, reading A5's catalogue facts. |
+| Y5 | **Cancelled**: the team keeps Camera Check and its Home button. |
 | Agrim A0–A5 | All on `main` as of PR #5 (`ebdafae`). `agrim/evidence-engine` and `agrim/a4-capture-health` are **deleted**: merge from `origin/main` from now on. |
 
 ## Start here: sync with `main`
@@ -41,8 +42,7 @@ What A5 contains, for reference: headquarters (US) for Google ×4, Meta ×3, Mic
 - **Y3 to `main`:** finish the changes above, re-run tests, then open a PR from `yashvi/phone-experience` to `main` with test output and screenshots. Keep GeoLite2 data out of Git as you decided; Nitya records it in `ATTRIBUTIONS.md` (it does not exist yet; send her the exact entry). A filled map with real countries has not been seen on a phone yet: the live audits on 10 Oct produced real `answerIps` (see the bug report), so test with your own GeoLite2 file and a Full audit of LeakyShop.
 - **Network Proof check against live data:** a leaky Reject plan relayed 8 datagrams, 322 B sent, 653 B received. Encrypted-DNS attempts appear as `CaptureHealth.hiddenDnsPackets` (8 in each audit's first plan with Private DNS on Automatic) and never reach the relay; `nonDnsPackets` are IPv6 control traffic. Make sure your card states both where relevant, and still never clamps an unknown or negative remainder to 0.
 - **Y4:** the company layer from the catalogue, per point 4 above.
-- **Y5:** after Nitya removes the Camera Check Home button and route (still present on `main`: `MainActivity.kt` route `camera`, `HomeScreen.kt` "Camera check"), remove `CameraCheckScreen` and its unused helpers from your `ToolScreens.kt`. Keep AI Lab and Settings working. Coordinate so no commit leaves a dangling route.
-- **Y6 last:** a controlled aliased host in the leaky flavour only if the team controls a real CNAME. Otherwise keep the labelled synthetic fixture (Nitya's `nitya/sample-fixtures` has one). Fixed must stay at 100.
+- **Camera Check stays.** Do not remove its Home button, route, screen or helpers (the earlier Y5 plan is cancelled).
 
 Do not implement a fraud scanner, a permission interceptor, a second Safety Coach, wake words or camera improvements. Any cloud feature (including the Sarvam online voice mode) must stay off by default with explicit consent and be recorded with Nitya.
 

@@ -38,7 +38,13 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.data.AuditBundle
+import com.dpdpxray.app.audit.AuditPlanCoverage
+import com.dpdpxray.app.data.AuditNetworkReadings
+import com.dpdpxray.app.data.AuditComparisonResult
+import com.dpdpxray.app.netproof.NetworkProofCard
 import com.dpdpxray.app.ui.XrayViewModel
+import com.dpdpxray.app.ui.EndpointMapIntegration
+import com.dpdpxray.app.ui.screens.map.EndpointMapCard
 import com.dpdpxray.app.ui.components.CodeBlock
 import com.dpdpxray.app.ui.components.ConsentLine
 import com.dpdpxray.app.ui.components.Note
@@ -57,6 +63,7 @@ import com.dpdpxray.core.model.EvidenceType
 import com.dpdpxray.core.model.Finding
 import com.dpdpxray.core.model.ScoreBand
 import com.dpdpxray.core.model.Severity
+import com.dpdpxray.core.score.ConfidenceGrader
 import java.io.File
 
 @Composable
@@ -68,7 +75,7 @@ private fun WithBundle(vm: XrayViewModel, id: String, content: @Composable (Audi
 }
 
 @Composable
-fun ResultsScreen(vm: XrayViewModel, id: String, onBack: () -> Unit, onFinding: (CheckId) -> Unit, onFixes: () -> Unit, onReport: () -> Unit) {
+fun ResultsScreen(vm: XrayViewModel, id: String, onBack: () -> Unit, onFinding: (CheckId) -> Unit, onFixes: () -> Unit, onReport: () -> Unit, onAsk: () -> Unit) {
     WithBundle(vm, id) { b ->
         val r = b.result
         Column(Modifier.fillMaxSize()) {
@@ -87,6 +94,8 @@ fun ResultsScreen(vm: XrayViewModel, id: String, onBack: () -> Unit, onFinding: 
                     Spacer(Modifier.weight(1f))
                     if (b.meta.sample) Tag("Sample data", Film.boneDim)
                 }
+                AuditPlanCoverage.gaps(b.sessions).forEach { Note(it, Film.warn) }
+                AuditPlanCoverage.freshStateHint(b.sessions)?.let { Note(it, Film.warn) }
                 SeverityStrip(r.findings)
                 Text(headline(r.findings), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 12.dp))
 
@@ -94,6 +103,35 @@ fun ResultsScreen(vm: XrayViewModel, id: String, onBack: () -> Unit, onFinding: 
                     val fixCount = vm.fixesFor(b).size
                     SecondaryAction("How to fix ($fixCount)", onFixes, Modifier.weight(1f), enabled = fixCount > 0)
                     SecondaryAction("Report and export", onReport, Modifier.weight(1f))
+                }
+
+                SecondaryAction("Ask this audit", onAsk, Modifier.fillMaxWidth().padding(top = 10.dp))
+                SectionTitle("Evidence coverage")
+                if (b.meta.sample) Note("Synthetic sample: capture confidence was not measured.", Film.warn)
+                else Note(ConfidenceGrader.gradeAudit(b.sessions).summary)
+                NetworkProofCard(AuditNetworkReadings.proof(b.sessions, b.networkReadings))
+
+                SectionTitle("Endpoint evidence")
+                if (b.meta.sample) Note("Synthetic sample: example IPs do not establish real locations.", Film.warn)
+                val mapSettings by vm.settings.collectAsState()
+                val mapCatalog = remember(vm, mapSettings.firstPartyDomains) { vm.graph.catalog() }
+                val mapOwners = remember(mapCatalog) { EndpointMapIntegration.owners(mapCatalog) }
+                EndpointMapCard(b.sessions, mapCatalog, owners = mapOwners)
+
+                SectionTitle("Before / after")
+                val comparison by produceState<AuditComparisonResult?>(null, b.meta.id) { value = vm.previousComparison(b) }
+                when (val change = comparison) {
+                    null -> Note("Checking earlier saved audits…")
+                    is AuditComparisonResult.Unavailable -> Note(change.reason)
+                    is AuditComparisonResult.Available -> RuleRow(Film.scan) {
+                        val delta = if (change.scoreDelta > 0) "+${change.scoreDelta}" else change.scoreDelta.toString()
+                        Text("$delta points since the previous audit", style = MaterialTheme.typography.titleMedium)
+                        Note("Same package and audit plans. Previous audit: ${java.time.Instant.ofEpochMilli(change.previousTimeMs).atZone(java.time.ZoneId.systemDefault())}.")
+                        Note("${change.noLongerRecorded.size} findings no longer recorded" +
+                            change.noLongerRecorded.takeIf { it.isNotEmpty() }?.joinToString(prefix = ": ") { it.code }.orEmpty())
+                        if (change.newlyRecorded.isNotEmpty()) Note("New findings: ${change.newlyRecorded.joinToString { it.code }}", Film.warn)
+                        Note("Capture coverage can differ. A finding not repeated is not proof it was fixed or that the app is safe.")
+                    }
                 }
 
                 SectionTitle("Findings")
@@ -189,7 +227,7 @@ private fun PlanTimelines(vm: XrayViewModel, b: AuditBundle) {
         AlertDialog(
             onDismissRequest = { markHost = null },
             title = { Text("Mark as your own domain?") },
-            text = { Text("$host will be treated as first-party in future results, so it never counts as a tracker.") },
+            text = { Text("$host will be treated as first-party in future results. An observed alias to a known tracker can still count as tracking.") },
             confirmButton = { TextButton(onClick = { vm.markFirstParty(host); markHost = null }) { Text("Mark as mine") } },
             dismissButton = { TextButton(onClick = { markHost = null }) { Text("Cancel") } },
             containerColor = Film.raised,
@@ -215,6 +253,40 @@ fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: ()
                     if (f.penaltyBand.name != "NONE") Tag(f.penaltyBand.label.substringBefore(" ("), Film.boneDim)
                 }
                 Text(f.explanation, style = MaterialTheme.typography.bodyLarge)
+
+                val aliases = remember(b, f) { vm.findingAliases(f, b) }
+                if (aliases.isNotEmpty()) {
+                    SectionTitle("Observed tracker aliases")
+                    aliases.forEach { Tag(it, Film.warn); Spacer(Modifier.height(6.dp)) }
+                    Note("The DNS reply revealed an alias to a catalogue tracker. This does not show what data was sent.")
+                }
+
+                val notice = remember(b, f) { vm.rightsNotice(b, f.checkId) }
+                var showNotice by remember(b.meta.id, f.checkId) { mutableStateOf(false) }
+                if (notice != null) {
+                    SectionTitle("Ask the developer to investigate")
+                    SecondaryAction("Draft notice to developer", { showNotice = true }, Modifier.fillMaxWidth())
+                    Note("Review before sharing. The cited rights relate to India's DPDP framework; this is not a legal finding.")
+                    if (showNotice) AlertDialog(
+                        onDismissRequest = { showNotice = false },
+                        title = { Text("Review developer notice") },
+                        text = {
+                            Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
+                                if (b.meta.sample) Note("SAMPLE: demonstration draft, not evidence from your device.", Film.warn)
+                                Note("Nothing is sent automatically. Check the observations and replace the name/contact placeholders.")
+                                Text(notice.text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 12.dp))
+                            }
+                        },
+                        confirmButton = {
+                            Row {
+                                TextButton(onClick = { vm.copy("Developer notice", notice.text) }) { Text("Copy") }
+                                TextButton(onClick = { vm.shareNotice(notice) }) { Text("Share") }
+                            }
+                        },
+                        dismissButton = { TextButton(onClick = { showNotice = false }) { Text("Close") } },
+                        containerColor = Film.raised,
+                    )
+                }
 
                 screenshotFor(b, f)?.let { path ->
                     SectionTitle("Consent screen as captured")

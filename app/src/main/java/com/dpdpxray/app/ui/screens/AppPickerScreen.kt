@@ -52,7 +52,7 @@ fun AppPickerScreen(vm: XrayViewModel, onBack: () -> Unit, onStarted: () -> Unit
     val pf by vm.preflight.collectAsState()
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf<AuditableApp?>(null) }
-    LaunchedEffect(Unit) { vm.loadApps() }
+    LaunchedEffect(Unit) { vm.refreshPreflight(); vm.loadApps() }
 
     Column(Modifier.fillMaxSize()) {
         TopBar("Choose an app", onBack)
@@ -86,8 +86,7 @@ fun AppPickerScreen(vm: XrayViewModel, onBack: () -> Unit, onStarted: () -> Unit
         ModalBottomSheet(onDismissRequest = { selected = null }, containerColor = Film.raised) {
             AuditSetup(app, shizukuReady = pf.shizukuGranted) { config ->
                 selected = null
-                vm.startAudit(config)
-                onStarted()
+                if (vm.startAudit(config)) onStarted()
             }
         }
     }
@@ -95,21 +94,30 @@ fun AppPickerScreen(vm: XrayViewModel, onBack: () -> Unit, onStarted: () -> Unit
 
 @Composable
 private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, onStart: (AuditConfig) -> Unit) {
-    var full by remember { mutableStateOf(shizukuReady) }
-    var agent by remember { mutableStateOf(true) }
+    val controlledDemo = app.packageName == "com.leakyshop.demo" || app.packageName == "com.leakyshop.demo.fixed"
+    var allowReset by remember { mutableStateOf(controlledDemo) }
+    val freshReset = allowReset && shizukuReady
+    var full by remember { mutableStateOf(shizukuReady && controlledDemo) }
+    var agent by remember { mutableStateOf(controlledDemo) }
     var child by remember { mutableStateOf(false) }
     var gms by remember { mutableStateOf(false) }
 
     Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("Audit ${app.label}", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
+        if (shizukuReady) Toggle("Allow clearing this test app's local data", "Developer testing only. Removes its saved state, accounts and settings before each run. Leave off for personal apps.", allowReset) {
+            allowReset = it
+            if (!it) full = false
+        }
         PlanOption(
             "Full audit, about 2 minutes",
             "Three runs from a fresh install: no interaction, then Reject, then Accept. Catches tracking that ignores a refusal.",
-            full, enabled = shizukuReady,
+            full, enabled = freshReset,
         ) { full = true }
-        if (!shizukuReady) Note("Full audits need Shizuku to reset the app between runs.", Film.warn)
+        if (!freshReset) Note("Full audits need Shizuku and explicit approval to reset a test app between runs.", Film.warn)
         PlanOption("Quick audit, about 40 seconds", "One run: open the app and accept consent.", !full, enabled = true) { full = false }
+        if (!freshReset) Note("Quick keeps the app's data. An already-opened app may keep its consent choice and not repeat launch-time DNS lookups. A missing dialog or quiet run is not a privacy pass.", Film.warn)
+        else Note("Starting an audit clears this selected app's local data before each plan. Use a test app or a backed-up development build; do not use a personal app with data you need.", Film.warn)
 
         Spacer(Modifier.height(8.dp))
         Toggle("Let the agent tap Accept and Reject", "Off: you tap them yourself when asked.", agent) { agent = it }
@@ -121,8 +129,8 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, onStart: (Audit
             onStart(
                 AuditConfig(
                     targetPackage = app.packageName, targetLabel = app.label,
-                    plans = if (full) listOf(AuditPlan.SILENT, AuditPlan.REJECT, AuditPlan.ACCEPT) else listOf(AuditPlan.ACCEPT),
-                    childFacing = child, includeGms = gms, autoDrive = agent,
+                    plans = if (full && freshReset) listOf(AuditPlan.SILENT, AuditPlan.REJECT, AuditPlan.ACCEPT) else listOf(AuditPlan.ACCEPT),
+                    childFacing = child, includeGms = gms, autoDrive = agent, resetAppData = freshReset,
                 ),
             )
         })

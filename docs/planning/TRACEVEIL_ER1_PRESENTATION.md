@@ -259,3 +259,6 @@ Penalty ceilings in the README are the Act's statutory maximums, not predicted f
 - [CERT-In: e-Challan APK campaign, Mar 2026](https://www.cert-in.org.in/s2cMainServlet?CACODE=CICA-2026-3492&pageid=PUBADV01)
 - [Indian Express: Chandigarh APK fraud, Oct 2025](https://indianexpress.com/article/cities/chandigarh/fraudsters-new-weapon-to-target-android-smartphones-apk-files-10332841/)
 - Internal: `README.md`, `docs/VERIFICATION.md`, `docs/TEAM_HANDOFF.md`, `docs/planning/TRACEVEIL_ANDROID_APK_MISUSE_CASES.md`
+
+---
+This product includes GeoLite Data created by MaxMind, available from https://www.maxmind.com

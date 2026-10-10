@@ -23,7 +23,7 @@ Repo: `IQOO-Kernel-Panic`, branch `main`, modules `core/`, `app/`, `leakyshop/`.
 | 7 | Country map | Where tracker lookups were answered, by consent phase, kept apart from where the company is registered |
 | 8 | Before/after card | "+79 points, N findings resolved" |
 | 9 | Company country data | Each tracker company's country with a source link |
-| — | Camera Check removal | Feature removed from the app |
+| — | Camera Check | **Kept** (team decision, 10 Oct): the Home button, the camera screen and its code stay; the removal is cancelled |
 
 ---
 
@@ -52,12 +52,11 @@ Owns: `app/.../voice/**`, `netproof/**`, `ui/screens/map/**`, `ToolScreens.kt`, 
 | **Y2** (impact 5) | **Network Proof.** Measure TraceVeil's transmitted bytes during an audit (`TrafficStats` by UID), subtract DNS bytes relayed, show the remainder; separate line for any optional online lookup | new `app/.../netproof/*`, `NetworkProofCard.kt` | Remainder is within a stated tolerance of zero on a real audit and the number is recorded in `docs/`; arithmetic unit test; nothing hard-coded to 0 | A4 counters (use fakes until then) | M |
 | **Y3** (impact 7) | **Country map, list view.** Offline country lookup, aggregator by consent phase, `EndpointMapCard` list. Each country labelled "inferred"; CDN-only countries marked "uncertain"; unknown IPs omitted | new `core/.../geo/*`, `core/src/main/resources/geo/`, `tools/build-geo-table.*`, `app/.../ui/screens/map/EndpointMapCard.kt` | Fixture test: three hosts with known IPs aggregate to the expected `country → phase → hosts`; card renders with 0, 1 and 20 countries; card text never says "transfer", "violat" or "illegal" | A0, A2; IP-country source with a cleared licence | L |
 | **Y4** (impact 7) | **Company-jurisdiction layer** on the same card: separate toggle, outlined tiles, never coloured by consent phase, labelled "company registered in…" | `EndpointMapCard.kt`, new `JurisdictionLayer.kt` | Toggle changes the heading; shows only entries with a `hqSource` | Y3, A5 | S–M |
-| **Y5** | Delete the Camera Check screen and its helpers (`Verdict`, `VerdictLine`) from `ToolScreens.kt` | `ui/screens/ToolScreens.kt` | Project compiles; AI Lab and Settings unchanged | Nitya's Camera removal commit first | S |
-| **Y6** | LeakyShop leaky flavour gets one aliased host, only if the team controls a name that points to a tracker domain | `leakyshop/**` | Leaky shows the alias chip; fixed still scores 100 | A2, A3 | S |
+| **Y5** | ~~Delete the Camera Check screen and its helpers~~ **Cancelled.** The team keeps Camera Check and its Home button | none | Nothing to remove; AI Lab and Settings unchanged | none | none |
 
 **Map data decision, Sat 14:00:** use an offline country table if its licence allows redistribution with attribution. Otherwise use the one permitted cloud feature: an opt-in, off-by-default online lookup that sends only public server IPs. If neither works, ship the jurisdiction layer alone. Record the outcome in `ATTRIBUTIONS.md`.
 
-Order of work: Y1 → Y2 → Y3 → Y4 → Y5 → Y6 (Y5 slots in as soon as Nitya's removal lands). Cut from the bottom: Y6, Y4, Y2.
+Order of work: Y1 → Y2 → Y3 → Y4. Cut from the bottom: Y4, Y2.
 
 ---
 
@@ -85,11 +84,11 @@ Order of work: N1, N2, N3 and N4 immediately (they touch nobody else's files) �
 3. **After fixtures merge:** Agrim A3, A4 · Nitya N5, N6 · Yashvi Y2, Y3 against fixtures.
 4. **Integration pass 1 (Sat 08:00–09:45), before ER1:** device smoke, 21 / 100 unchanged.
 5. **Integration pass 2 (Sat 15:30–18:45), before ER2:** real data replaces fixtures; Nitya N7; map-data decision at 14:00.
-6. **Sat 22:00 – Sun 06:30:** N8, Y4, Y6, A5, remaining fixes.
+6. **Sat 22:00 – Sun 06:30:** N8, Y4, A5, remaining fixes.
 7. **Sun 06:30–08:30:** bug fixes only, then tag `submission` at 08:30.
 
 ## Visible at each evaluation (anything unmerged at the freeze is not shown)
-- **ER1 (Sat 10:00):** verified core loop (21 → 100), Camera Check gone; alias chip, confidence badge and voice screen if merged.
+- **ER1 (Sat 10:00):** verified core loop (21 → 100), Camera Check kept; alias chip, confidence badge and voice screen if merged.
 - **ER2 (Sat 19:00):** adds the rights notice, country map list and Network Proof.
 - **ER3 (Sun 09:00):** adds the before/after card and jurisdiction layer.
 

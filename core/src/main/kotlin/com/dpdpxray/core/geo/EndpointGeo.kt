@@ -93,6 +93,8 @@ data class HostEndpoint(
     val uncertainWhy: String?,
     /** What each query type came back with, e.g. "A: answered; AAAA: no reply from any resolver". */
     val answerSummary: String,
+    /** Only matched COMPLETE/PARTIAL replies associate a country with a particular consent phase. */
+    val locatedByPhase: Map<Phase, Set<String>> = emptyMap(),
 )
 
 data class CountryEndpoints(
@@ -128,6 +130,7 @@ object EndpointGeoAggregator {
         class Acc(val host: String) {
             val phases = linkedSetOf<Phase>()
             val addresses = linkedSetOf<String>()
+            val addressesByPhase = linkedMapOf<Phase, MutableSet<String>>()
             val outcomes = ArrayList<Outcome>()
             var chain: List<String> = emptyList()
             var via: String? = null
@@ -141,30 +144,38 @@ object EndpointGeoAggregator {
                 if (trackersOnly && !info.category.isTracking && e.disguisedVia == null) continue
                 val a = acc.getOrPut(host) { Acc(host) }
                 a.phases += e.phase
-                a.addresses += e.answerIps
+                if (e.hasUsableReply()) {
+                    a.addresses += e.answerIps
+                    a.addressesByPhase.getOrPut(e.phase) { linkedSetOf() } += e.answerIps
+                }
                 a.outcomes += outcome(e)
                 if (a.chain.isEmpty()) a.chain = e.cnameChain
                 a.via = a.via ?: e.disguisedVia ?: info.disguisedVia
                 a.entity = a.entity ?: info.entity
             }
         }
-        val hosts = acc.values.map { a -> host(a.host, a.entity, a.phases, a.chain, a.via, a.addresses.toList(), a.outcomes, geo) }.sortedBy { it.host }
+        val hosts = acc.values.map { a -> host(a.host, a.entity, a.phases, a.chain, a.via, a.addresses.toList(), a.addressesByPhase, a.outcomes, geo) }.sortedBy { it.host }
         return EndpointMapModel(geo, hosts, countries(hosts), unknown(hosts))
     }
 
-    private fun outcome(e: NetEvent) = Outcome(e.queryType, e.answerStatus, e.rcode, e.answerIps.isNotEmpty())
+    private fun NetEvent.hasUsableReply() = answerStatus == AnswerStatus.COMPLETE || answerStatus == AnswerStatus.PARTIAL
+
+    private fun outcome(e: NetEvent) = Outcome(e.queryType, e.answerStatus, e.rcode, e.hasUsableReply() && e.answerIps.isNotEmpty())
 
     private fun summary(outcomes: List<Outcome>): String =
         outcomes.groupBy { it.typeName }.entries.joinToString("; ") { (type, os) -> "$type: ${os.map { it.description }.distinct().joinToString(" / ")}" }
 
     private fun host(
         name: String, entity: String?, phases: Set<Phase>, chain: List<String>, via: String?, addresses: List<String>,
+        addressesByPhase: Map<Phase, Set<String>>,
         outcomes: List<Outcome>, geo: GeoSource,
     ): HostEndpoint {
         val lookup = (geo as? GeoSource.Loaded)?.lookup
         val literals = addresses.mapNotNull { IpLiteral.parse(it) }
         val reservedOnly = literals.isNotEmpty() && literals.all { IpLiteral.isReserved(it) }
-        val found = if (lookup == null) emptyList() else addresses.mapNotNull { lookup.lookup(it) }
+        val byAddress = if (lookup == null) emptyMap() else addresses.associateWith { lookup.lookup(it) }
+        val found = byAddress.values.filterNotNull()
+        val locatedByPhase = addressesByPhase.mapValues { (_, ips) -> ips.mapNotNull { byAddress[it]?.located }.toSet() }
         val lookups = found.filter { it.located != null }
         val unplaced = found.filter { it.located == null }.mapNotNull { it.registered }.toCollection(linkedSetOf())
         val located = lookups.mapNotNull { it.located }.toCollection(linkedSetOf())
@@ -182,7 +193,7 @@ object EndpointGeoAggregator {
             if (located.size > 1) add("Its answers are placed in ${located.size} countries")
             if (outcomes.any { it.hasAddresses && it.status == AnswerStatus.PARTIAL }) add("The reply was cut short, so its address list may be incomplete")
         }.joinToString(". ").ifEmpty { null }
-        return HostEndpoint(name, entity, phases, chain, via, addresses, lookups, located, unplaced, unknown, why, summary(outcomes))
+        return HostEndpoint(name, entity, phases, chain, via, addresses, lookups, located, unplaced, unknown, why, summary(outcomes), locatedByPhase)
     }
 
     private fun countries(hosts: List<HostEndpoint>): List<CountryEndpoints> {
@@ -191,7 +202,7 @@ object EndpointGeoAggregator {
         return byIso.map { (iso, hs) ->
             CountryEndpoints(
                 iso = iso,
-                hostsByPhase = Phase.entries.mapNotNull { p -> hs.filter { p in it.phases }.map { it.host }.takeIf { it.isNotEmpty() }?.let { p to it } }.toMap(),
+                hostsByPhase = Phase.entries.mapNotNull { p -> hs.filter { iso in it.locatedByPhase[p].orEmpty() }.map { it.host }.takeIf { it.isNotEmpty() }?.let { p to it } }.toMap(),
                 uncertainHosts = hs.mapNotNull { h -> h.uncertainWhy?.let { h.host to it } }.toMap(),
                 registeredElsewhere = hs.flatMap { it.lookups }.filter { it.located == iso }.mapNotNull { it.registered }.filter { it != iso }.toSet(),
             )

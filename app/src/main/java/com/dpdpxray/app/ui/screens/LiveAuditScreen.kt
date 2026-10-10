@@ -26,12 +26,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.ui.XrayViewModel
+import com.dpdpxray.app.ui.observedAliasLabel
 import com.dpdpxray.app.ui.components.ConsentLine
 import com.dpdpxray.app.ui.components.HostText
 import com.dpdpxray.app.ui.components.Note
 import com.dpdpxray.app.ui.components.PrimaryAction
 import com.dpdpxray.app.ui.components.SecondaryAction
 import com.dpdpxray.app.ui.components.StatusDot
+import com.dpdpxray.app.ui.components.Tag
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.categoryColor
 import com.dpdpxray.core.model.ConsentEvent
@@ -84,7 +86,7 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
                     Spacer(Modifier.width(10.dp))
                     Text(p.step, style = MaterialTheme.typography.titleMedium)
                 }
-                val classified = net.map { e -> vm.graph.catalog().classify(e.hostname).let { e.copy(entity = it.entity, category = it.category) } }
+                val classified = net.map(vm::classify)
                 val choice = consent.firstOrNull { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }
                 val trackers = classified.filter { it.category.isTracking }
                 val before = trackers.count { choice == null || it.tNanos < choice.tNanos }
@@ -139,6 +141,7 @@ fun TimelineRow(e: NetEvent, start: Long, beforeConsent: Boolean, afterRefusal: 
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             HostText(e.hostname, if (leak) Film.leak else Film.bone)
+            observedAliasLabel(e)?.let { Tag(it, Film.warn) }
             Text(
                 listOfNotNull(e.entity, e.category.name.lowercase().replace('_', ' ')).joinToString(", "),
                 style = MaterialTheme.typography.labelMedium, color = Film.boneDim,

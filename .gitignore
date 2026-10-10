@@ -19,3 +19,5 @@ google-services.json
 *.keystore
 *.pem
 *.key
+
+/tools/tests/__pycache__/

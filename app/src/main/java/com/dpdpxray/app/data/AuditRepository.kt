@@ -26,7 +26,10 @@ data class AuditMeta(
     val sample: Boolean = false,
 )
 
-data class AuditBundle(val meta: AuditMeta, val sessions: List<AuditSession>, val result: AuditResult, val dir: File)
+data class AuditBundle(
+    val meta: AuditMeta, val sessions: List<AuditSession>, val result: AuditResult, val dir: File,
+    val networkReadings: List<SessionNetworkReadings> = emptyList(),
+)
 
 /** Stores each audit as plain JSON + Markdown under filesDir/audits/<id>/ (nothing leaves the device). */
 class AuditRepository(private val context: Context) {
@@ -43,11 +46,15 @@ class AuditRepository(private val context: Context) {
             .sortedByDescending { it.createdAtMs }
     }
 
-    suspend fun save(meta: AuditMeta, sessions: List<AuditSession>, result: AuditResult, markdown: String) = withContext(Dispatchers.IO) {
+    suspend fun save(
+        meta: AuditMeta, sessions: List<AuditSession>, result: AuditResult, markdown: String,
+        networkReadings: List<SessionNetworkReadings> = emptyList(),
+    ) = withContext(Dispatchers.IO) {
         val dir = newAuditDir(meta.id)
         File(dir, SESSIONS).writeText(AuditJson.encodeSessions(sessions))
         File(dir, RESULT).writeText(AuditJson.encodeResult(result))
         File(dir, REPORT_MD).writeText(markdown)
+        AuditNetworkReadings.save(dir, networkReadings)
         File(dir, META).writeText(AuditJson.json.encodeToString(AuditMeta.serializer(), meta))
         refresh()
     }
@@ -60,6 +67,7 @@ class AuditRepository(private val context: Context) {
                 sessions = AuditJson.decodeSessions(File(dir, SESSIONS).readText()),
                 result = AuditJson.json.decodeFromString(AuditResult.serializer(), File(dir, RESULT).readText()),
                 dir = dir,
+                networkReadings = AuditNetworkReadings.load(dir),
             )
         }.getOrNull()
     }

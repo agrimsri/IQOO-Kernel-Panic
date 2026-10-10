@@ -25,9 +25,9 @@ object MicAvailability {
         sdkInt < 31 -> MicState.Unavailable("On-device speech recognition needs Android 12 or later. $CHIPS")
         !permissionDeclared -> MicState.Unavailable("Microphone access is not part of this build yet. $CHIPS")
         !onDeviceAvailable -> MicState.Unavailable("This phone has no on-device speech recognizer, and TraceVeil never sends audio to the cloud. $CHIPS")
+        !permissionGranted -> MicState.NeedsPermission
         installedLanguages != null && installedLanguages.none { it.substringBefore('-').equals(language.tag.substringBefore('-'), true) } ->
             MicState.Unavailable("The ${name(language)} on-device speech pack is not installed. You can add it in the phone's speech settings. $CHIPS")
-        !permissionGranted -> MicState.NeedsPermission
         else -> MicState.Ready
     }
 
@@ -36,8 +36,10 @@ object MicAvailability {
     fun errorReason(code: Int): String = when (code) {
         SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Sorry, I did not catch that. Try again or tap a question."
         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission was not granted. $CHIPS"
-        SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE, SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ->
-            "The on-device speech pack for this language is not available. $CHIPS"
+        SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ->
+            "The on-device speech pack is missing. Use Download speech pack, then Check again. $CHIPS"
+        SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ->
+            "This recognition service does not support that language. Try another language or check speech settings. $CHIPS"
         SpeechRecognizer.ERROR_AUDIO -> "The microphone could not be read. $CHIPS"
         SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "The speech recognizer is busy. Try again in a moment."
         else -> "Speech recognition stopped (code $code). $CHIPS"

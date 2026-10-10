@@ -14,6 +14,9 @@ import com.dpdpxray.app.consent.ConsentBus
 import com.dpdpxray.app.control.DeviceChecks
 import com.dpdpxray.app.control.ShizukuBridge
 import com.dpdpxray.app.data.AuditMeta
+import com.dpdpxray.app.data.SessionNetworkReadings
+import com.dpdpxray.app.netproof.UidTx
+import com.dpdpxray.app.report.EvidenceReport
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.ConsentEvent
@@ -22,6 +25,7 @@ import com.dpdpxray.core.report.MarkdownReport
 import com.dpdpxray.core.rules.RulesEngine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -31,6 +35,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import java.io.File
 
 data class AuditConfig(
@@ -39,7 +44,9 @@ data class AuditConfig(
     val plans: List<AuditPlan>,
     val childFacing: Boolean = false,
     val includeGms: Boolean = false,
-    val autoDrive: Boolean = true,
+    val autoDrive: Boolean = false,
+    /** Explicit developer-test approval; never inferred from Shizuku being available. */
+    val resetAppData: Boolean = false,
 )
 
 sealed interface AuditProgress {
@@ -64,6 +71,10 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
     private val _progress = MutableStateFlow<AuditProgress>(AuditProgress.Idle)
     val progress: StateFlow<AuditProgress> = _progress.asStateFlow()
     private var job: Job? = null
+
+    private val planCapture = PlanCaptureRecorder(UidTx::now, CaptureBus::reset, CaptureBus::snapshot, SystemClock::elapsedRealtimeNanos)
+
+    private data class CapturedPlan(val session: AuditSession, val upload: SessionNetworkReadings)
 
     private data class Timing(val waitConsentMs: Long, val dwellMs: Long, val observeMs: Long, val silentMs: Long)
 
@@ -100,7 +111,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
     private suspend fun run(config: AuditConfig) {
         val auditId = "audit-${System.currentTimeMillis()}"
         val dir = graph.repository.newAuditDir(auditId)
-        val sessions = try {
+        val capturedPlans = try {
             // Capture starts while TraceVeil is still on screen: Android does not let a background app start a
             // foreground service, and the running capture service keeps TraceVeil allowed to work between plans.
             _progress.value = AuditProgress.Running(config, 0, config.plans.first(), "Starting per-app DNS capture")
@@ -109,46 +120,60 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
                 _progress.value = AuditProgress.Running(config, 0, config.plans.first(), "Loading on-device AI model")
                 graph.llm.load(BackendKind.GPU)
             }
-            config.plans.mapIndexed { i, plan -> runPlan(config, plan, i, auditId, dir) }
+            config.plans.mapIndexed { i, plan ->
+                ConsentPlanRetry.capture(plan, config.targetPackage, { config.resetAppData && ShizukuBridge.hasPermission() }, { it.session }) { attempt ->
+                    runPlan(config, plan, i, auditId, dir, attempt)
+                }.let { attempts ->
+                    if (attempts.size == 1) attempts else attempts.mapIndexed { attempt, captured ->
+                        val note = if (attempt == 0) "Consent screen missed; first attempt retained and one fresh-state demo retry requested."
+                            else "Bounded fresh-state demo retry (1 of 1); the failed first attempt remains in this audit."
+                        captured.copy(session = captured.session.copy(notes = captured.session.notes + note))
+                    }
+                }
+            }.flatten()
         } finally {
             runCatching { XrayVpnService.stop(context) }
             ConsentBus.disarm()
         }
 
+        val sessions = capturedPlans.map { it.session }
+
         _progress.value = AuditProgress.Running(config, config.plans.lastIndex, config.plans.last(), "Evaluating DPDP checks")
         val catalog = graph.catalog()
         val result = RulesEngine(catalog).evaluate(sessions)
         val fixes = graph.fixCatalog.fixesFor(result, catalog)
-        val markdown = MarkdownReport.build(result, sessions, fixes, graph.citations())
+        val markdown = EvidenceReport.annotate(MarkdownReport.build(result, sessions, fixes, graph.citations()), sessions)
         val meta = AuditMeta(
             id = auditId, targetPackage = config.targetPackage, targetLabel = config.targetLabel,
             createdAtMs = System.currentTimeMillis(), score = result.score, band = result.band,
             findingCount = result.findings.size, plans = config.plans.map { it.label },
         )
-        graph.repository.save(meta, sessions, result, markdown)
+        graph.repository.save(meta, sessions, result, markdown, capturedPlans.map { it.upload })
         _progress.value = AuditProgress.Done(auditId)
         returnToXray()
     }
 
-    private suspend fun runPlan(config: AuditConfig, plan: AuditPlan, index: Int, auditId: String, dir: File): AuditSession = coroutineScope {
+    private suspend fun runPlan(config: AuditConfig, plan: AuditPlan, index: Int, auditId: String, dir: File, attempt: Int = 0): CapturedPlan = coroutineScope {
         val t = timing()
         val pkg = config.targetPackage
+        val sessionId = "$auditId-${plan.name}" + if (attempt == 0) "" else "-retry-$attempt"
         val notes = mutableListOf<String>()
         fun step(s: String, start: Long = 0) {
             _progress.value = AuditProgress.Running(config, index, plan, s, start)
         }
 
-        step("Resetting ${config.targetLabel} to a fresh install")
-        if (ShizukuBridge.hasPermission()) {
-            ShizukuBridge.forceStop(pkg)
-            ShizukuBridge.clearAppData(pkg).onFailure { notes += "Could not clear app data: ${it.message}" }
+        step(if (config.resetAppData) "Resetting authorised test app ${config.targetLabel}" else "Keeping ${config.targetLabel}'s current data")
+        if (config.resetAppData && ShizukuBridge.hasPermission()) {
+            val stopped = ShizukuBridge.forceStop(pkg)
+            if (stopped.isSuccess) ShizukuBridge.clearAppData(pkg).onFailure { notes += "Could not clear app data: ${it.message}" }
+            else notes += "Could not clear app data because stopping the test app failed: ${stopped.exceptionOrNull()?.message}"
         } else {
-            notes += "App data was not cleared (Shizuku not authorised) — results reflect the app's current state."
+            notes += "App data was not cleared (reset not approved or Shizuku not authorised) — results reflect the app's current state."
         }
 
         check(CaptureBus.state.value is CaptureState.Running) { (CaptureBus.state.value as? CaptureState.Error)?.message ?: "Capture stopped unexpectedly" }
-        CaptureBus.reset()
-        ConsentBus.arm(pkg, File(dir, "shots"))
+        val captureStart = planCapture.start()
+        ConsentBus.arm(pkg, File(dir, "shots/$sessionId"))
         if (!config.autoDrive && plan != AuditPlan.SILENT) {
             ConsentBus.expectedChoice = if (plan == AuditPlan.ACCEPT) ConsentKind.ACCEPT else ConsentKind.REJECT
         }
@@ -157,15 +182,24 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
 
         step("Launching ${config.targetLabel}", t0)
         check(launchTarget(pkg)) { "Cannot launch $pkg" }
-        val onScreen = withTimeoutOrNull(LAUNCH_CHECK_MS) { ConsentBus.targetSeen.first { it } } ?: false
+        val onScreen = withTimeoutOrNull(LAUNCH_CHECK_MS) {
+            while (!ConsentBus.targetSeen.value) {
+                withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.probeNow() }
+                if (!ConsentBus.targetSeen.value) delay(250)
+            }
+            true
+        } ?: false
         check(onScreen) {
             "${config.targetLabel} did not come to the screen. Android may have blocked opening it from the background — start Shizuku, or keep TraceVeil open and retry."
         }
 
         step("Waiting for a consent screen", t0)
-        val appeared = withTimeoutOrNull(t.waitConsentMs) {
-            ConsentBus.events.first { list -> list.any { it.kind == ConsentKind.SCREEN_APPEARED || it.kind == ConsentKind.MANUAL_MARK } }
-        }?.firstOrNull { it.kind == ConsentKind.SCREEN_APPEARED || it.kind == ConsentKind.MANUAL_MARK }
+        val appeared = ConsentScreenWaiter(
+            probe = {
+                withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.probeNow() }
+                ConsentBus.events.value.firstOrNull { it.kind == ConsentKind.SCREEN_APPEARED || it.kind == ConsentKind.MANUAL_MARK }
+            }, clockMs = SystemClock::elapsedRealtime, pause = { delay(it) },
+        ).await(t.waitConsentMs)
 
         // A child of this plan: cancelling the audit cancels the review too.
         val review = appeared?.let { ev -> async { graph.screenAuditor.audit(ev.tree, ev.screenshotPath?.let(::File)) } }
@@ -179,7 +213,12 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
                     driveChoice(kind, notes)
                 } else if (appeared != null) {
                     step("Your turn: tap ${if (kind == ConsentKind.ACCEPT) "Accept" else "Reject"} in the app", t0)
-                    val chosen = withTimeoutOrNull(45_000) { ConsentBus.events.first { it.any { e -> e.kind == ConsentKind.ACCEPT || e.kind == ConsentKind.REJECT } } }
+                    val chosen = ConsentScreenWaiter(
+                        probe = {
+                            withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.probeNow() }
+                            ConsentBus.events.value.firstOrNull { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }
+                        }, clockMs = SystemClock::elapsedRealtime, pause = { delay(it) },
+                    ).await(45_000)
                     if (chosen == null) notes += "No consent choice was recorded within 45 s."
                 }
                 step("Observing traffic after the choice", t0)
@@ -191,9 +230,15 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             }
         }
 
-        val tEnd = SystemClock.elapsedRealtimeNanos()
-        val captured = CaptureBus.events.value
+        // One immutable boundary: events and health cannot drift while the remaining model review finishes.
+        val capturedBoundary = planCapture.finish(sessionId, captureStart)
+        val snapshot = capturedBoundary.snapshot
+        val tEnd = snapshot.health.captureEndedNanos ?: SystemClock.elapsedRealtimeNanos()
+        val captured = snapshot.events
         val consentEvents = ConsentBus.events.value
+        if (ConsentBus.unconfirmedDialogClosedAtNanos != null && !ConsentBus.choiceMade) {
+            notes += "Consent dialog closed without an observed button action; the choice remains unknown."
+        }
         ConsentBus.disarm()
         step("Finishing AI review of the consent screen", t0)
         val screen = review?.let { d -> withTimeoutOrNull(REVIEW_TIMEOUT_MS) { d.await() }.also { if (it == null) d.cancel() } }
@@ -202,8 +247,8 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         if (!graph.llm.isReady && appeared != null) notes += "On-device AI model not loaded — screen review used the accessibility tree only."
         if (consentEvents.any { it.nodeText?.contains("inferred") == true }) notes += "The consent choice was inferred from the dialog closing (this app does not report taps)."
 
-        AuditSession(
-            id = "$auditId-${plan.name}",
+        val session = AuditSession(
+            id = sessionId,
             targetPackage = pkg,
             targetLabel = config.targetLabel,
             plan = plan,
@@ -218,7 +263,9 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             androidVersion = Build.VERSION.RELEASE,
             privateDnsActive = DeviceChecks.privateDnsActive(context),
             notes = notes,
+            captureHealth = snapshot.health,
         )
+        CapturedPlan(session, capturedBoundary.reading)
     }
 
     private suspend fun startCapture(config: AuditConfig) {

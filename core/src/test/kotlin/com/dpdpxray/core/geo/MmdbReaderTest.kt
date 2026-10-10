@@ -96,4 +96,29 @@ class MmdbReaderTest {
         assertNull(r.find(ByteArray(5)))
         assertNull(r.find(ByteArray(0)))
     }
+
+    @Test fun `unsigned 32 bit pointer cannot become a negative tree index`() {
+        val bytes = MmdbBuilder(4, 32).also {
+            it.insert(v4(8, 8, 0, 0), 16, it.record(MmdbBuilder.country("US", "US")))
+        }.build()
+        repeat(4) { bytes[it] = 0xFF.toByte() }
+        val reader = MmdbReader.open(bytes)
+        try {
+            reader.find(v4(8, 8, 8, 8))
+            fail("impossible pointer must fail closed")
+        } catch (_: MmdbFormatException) { }
+        assertNull(IpCountryLookup(reader).lookup("8.8.8.8"))
+    }
+
+    @Test fun `invalid build dates are rejected before date presentation`() {
+        for (epoch in listOf(Long.MAX_VALUE, -1L, 253_402_300_800L)) {
+            val bytes = MmdbBuilder(4).also {
+                it.insert(v4(8, 8, 0, 0), 16, it.record(MmdbBuilder.country("US", "US")))
+            }.build(buildEpoch = epoch)
+            try {
+                MmdbReader.open(bytes)
+                fail("invalid build epoch $epoch accepted")
+            } catch (_: MmdbFormatException) { }
+        }
+    }
 }

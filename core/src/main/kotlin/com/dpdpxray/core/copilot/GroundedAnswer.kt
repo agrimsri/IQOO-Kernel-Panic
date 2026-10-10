@@ -20,6 +20,8 @@ data class AuditEvidence(
     val result: AuditResult,
     /** Plans that actually ran; empty when unknown. */
     val plans: Set<AuditPlan> = emptySet(),
+    /** Null for legacy callers; otherwise plans whose intended consent choice was actually recorded. */
+    val completedPlans: Set<AuditPlan>? = null,
 )
 
 data class GroundedAnswer(
@@ -53,6 +55,13 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
             if (evidence.sample) append(t.samplePrefix)
             if (evidence.result.band == ScoreBand.INCONCLUSIVE) append(t.inconclusive)
             append(compose(intent, evidence, t))
+            evidence.plans.filter { it != AuditPlan.SILENT && evidence.completedPlans?.contains(it) == false }
+                .forEach { plan ->
+                    // AFTER_REJECT already explains a missing refusal unless it reports an actual C2 finding.
+                    val explained = plan == AuditPlan.REJECT && intent == CopilotIntent.AFTER_REJECT &&
+                        evidence.result.findings.none { it.checkId == CheckId.C2 }
+                    if (!explained) append(" " + t.planNotCompleted(plan))
+                }
             if (citations.isNotEmpty()) append(t.lawLine(citations))
         }
         if (!CitationValidator.isGrounded(body, citations.map { it.id }.toSet())) return refusal(language, intent)
@@ -71,6 +80,7 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
             CopilotIntent.AFTER_REJECT -> when {
                 f[CheckId.C2] != null -> t.afterReject(entities(listOf(f.getValue(CheckId.C2))))
                 planMissing(AuditPlan.REJECT) -> t.planNotRun(AuditPlan.REJECT)
+                e.completedPlans?.contains(AuditPlan.REJECT) == false -> t.planNotCompleted(AuditPlan.REJECT)
                 else -> t.notRecorded(CheckId.C2)
             }
             CopilotIntent.BEFORE_CONSENT -> {
@@ -105,6 +115,7 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
         fun notRecorded(id: CheckId): String
         fun notRecordedMany(ids: List<CheckId>): String
         fun planNotRun(plan: AuditPlan): String
+        fun planNotCompleted(plan: AuditPlan): String
         fun score(r: AuditResult): String
         fun trackers(entities: List<String>): String
         fun lawLine(passages: List<Passage>): String
@@ -132,6 +143,11 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
         override fun notRecordedMany(ids: List<CheckId>) =
             "This audit did not record ${ids.joinToString(", ") { it.code }} in its captured evidence."
         override fun planNotRun(plan: AuditPlan) = "This audit did not run ${plan.label}, so it has no evidence about that."
+        override fun planNotCompleted(plan: AuditPlan) = when (plan) {
+            AuditPlan.ACCEPT -> "The intended Accept choice was not recorded; this planned consent test is incomplete. The score covers only the evidence recorded."
+            AuditPlan.REJECT -> "The intended ${plan.label} choice was not recorded; C2 not tested. The score is not a completed refusal assessment."
+            AuditPlan.SILENT -> ""
+        }
         override fun score(r: AuditResult) = if (r.score == null) "This audit is inconclusive and has no score."
         else "It scored ${r.score} out of 100 (${r.band.label}) with ${r.findings.size} finding${if (r.findings.size == 1) "" else "s"}" +
             (if (r.findings.isEmpty()) "." else ": ${r.findings.joinToString(", ") { it.checkId.code }}.")
@@ -161,6 +177,11 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
         override fun notRecorded(id: CheckId) = "इस ऑडिट के दर्ज साक्ष्य में ${id.code} नहीं मिला।"
         override fun notRecordedMany(ids: List<CheckId>) = "इस ऑडिट के दर्ज साक्ष्य में ${ids.joinToString(", ") { it.code }} नहीं मिले।"
         override fun planNotRun(plan: AuditPlan) = "इस ऑडिट में ${plan.label} नहीं चला, इसलिए इसका कोई साक्ष्य नहीं है।"
+        override fun planNotCompleted(plan: AuditPlan) = when (plan) {
+            AuditPlan.ACCEPT -> "इस ऑडिट में स्वीकार करने का चुनाव दर्ज नहीं हुआ; नियोजित सहमति परीक्षण अधूरा है। स्कोर केवल दर्ज साक्ष्य पर आधारित है।"
+            AuditPlan.REJECT -> "इस ऑडिट में मना करने का चुनाव दर्ज नहीं हुआ; C2 की जाँच नहीं हुई। स्कोर को पूरी हुई अस्वीकृति-जाँच न मानें।"
+            AuditPlan.SILENT -> ""
+        }
         override fun score(r: AuditResult) = if (r.score == null) "यह ऑडिट अनिर्णायक है और इसका कोई स्कोर नहीं है।"
         else "स्कोर ${r.score}/100 (${r.band.label}), ${r.findings.size} निष्कर्ष" +
             (if (r.findings.isEmpty()) "।" else ": ${r.findings.joinToString(", ") { it.checkId.code }}।")

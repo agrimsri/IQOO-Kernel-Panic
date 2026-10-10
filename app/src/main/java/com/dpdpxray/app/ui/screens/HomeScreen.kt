@@ -1,6 +1,10 @@
 package com.dpdpxray.app.ui.screens
 
 import android.net.VpnService
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -15,11 +19,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -27,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.control.DeviceChecks
 import com.dpdpxray.app.data.AuditMeta
+import com.dpdpxray.app.data.SampleAudit
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.Note
 import com.dpdpxray.app.ui.components.PrimaryAction
@@ -49,12 +60,22 @@ fun HomeScreen(
     onLab: () -> Unit,
     onCamera: () -> Unit,
     onSettings: () -> Unit,
+    onVoice: (String) -> Unit,
 ) {
     val ctx = LocalContext.current
     val pf by vm.preflight.collectAsState()
     val audits by vm.audits.collectAsState()
     val llm by vm.llmStatus.collectAsState()
+    var showSampleFixtures by remember { mutableStateOf(false) }
     val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { vm.refreshPreflight() }
+    LaunchedEffect(vm) { vm.refreshPreflight() }
+    DisposableEffect(ctx, vm) {
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) { vm.refreshPreflight() }
+        }
+        ctx.contentResolver.registerContentObserver(Settings.Secure.getUriFor(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES), false, observer)
+        onDispose { ctx.contentResolver.unregisterContentObserver(observer) }
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 28.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -63,7 +84,7 @@ fun HomeScreen(
             TextButton(onClick = onSettings) { Text("Settings", color = Film.boneDim) }
         }
         Text(
-            "Find out what an app sends to trackers before people agree, and how to fix it. Everything runs on this phone.",
+            "Observe an app's DNS lookups around consent choices, understand the evidence, and find practical fixes. Analysis runs on this phone.",
             style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 6.dp),
         )
 
@@ -81,7 +102,7 @@ fun HomeScreen(
             )
             CheckLine(
                 "Fresh-install reset", when {
-                    pf.shizukuGranted -> "Shizuku ready: each plan starts from a clean app"
+                    pf.shizukuGranted -> "Shizuku ready: reset is available only when approved in audit setup"
                     pf.shizukuRunning -> "Shizuku is running; allow TraceVeil to use it"
                     else -> "Optional. Start Shizuku for full audits (reject + accept)"
                 },
@@ -106,11 +127,15 @@ fun HomeScreen(
         }
 
         Spacer(Modifier.height(24.dp))
-        PrimaryAction("Audit an app", onAudit, enabled = pf.canAudit)
+        PrimaryAction("Audit an app", { if (vm.prepareAudit()) onAudit() })
         if (!pf.canAudit) Note("Allow the VPN and turn on the consent watcher to run a live audit.", Film.warn)
         Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             SecondaryAction("Open sample audit", { vm.openSample(onOpen) }, Modifier.weight(1f))
             SecondaryAction("Camera check", onCamera, Modifier.weight(1f))
+        }
+        TextButton(onClick = { showSampleFixtures = true }) { Text("More sample evidence", color = Film.scan) }
+        audits.firstOrNull()?.let { latest ->
+            TextButton(onClick = { onVoice(latest.id) }) { Text("Ask latest audit", color = Film.scan) }
         }
 
         SectionTitle("Recent audits")
@@ -119,6 +144,24 @@ fun HomeScreen(
             audits.forEach { AuditRow(it) { onOpen(it.id) } }
         }
         Spacer(Modifier.height(32.dp))
+    }
+    if (showSampleFixtures) {
+        AlertDialog(
+            onDismissRequest = { showSampleFixtures = false },
+            title = { Text("Sample evidence") },
+            text = {
+                Column {
+                    Text("Synthetic examples, not a live audit. Example IPs do not identify real server locations.")
+                    SampleAudit.Variant.entries.filter { it != SampleAudit.Variant.BASELINE }.forEach { variant ->
+                        TextButton(onClick = {
+                            showSampleFixtures = false
+                            vm.openSample(variant, onOpen)
+                        }) { Text(variant.label) }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showSampleFixtures = false }) { Text("Cancel") } },
+        )
     }
 }
 

@@ -59,3 +59,6 @@ Agrim's PR #3 notes that the byte counters, the 28-byte header per datagram, the
 ## Not covered by automated tests
 
 The Compose layout itself (0, 1 and 20 countries, the map, the mode switch) has no JVM UI test, because the project has no Compose or Robolectric test setup. The data shown in those cases (0, 1 and 20 country rows, empty states, repeats) is tested in the presenter; the rendering was checked by eye on the iQOO 15 with the audits available at the time, which had no DNS answer addresses, so a filled map with real countries has not yet been seen on the phone.
+
+---
+This product includes GeoLite Data created by MaxMind, available from https://www.maxmind.com

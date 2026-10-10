@@ -15,6 +15,12 @@ import com.dpdpxray.core.model.UiNode
  * model, e.g. for a first look or as a stage fallback). Clearly labelled as a sample in the UI and report.
  */
 object SampleAudit {
+    enum class Variant(val label: String) {
+        BASELINE("Basic sample"),
+        ALIAS("Alias sample"),
+        ENDPOINTS("Alias + IP sample"),
+    }
+
     private const val S = 1_000_000_000L
 
     private val tree = UiNode(
@@ -40,14 +46,14 @@ object SampleAudit {
 
     private fun net(t: Double, host: String) = NetEvent(tNanos = (t * S).toLong(), hostname = host)
 
-    fun sessions(nowMs: Long): List<AuditSession> {
+    fun sessions(nowMs: Long, variant: Variant = Variant.BASELINE): List<AuditSession> {
         val base = AuditSession(
             id = "", targetPackage = "com.leakyshop.demo", targetLabel = "LeakyShop (sample)", plan = AuditPlan.SILENT,
             startedAtEpochMs = nowMs, deviceModel = "Sample device", androidVersion = "16", privateDnsActive = false,
             notes = listOf("Sample audit generated in-app; run a live audit for real evidence."),
         )
         val consentShown = ConsentEvent((2.1 * S).toLong(), ConsentKind.SCREEN_APPEARED, tree = tree)
-        return listOf(
+        val baseline = listOf(
             base.copy(
                 id = "sample-c", plan = AuditPlan.SILENT, endedAtNanos = 30 * S,
                 netEvents = listOf(
@@ -75,5 +81,30 @@ object SampleAudit {
                 screenAudit = screen,
             ),
         )
+        if (variant == Variant.BASELINE) return baseline
+
+        return baseline.map { session ->
+            val endpoints = variant == Variant.ENDPOINTS
+            session.copy(
+                id = session.id.replace("sample-", if (endpoints) "sample-endpoints-" else "sample-alias-"),
+                targetLabel = if (endpoints) "LeakyShop (alias + IP sample)" else "LeakyShop (alias sample)",
+                notes = session.notes + "Synthetic alias fixture; no DNS response was observed." +
+                    if (endpoints) listOf("Synthetic documentation IP addresses, not real server locations. Do not infer a country from them.") else emptyList(),
+                netEvents = session.netEvents.map { event ->
+                    val annotated = if (event.hostname == "graph.facebook.com") {
+                        event.copy(
+                            hostname = "metrics.leakyshop.example",
+                            cnameChain = listOf("metrics.leakyshop.example", "graph.facebook.com"),
+                        )
+                    } else event
+                    if (!endpoints) annotated else annotated.copy(answerIps = when (annotated.hostname) {
+                        "api.leakyshop.example" -> listOf("192.0.2.10")
+                        "app-measurement.com" -> listOf("198.51.100.20")
+                        "metrics.leakyshop.example" -> listOf("203.0.113.30", "2001:db8::30")
+                        else -> emptyList()
+                    })
+                },
+            )
+        }
     }
 }
