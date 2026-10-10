@@ -220,6 +220,15 @@ fun ResultsScreen(
                         Text(it, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 10.dp))
                     }
                 }
+                // Dark-pattern signals (India CCPA 2023): their own card next to the findings, never part of the score.
+                if (lensSettings.audience == Audience.DEVELOPER) {
+                    DarkPatternCard(b.sessions, Modifier.padding(top = 12.dp))
+                } else {
+                    val darkPatterns = remember(b.meta.id) { DarkPatternView.of(b.sessions) }
+                    darkPatterns.everydayLine?.let {
+                        Text(it, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 10.dp))
+                    }
+                }
 
                 // The server map has its own open section, so nobody has to find it inside "Evidence and limits".
                 GroupHeader("Where it connects")
