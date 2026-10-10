@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,7 +34,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,12 +52,15 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.guide.GradientAction
 import com.dpdpxray.app.ui.guide.GuideLang
 import com.dpdpxray.app.ui.guide.LinkAction
 import com.dpdpxray.app.ui.guide.LocalGuide
+import com.dpdpxray.app.ui.modes.ModeGlyph
+import com.dpdpxray.app.ui.modes.ModeGlyphIcon
 import com.dpdpxray.app.ui.theme.ArchivoDisplay
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
@@ -61,8 +69,12 @@ import com.dpdpxray.app.ui.theme.LocalScale
 import kotlinx.coroutines.launch
 
 /**
- * First-run onboarding: four short pages drawn in code (no image files). Skip is always visible; the last page offers
- * three safe first steps. Spoken guidance and its language can be switched on here, before anything else.
+ * First-run onboarding: five short pages drawn in code (no image files). Skip is always visible; page two asks how the
+ * person will use TraceVeil (everyday or developer), and the last page offers three safe first steps. Spoken guidance
+ * and its language can be switched on here, before anything else.
+ *
+ * [audience] is the mode to show as chosen (null on first run, so neither door is pre-picked); [onAudience] saves a
+ * pick at once. Skipping without a pick keeps the stored default, developer mode.
  */
 @Composable
 fun OnboardingScreen(
@@ -70,10 +82,13 @@ fun OnboardingScreen(
     onSample: () -> Unit,
     onDemo: () -> Unit,
     onApk: (() -> Unit)?,
+    audience: Audience? = null,
+    onAudience: (Audience) -> Unit = {},
 ) {
     val guide = LocalGuide.current
     val lang = guide?.lang ?: GuideLang.EN
-    val pages = OnboardingCopy.pages
+    var picked by rememberSaveable { mutableStateOf(audience) }
+    val pages = OnboardingCopy.pagesFor(picked ?: Audience.DEFAULT)
     val pager = rememberPagerState { pages.size }
     val scope = rememberCoroutineScope()
     val page = pager.currentPage
@@ -109,7 +124,9 @@ fun OnboardingScreen(
             }
         }
 
-        HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { i ->
+        // The mode page waits for a pick (no swiping past it); Skip (top right) still leaves with developer mode.
+        val waitingForPick = pages[page].key == "audience" && picked == null
+        HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), userScrollEnabled = !waitingForPick) { i ->
             val p = pages[i]
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
                 Spacer(Modifier.height(12.dp))
@@ -126,8 +143,9 @@ fun OnboardingScreen(
                 )
                 Text(p.body.pick(lang), style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 10.dp))
                 when (p.key) {
-                    "needs" -> Needs(lang)
-                    "try" -> TryChoices(lang, onSample, onDemo, onApk)
+                    "audience" -> AudienceChoices(lang, picked) { a -> picked = a; onAudience(a) }
+                    "needs" -> Needs(lang, OnboardingCopy.needsFor(picked ?: Audience.DEFAULT))
+                    "try" -> TryChoices(lang, picked ?: Audience.DEFAULT, onSample, onDemo, onApk)
                     else -> {}
                 }
                 Spacer(Modifier.height(24.dp))
@@ -138,15 +156,16 @@ fun OnboardingScreen(
             if (page > 0) LinkAction(OnboardingCopy.back.pick(lang), { scope.launch { pager.animateScrollToPage(page - 1) } }, color = Film.boneDim)
             Spacer(Modifier.weight(1f))
             GradientAction(
-                if (last) OnboardingCopy.done.pick(lang) else OnboardingCopy.next.pick(lang),
+                when { last -> OnboardingCopy.done; waitingForPick -> OnboardingCopy.pickOne; else -> OnboardingCopy.next }.pick(lang),
                 { if (last) onDone() else scope.launch { pager.animateScrollToPage(page + 1) } },
                 Modifier.width(184.dp),
+                enabled = !waitingForPick,
             )
         }
     }
 }
 
-/** Four segments; the current one stretches and takes the brand gradient. */
+/** One segment per page; the current one stretches and takes the brand gradient. */
 @Composable
 private fun ProgressSegments(current: Int, total: Int, modifier: Modifier = Modifier) {
     Row(modifier.semantics { contentDescription = "Page ${current + 1} of $total" }, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -182,11 +201,52 @@ private fun Pill(text: String, glyph: Glyph?, on: Boolean, onToggle: (Boolean) -
     }
 }
 
+/**
+ * The two front doors as big radio cards. The picked one takes the brand outline and a check; nothing is pre-picked
+ * on first run.
+ */
 @Composable
-private fun Needs(lang: GuideLang) {
+private fun AudienceChoices(lang: GuideLang, picked: Audience?, onPick: (Audience) -> Unit) {
+    Column(Modifier.padding(top = 20.dp).selectableGroup(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        OnboardingCopy.audiences.forEach { option ->
+            val selected = option.audience == picked
+            val shape = RoundedCornerShape(20.dp)
+            val accent = if (option.audience == Audience.USER) Brand.coral else Film.scan
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 120.dp).clip(shape)
+                    .background(if (selected) accent.copy(alpha = 0.10f) else Film.raised)
+                    .border(if (selected) 2.dp else 1.dp, if (selected) Brand.horizontal else SolidColor(FilmExtra.hairline), shape)
+                    .selectable(selected = selected, role = Role.RadioButton) { onPick(option.audience) }
+                    .padding(18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(56.dp).clip(CircleShape).background(accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                    ModeGlyphIcon(if (option.audience == Audience.USER) ModeGlyph.PHONE else ModeGlyph.CODE, accent, size = 30.dp)
+                }
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(option.title.pick(lang), style = MaterialTheme.typography.titleLarge, color = Film.bone)
+                    Text(option.tagline.pick(lang), style = MaterialTheme.typography.labelLarge, color = accent, modifier = Modifier.padding(top = 2.dp))
+                    Text(option.detail.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 4.dp))
+                }
+                Spacer(Modifier.width(10.dp))
+                val ring by animateColorAsState(if (selected) Brand.coral else Film.line, tween(200), label = "pick")
+                Box(
+                    Modifier.size(26.dp).clip(CircleShape).background(if (selected) Brand.coral else Color.Transparent).border(1.5.dp, ring, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (selected) GlyphIcon(Glyph.CHECK, Film.base, size = 16.dp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Needs(lang: GuideLang, needs: List<OnboardingNeed>) {
     val glyphs = mapOf("vpn" to Glyph.VPN, "watcher" to Glyph.WATCHER, "shizuku" to Glyph.RESET)
     Column(Modifier.padding(top = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OnboardingCopy.needs.forEach { need ->
+        needs.forEach { need ->
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Film.raised).padding(14.dp),
                 verticalAlignment = Alignment.Top,
@@ -218,11 +278,16 @@ private fun Needs(lang: GuideLang) {
 }
 
 @Composable
-private fun TryChoices(lang: GuideLang, onSample: () -> Unit, onDemo: () -> Unit, onApk: (() -> Unit)?) {
+private fun TryChoices(lang: GuideLang, audience: Audience, onSample: () -> Unit, onDemo: () -> Unit, onApk: (() -> Unit)?) {
+    val shown = OnboardingCopy.choicesFor(audience).mapNotNull { c ->
+        when (c.key) {
+            OnboardingCopy.sample.key -> Triple(c, Glyph.SAMPLE, onSample)
+            OnboardingCopy.demo.key -> Triple(c, Glyph.PLAY, onDemo)
+            else -> onApk?.let { Triple(c, Glyph.APK, it) }
+        }
+    }
     Column(Modifier.padding(top = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Choice(OnboardingCopy.sample, Glyph.SAMPLE, lang, highlight = true, onClick = onSample)
-        Choice(OnboardingCopy.demo, Glyph.PLAY, lang, highlight = false, onClick = onDemo)
-        if (onApk != null) Choice(OnboardingCopy.apk, Glyph.APK, lang, highlight = false, onClick = onApk)
+        shown.forEachIndexed { i, (choice, glyph, onClick) -> Choice(choice, glyph, lang, highlight = i == 0, onClick = onClick) }
     }
 }
 

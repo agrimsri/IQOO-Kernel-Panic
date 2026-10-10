@@ -163,6 +163,9 @@ class MainActivity : ComponentActivity() {
                                 onSample = { leaveOnboarding(); vm.openSample { nav.navigate("results/$it") } },
                                 onDemo = { leaveOnboarding(); if (vm.prepareAudit()) nav.navigate("pick?q=LeakyShop") },
                                 onApk = apkCheck()?.let { open -> { leaveOnboarding(); open() } },
+                                // Mode choice: nothing pre-picked on first run; a replay shows the current mode.
+                                audience = settings.audience.takeIf { settings.onboardingDone },
+                                onAudience = { a -> vm.updateSettings { it.copy(audience = a) } },
                             )
                         }
                         composable("home") {
