@@ -7,8 +7,11 @@ enum class OpenTarget { REPORTS, SETTINGS, HOME, TRUST }
 
 /** What the user asked TraceVeil to do. Anything that is not a command is a [Question] for the grounded copilot. */
 sealed interface VoiceCommand {
-    /** Check (audit) an installed app; [name] is the spoken app name, or null when none was given. */
-    data class CheckApp(val name: String?) : VoiceCommand
+    /**
+     * Check (audit) an installed app; [name] is the spoken app name, or null when none was given. [askedForMore] is
+     * true when the user also asked for a full, complete or reset audit, which voice never starts.
+     */
+    data class CheckApp(val name: String?, val askedForMore: Boolean = false) : VoiceCommand
 
     /** Check an APK file with APK Guard. */
     data object CheckFile : VoiceCommand
@@ -61,6 +64,9 @@ object VoiceCommandParser {
         "एक", "ज़रा", "जरा", "कृपया", "अभी", "जल्दी", "को", "की", "का", "के", "करो", "कर", "करें", "कीजिए", "कीजिये", "करिए", "दो", "दें",
         "ऐप", "एप", "एप्लीकेशन", "मेरा", "मेरी", "मेरे", "यह", "इस",
     )
+
+    /** Asking for a deeper audit than voice runs; removed from the name and reported back to the user. */
+    private val MORE_WORDS = setOf("full", "complete", "detailed", "reset", "clear", "wipe", "fresh", "poora", "pura", "poori", "puri", "पूरा", "पूरी", "रीसेट")
 
     private val STOP_WORDS = setOf("stop", "quiet", "sleep", "band", "ruko", "ruk", "chup", "bas", "बंद", "रुको", "रुक", "चुप", "बस")
     private val STOP_ALLOWED = STOP_WORDS + setOf(
@@ -132,12 +138,13 @@ object VoiceCommandParser {
         if (isPhoneCheckup(words, hasCheckVerb)) return VoiceCommand.PhoneCheckup
         open(words)?.let { return it }
         if (hasCheckVerb) {
-            val name = t.filterNot { it in CHECK_VERBS || it in FILLER }
-            if (name.isEmpty()) return VoiceCommand.CheckApp(null)
+            val more = words.any { it in MORE_WORDS }
+            val name = t.filterNot { it in CHECK_VERBS || it in FILLER || it in MORE_WORDS || it == "data" }
+            if (name.isEmpty()) return VoiceCommand.CheckApp(null, more)
             val joined = name.joinToString(" ")
             // "check the score", "check trackers": a question about the audit, not an app called "score".
             if (CopilotQuestions.match(joined) != null) return VoiceCommand.Question(text)
-            return VoiceCommand.CheckApp(joined)
+            return VoiceCommand.CheckApp(joined, more)
         }
         return VoiceCommand.Question(text)
     }

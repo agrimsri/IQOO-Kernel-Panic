@@ -38,6 +38,13 @@ class VoiceCommandParserTest {
         assertFalse(hindi("check Instagram"))
     }
 
+    @Test fun `asking for a full or reset audit is noted, never dropped silently`() {
+        assertEquals(VoiceCommand.CheckApp("instagram", askedForMore = true), cmd("run a full audit of Instagram"))
+        assertEquals(VoiceCommand.CheckApp("instagram", askedForMore = true), cmd("reset and check instagram"))
+        assertEquals(VoiceCommand.CheckApp("instagram", askedForMore = true), cmd("Instagram ka poora audit karo"))
+        assertEquals(VoiceCommand.CheckApp("instagram", askedForMore = false), cmd("check instagram"))
+    }
+
     @Test fun `a check without an app name asks which app`() {
         assertEquals(VoiceCommand.CheckApp(null), cmd("check an app"))
         assertEquals(VoiceCommand.CheckApp(null), cmd("audit"))
