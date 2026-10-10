@@ -196,3 +196,17 @@ fun PillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier)
         Text(text, style = MaterialTheme.typography.labelLarge, color = Film.scan)
     }
 }
+
+/**
+ * Speaks a guide step when read-aloud is on, without showing anything. Screens that dropped the visible banner use it so
+ * people who rely on spoken guidance still hear the same step, once, in their language.
+ */
+@Composable
+fun SpeakStep(step: GuideStep) {
+    val guide = LocalGuide.current ?: return
+    val speaker = guide.speaker ?: return
+    val lang = guide.lang
+    val spokenText = step.spoken.pick(lang)
+    LaunchedEffect(step.key, guide.spoken, lang) { if (guide.spoken) speaker.say(step.key, spokenText, lang) }
+    DisposableEffect(step.key, speaker) { onDispose { speaker.stop(step.key) } }
+}

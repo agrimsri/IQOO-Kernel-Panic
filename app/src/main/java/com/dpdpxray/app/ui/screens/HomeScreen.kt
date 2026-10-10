@@ -59,6 +59,7 @@ import com.dpdpxray.app.ui.guide.SetupItem
 import com.dpdpxray.app.ui.guide.SetupKind
 import com.dpdpxray.app.ui.guide.SetupNeed
 import com.dpdpxray.app.ui.guide.SetupSteps
+import com.dpdpxray.app.ui.guide.SpeakStep
 import com.dpdpxray.app.ui.guide.guideLang
 import com.dpdpxray.app.ui.modes.EverydayCopy
 import com.dpdpxray.app.ui.system.Group
@@ -159,6 +160,8 @@ fun HomeScreen(
     val items = SetupSteps.from(pf)
     val todo = SetupSteps.todo(items)
     val running = progress as? AuditProgress.Running
+    // The visible guide banner is gone from Home; read-aloud still speaks the same step.
+    if (running == null) SpeakStep(com.dpdpxray.app.ui.guide.GuideFlow.home(pf))
     val fix: (SetupKind) -> Unit = { kind ->
         when (kind) {
             SetupKind.VPN -> if (DeviceChecks.otherVpnActive(ctx)) DeviceChecks.openVpnSettings(ctx) else VpnService.prepare(ctx)?.let { vpnLauncher.launch(it) } ?: vm.refreshPreflight()
