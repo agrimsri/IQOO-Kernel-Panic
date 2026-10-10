@@ -21,12 +21,15 @@ object Wording {
         "This is an automated technical check, not legal advice or a compliance certificate."
 
     fun score(r: AuditResult): String =
-        if (r.band == ScoreBand.INCONCLUSIVE || r.score == null) "Inconclusive (score not established)" else "${r.score}/100 · ${band(r.band)}"
+        if (r.band == ScoreBand.INCONCLUSIVE || r.score == null) "Inconclusive (score not established)" else "${r.score}/100 · ${band(r.band, r.score)}"
 
-    /** The score band as a plain range; never a readiness or compliance label. Thresholds as in the core rules engine. */
-    fun band(b: ScoreBand): String = when (b) {
+    /**
+     * The score band as a plain range; never a readiness or compliance label. Thresholds as in the core rules engine,
+     * where an observed High or Critical finding keeps even 85+ points out of the top band.
+     */
+    fun band(b: ScoreBand, score: Int? = null): String = when (b) {
         ScoreBand.READY -> "85–100 band"
-        ScoreBand.NEEDS_WORK -> "60–84 band"
+        ScoreBand.NEEDS_WORK -> if (score != null && score >= 85) "below the 85–100 band: a High or Critical finding was observed" else "60–84 band"
         ScoreBand.AT_RISK -> "below 60"
         ScoreBand.INCONCLUSIVE -> "inconclusive"
     }
@@ -200,7 +203,7 @@ object CheckJson {
         put("source", c.lensSource.name.lowercase())
         put("score", v.score)
         put("band", v.band.name)
-        put("bandText", Wording.band(v.band))
+        put("bandText", Wording.band(v.band, v.score))
         put("notApplicable", JsonArray(v.notApplicable.map { JsonPrimitive(it.finding.checkId.code) }))
         put("relations", buildJsonArray {
             v.findings.forEach { lf ->
@@ -219,7 +222,7 @@ object CheckJson {
     private fun result(r: AuditResult) = buildJsonObject {
         put("score", r.score)
         put("band", r.band.name)
-        put("bandText", Wording.band(r.band))
+        put("bandText", Wording.band(r.band, r.score))
         put("checks", JsonArray(r.findings.map { JsonPrimitive(it.checkId.code) }))
     }
 

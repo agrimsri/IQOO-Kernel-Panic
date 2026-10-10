@@ -131,7 +131,7 @@ object DiffJson {
         put("sample", b.sample)
         put("score", r.score)
         put("band", r.band.name)
-        put("bandText", Wording.band(r.band))
+        put("bandText", Wording.band(r.band, r.score))
         put("storedScore", b.bundle.result.score)
         put("checks", JsonArray(r.findings.map { JsonPrimitive(it.checkId.code) }))
     }

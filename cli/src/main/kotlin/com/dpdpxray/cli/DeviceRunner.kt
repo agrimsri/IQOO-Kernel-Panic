@@ -276,7 +276,7 @@ class DeviceRunner(
             val band = runCatching { ScoreBand.valueOf(s.band.orEmpty()) }.getOrNull()
             return when {
                 band == ScoreBand.INCONCLUSIVE || s.score == null -> "score not established (inconclusive)"
-                band != null -> "${s.score}/100 · ${Wording.band(band)}"
+                band != null -> "${s.score}/100 · ${Wording.band(band, s.score)}"
                 else -> "${s.score}/100"
             }
         }
