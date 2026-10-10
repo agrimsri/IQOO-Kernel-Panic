@@ -240,6 +240,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 
 .status { font: 600 10px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; white-space: nowrap; border: 1px solid; }
 .status.live { color: var(--clear); border-color: rgba(95, 212, 155, 0.4); background: rgba(95, 212, 155, 0.08); }
 .status.dev { color: var(--sev-medium); border-color: rgba(242, 181, 68, 0.4); background: rgba(242, 181, 68, 0.08); }
+.status.built { color: var(--sev-medium); border-color: rgba(242, 181, 68, 0.3); background: rgba(242, 181, 68, 0.04); white-space: normal; text-align: center; max-width: 132px; }
 .status.soon { color: var(--lav); border-color: rgba(159, 160, 195, 0.45); background: rgba(159, 160, 195, 0.08); border-style: dashed; }
 
 /* policy */

@@ -1,22 +1,32 @@
 import { useState } from "react";
-import { Smartphone, Users, Building2, Check, Clock, Wrench, Info } from "lucide-react";
+import { Smartphone, Users, Building2, Check, Clock, Wrench, Hammer, Info } from "lucide-react";
 import { Card, PageHead, Fade, Hud, Sheet } from "../ui";
 import { Truth } from "../ui/tv";
 import { CATALOGUE_SIZE } from "../data/model";
 
-const LIVE = "live", DEV = "dev", SOON = "soon";
-const STATUS_LABEL = { live: "Available", dev: "In development", soon: "Coming soon" };
+// "Available" only for what has been verified on a phone (or, for the console, by its own smoke test). Built features
+// that have unit tests but no phone check yet say so; a third tuple element overrides the label.
+const LIVE = "live", BUILT = "built", DEV = "dev", SOON = "soon";
+const STATUS_LABEL = { live: "Available", built: "Built · phone check pending", dev: "In development", soon: "Coming soon" };
 
 const PLANS = [
   {
     id: "free", icon: Smartphone, name: "Free", price: "No account needed", priceSub: "for individuals and testers",
     blurb: "The on-phone Android App Trust Lab and this local console.",
     features: [
-      ["APK Guard: check an APK file before installing it", LIVE],
-      ["Quarantine: run an app with its internet cut off and get a behaviour report", LIVE],
       ["Consent X-ray: three runs (no interaction, Reject, Accept) with DNS evidence", LIVE],
-      ["On-device AI explanations of findings", LIVE],
-      ["Offline HTML evidence report from the phone", LIVE],
+      ["Live consent timeline and findings labelled observed or inferred", LIVE],
+      ["Fix snippets for each finding", LIVE],
+      ["Voice copilot: ask about an audit's evidence on the phone", LIVE],
+      ["Network Proof: per-plan upload estimate with its accounting caveat", LIVE],
+      ["Map of the endpoints an app contacted", LIVE],
+      ["Draft notice to the app's developer", LIVE],
+      ["APK Guard: an app's powers before you install or open it", BUILT],
+      ["Quarantine: run an app with its internet cut off and get a behaviour report", BUILT],
+      ["Hey TraceVeil wake word and assistant shortcuts (opt-in, offline)", BUILT],
+      ["Guided UI: onboarding, step guidance and spoken guidance", BUILT],
+      ["Offline HTML evidence report from the phone", BUILT],
+      ["On-device AI explanations of findings", BUILT],
       ["Local console: import, portfolio, compare, policy preview (this page)", LIVE],
     ],
     cta: null,
@@ -25,7 +35,7 @@ const PLANS = [
     id: "pro", icon: Users, name: "Pro team", price: "Free during beta", priceSub: "pricing to be announced",
     blurb: "For app teams that want privacy evidence in every release.", highlight: true,
     features: [
-      ["CI release gate: traceveil-ci check with your policy.json", DEV],
+      ["CI release gate: traceveil-ci check and diff with your policy.json, SARIF for code scanning", BUILT, "Built · GitHub run pending"],
       ["Opt-in, end-to-end encrypted report sync between teammates (off by default)", SOON],
       ["Legal-profile pack: India (DPDP Act 2023, readiness)", LIVE],
       ["Legal-profile pack: EU / UK (GDPR, ePrivacy)", SOON],
@@ -64,11 +74,11 @@ export default function Plans() {
                 <div><div className="price">{p.price}</div><div className="small muted">{p.priceSub}</div></div>
                 <p className="small text-2">{p.blurb}</p>
                 <ul className="feat">
-                  {p.features.map(([f, st]) => (
+                  {p.features.map(([f, st, label]) => (
                     <li key={f}>
-                      {st === LIVE ? <Check size={15} color="var(--clear)" /> : st === DEV ? <Wrench size={15} color="var(--sev-medium)" /> : <Clock size={15} color="var(--lav)" />}
+                      {st === LIVE ? <Check size={15} color="var(--clear)" /> : st === BUILT ? <Hammer size={15} color="var(--sev-medium)" /> : st === DEV ? <Wrench size={15} color="var(--sev-medium)" /> : <Clock size={15} color="var(--lav)" />}
                       <span>{f}</span>
-                      <span className={`status ${st}`}>{STATUS_LABEL[st]}</span>
+                      <span className={`status ${st}`}>{label || STATUS_LABEL[st]}</span>
                     </li>
                   ))}
                 </ul>
@@ -81,8 +91,9 @@ export default function Plans() {
           </Fade>
         ))}
       </div>
-      <div className="grid g2" style={{ marginTop: 16 }}>
+      <div className="grid g3" style={{ marginTop: 16 }}>
         <Truth icon={Info}>No customer logos or testimonials are shown because there are none to show yet. Prices are not set; "Free during beta" and "Contact" are the only commitments on this page.</Truth>
+        <Truth icon={Info}>"Available" means verified on a phone (the console: by its own end-to-end test). "Built · phone check pending" means the feature is in the current build and unit-tested, but nobody has checked it on a phone yet.</Truth>
         <Truth icon={Info}>Every plan keeps the same rules: evidence is labelled observed, inferred or not established; nothing leaves the phone or this browser unless a team turns sync on; findings are context, not legal advice or a malware verdict.</Truth>
       </div>
       <Sheet open={!!ask} onClose={() => setAsk(null)} title={ask?.name || ""}>
