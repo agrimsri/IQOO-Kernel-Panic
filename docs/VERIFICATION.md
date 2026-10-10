@@ -4,7 +4,7 @@
 
 The sections below retain their historical test results. Current local work additionally includes voice-pack recovery, alias/notice UI, same-package comparison, Agrim-report reliability fixes and the published Y3/A5 components. `origin/main` at `ebdafae` and `origin/yashvi/phone-experience` at `5679a5a` merged cleanly into `nitya/evidence-integration` as `83db945` and `55cac49`. Bug fixes are saved at `14a0d2a`; the subsequent map mount is separately identifiable.
 
-After the independent review fixes, a fresh full offline rerun passed: **BUILD SUCCESSFUL in 37s**, 128 tasks executed; **303 core + 152 app JVM = 455 tests**, zero failures/errors/skips. All three debug APKs rebuilt. That tested APK SHA-256:
+After the independent review fixes, a fresh full offline rerun passed in 37s. The publication rerun passed again: **BUILD SUCCESSFUL in 52s**, 128 tasks executed; **303 core + 152 app JVM = 455 tests**, zero failures/errors/skips. All three debug APKs rebuilt. The APK hash remains identical to the phone-tested artifact:
 
 ```text
 247c7ac79c899e977f9e57125732218a481105a83744daf6fe77572d4ffc2e6b
@@ -20,9 +20,17 @@ On the first 455-test APK (`53c9068c…`), Full LeakyShop completed as live audi
 
 PDF and Markdown exported to `Downloads/TraceVeil`, without sending/sharing externally. The live PDF has five pages; all five were rendered and inspected using the available PyMuPDF fallback (Poppler is unavailable). Evidence, scope warning and 21/100 result are readable; the old zero-byte assertion is absent. Minor layout polish remains: a few headings/metadata sit at a page bottom while their body starts on the next page. Export function passes; polished pagination is not claimed. Existing older Downloads files were retained, with MediaStore naming the new PDF `TraceVeil-LeakyShop (1).pdf`.
 
-The fixed-demo Full audit is running on final APK `247c7ac7…`; its result and real-app/voice acceptance are not yet claimed. Repository checker tests also passed 15/15 in 15.801s; read-only cutoff metadata passed all 67 reachable commits at `f37f6cd`. This does not establish originality or organiser eligibility.
+On final APK `247c7ac7…`, Full fixed demo completed as `audit-1791591219563`: **100/100**, zero findings, one lookup per plan and actual Reject/Accept actions. Results correctly showed Low capture confidence; this is not a safety certificate. Network Proof displayed 201 estimated bytes/3 packets with its accounting caveat.
 
-**Honest remaining work:** repeated consent detection on the device (Agrim requests ten full leaky runs), visible Home refresh after install, microphone permission/download/recheck, human speech/TTS check, 0/1/20-country rendering, actual IP-country data licensing/provisioning if wanted, network accounting and report export. Agrim's JDK-kit scripts are missing, so its extraction integrity patch cannot yet be applied. Camera entry/route are gone; unreachable old helpers remain for Yashvi to delete.
+The authorised real-app Quick check on Block Blast! (`com.block.juggle`) completed as `audit-1791591583098`: **66/100**, three findings, 30 DNS lookups and a known catalogue match. Data was retained; reset, automated consent, child-facing and Play-services flags were off. No consent screen or choice was captured. Results explicitly said the planned Accept was not completed. Historical consent is unknown, so this does not establish first-install behaviour, fraud, personal-data upload or unlawful processing. The measured run was about 35 seconds; the two Full demo examples took about 67–70 seconds.
+
+On the final APK, the fixed audit's score chip answered 100/100 with zero findings; its tracker chip answered that no finding named a known tracker. These were distinct question-specific answers on live saved evidence, not a recognised-human-speech test. The TTS control showed playback requested; audible quality remains unverified.
+
+Repository checker tests passed again 15/15 in 18.796s (earlier 15.801s); read-only cutoff metadata passed all 68 reachable commits at `35daed6`. This does not establish originality or organiser eligibility.
+
+**Honest remaining work:** repeated consent detection on the device (Agrim requests ten full leaky runs; no batch has started), microphone denial/download/recheck and human speech/TTS checks, pause/cancel cleanup, 0/1/20-country rendering, actual IP-country data licensing/provisioning if wanted, and OEM network accounting. Home readiness refresh and live PDF/Markdown export have been observed, with the limitations above. Agrim's JDK-kit scripts are missing, so its extraction integrity patch cannot yet be applied. Camera entry/route are absent in this checkpoint; upstream Yashvi now says to keep Camera Check, requiring an explicit integration decision rather than blindly deleting helpers.
+
+A fresh fetch found `origin/main` still at `ebdafae`, but Yashvi advanced from our merged `5679a5a` to `cd7cfae`, including optional online voice at `7f1718b` and a changed Camera Check decision. These later changes are **not merged or verified in this checkpoint**. Coordinate them through review; do not imply the tested offline build includes them. Read the root `handoff.md` for the second-terminal file/phone leases and latency task.
 
 Read [bug-fix handoff](BUG_FIX_HANDOFF.md) and the [Round 1 brief](MENTOR_ROUND_1.md) before demoing. Publication does not certify these unperformed device checks.
 
