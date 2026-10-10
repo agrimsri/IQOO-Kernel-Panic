@@ -31,3 +31,6 @@ __pycache__/
 
 # ConsentLens-1 ships in the APK (about 146 KB, trained by ml/consentlens/train_consentlens.py).
 !/app/src/main/assets/consentlens/*.tflite
+
+# Release signing: passwords and keystore path live outside Git (see docs/RELEASE.md).
+keystore.properties

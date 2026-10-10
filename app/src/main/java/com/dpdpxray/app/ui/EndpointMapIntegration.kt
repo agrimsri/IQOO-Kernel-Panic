@@ -1,5 +1,6 @@
 package com.dpdpxray.app.ui
 
+import com.dpdpxray.core.geo.CountryNames
 import com.dpdpxray.core.geo.LegalContext
 import com.dpdpxray.core.geo.OwnerRegistry
 import com.dpdpxray.core.trackers.TrackerCatalog
@@ -22,5 +23,13 @@ internal object EndpointMapIntegration {
         )
     }
 
-    const val OUTLINE_CREDIT = "World outline: amCharts via GeoMap by Takuma Seno, CC BY-NC 4.0; geometry unchanged, rendered with TraceVeil styling. https://www.amcharts.com/svg-maps/ · https://github.com/takuseno/GeoMap · https://creativecommons.org/licenses/by-nc/4.0/ . Non-commercial only; not cleared for commercial distribution."
+    /** Natural Earth is public domain and needs no credit; it is named anyway so the outline's source stays visible. */
+    const val OUTLINE_CREDIT = "Country outlines: Natural Earth (public domain)."
+
+    /** One line under the map naming highlighted countries the outline cannot draw (too small at 1:110m), or null. */
+    fun undrawnNote(undrawn: List<String>): String? = when (undrawn.size) {
+        0 -> null
+        1 -> "Not drawn at this scale: ${CountryNames.name(undrawn[0])}. The list below includes it."
+        else -> "Not drawn at this scale: ${undrawn.joinToString(", ") { CountryNames.name(it) }}. The list below includes them."
+    }
 }
