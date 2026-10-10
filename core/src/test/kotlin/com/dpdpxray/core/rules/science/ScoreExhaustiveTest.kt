@@ -29,8 +29,8 @@ import org.junit.Test
  *    is never serious. So it is enough, and fast, to check each scored assignment with each of the 8 zero-weight variants
  *    alone, with all of them together (with and without V0 / U1 with trackers) and with one seeded random combination of
  *    the 192: 13 sets per assignment, 2,729,376 in all. Inconclusive ones must give no score; the others exactly the scored
- *    assignment's result. Set TRACEVEIL_SCORE_FULL=1 to evaluate all 40,310,784 sets instead (about 80 s on the team
- *    laptop; it passed on 10 October 2026).
+ *    assignment's result. Set TRACEVEIL_SCORE_FULL=1 to evaluate all 40,310,784 sets instead (14 to 80 s on the team
+ *    laptop; it passed twice on 10 October 2026).
  *
  * The counts and the band distribution are written to core/build/reports/score-science/exhaustive.{json,md}.
  */

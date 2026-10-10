@@ -14,7 +14,7 @@ Nothing on this page changed a weight, threshold or band rule. Every number belo
 | Property tests (13 properties, seeded, printed seed) | 25,000 random finding sets per property, 0 failures |
 | Every combination of the checks that carry points, in every severity and evidence label the engine can give | 209,952 assignments, 0 failures |
 | Every edge of that lattice (add a finding, confirm an inferred one) | 2,204,496 edges, score and band never improve |
-| With the 7 checks that never carry points | 40,310,784 sets in all; factored check by default, full run passed once |
+| With the 7 checks that never carry points | 40,310,784 sets in all; factored check by default; the full run passed twice |
 | Engine witness and fuzz | all 29 check variants produced by the real engine; 3,000 random audits emit nothing else, each check at most once |
 | Legal lens views | 1,679,616 views, a lens score is never below the headline score |
 | Flaws found | none: every property held. Two design observations are listed in section 9 |
@@ -136,8 +136,8 @@ combinations, not frequencies in real apps.
    the sum of w·m; any observed serious finding), and a zero-weight check adds 0 to the sum and is never serious. The
    default run therefore checks each assignment with each of the 8 zero-weight variants alone, with all of them together
    (with and without V0 / U1 with trackers) and with one seeded random combination: 2,729,376 sets in about 2–5 s. The
-   full product of all **40,310,784** sets was also run (`TRACEVEIL_SCORE_FULL=1`, about 80 s on the team laptop) and
-   passed on 10 October 2026.
+   full product of all **40,310,784** sets was also run (`TRACEVEIL_SCORE_FULL=1`; 80.4 s and 13.8 s in two runs on the
+   team laptop) and passed both times on 10 October 2026.
 
 **Band distribution** over the 209,952 assignments (each conclusive one appears 64 times in the full space, so the
 proportions are the same there):
