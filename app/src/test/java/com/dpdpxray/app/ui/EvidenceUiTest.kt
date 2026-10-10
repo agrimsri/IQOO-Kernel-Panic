@@ -49,6 +49,17 @@ class EvidenceUiTest {
         assertEquals(listOf("s6(4)", "s6(6)", "s6(10)", "r3(c)"), n.citedIds)
     }
 
+    @Test fun `timeline labels the audited app's own company servers as first party`() {
+        val instagram = sessions.first { it.plan == AuditPlan.ACCEPT }
+            .copy(targetPackage = "com.instagram.android", netEvents = listOf(NetEvent(1_000_000_000, "graph.facebook.com")))
+        assertEquals(Category.FIRST_PARTY_SAME_COMPANY, ui.timeline(instagram).single().category)
+    }
+
+    @Test fun `timeline keeps the Facebook SDK a tracker inside another publisher's app`() {
+        val shop = sessions.first { it.plan == AuditPlan.ACCEPT }.copy(netEvents = listOf(NetEvent(1_000_000_000, "graph.facebook.com")))
+        assertEquals(Category.ADVERTISING, ui.timeline(shop).single().category)
+    }
+
     @Test fun `notice action is absent on any other finding`() {
         assertNull(ui.notice(CheckId.C1, result, sessions))
     }

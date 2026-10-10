@@ -31,6 +31,31 @@ class ScreenAuditTest {
         assertEquals(RejectOption.VISIBLE, a.rejectOption)
         assertEquals(true, a.withdrawalInfo)
         assertTrue(a.languageOptions!!.containsAll(listOf("English", "Hindi", "Kannada")))
+        // "email, device ID, purchase history" is an itemised list: an observed fact the AI cannot overturn.
+        assertEquals(true, a.itemisedData)
+        assertTrue("itemisedData" in a.observedFields)
+    }
+
+    @Test
+    fun `a notice that names no data items is not judged by the tree`() {
+        val a = DeterministicScreenAuditor.audit(Fixtures.leakyDialog)
+        assertNull(a.itemisedData)
+        assertFalse("itemisedData" in a.observedFields)
+        assertEquals(emptyList<String>(), DeterministicScreenAuditor.dataItems("we use your data to give you the best offers"))
+        assertEquals(listOf("email", "phone number", "order history"),
+            DeterministicScreenAuditor.dataItems("we collect your email, phone number and order history to deliver orders"))
+        assertEquals(listOf("ईमेल", "फ़ोन नंबर"), DeterministicScreenAuditor.dataItems("हम आपका ईमेल, फ़ोन नंबर लेते हैं"))
+        // "location" inside another word does not count.
+        assertEquals(emptyList<String>(), DeterministicScreenAuditor.dataItems("relocation services"))
+    }
+
+    @Test
+    fun `the tree's itemised list wins over the AI and the disagreement stays visible`() {
+        val det = DeterministicScreenAuditor.audit(Fixtures.fixedDialog)
+        val vlm = ScreenAudit(isConsentScreen = true, itemisedData = false, purposeStated = true, source = AuditSource.VLM)
+        val merged = ScreenAuditMerger.merge(det, vlm)
+        assertEquals(true, merged.itemisedData)
+        assertTrue(merged.conflicts.any { it.startsWith("itemisedData") })
     }
 
     @Test

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification channels for the opt-in Hey TraceVeil wake word. -->
+<resources>
+    <string name="wake_channel_listening">Hey TraceVeil listening</string>
+    <string name="wake_channel_listening_description">Shown the whole time TraceVeil listens for its wake word. Tap it to stop.</string>
+    <string name="wake_channel_heard">Hey TraceVeil heard you</string>
+    <string name="wake_channel_heard_description">Appears after the wake word so you can open your last check.</string>
+</resources>

@@ -38,6 +38,7 @@ internal object CompanyFactRules {
 
     /** Throws [IllegalArgumentException] naming the entity when a claim lacks its citation or basis. */
     fun check(e: TrackerEntry) {
+        require(e.company == null || e.company.isNotBlank()) { "${e.entity} company: must be a name or absent, not blank" }
         e.location?.let { check(e.entity, "location", it, needsBasis = true) }
         e.incorporation?.let { check(e.entity, "incorporation", it, needsBasis = false) }
     }

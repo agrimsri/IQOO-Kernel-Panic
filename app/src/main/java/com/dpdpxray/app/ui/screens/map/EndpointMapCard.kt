@@ -5,14 +5,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -28,11 +25,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.dpdpxray.app.capture.DnsForwarder
+import com.dpdpxray.app.ui.components.FoldText
+import com.dpdpxray.app.ui.components.KeyCaveat
+import com.dpdpxray.app.ui.components.LearnMore
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.Mono
 import com.dpdpxray.core.geo.Evidence
@@ -40,11 +43,14 @@ import com.dpdpxray.core.geo.EndpointGeoAggregator
 import com.dpdpxray.core.geo.EndpointMapModel
 import com.dpdpxray.core.geo.Fact
 import com.dpdpxray.core.geo.GeoSource
+import com.dpdpxray.core.geo.GeoTableInfo
+import com.dpdpxray.core.geo.MapGuide
 import com.dpdpxray.core.geo.MapMode
 import com.dpdpxray.core.geo.MapPresenter
 import com.dpdpxray.core.geo.MapRow
 import com.dpdpxray.core.geo.OwnerRegistry
 import com.dpdpxray.core.geo.LegalContext
+import com.dpdpxray.core.geo.TableOrigin
 import com.dpdpxray.app.ui.EndpointMapIntegration
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.trackers.TrackerCatalog
@@ -58,8 +64,8 @@ private fun c(argb: Long) = Color(argb)
 
 /**
  * Endpoint map for one audit: where tracker lookups were answered, or who runs those services and what law may apply.
- * One call mounts it: `EndpointMapCard(bundle.sessions, catalog)`. It reads the optional GeoLite2 file itself and never
- * touches the network.
+ * One call mounts it: `EndpointMapCard(bundle.sessions, catalog)`. It loads the IP-to-country table itself (the person's
+ * own GeoLite2 file if present, else the DB-IP Lite table bundled in the APK) and never touches the network.
  */
 @Composable
 fun EndpointMapCard(
@@ -76,7 +82,8 @@ fun EndpointMapCard(
     }
     var mode by rememberSaveable { mutableStateOf(MapMode.SOURCE_DNS) }
     val m = model
-    EndpointMapCardContent(m, owners, mode, { mode = it }, GeoTableLoader.pushCommand(ctx), modifier, legal)
+    val network = remember(sessions) { MapGuide.networkContext(sessions, DnsForwarder.FALLBACKS) }
+    EndpointMapCardContent(m, owners, mode, { mode = it }, GeoTableLoader.pushCommand(ctx), modifier, legal, network)
 }
 
 /** Stateless body, so the layout is the same for any model. */
@@ -89,6 +96,7 @@ fun EndpointMapCardContent(
     pushCommand: String,
     modifier: Modifier = Modifier,
     legal: LegalContext = EndpointMapIntegration.legalContext(),
+    network: List<Fact> = emptyList(),
 ) {
     val shape = RoundedCornerShape(12.dp)
     Column(modifier.fillMaxWidth().clip(shape).background(Film.raised).border(1.dp, Film.line, shape)) {
@@ -96,13 +104,15 @@ fun EndpointMapCardContent(
             listOf(Brand.TangerineDream.color, Brand.CoralGlow.color, Brand.BlushRose.color, Brand.BerryBlush.color))))
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Endpoint map", style = MaterialTheme.typography.titleMedium)
+            // Which table placed the countries, so the source is visible before any country is read.
+            (model?.source as? GeoSource.Loaded)?.let { Text(GeoTableInfo.of(it).headline, style = MaterialTheme.typography.labelMedium, color = Film.boneDim) }
             ModeSwitch(mode, onMode)
             if (model == null) {
                 Text("Placing lookups…", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
                 return@Column
             }
             val view = remember(model, owners, mode, legal) { MapPresenter.view(model, owners, mode, legal) }
-            Text(view.explanation, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+            FoldText(view.explanation)
 
             val highlighted = remember(model, owners, mode) { MapPresenter.highlight(model, owners, mode) }
             val uncertain = remember(model, mode) {
@@ -130,12 +140,58 @@ fun EndpointMapCardContent(
                 }
             }
 
-            view.footer.forEach { Text(it, style = MaterialTheme.typography.labelMedium, color = Film.boneDim) }
-            if (view.rows.isNotEmpty()) Text(
-                "Observed: seen in this audit's DNS. Inferred: derived from it. Sourced: from a cited document. Unknown: no evidence.",
-                style = MaterialTheme.typography.labelMedium, color = Film.boneDim,
+            // Text diet: the one caveat that must stay in view, then the table's own notes and licence credit as before.
+            // The long explanation of each mode and the evidence legend fold into "What this map shows, and what it doesn't".
+            KeyCaveat(
+                if (mode == MapMode.SOURCE_DNS) "A country shows where an address is placed, not where data went."
+                else "Nothing here says a vendor or app broke a law.",
+                color = Brand.CoralGlow.color,
             )
+            val folded = if (mode == MapMode.SOURCE_DNS) view.footer.take(1) else view.footer
+            view.footer.drop(folded.size).forEach { Text(it, style = MaterialTheme.typography.labelMedium, color = Film.boneDim) }
+            val legend = if (view.rows.isNotEmpty()) {
+                "Observed: seen in this audit's DNS. Inferred: derived from it. Sourced: from a cited document. Unknown: no evidence."
+            } else null
+            MapLimitsFold(network, (model.source as? GeoSource.Loaded)?.origin == TableOrigin.BUNDLED, pushCommand, folded, legend)
         }
+    }
+}
+
+/**
+ * "What this map shows, and what it doesn't": this view's own notes ([footer]) and the evidence [legend] first, then short
+ * lines, the capture's network, and why a country can matter.
+ */
+@Composable
+private fun MapLimitsFold(network: List<Fact>, bundledTable: Boolean, pushCommand: String, footer: List<String>, legend: String?) {
+    LearnMore(label = MapGuide.TITLE, openLabel = "Hide: ${MapGuide.TITLE.replaceFirstChar { it.lowercase() }}") {
+        footer.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Film.bone) }
+        legend?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Film.boneDim) }
+        MapGuide.points(DnsForwarder.FALLBACKS).forEach { p ->
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(p.title, style = MaterialTheme.typography.titleSmall, color = Film.bone)
+                Text(p.line, style = MaterialTheme.typography.bodyMedium, color = Film.bone)
+                Text(p.detail, style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
+            }
+        }
+        if (network.isNotEmpty()) {
+            Text("This check's network", style = MaterialTheme.typography.titleSmall, color = Film.bone)
+            network.forEachIndexed { i, f -> FactLine(f, "network#$i", repeat = false) }
+        }
+        if (bundledTable) {
+            Text("Use your own table instead", style = MaterialTheme.typography.titleSmall, color = Film.bone)
+            Text("If you have a MaxMind GeoLite2-Country.mmdb of your own, copy it to the phone and the map uses it in place of the bundled DB-IP table:",
+                style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
+            Text(pushCommand, fontFamily = Mono, style = MaterialTheme.typography.labelMedium)
+        }
+        Text(MapGuide.WHY_HEADING, style = MaterialTheme.typography.titleSmall, color = Film.bone)
+        MapGuide.whyItMatters.forEach { r ->
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("${r.region}: ${r.rule}", style = MaterialTheme.typography.labelLarge, color = Film.bone)
+                Text(r.line, style = MaterialTheme.typography.bodyMedium, color = Film.bone)
+                Text(r.citation, style = MaterialTheme.typography.labelSmall, color = Film.boneDim)
+            }
+        }
+        Text(MapGuide.WHY_CLOSING, style = MaterialTheme.typography.bodyMedium, color = Brand.CoralGlow.color)
     }
 }
 
@@ -162,9 +218,8 @@ private fun ModeSwitch(mode: MapMode, onMode: (MapMode) -> Unit) {
 
 @Composable
 private fun RowBlock(row: MapRow, rule: Color, isRepeat: (Int) -> Boolean) {
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-        Box(Modifier.width(2.dp).fillMaxHeight().background(rule))
-        Column(Modifier.padding(start = 12.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxWidth().drawBehind { drawRect(rule, size = Size(2.dp.toPx(), size.height)) }) {
+        Column(Modifier.padding(start = 14.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(row.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 EvidenceChip(row.evidence)

@@ -28,6 +28,7 @@ object Fixtures {
             label("We collect: email, device ID, purchase history. Purpose: order delivery and, only if you agree, personalised offers."),
             checkbox("Personalised offers (optional)", checked = false),
             label("You can withdraw consent anytime in Settings > Privacy."),
+            label("Read our privacy policy"),
             label("View in: English · हिन्दी · ಕನ್ನಡ"),
             button("Reject"),
             button("Accept"),

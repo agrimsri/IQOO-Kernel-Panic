@@ -217,6 +217,27 @@ object DnsPacketCodec {
         return out
     }
 
+    /**
+     * A local NXDOMAIN ("this name does not exist") answer for [dnsQuery], used by quarantine runs so the query is never
+     * forwarded. Keeps the id, opcode, RD bit and first question; one question, no records (any EDNS OPT is dropped).
+     * A message too short for a header yields a bare 12-byte NXDOMAIN header.
+     */
+    fun nxDomain(dnsQuery: ByteArray): ByteArray {
+        if (dnsQuery.size < 12) {
+            val out = ByteArray(12)
+            dnsQuery.copyInto(out, 0, 0, minOf(2, dnsQuery.size))
+            out[2] = 0x80.toByte(); out[3] = 0x83.toByte()
+            return out
+        }
+        val questionEnd = questionEnd(dnsQuery)
+        val out = dnsQuery.copyOf(questionEnd ?: 12)
+        out[2] = (0x80 or (u8(dnsQuery, 2) and 0x79)).toByte() // QR=1, keep opcode and RD, AA=0, TC=0
+        out[3] = 0x83.toByte() // RA=1, RCODE=3 (NXDOMAIN)
+        put16(out, 4, if (questionEnd == null) 0 else 1)
+        put16(out, 6, 0); put16(out, 8, 0); put16(out, 10, 0)
+        return out
+    }
+
     private fun questionEnd(dns: ByteArray): Int? {
         var pos = 12
         while (pos < dns.size) {

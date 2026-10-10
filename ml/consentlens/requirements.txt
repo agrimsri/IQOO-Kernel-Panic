@@ -1,0 +1,9 @@
+# ConsentLens-1 was built with Python 3.11.9 (TensorFlow has no Python 3.14 wheels) and these packages.
+# ml_dtypes is pinned to 0.5.1 because Windows application control blocked the newer unsigned native extension;
+# scikit-learn is deliberately not used for the same reason (metrics are implemented with numpy).
+tensorflow==2.20.0
+keras==3.15.1
+numpy==2.4.6
+ml_dtypes==0.5.1
+matplotlib==3.11.2
+PyYAML==6.0.3

@@ -1,0 +1,709 @@
+{
+  "schema": "traceveil.audit.v1",
+  "exportedAt": "2026-10-10T00:13:45Z",
+  "app": {
+    "package": "com.leakyshop.demo.fixed",
+    "label": "LeakyShop Fixed"
+  },
+  "meta": {
+    "id": "audit-1791591219563",
+    "targetPackage": "com.leakyshop.demo.fixed",
+    "targetLabel": "LeakyShop Fixed",
+    "createdAtMs": 1791591219563,
+    "score": 100,
+    "band": "READY",
+    "findingCount": 0,
+    "plans": [
+      "Plan C · No interaction",
+      "Plan B · Reject",
+      "Plan A · Accept"
+    ],
+    "sample": true,
+    "timingProfile": null
+  },
+  "sessions": [
+    {
+      "id": "audit-1791591219563-SILENT",
+      "targetPackage": "com.leakyshop.demo.fixed",
+      "targetLabel": "LeakyShop Fixed",
+      "plan": "SILENT",
+      "childFacing": false,
+      "startedAtNanos": 53037818000000,
+      "endedAtNanos": 53063656000000,
+      "startedAtEpochMs": 1791591151300,
+      "netEvents": [
+        {
+          "tNanos": 53037918000000,
+          "hostname": "api.leakyshop.example",
+          "queryType": 1,
+          "entity": null,
+          "category": "UNKNOWN",
+          "phase": "NO_CONSENT_SEEN",
+          "viaPackage": null,
+          "cnameChain": [],
+          "answerIps": [],
+          "disguisedVia": null,
+          "answerStatus": null,
+          "rcode": null
+        }
+      ],
+      "consentEvents": [
+        {
+          "tNanos": 53038738000000,
+          "kind": "SCREEN_APPEARED",
+          "nodeText": "Your privacy choices",
+          "screenshotPath": null,
+          "tree": {
+            "className": "android.widget.FrameLayout",
+            "text": null,
+            "contentDescription": null,
+            "isCheckable": false,
+            "isChecked": false,
+            "isClickable": false,
+            "bounds": null,
+            "children": [
+              {
+                "className": "android.widget.TextView",
+                "text": "Your privacy choices",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "We collect your email, phone number and order history to deliver orders. The choices below are optional.",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "Analytics to improve the app",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.Switch",
+                "text": null,
+                "contentDescription": null,
+                "isCheckable": true,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "Personalised offers",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.Switch",
+                "text": null,
+                "contentDescription": null,
+                "isCheckable": true,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "You can withdraw consent anytime in Settings › Privacy, or complain to the Data Protection Board.",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "English",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "हिन्दी",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "ಕನ್ನಡ",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.Button",
+                "text": "Reject",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.Button",
+                "text": "Accept",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              }
+            ]
+          }
+        }
+      ],
+      "screenAudit": {
+        "isConsentScreen": true,
+        "preTicked": false,
+        "rejectOption": "VISIBLE",
+        "purposesCount": null,
+        "separateChoices": null,
+        "itemisedData": null,
+        "purposeStated": null,
+        "withdrawalInfo": null,
+        "languageOptions": null,
+        "childAudienceSignals": null,
+        "darkPatterns": [],
+        "summary": "",
+        "confidence": 1,
+        "source": "DETERMINISTIC",
+        "observedFields": [
+          "preTicked",
+          "rejectOption"
+        ],
+        "conflicts": [],
+        "modelId": null,
+        "latencyMs": null
+      },
+      "deviceModel": "vivo I2501",
+      "androidVersion": "16",
+      "privateDnsActive": false,
+      "notes": [],
+      "captureHealth": {
+        "schemaVersion": 1,
+        "captureStartedNanos": 53037818000000,
+        "captureEndedNanos": 53063656000000,
+        "dnsQueriesParsed": 1,
+        "malformedPackets": null,
+        "dnsResponsesRelayed": null,
+        "dnsRelayFailures": null,
+        "malformedResponses": null,
+        "eventsRecorded": 1,
+        "eventsDropped": null,
+        "eventBufferCapacity": null,
+        "firstLookupNanos": 53037918000000,
+        "lastLookupNanos": 53037918000000,
+        "dnsUpstreamPayloadBytesSent": null,
+        "dnsUpstreamDatagramsSent": null,
+        "dnsUpstreamPayloadBytesReceived": null,
+        "dnsUpstreamDatagramsReceived": null,
+        "notes": [
+          "Console sample: only counters derivable from the saved report are filled in; the others are null (not recorded in this sample)."
+        ],
+        "hiddenDnsPackets": null,
+        "nonDnsPackets": null
+      },
+      "freshState": null
+    },
+    {
+      "id": "audit-1791591219563-REJECT",
+      "targetPackage": "com.leakyshop.demo.fixed",
+      "targetLabel": "LeakyShop Fixed",
+      "plan": "REJECT",
+      "childFacing": false,
+      "startedAtNanos": 53065118000000,
+      "endedAtNanos": 53083487000000,
+      "startedAtEpochMs": 1791591178600,
+      "netEvents": [
+        {
+          "tNanos": 53065218000000,
+          "hostname": "api.leakyshop.example",
+          "queryType": 1,
+          "entity": null,
+          "category": "UNKNOWN",
+          "phase": "NO_CONSENT_SEEN",
+          "viaPackage": null,
+          "cnameChain": [],
+          "answerIps": [],
+          "disguisedVia": null,
+          "answerStatus": null,
+          "rcode": null
+        }
+      ],
+      "consentEvents": [
+        {
+          "tNanos": 53065938000000,
+          "kind": "SCREEN_APPEARED",
+          "nodeText": "Your privacy choices",
+          "screenshotPath": null,
+          "tree": {
+            "className": "android.widget.FrameLayout",
+            "text": null,
+            "contentDescription": null,
+            "isCheckable": false,
+            "isChecked": false,
+            "isClickable": false,
+            "bounds": null,
+            "children": [
+              {
+                "className": "android.widget.TextView",
+                "text": "Your privacy choices",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "We collect your email, phone number and order history to deliver orders. The choices below are optional.",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "Analytics to improve the app",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.Switch",
+                "text": null,
+                "contentDescription": null,
+                "isCheckable": true,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "Personalised offers",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.Switch",
+                "text": null,
+                "contentDescription": null,
+                "isCheckable": true,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "You can withdraw consent anytime in Settings › Privacy, or complain to the Data Protection Board.",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "English",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "हिन्दी",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "ಕನ್ನಡ",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.Button",
+                "text": "Reject",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.Button",
+                "text": "Accept",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              }
+            ]
+          }
+        },
+        {
+          "tNanos": 53068438000000,
+          "kind": "REJECT",
+          "nodeText": "Reject",
+          "screenshotPath": null,
+          "tree": null
+        }
+      ],
+      "screenAudit": {
+        "isConsentScreen": true,
+        "preTicked": false,
+        "rejectOption": "VISIBLE",
+        "purposesCount": null,
+        "separateChoices": null,
+        "itemisedData": null,
+        "purposeStated": null,
+        "withdrawalInfo": null,
+        "languageOptions": null,
+        "childAudienceSignals": null,
+        "darkPatterns": [],
+        "summary": "",
+        "confidence": 1,
+        "source": "DETERMINISTIC",
+        "observedFields": [
+          "preTicked",
+          "rejectOption"
+        ],
+        "conflicts": [],
+        "modelId": null,
+        "latencyMs": null
+      },
+      "deviceModel": "vivo I2501",
+      "androidVersion": "16",
+      "privateDnsActive": false,
+      "notes": [],
+      "captureHealth": {
+        "schemaVersion": 1,
+        "captureStartedNanos": 53065118000000,
+        "captureEndedNanos": 53083487000000,
+        "dnsQueriesParsed": 1,
+        "malformedPackets": null,
+        "dnsResponsesRelayed": null,
+        "dnsRelayFailures": null,
+        "malformedResponses": null,
+        "eventsRecorded": 1,
+        "eventsDropped": null,
+        "eventBufferCapacity": null,
+        "firstLookupNanos": 53065218000000,
+        "lastLookupNanos": 53065218000000,
+        "dnsUpstreamPayloadBytesSent": null,
+        "dnsUpstreamDatagramsSent": null,
+        "dnsUpstreamPayloadBytesReceived": null,
+        "dnsUpstreamDatagramsReceived": null,
+        "notes": [
+          "Console sample: only counters derivable from the saved report are filled in; the others are null (not recorded in this sample)."
+        ],
+        "hiddenDnsPackets": null,
+        "nonDnsPackets": null
+      },
+      "freshState": null
+    },
+    {
+      "id": "audit-1791591219563-ACCEPT",
+      "targetPackage": "com.leakyshop.demo.fixed",
+      "targetLabel": "LeakyShop Fixed",
+      "plan": "ACCEPT",
+      "childFacing": false,
+      "startedAtNanos": 53085018000000,
+      "endedAtNanos": 53103379000000,
+      "startedAtEpochMs": 1791591198500,
+      "netEvents": [
+        {
+          "tNanos": 53085118000000,
+          "hostname": "api.leakyshop.example",
+          "queryType": 1,
+          "entity": null,
+          "category": "UNKNOWN",
+          "phase": "NO_CONSENT_SEEN",
+          "viaPackage": null,
+          "cnameChain": [],
+          "answerIps": [],
+          "disguisedVia": null,
+          "answerStatus": null,
+          "rcode": null
+        }
+      ],
+      "consentEvents": [
+        {
+          "tNanos": 53085938000000,
+          "kind": "SCREEN_APPEARED",
+          "nodeText": "Your privacy choices",
+          "screenshotPath": null,
+          "tree": {
+            "className": "android.widget.FrameLayout",
+            "text": null,
+            "contentDescription": null,
+            "isCheckable": false,
+            "isChecked": false,
+            "isClickable": false,
+            "bounds": null,
+            "children": [
+              {
+                "className": "android.widget.TextView",
+                "text": "Your privacy choices",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "We collect your email, phone number and order history to deliver orders. The choices below are optional.",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "Analytics to improve the app",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.Switch",
+                "text": null,
+                "contentDescription": null,
+                "isCheckable": true,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "Personalised offers",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.Switch",
+                "text": null,
+                "contentDescription": null,
+                "isCheckable": true,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "You can withdraw consent anytime in Settings › Privacy, or complain to the Data Protection Board.",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "English",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "हिन्दी",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.TextView",
+                "text": "ಕನ್ನಡ",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": false,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.Button",
+                "text": "Reject",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              },
+              {
+                "className": "android.widget.Button",
+                "text": "Accept",
+                "contentDescription": null,
+                "isCheckable": false,
+                "isChecked": false,
+                "isClickable": true,
+                "bounds": null,
+                "children": []
+              }
+            ]
+          }
+        },
+        {
+          "tNanos": 53088438000000,
+          "kind": "ACCEPT",
+          "nodeText": "Accept",
+          "screenshotPath": null,
+          "tree": null
+        }
+      ],
+      "screenAudit": {
+        "isConsentScreen": true,
+        "preTicked": false,
+        "rejectOption": "VISIBLE",
+        "purposesCount": null,
+        "separateChoices": null,
+        "itemisedData": null,
+        "purposeStated": null,
+        "withdrawalInfo": null,
+        "languageOptions": null,
+        "childAudienceSignals": null,
+        "darkPatterns": [],
+        "summary": "",
+        "confidence": 1,
+        "source": "DETERMINISTIC",
+        "observedFields": [
+          "preTicked",
+          "rejectOption"
+        ],
+        "conflicts": [],
+        "modelId": null,
+        "latencyMs": null
+      },
+      "deviceModel": "vivo I2501",
+      "androidVersion": "16",
+      "privateDnsActive": false,
+      "notes": [],
+      "captureHealth": {
+        "schemaVersion": 1,
+        "captureStartedNanos": 53085018000000,
+        "captureEndedNanos": 53103379000000,
+        "dnsQueriesParsed": 1,
+        "malformedPackets": null,
+        "dnsResponsesRelayed": null,
+        "dnsRelayFailures": null,
+        "malformedResponses": null,
+        "eventsRecorded": 1,
+        "eventsDropped": null,
+        "eventBufferCapacity": null,
+        "firstLookupNanos": 53085118000000,
+        "lastLookupNanos": 53085118000000,
+        "dnsUpstreamPayloadBytesSent": null,
+        "dnsUpstreamDatagramsSent": null,
+        "dnsUpstreamPayloadBytesReceived": null,
+        "dnsUpstreamDatagramsReceived": null,
+        "notes": [
+          "Console sample: only counters derivable from the saved report are filled in; the others are null (not recorded in this sample)."
+        ],
+        "hiddenDnsPackets": null,
+        "nonDnsPackets": null
+      },
+      "freshState": null
+    }
+  ],
+  "result": {
+    "findings": [],
+    "score": 100,
+    "band": "READY"
+  },
+  "networkReadings": [],
+  "tool": {
+    "name": "TraceVeil Console sample",
+    "version": "1"
+  },
+  "sample": {
+    "kind": "reconstructed",
+    "note": "Sample reconstructed from a live audit of the LeakyShop fixed build (vivo I2501, Android 16): 100/100, zero findings, one lookup per plan, real Reject and Accept. The lookup time and consent-screen times are set like the leaky build's (not in the saved summary); plan windows and capture counters are approximate. 100 means no finding in the captured evidence, not a certificate.",
+    "sources": [
+      "docs/VERIFICATION.md (audit-1791591219563)",
+      "leakyshop/src/main/java/com/leakyshop/demo/Shop.kt"
+    ]
+  }
+}

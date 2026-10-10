@@ -147,6 +147,18 @@ class ShopActivity : ComponentActivity() {
         var hindi by remember { mutableStateOf(false) }
         var analytics by remember { mutableStateOf(false) }
         var offers by remember { mutableStateOf(false) }
+        var policy by remember { mutableStateOf(false) }
+        if (policy) AlertDialog(
+            onDismissRequest = { policy = false },
+            title = { Text(if (hindi) "गोपनीयता नीति" else "Privacy policy") },
+            text = {
+                Text(
+                    if (hindi) "LeakyShop (डेमो) डिलीवरी के लिए ईमेल, फ़ोन और ऑर्डर इतिहास रखता है। एनालिटिक्स और ऑफ़र सिर्फ़ आपकी सहमति से चलते हैं। सहमति सेटिंग्स › गोपनीयता में वापस लें।"
+                    else "LeakyShop (demo) keeps your email, phone and order history to deliver orders. Analytics and offers run only with your consent. Withdraw it in Settings › Privacy.",
+                )
+            },
+            confirmButton = { TextButton(onClick = { policy = false }) { Text(if (hindi) "ठीक है" else "OK") } },
+        )
         AlertDialog(
             onDismissRequest = {},
             title = { Text(if (hindi) "आपकी गोपनीयता के विकल्प" else "Your privacy choices") },
@@ -168,6 +180,11 @@ class ShopActivity : ComponentActivity() {
                         if (hindi) "आप सेटिंग्स › गोपनीयता में कभी भी सहमति वापस ले सकते हैं।"
                         else "You can withdraw consent anytime in Settings › Privacy, or complain to the Data Protection Board.",
                         fontSize = 12.sp,
+                    )
+                    Text(
+                        if (hindi) "हमारी गोपनीयता नीति पढ़ें" else "Read our privacy policy",
+                        color = Color(0xFF5B3CC4), fontSize = 12.sp,
+                        modifier = Modifier.clickable { policy = true }.padding(top = 6.dp),
                     )
                     Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("English", Modifier.clickable { hindi = false }, fontWeight = if (!hindi) FontWeight.Bold else null)

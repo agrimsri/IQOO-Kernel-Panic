@@ -5,6 +5,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
@@ -13,6 +14,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dpdpxray.app.R
 import com.dpdpxray.core.model.Category
@@ -31,6 +33,57 @@ object Film {
     val high = Color(0xFFFF8A3D)
     val warn = Color(0xFFF2B544)
     val clear = Color(0xFF5FD49B)
+}
+
+/**
+ * Brand accent: peach to coral to rose. Used sparingly, only where the person should act next (the main action,
+ * the current guide step, the current onboarding page). Dark [Film.base] text on it keeps at least 4.5:1 contrast.
+ */
+object Brand {
+    val peach = Color(0xFFFAA275)
+    val coral = Color(0xFFFF8C61)
+    val rose = Color(0xFFCE6A85)
+    val stops = listOf(peach, coral, rose)
+    val horizontal: Brush get() = Brush.horizontalGradient(stops)
+    val vertical: Brush get() = Brush.verticalGradient(stops)
+    /** Short brand rule under headings: peach to rose, fading out to the right. */
+    val underline: Brush = Brush.horizontalGradient(listOf(peach, coral, rose.copy(alpha = 0.35f)))
+    /** A faint warm wash for hero cards: brand colour at the top-left corner, fading into the card. */
+    val heroWash: Brush = Brush.linearGradient(listOf(coral.copy(alpha = 0.20f), rose.copy(alpha = 0.07f), Color.Transparent))
+}
+
+/** Extra film surfaces for layered panels: one step lighter than [Film.raised], plus a faint scan-coloured wash. */
+object FilmExtra {
+    val raisedHigh = Color(0xFF1D3649)
+    val scanWash = Color(0x1A7FD3E6)
+    val hairline = Color(0xFF223B4D)
+    /** Bottom navigation bar: between [Film.base] and [Film.raised], with a hairline on top. */
+    val bar = Color(0xFF132736)
+    /** Faint warm wash behind caveat callouts. */
+    val warnWash = Color(0x1AF2B544)
+    /** Screen backdrop: film base at the top, a touch lighter towards the bottom. */
+    val backdrop: Brush = Brush.verticalGradient(listOf(Film.base, Color(0xFF122635), Color(0xFF15293A)))
+    /** Card fill: lit slightly from the top, settling into [Film.raised]. */
+    val card: Brush = Brush.verticalGradient(listOf(Color(0xFF1B3245), Film.raised))
+    /** Card edge: a brighter hairline on top, like light catching the rim. */
+    val cardEdge: Brush = Brush.verticalGradient(listOf(Color(0xFF2E4C61), hairline))
+}
+
+/** Score band as a two-stop gradient for the score ring: the band colour leads, a neighbouring hue trails. */
+fun bandStops(b: ScoreBand): List<Color> = when (b) {
+    ScoreBand.READY -> listOf(Film.scan, Film.clear)
+    ScoreBand.NEEDS_WORK -> listOf(Film.high, Film.warn)
+    ScoreBand.AT_RISK -> listOf(Brand.rose, Film.leak)
+    ScoreBand.INCONCLUSIVE -> listOf(Film.boneDim, Film.boneDim)
+}
+
+/** Corner radii used across the app, so cards, buttons and chips share one rhythm. */
+object Radii {
+    val card = 18.dp
+    val tile = 16.dp
+    val button = 16.dp
+    val row = 14.dp
+    val small = 12.dp
 }
 
 fun severityColor(s: Severity) = when (s) {
@@ -52,8 +105,8 @@ fun categoryColor(c: Category) = when (c) {
     Category.ADVERTISING, Category.ATTRIBUTION -> Film.leak
     Category.ANALYTICS, Category.SOCIAL, Category.ENGAGEMENT -> Film.high
     Category.CRASH_REPORTING -> Film.warn
-    Category.FIRST_PARTY -> Film.clear
-    Category.UNKNOWN -> Film.boneDim
+    Category.FIRST_PARTY, Category.FIRST_PARTY_SAME_COMPANY -> Film.clear
+    Category.UNKNOWN, Category.CONTENT_DELIVERY, Category.COMPANY_SERVICE -> Film.boneDim
 }
 
 @OptIn(ExperimentalTextApi::class)
@@ -73,27 +126,42 @@ class Scale(val k: Float) {
 
 val LocalScale = staticCompositionLocalOf { Scale(1f) }
 
+/**
+ * Type scale tuned for reading on a phone: body text 15-16sp with roomy line height, titles a clear step above body,
+ * labels never below 12sp. Every M3 slot is set so dialogs, sheets and the navigation bar use Archivo too.
+ */
 private fun typography(k: Float) = Typography(
     displayLarge = TextStyle(fontFamily = ArchivoDisplay, fontWeight = FontWeight(800), fontSize = (64 * k).sp, lineHeight = (64 * k).sp),
-    headlineMedium = TextStyle(fontFamily = ArchivoDisplay, fontWeight = FontWeight(700), fontSize = (28 * k).sp, lineHeight = (32 * k).sp),
-    titleLarge = TextStyle(fontFamily = ArchivoDisplay, fontWeight = FontWeight(700), fontSize = (21 * k).sp, lineHeight = (26 * k).sp),
-    titleMedium = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (16 * k).sp, lineHeight = (22 * k).sp),
+    headlineMedium = TextStyle(fontFamily = ArchivoDisplay, fontWeight = FontWeight(700), fontSize = (28 * k).sp, lineHeight = (34 * k).sp),
+    headlineSmall = TextStyle(fontFamily = ArchivoDisplay, fontWeight = FontWeight(700), fontSize = (24 * k).sp, lineHeight = (30 * k).sp),
+    titleLarge = TextStyle(fontFamily = ArchivoDisplay, fontWeight = FontWeight(700), fontSize = (21 * k).sp, lineHeight = (27 * k).sp),
+    titleMedium = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (17 * k).sp, lineHeight = (23 * k).sp),
+    titleSmall = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (15 * k).sp, lineHeight = (20 * k).sp),
     bodyLarge = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(400), fontSize = (16 * k).sp, lineHeight = (24 * k).sp),
-    bodyMedium = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(400), fontSize = (14 * k).sp, lineHeight = (21 * k).sp),
-    labelLarge = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (15 * k).sp),
-    labelMedium = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(500), fontSize = (12.5f * k).sp),
+    bodyMedium = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(400), fontSize = (15 * k).sp, lineHeight = (22 * k).sp),
+    bodySmall = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(400), fontSize = (14 * k).sp, lineHeight = (20 * k).sp),
+    labelLarge = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (15 * k).sp, lineHeight = (20 * k).sp),
+    labelMedium = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(500), fontSize = (13 * k).sp, lineHeight = (18 * k).sp),
+    labelSmall = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (12 * k).sp, lineHeight = (16 * k).sp),
 )
 
 @Composable
 fun XrayTheme(stageMode: Boolean, content: @Composable () -> Unit) {
     val k = if (stageMode) 1.18f else 1f
+    val reduceMotion = rememberSystemReduceMotion()
     // Text without an explicit colour must read as "bone" on the film background (Compose defaults it to black).
-    androidx.compose.runtime.CompositionLocalProvider(LocalScale provides Scale(k), androidx.compose.material3.LocalContentColor provides Film.bone) {
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalScale provides Scale(k),
+        androidx.compose.material3.LocalContentColor provides Film.bone,
+        LocalReduceMotion provides reduceMotion,
+    ) {
         MaterialTheme(
             colorScheme = darkColorScheme(
                 primary = Film.scan, onPrimary = Film.base, background = Film.base, onBackground = Film.bone,
                 surface = Film.base, onSurface = Film.bone, surfaceVariant = Film.raised, onSurfaceVariant = Film.boneDim,
-                outline = Film.line, error = Film.leak,
+                surfaceContainer = FilmExtra.bar, surfaceContainerHigh = Film.raised, surfaceContainerHighest = FilmExtra.raisedHigh,
+                surfaceContainerLow = Film.raised, secondaryContainer = Film.scan.copy(alpha = 0.18f), onSecondaryContainer = Film.bone,
+                outline = Film.line, outlineVariant = FilmExtra.hairline, error = Film.leak,
             ),
             typography = typography(k),
             content = content,

@@ -1,0 +1,236 @@
+{
+ "model_id": "ConsentLens-1",
+ "file": "consentlens_int8.tflite",
+ "sha256": "5802e3dff77f70ee10778384cb548f7c832389ffdd52f8754c308d91a03fa6c2",
+ "bytes": 145816,
+ "roles": [
+  "ACCEPT",
+  "REJECT",
+  "MANAGE",
+  "PURPOSE_NOTICE",
+  "PRIVACY_LINK",
+  "WITHDRAW_INFO",
+  "OTHER"
+ ],
+ "max_bytes": 128,
+ "input": "int32[1,128] UTF-8 byte ids (0 = padding)",
+ "output": {
+  "type": "int8[1,7] softmax",
+  "scale": 0.00390625,
+  "zero_point": -128
+ },
+ "tflite_ops": [
+  "GATHER",
+  "EXPAND_DIMS",
+  "CONV_2D",
+  "RESHAPE",
+  "EXPAND_DIMS",
+  "CONV_2D",
+  "RESHAPE",
+  "REDUCE_MAX",
+  "FULLY_CONNECTED",
+  "FULLY_CONNECTED",
+  "SOFTMAX"
+ ],
+ "op_count": 11,
+ "params": 130311,
+ "train_rows": 18655,
+ "languages": 76,
+ "default_threshold": 0.9,
+ "held_out_language_macro_f1_int8": 0.5207,
+ "held_out_language_macro_f1_lexicon": 0.1489,
+ "demo": [
+  {
+   "lang": "en",
+   "text": "Decline optional tracking",
+   "expected": "REJECT",
+   "in_training_data": false,
+   "reference_role": "PURPOSE_NOTICE",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "en",
+   "text": "Read our privacy notice",
+   "expected": "PRIVACY_LINK",
+   "in_training_data": false,
+   "reference_role": "PRIVACY_LINK",
+   "reference_confidence": 0.9492
+  },
+  {
+   "lang": "en",
+   "text": "Add to cart",
+   "expected": "OTHER",
+   "in_training_data": false,
+   "reference_role": "OTHER",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "hi",
+   "text": "सभी स्वीकार करें",
+   "expected": "ACCEPT",
+   "in_training_data": false,
+   "reference_role": "ACCEPT",
+   "reference_confidence": 0.5
+  },
+  {
+   "lang": "hi",
+   "text": "हम विज्ञापन दिखाने के लिए आपके डेटा का उपयोग करते हैं",
+   "expected": "PURPOSE_NOTICE",
+   "in_training_data": false,
+   "reference_role": "PURPOSE_NOTICE",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "de",
+   "text": "Alle ablehnen",
+   "expected": "REJECT",
+   "in_training_data": false,
+   "reference_role": "OTHER",
+   "reference_confidence": 0.6562
+  },
+  {
+   "lang": "de",
+   "text": "Einstellungen anpassen",
+   "expected": "MANAGE",
+   "in_training_data": false,
+   "reference_role": "MANAGE",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "fr",
+   "text": "Tout accepter",
+   "expected": "ACCEPT",
+   "in_training_data": true,
+   "reference_role": "ACCEPT",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "fr",
+   "text": "Vous pouvez retirer votre consentement à tout moment.",
+   "expected": "WITHDRAW_INFO",
+   "in_training_data": false,
+   "reference_role": "OTHER",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "es",
+   "text": "Rechazar todo",
+   "expected": "REJECT",
+   "in_training_data": false,
+   "reference_role": "REJECT",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "es",
+   "text": "Usamos sus datos para mostrar anuncios personalizados.",
+   "expected": "PURPOSE_NOTICE",
+   "in_training_data": false,
+   "reference_role": "PURPOSE_NOTICE",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "pt",
+   "text": "Aceitar todos",
+   "expected": "ACCEPT",
+   "in_training_data": true,
+   "reference_role": "ACCEPT",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "pt",
+   "text": "Política de privacidade",
+   "expected": "PRIVACY_LINK",
+   "in_training_data": true,
+   "reference_role": "PRIVACY_LINK",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "it",
+   "text": "Gestisci preferenze",
+   "expected": "MANAGE",
+   "in_training_data": false,
+   "reference_role": "MANAGE",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "ja",
+   "text": "すべて拒否",
+   "expected": "REJECT",
+   "in_training_data": false,
+   "reference_role": "REJECT",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "ja",
+   "text": "同意する",
+   "expected": "ACCEPT",
+   "in_training_data": true,
+   "reference_role": "ACCEPT",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "zh",
+   "text": "接受全部",
+   "expected": "ACCEPT",
+   "in_training_data": false,
+   "reference_role": "OTHER",
+   "reference_confidence": 0.9492
+  },
+  {
+   "lang": "zh",
+   "text": "管理偏好设置",
+   "expected": "MANAGE",
+   "in_training_data": false,
+   "reference_role": "MANAGE",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "ar",
+   "text": "رفض الكل",
+   "expected": "REJECT",
+   "in_training_data": false,
+   "reference_role": "OTHER",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "ar",
+   "text": "سياسة الخصوصية",
+   "expected": "PRIVACY_LINK",
+   "in_training_data": true,
+   "reference_role": "PRIVACY_LINK",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "ko",
+   "text": "모두 거부",
+   "expected": "REJECT",
+   "in_training_data": true,
+   "reference_role": "REJECT",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "ru",
+   "text": "Принять все",
+   "expected": "ACCEPT",
+   "in_training_data": false,
+   "reference_role": "ACCEPT",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "tr",
+   "text": "Tümünü kabul et",
+   "expected": "ACCEPT",
+   "in_training_data": false,
+   "reference_role": "ACCEPT",
+   "reference_confidence": 0.9961
+  },
+  {
+   "lang": "id",
+   "text": "Tolak semua",
+   "expected": "REJECT",
+   "in_training_data": false,
+   "reference_role": "REJECT",
+   "reference_confidence": 0.8164
+  }
+ ]
+}

@@ -29,6 +29,9 @@ class AnswerVoice(private val context: Context, private val onState: (VoiceOutpu
 
     override val online = false
 
+    /** True once the phone's text-to-speech engine has finished binding. */
+    val ready: Boolean get() = ttsReady
+
     init {
         tts = TextToSpeech(context.applicationContext) { status ->
             ttsReady = status == TextToSpeech.SUCCESS

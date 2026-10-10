@@ -19,6 +19,8 @@ data class Preflight(
     val privateDnsActive: Boolean,
     val modelFound: Boolean,
     val modelLoaded: Boolean,
+    /** Another app's VPN is running; TraceVeil must not take over its slot without the user turning it off. */
+    val otherVpnActive: Boolean = false,
 ) {
     /** Minimum for a real (non-sample) audit. */
     val canAudit: Boolean get() = vpnReady && accessibilityOn
@@ -27,7 +29,31 @@ data class Preflight(
 data class AuditableApp(val packageName: String, val label: String, val icon: Drawable?, val isSystem: Boolean)
 
 object DeviceChecks {
-    fun vpnReady(context: Context): Boolean = VpnService.prepare(context) == null
+    /**
+     * True when the VPN permission is granted and no other app's VPN is running. Android allows one VPN at a time, and
+     * VpnService.prepare() from an app the user approved earlier hands the VPN slot to that app, which stops another
+     * app's running VPN. So prepare() is never called while another VPN is up: just opening TraceVeil must not switch
+     * off the user's own VPN.
+     */
+    fun vpnReady(context: Context): Boolean = !otherVpnActive(context) && VpnService.prepare(context) == null
+
+    /** Another app's VPN network is up. Our own VPN is recognised by its owner UID, which Android reveals only to us. */
+    @Suppress("DEPRECATION")
+    fun otherVpnActive(context: Context): Boolean {
+        val cm = context.getSystemService(ConnectivityManager::class.java) ?: return false
+        val me = android.os.Process.myUid()
+        return runCatching {
+            cm.allNetworks.any { n ->
+                val caps = cm.getNetworkCapabilities(n) ?: return@any false
+                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) && caps.ownerUid != me
+            }
+        }.getOrDefault(false)
+    }
+
+    /** Android's VPN settings, where the user can turn their own VPN off before a check. */
+    fun openVpnSettings(context: Context) {
+        runCatching { context.startActivity(Intent(Settings.ACTION_VPN_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
 
     fun accessibilityOn(context: Context): Boolean {
         val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()

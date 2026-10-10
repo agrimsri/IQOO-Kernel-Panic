@@ -21,3 +21,13 @@ google-services.json
 *.key
 
 /tools/tests/__pycache__/
+
+# Local online-voice settings may hold an API key; never commit it.
+api.env
+
+# ML: raw datasets and caches stay out of Git (see ml/DATA_SOURCES.md to re-download).
+/ml/data/
+__pycache__/
+
+# ConsentLens-1 ships in the APK (about 146 KB, trained by ml/consentlens/train_consentlens.py).
+!/app/src/main/assets/consentlens/*.tflite

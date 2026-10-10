@@ -38,7 +38,8 @@ class FixCatalog(private val templates: List<FixTemplate>) {
     }
 
     companion object {
-        private val SDK_CHECKS = setOf(CheckId.C1, CheckId.C2, CheckId.C9, CheckId.C10)
+        /** C13 names the SDKs whose manifest switches are on, so its entities pick the same vendor fixes. */
+        private val SDK_CHECKS = setOf(CheckId.C1, CheckId.C2, CheckId.C9, CheckId.C10, CheckId.C13)
         private val json = Json { ignoreUnknownKeys = true }
 
         fun loadDefault(): FixCatalog {

@@ -7,6 +7,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dpdpxray.app.ai.BackendKind
 import com.dpdpxray.app.ai.BenchResult
+import com.dpdpxray.app.ai.Explanation
+import com.dpdpxray.app.ai.Explanations
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.audit.AuditConfig
 import com.dpdpxray.app.capture.CaptureBus
@@ -20,15 +22,24 @@ import com.dpdpxray.app.data.AuditBundle
 import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.data.AuditComparison
 import com.dpdpxray.app.data.AuditComparisonResult
+import com.dpdpxray.app.data.LegalLensSetting
+import com.dpdpxray.app.data.LensChoice
 import com.dpdpxray.app.data.SampleAudit
+import com.dpdpxray.app.BuildConfig
 import com.dpdpxray.app.graph
+import com.dpdpxray.app.report.AuditJsonExport
 import com.dpdpxray.app.report.ExportManager
 import com.dpdpxray.app.report.EvidenceReport
+import com.dpdpxray.app.report.HtmlExporter
 import com.dpdpxray.app.report.PdfExporter
 import com.dpdpxray.app.report.SampleReport
 import com.dpdpxray.core.audit.PhaseAssigner
 import com.dpdpxray.core.dpdp.Passage
 import com.dpdpxray.core.fixes.FixTemplate
+import com.dpdpxray.core.law.LegalLens
+import com.dpdpxray.core.law.LegalProfile
+import com.dpdpxray.core.law.LensPassage
+import com.dpdpxray.core.law.asLensPassage
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.CheckId
 import com.dpdpxray.core.model.Finding
@@ -66,7 +77,7 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     private val _bundle = MutableStateFlow<AuditBundle?>(null)
     val bundle = _bundle.asStateFlow()
 
-    private val _explanations = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val _explanations = MutableStateFlow<Map<String, Explanation>>(emptyMap())
     val explanations = _explanations.asStateFlow()
     private val _explaining = MutableStateFlow<String?>(null)
     val explaining = _explaining.asStateFlow()
@@ -93,6 +104,7 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
             privateDnsActive = DeviceChecks.privateDnsActive(ctx),
             modelFound = llmStatus.value !is LlmStatus.NoModel,
             modelLoaded = graph.llm.isReady,
+            otherVpnActive = DeviceChecks.otherVpnActive(ctx),
         )
     }
 
@@ -110,6 +122,8 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startAudit(config: AuditConfig): Boolean {
+        // One tunnel at a time: an audit would replace a running quarantine run's tunnel.
+        if (com.dpdpxray.app.quarantine.QuarantineController.isActive) { _toast.value = "Stop the quarantine run before starting an audit."; return false }
         if (!prepareAudit()) return false
         graph.orchestrator.start(config)
         return true
@@ -131,7 +145,7 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         val catalog = graph.catalog()
         val result = RulesEngine(catalog).evaluate(sessions)
         val fixes = graph.fixCatalog.fixesFor(result, catalog)
-        val md = EvidenceReport.annotate(SampleReport.annotate(MarkdownReport.build(result, sessions, fixes, graph.citations()), sessions), sessions)
+        val md = EvidenceReport.annotate(SampleReport.annotate(MarkdownReport.build(result, sessions, fixes, graph.citations()), sessions), sessions, sample = true)
         graph.repository.save(
             AuditMeta(id, sessions.first().targetPackage, sessions.first().targetLabel, System.currentTimeMillis(), result.score, result.band,
                 result.findings.size, sessions.map { it.plan.label }, sample = true),
@@ -160,6 +174,19 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun citationsFor(f: Finding): List<Passage> = citationCache[f.checkId.name + f.explanation.hashCode()]
         ?: withContext(Dispatchers.Default) { graph.citations().cite(f, 3) }.also { citationCache[f.checkId.name + f.explanation.hashCode()] = it }
 
+    /** The bundled legal lenses (profiles, check mapping and passages). */
+    val legal: LegalLens get() = LegalLens.default
+
+    /** The legal lens in use: the Settings choice, else the device region, else the global baseline. */
+    fun lensChoice(setting: String = settings.value.legalProfile): LensChoice =
+        LegalLensSetting.resolve(setting, java.util.Locale.getDefault().country)
+
+    fun lensProfile(): LegalProfile = lensChoice().profile
+
+    /** Legal text for a finding under [profile]: India keeps its DPDP citations; other lenses show their mapped passages. */
+    suspend fun lensPassagesFor(f: Finding, profile: LegalProfile): List<LensPassage> =
+        if (profile == LegalProfile.INDIA) citationsFor(f).map { it.asLensPassage() } else legal.passages(profile, f.checkId.code)
+
     /** Network events of a session, classified and placed before/after the consent choice, for the timeline. */
     fun timeline(session: AuditSession): List<NetEvent> {
         return EvidenceUi(graph.catalog(), graph.corpus).timeline(session)
@@ -184,19 +211,23 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
             .onFailure { _toast.value = "No sharing app is available. You can copy the draft instead." }
     }
 
+    /** Always ends with an explanation: the AI's (labelled AI-inferred) or a rules-based fallback that says why. */
     fun explain(finding: Finding, hindi: Boolean) = viewModelScope.launch {
         val key = "${finding.checkId}-${if (hindi) "hi" else "en"}"
-        if (!graph.llm.isReady) {
-            _explaining.value = key
-            if (!graph.llm.load(BackendKind.GPU)) {
-                _explaining.value = null
-                _toast.value = "On-device model not available — see AI lab"
-                return@launch
-            }
-        }
         _explaining.value = key
-        val text = graph.explainer.explain(finding, citationsFor(finding), hindi)
-        _explanations.update { it + (key to (text ?: "The model returned no text. Try again.")) }
+        val passages = citationsFor(finding)
+        val explanation = if (!graph.llm.isReady && !graph.llm.load(BackendKind.GPU)) {
+            val reason = when (val s = graph.llm.status.value) {
+                LlmStatus.NoModel -> "no on-device model is installed (see AI lab)"
+                is LlmStatus.Failed -> "the on-device model could not load (${s.message.take(80)})"
+                else -> "the on-device model is not available (see AI lab)"
+            }
+            Explanations.fallback(finding, hindi, reason)
+        } else {
+            val model = (graph.llm.status.value as? LlmStatus.Ready)?.let { "${it.model} on ${it.backend.label}" } ?: "the on-device model"
+            Explanations.fromModel(graph.explainer.explain(finding, passages, hindi), finding, passages, hindi, model)
+        }
+        _explanations.update { it + (key to explanation) }
         _explaining.value = null
     }
 
@@ -229,6 +260,10 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
             _cameraResult.value = CameraCheckState.Error("The on-device model is not loaded. Push a Gemma model and open AI lab.")
             return@launch
         }
+        if (!graph.llm.canReadImages) {
+            _cameraResult.value = CameraCheckState.Error("The loaded model reads text only, so the photo was not sent to it. Load the GPU model (Gemma 4) in AI lab for Camera Check.")
+            return@launch
+        }
         val file = File(ctx.cacheDir, "camera_check.jpg")
         withContext(Dispatchers.IO) { file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 92, it) } }
         val audit = graph.llm.auditConsentScreen(file, "(photo of a screen; no accessibility tree)")
@@ -256,8 +291,47 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         _toast.value = if (ok) "Markdown saved to Downloads/TraceVeil" else "Could not save the report"
     }
 
-    fun markdown(bundle: AuditBundle): String = EvidenceReport.annotate(
-        graph.repository.markdownFile(bundle.meta.id).takeIf { it.exists() }?.readText().orEmpty(), bundle.sessions)
+    /** Offline single-file HTML (inline CSS/JS, no network requests) to open in any browser, e.g. on the laptop. */
+    fun exportHtml(bundle: AuditBundle, share: Boolean) = viewModelScope.launch {
+        val file = runCatching {
+            val html = withContext(Dispatchers.Default) {
+                HtmlExporter.build(
+                    bundle.result, bundle.sessions, bundle.meta.timingProfile, bundle.meta.sample, fixesFor(bundle), graph.citations(), graph.catalog(),
+                    profile = lensProfile(),
+                )
+            }
+            withContext(Dispatchers.IO) { HtmlExporter.write(html, File(bundle.dir, "TraceVeil-${bundle.meta.targetLabel.filter { it.isLetterOrDigit() }}.html")) }
+        }.getOrElse { _toast.value = "Could not build the HTML report"; return@launch }
+        if (share) ExportManager.share(ctx, file, HtmlExporter.MIME)
+        else {
+            val ok = withContext(Dispatchers.IO) { ExportManager.saveToDownloads(ctx, file, file.name, HtmlExporter.MIME) }
+            _toast.value = if (ok) "Interactive report saved to Downloads/TraceVeil" else "Could not save the HTML report"
+        }
+    }
+
+    /** Audit data as a traceveil.audit.v1 JSON bundle for TraceVeil CI; it leaves the phone only when saved or shared. */
+    fun exportAuditJson(bundle: AuditBundle, share: Boolean) = viewModelScope.launch {
+        val file = runCatching { withContext(Dispatchers.IO) { AuditJsonExport.write(bundle, BuildConfig.VERSION_NAME, lensProfile().name) } }
+            .getOrElse { _toast.value = "Could not build the audit data export"; return@launch }
+        if (share) ExportManager.share(ctx, file, AuditJsonExport.MIME)
+        else {
+            val ok = withContext(Dispatchers.IO) { ExportManager.saveToDownloads(ctx, file, file.name, AuditJsonExport.MIME) }
+            _toast.value = if (ok) "Audit data (JSON) saved to Downloads/TraceVeil" else "Could not save the audit data"
+        }
+    }
+
+    /**
+     * The Markdown (and PDF) report under the selected legal lens, built from the saved result like the HTML export. The
+     * report saved at audit time is the fallback if that fails. Call off the main thread: citations may use the
+     * on-device embedding model.
+     */
+    fun markdown(bundle: AuditBundle, profile: LegalProfile = lensProfile()): String {
+        val md = runCatching {
+            val built = MarkdownReport.build(bundle.result, bundle.sessions, fixesFor(bundle), graph.citations(), profile)
+            if (bundle.meta.sample) SampleReport.annotate(built, bundle.sessions) else built
+        }.getOrElse { graph.repository.markdownFile(bundle.meta.id).takeIf { it.exists() }?.readText().orEmpty() }
+        return EvidenceReport.annotate(md, bundle.sessions, bundle.meta.timingProfile, sample = bundle.meta.sample)
+    }
 
     fun copy(label: String, text: String) {
         ExportManager.copy(ctx, label, text)
