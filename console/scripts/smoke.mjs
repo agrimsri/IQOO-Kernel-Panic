@@ -106,7 +106,7 @@ check(/Score change\s*0/i.test(t) || t.includes("\n0\n"), "same findings give a 
 // 4. policy preview: the traceveil-ci defaults and rules (cli Policy.kt / Gate.kt)
 await go("/policy");
 t = await text();
-check(t.includes("C2 Trackers contacted after the user refused (Critical, OBSERVED evidence)"), "the default policy fails LeakyShop on C2");
+check(t.includes("C2 Tracker hosts looked up after the user refused (Critical, OBSERVED evidence)"), "the default policy fails LeakyShop on C2");
 check(t.includes("C9 NOT ESTABLISHED: the app was not declared child-facing"), "a failOn check that could not be tested fails by default (C9 NOT ESTABLISHED)");
 check(t.includes("fresh state NOT ESTABLISHED (not recorded in this audit)"), "requireFreshState is on by default and fails a fresh state that was not recorded");
 check(t.includes("All 3 plans started from an approved fresh reset."), "the CLI fixed sample's recorded fresh resets pass requireFreshState");

@@ -97,7 +97,7 @@ function Console() {
     if (worst) {
       steps.push(
         { id: "coverage", route: `/audits/${encodeURIComponent(worst.id)}`, target: "coverage", title: "Coverage comes first", body: "Before any finding: which plans ran, whether the consent screen appeared and whether the planned Accept or Reject was really tapped." },
-        { id: "lanes", route: `/audits/${encodeURIComponent(worst.id)}`, target: "lanes", title: "Consent timeline", body: "One lane per plan. Dots are DNS lookups; the vertical marks are the consent screen and the exact recorded tap. Red diamonds are trackers contacted after the user refused." },
+        { id: "lanes", route: `/audits/${encodeURIComponent(worst.id)}`, target: "lanes", title: "Consent timeline", body: "One lane per plan. Dots are DNS lookups; the vertical marks are the consent screen and the exact recorded tap. Red diamonds are tracker hosts looked up after the user refused (catalogue matches, not proof that data was sent)." },
         { id: "finding", route: `/audits/${encodeURIComponent(worst.id)}`, target: "finding-0", title: "Findings with evidence labels", body: "Each finding says whether it was observed or inferred, shows its first evidence lines and the fix, with a copy button." },
       );
     }

@@ -80,7 +80,7 @@ export default function Compare({ query }) {
             <Fade delay={0.08}><Column icon={Equal} tone="var(--muted)" title="Unchanged" sub="recorded in both" items={cmp.unchanged} /></Fade>
           </div>
 
-          <Fade delay={0.1}><Card title="Hosts contacted" icon={Globe2} style={{ marginTop: 16 }} right={<Hud>by host name</Hud>}>
+          <Fade delay={0.1}><Card title="Hosts looked up" icon={Globe2} style={{ marginTop: 16 }} right={<Hud>by host name</Hud>}>
             <div className="grid g3">
               <HostCol title="Only in baseline" hosts={cmp.hostsOnlyBase} />
               <HostCol title="Only in candidate" hosts={cmp.hostsOnlyCand} />

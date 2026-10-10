@@ -232,7 +232,7 @@ function ScreenCard({ a }) {
 
 function HostsCard({ a }) {
   return (
-    <Card title="Hosts contacted" icon={Globe2} right={<Hud>{plural(a.hosts.length, "host")} · {plural(a.lookups, "lookup")}</Hud>}>
+    <Card title="Hosts looked up" icon={Globe2} right={<Hud>{plural(a.hosts.length, "host")} · {plural(a.lookups, "lookup")}</Hud>}>
       <div className="table-wrap">
         <table className="tbl">
           <thead><tr><th>Host</th><th>Who (tracker catalogue)</th><th>Category</th><th>Phases</th><th>Plans</th><th className="num">Lookups</th></tr></thead>

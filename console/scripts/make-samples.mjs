@@ -121,30 +121,30 @@ const leakySessions = [
 const ENT3 = ["Google Analytics for Firebase", "Meta (Facebook SDK)", "AppsFlyer"];
 const ALL = ["SILENT", "REJECT", "ACCEPT"];
 const preConsentEvidence = [
-  "app-measurement.com (Google Analytics for Firebase) — 0.2 s after launch, the user had not chosen yet [Plan C · No interaction]",
-  "graph.facebook.com (Meta (Facebook SDK)) — 0.2 s after launch, the user had not chosen yet [Plan C · No interaction]",
-  "launches.appsflyersdk.com (AppsFlyer) — 0.2 s after launch, the user had not chosen yet [Plan C · No interaction]",
-  "launches.appsflyersdk.com (AppsFlyer) — 0.1 s after launch, 4.8 s before the consent choice [Plan B · Reject]",
-  "graph.facebook.com (Meta (Facebook SDK)) — 0.1 s after launch, 4.8 s before the consent choice [Plan B · Reject]",
-  "app-measurement.com (Google Analytics for Firebase) — 0.1 s after launch, 4.8 s before the consent choice [Plan B · Reject]",
-  "graph.facebook.com (Meta (Facebook SDK)) — 0.1 s after launch, 3.3 s before the consent choice [Plan A · Accept]",
-  "launches.appsflyersdk.com (AppsFlyer) — 0.1 s after launch, 3.3 s before the consent choice [Plan A · Accept]",
-  "app-measurement.com (Google Analytics for Firebase) — 0.1 s after launch, 3.3 s before the consent choice [Plan A · Accept]",
+  "app-measurement.com (Google Analytics for Firebase) — catalogue match: analytics — looked up 0.2 s after launch, the user had not chosen yet [Plan C · No interaction]",
+  "graph.facebook.com (Meta (Facebook SDK)) — catalogue match: advertising — looked up 0.2 s after launch, the user had not chosen yet [Plan C · No interaction]",
+  "launches.appsflyersdk.com (AppsFlyer) — catalogue match: attribution — looked up 0.2 s after launch, the user had not chosen yet [Plan C · No interaction]",
+  "launches.appsflyersdk.com (AppsFlyer) — catalogue match: attribution — looked up 0.1 s after launch, 4.8 s before the consent choice [Plan B · Reject]",
+  "graph.facebook.com (Meta (Facebook SDK)) — catalogue match: advertising — looked up 0.1 s after launch, 4.8 s before the consent choice [Plan B · Reject]",
+  "app-measurement.com (Google Analytics for Firebase) — catalogue match: analytics — looked up 0.1 s after launch, 4.8 s before the consent choice [Plan B · Reject]",
+  "graph.facebook.com (Meta (Facebook SDK)) — catalogue match: advertising — looked up 0.1 s after launch, 3.3 s before the consent choice [Plan A · Accept]",
+  "launches.appsflyersdk.com (AppsFlyer) — catalogue match: attribution — looked up 0.1 s after launch, 3.3 s before the consent choice [Plan A · Accept]",
+  "app-measurement.com (Google Analytics for Firebase) — catalogue match: analytics — looked up 0.1 s after launch, 3.3 s before the consent choice [Plan A · Accept]",
 ];
 const leakyFindings = [
   {
-    checkId: "C2", severity: "CRITICAL", evidenceType: "OBSERVED", title: "Trackers contacted after the user refused",
-    explanation: "The user refused consent, but the app still contacted Google Analytics for Firebase, Meta (Facebook SDK), AppsFlyer. Consent must be free and specific; processing based on a refused consent has no lawful ground.",
+    checkId: "C2", severity: "CRITICAL", evidenceType: "OBSERVED", title: "Tracker hosts looked up after the user refused",
+    explanation: "The user refused consent, but the app still looked up hosts the tracker catalogue lists for Google Analytics for Firebase, Meta (Facebook SDK), AppsFlyer. Each lookup is a catalogue match: the app tried to reach a host the tracker catalogue lists as a tracking endpoint. It shows an attempt to contact, not proof that personal data was sent. Consent must be free and specific; processing based on a refused consent has no lawful ground.",
     evidence: [
-      "app-measurement.com (Google Analytics for Firebase) — 4.9 s after launch, 0.0 s after the user chose reject [Plan B · Reject]",
-      "graph.facebook.com (Meta (Facebook SDK)) — 4.9 s after launch, 0.0 s after the user chose reject [Plan B · Reject]",
-      "launches.appsflyersdk.com (AppsFlyer) — 4.9 s after launch, 0.0 s after the user chose reject [Plan B · Reject]",
+      "app-measurement.com (Google Analytics for Firebase) — catalogue match: analytics — looked up 4.9 s after launch, 0.0 s after the user chose reject [Plan B · Reject]",
+      "graph.facebook.com (Meta (Facebook SDK)) — catalogue match: advertising — looked up 4.9 s after launch, 0.0 s after the user chose reject [Plan B · Reject]",
+      "launches.appsflyersdk.com (AppsFlyer) — catalogue match: attribution — looked up 4.9 s after launch, 0.0 s after the user chose reject [Plan B · Reject]",
     ],
     plans: ["REJECT"], dpdpRefs: ["s4(1)", "s6(1)"], penaltyBand: "RESIDUAL_50", confidence: 1.0, entities: ENT3,
   },
   {
-    checkId: "C1", severity: "HIGH", evidenceType: "OBSERVED", title: "Trackers contacted before consent",
-    explanation: "The app contacted Google Analytics for Firebase, Meta (Facebook SDK), AppsFlyer before the user made any consent choice. Under the DPDP Act, personal data may be processed only with consent (or a legitimate use), and consent must be given by a clear affirmative action before processing starts.",
+    checkId: "C1", severity: "HIGH", evidenceType: "OBSERVED", title: "Tracker hosts looked up before consent",
+    explanation: "The app looked up hosts the tracker catalogue lists for Google Analytics for Firebase, Meta (Facebook SDK), AppsFlyer before the user made any consent choice. Each lookup is a catalogue match: the app tried to reach a host the tracker catalogue lists as a tracking endpoint. It shows an attempt to contact, not proof that personal data was sent. Under the DPDP Act, personal data may be processed only with consent (or a legitimate use), and consent must be given by a clear affirmative action before processing starts.",
     evidence: preConsentEvidence, plans: ALL, dpdpRefs: ["s4(1)", "s6(1)"], penaltyBand: "RESIDUAL_50", confidence: 1.0, entities: ENT3,
   },
   {
@@ -159,7 +159,7 @@ const leakyFindings = [
   },
   {
     checkId: "C10", severity: "MEDIUM", evidenceType: "INFERRED", title: "Device identifiers likely shared before consent",
-    explanation: "Per vendor documentation, Google Analytics for Firebase, Meta (Facebook SDK), AppsFlyer read a device or advertising identifier when they initialise. They were contacted before consent, so identifiers were likely shared without consent. (Inferred from SDK behaviour; payloads were not inspected.)",
+    explanation: "Per vendor documentation, Google Analytics for Firebase, Meta (Facebook SDK), AppsFlyer read a device or advertising identifier when they initialise. They were looked up before consent, so identifiers were likely shared without consent. (Inferred from SDK behaviour; payloads were not inspected.)",
     evidence: preConsentEvidence, plans: ALL, dpdpRefs: ["s6(1)"], penaltyBand: "RESIDUAL_50", confidence: 0.7, entities: ENT3,
   },
 ];

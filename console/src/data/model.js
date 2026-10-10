@@ -34,8 +34,8 @@ export const BAND = {
 export const bandInfo = (b) => BAND[b] || { label: String(b || "Unknown"), short: String(b || "Unknown"), color: "var(--lav)", tone: "muted" };
 
 export const CHECKS = {
-  C1: "Trackers contacted before consent",
-  C2: "Trackers contacted after the user refused",
+  C1: "Tracker hosts looked up before consent",
+  C2: "Tracker hosts looked up after the user refused",
   C3: "Pre-ticked consent option",
   C4: "No clear way to refuse",
   C5: "Bundled consent for several purposes",
@@ -44,7 +44,7 @@ export const CHECKS = {
   C8: "Notice offered only in English",
   C9: "Tracking in a child-facing app",
   C10: "Device identifiers likely shared before consent",
-  NC: "No consent mechanism detected",
+  NC: "No consent screen seen during the capture",
   V0: "Low network visibility — result inconclusive",
   U1: "Consent history unknown — app kept its data",
   S1: "Same-company servers contacted (first-party data collection)",
@@ -61,7 +61,7 @@ export const PHASE = {
 export const CATEGORY_LABEL = {
   ANALYTICS: "Analytics", ADVERTISING: "Advertising", ATTRIBUTION: "Attribution", SOCIAL: "Social", CRASH_REPORTING: "Crash reporting",
   ENGAGEMENT: "Engagement", FIRST_PARTY: "First party", UNKNOWN: "Not in catalogue", CONTENT_DELIVERY: "Content delivery",
-  FIRST_PARTY_SAME_COMPANY: "Same company as the app",
+  FIRST_PARTY_SAME_COMPANY: "Same company as the app", COMPANY_SERVICE: "Company service (not a tracking endpoint)",
 };
 export const TRACKING = new Set(["ANALYTICS", "ADVERTISING", "ATTRIBUTION", "SOCIAL", "ENGAGEMENT"]);
 
@@ -82,11 +82,14 @@ const norm = (h) => String(h || "").toLowerCase().replace(/\.$/, "");
 const suffixes = (host) => { const p = host.split("."); return p.map((_, i) => p.slice(i).join(".")).filter((s) => s.includes(".") || s === host); };
 const entryForHost = (host) => { for (const s of suffixes(host)) { const e = byDomain.get(s); if (e) return e; } return null; };
 
-/** Entity, company and category for one lookup. A stored entity wins, as in the app's SessionClassifier. */
+/**
+ * Entity, company and category for one lookup. A stored entity wins, as in the app's SessionClassifier; a stored catalogue
+ * entity takes the catalogue's current category, so corrections (facebook.com is a company service) reach older audits.
+ */
 export function classifyHost(hostname, cnameChain = [], storedEntity = null, storedCategory = null) {
   if (storedEntity) {
     const e = byEntity.get(storedEntity);
-    const category = storedCategory && storedCategory !== "UNKNOWN" ? storedCategory : e?.category || "UNKNOWN";
+    const category = e?.category || (storedCategory && storedCategory !== "UNKNOWN" ? storedCategory : "UNKNOWN");
     return { entity: storedEntity, company: e?.company || storedEntity, category, sdkKey: e?.sdkKey || null, adIdAtInit: !!e?.collectsAdIdAtInit, via: null };
   }
   const host = norm(hostname);
@@ -95,7 +98,7 @@ export function classifyHost(hostname, cnameChain = [], storedEntity = null, sto
   for (const alias of (cnameChain || []).map(norm)) {
     if (alias === host) continue;
     const e = entryForHost(alias);
-    if (e && e.category !== "CONTENT_DELIVERY") return info(e, alias);
+    if (e && e.category !== "CONTENT_DELIVERY" && e.category !== "COMPANY_SERVICE") return info(e, alias);
   }
   const cat = storedCategory && storedCategory !== "UNKNOWN" ? storedCategory : "UNKNOWN";
   return { entity: null, company: null, category: cat, sdkKey: null, adIdAtInit: false, via: null };
