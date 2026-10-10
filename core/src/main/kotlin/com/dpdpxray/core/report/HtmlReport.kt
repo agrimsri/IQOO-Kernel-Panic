@@ -711,6 +711,7 @@ object HtmlReport {
         ConsentKind.REJECT -> "Reject recorded"
         ConsentKind.SETTINGS -> "Settings or Manage opened"
         ConsentKind.MANUAL_MARK -> "Consent moment marked by hand"
+        ConsentKind.PERMISSION_DIALOG -> "Android permission dialog shown"
     }
 
     private fun bandClass(b: ScoreBand) = when (b) {
