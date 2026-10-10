@@ -46,6 +46,10 @@ object Brand {
     val stops = listOf(peach, coral, rose)
     val horizontal: Brush get() = Brush.horizontalGradient(stops)
     val vertical: Brush get() = Brush.verticalGradient(stops)
+    /** Short brand rule under headings: peach to rose, fading out to the right. */
+    val underline: Brush = Brush.horizontalGradient(listOf(peach, coral, rose.copy(alpha = 0.35f)))
+    /** A faint warm wash for hero cards: brand colour at the top-left corner, fading into the card. */
+    val heroWash: Brush = Brush.linearGradient(listOf(coral.copy(alpha = 0.20f), rose.copy(alpha = 0.07f), Color.Transparent))
 }
 
 /** Extra film surfaces for layered panels: one step lighter than [Film.raised], plus a faint scan-coloured wash. */
@@ -57,6 +61,20 @@ object FilmExtra {
     val bar = Color(0xFF132736)
     /** Faint warm wash behind caveat callouts. */
     val warnWash = Color(0x1AF2B544)
+    /** Screen backdrop: film base at the top, a touch lighter towards the bottom. */
+    val backdrop: Brush = Brush.verticalGradient(listOf(Film.base, Color(0xFF122635), Color(0xFF15293A)))
+    /** Card fill: lit slightly from the top, settling into [Film.raised]. */
+    val card: Brush = Brush.verticalGradient(listOf(Color(0xFF1B3245), Film.raised))
+    /** Card edge: a brighter hairline on top, like light catching the rim. */
+    val cardEdge: Brush = Brush.verticalGradient(listOf(Color(0xFF2E4C61), hairline))
+}
+
+/** Score band as a two-stop gradient for the score ring: the band colour leads, a neighbouring hue trails. */
+fun bandStops(b: ScoreBand): List<Color> = when (b) {
+    ScoreBand.READY -> listOf(Film.scan, Film.clear)
+    ScoreBand.NEEDS_WORK -> listOf(Film.high, Film.warn)
+    ScoreBand.AT_RISK -> listOf(Brand.rose, Film.leak)
+    ScoreBand.INCONCLUSIVE -> listOf(Film.boneDim, Film.boneDim)
 }
 
 /** Corner radii used across the app, so cards, buttons and chips share one rhythm. */
@@ -121,7 +139,7 @@ private fun typography(k: Float) = Typography(
     titleSmall = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (15 * k).sp, lineHeight = (20 * k).sp),
     bodyLarge = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(400), fontSize = (16 * k).sp, lineHeight = (24 * k).sp),
     bodyMedium = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(400), fontSize = (15 * k).sp, lineHeight = (22 * k).sp),
-    bodySmall = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(400), fontSize = (13.5f * k).sp, lineHeight = (19 * k).sp),
+    bodySmall = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(400), fontSize = (14 * k).sp, lineHeight = (20 * k).sp),
     labelLarge = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (15 * k).sp, lineHeight = (20 * k).sp),
     labelMedium = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(500), fontSize = (13 * k).sp, lineHeight = (18 * k).sp),
     labelSmall = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (12 * k).sp, lineHeight = (16 * k).sp),
@@ -130,8 +148,13 @@ private fun typography(k: Float) = Typography(
 @Composable
 fun XrayTheme(stageMode: Boolean, content: @Composable () -> Unit) {
     val k = if (stageMode) 1.18f else 1f
+    val reduceMotion = rememberSystemReduceMotion()
     // Text without an explicit colour must read as "bone" on the film background (Compose defaults it to black).
-    androidx.compose.runtime.CompositionLocalProvider(LocalScale provides Scale(k), androidx.compose.material3.LocalContentColor provides Film.bone) {
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalScale provides Scale(k),
+        androidx.compose.material3.LocalContentColor provides Film.bone,
+        LocalReduceMotion provides reduceMotion,
+    ) {
         MaterialTheme(
             colorScheme = darkColorScheme(
                 primary = Film.scan, onPrimary = Film.base, background = Film.base, onBackground = Film.bone,
