@@ -1,20 +1,29 @@
 package com.dpdpxray.app.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +32,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.ui.XrayViewModel
@@ -30,12 +47,22 @@ import com.dpdpxray.app.ui.observedAliasLabel
 import com.dpdpxray.app.ui.components.ConsentLine
 import com.dpdpxray.app.ui.components.HostText
 import com.dpdpxray.app.ui.components.Note
-import com.dpdpxray.app.ui.components.PrimaryAction
 import com.dpdpxray.app.ui.components.SecondaryAction
-import com.dpdpxray.app.ui.components.StatusDot
 import com.dpdpxray.app.ui.components.Tag
+import com.dpdpxray.app.ui.guide.Bi
+import com.dpdpxray.app.ui.guide.Glyph
+import com.dpdpxray.app.ui.guide.GlyphIcon
+import com.dpdpxray.app.ui.guide.GradientAction
+import com.dpdpxray.app.ui.guide.GuideBanner
+import com.dpdpxray.app.ui.guide.GuideFlow
+import com.dpdpxray.app.ui.guide.GuideStep
+import com.dpdpxray.app.ui.guide.GuideTone
+import com.dpdpxray.app.ui.guide.LivePhase
+import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
+import com.dpdpxray.app.ui.theme.FilmExtra
 import com.dpdpxray.app.ui.theme.categoryColor
+import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.ConsentEvent
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.NetEvent
@@ -62,50 +89,101 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         when (val p = progress) {
             is AuditProgress.Failed -> {
-                Text("The audit stopped", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 32.dp))
+                Text("The check stopped", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 32.dp).semantics { heading() })
                 Text(p.message, style = MaterialTheme.typography.bodyLarge, color = Film.leak, modifier = Modifier.padding(vertical = 12.dp))
-                Note("Check the items under \"Before you audit\" on the home screen, then try again.")
-                PrimaryAction("Back to home", { vm.acknowledgeProgress(); onBack() }, Modifier.padding(top = 20.dp))
+                GuideBanner(
+                    GuideStep(
+                        "live.failed.screen", 1, GuideFlow.TOTAL, GuideTone.CAUTION,
+                        Bi("Fix the setup, then try again", "सेटअप ठीक करें, फिर दोबारा कोशिश करें"),
+                        Bi("Go back to Home and follow the Getting ready steps. Then tap Check an app again.",
+                            "होम पर जाएँ और Getting ready के चरण पूरे करें। फिर Check an app दोबारा दबाएँ।"),
+                        Bi("", ""),
+                    ),
+                    speak = false,
+                )
+                GradientAction("Back to Home", { vm.acknowledgeProgress(); onBack() }, Modifier.padding(top = 20.dp))
                 return@Column
             }
             is AuditProgress.Running -> {
-                Text(p.config.targetLabel, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 24.dp))
-                Tag(if (p.config.fastPreview) "Fast Preview · limited evidence" else "Normal capture", if (p.config.fastPreview) Film.warn else Film.boneDim)
+                Row(Modifier.fillMaxWidth().padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        p.config.targetLabel, style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).semantics { heading() },
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Tag(if (p.config.fastPreview) "Fast Preview · limited evidence" else "Normal capture", if (p.config.fastPreview) Film.warn else Film.boneDim)
+                }
                 if (p.config.fastPreview) Note("8-second observation; delayed traffic may be missed. Silent and Reject are not tested.", Film.warn)
-                // The plans really are a sequence, so they are shown as numbered steps.
-                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    p.config.plans.forEachIndexed { i, plan ->
-                        val color = when {
-                            i < p.planIndex -> Film.clear
-                            i == p.planIndex -> Film.scan
-                            else -> Film.boneDim
-                        }
-                        Text("${i + 1}. ${plan.label.substringAfter("· ")}", style = MaterialTheme.typography.labelMedium, color = color)
-                    }
-                }
-                Row(Modifier.padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    StatusDot(null)
-                    Spacer(Modifier.width(10.dp))
-                    Text(p.step, style = MaterialTheme.typography.titleMedium)
-                }
+                // The plans really are a sequence, so they are shown as numbered frames.
+                RunFrames(p.config.plans, p.planIndex, Modifier.padding(top = 12.dp))
+                // Narrated in the background by GuideNarrator, so this banner only shows the step.
+                GuideBanner(GuideFlow.live(p), Modifier.padding(top = 12.dp), speak = false)
                 val classified = net.map(vm::classify)
                 val choice = consent.firstOrNull { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }
                 val trackers = classified.filter { it.category.isTracking }
                 val before = trackers.count { choice == null || it.tNanos < choice.tNanos }
-                Text(
-                    "${classified.size} lookups, ${trackers.size} to trackers, $before before any consent choice",
-                    style = MaterialTheme.typography.bodyMedium, color = if (before > 0) Film.leak else Film.boneDim,
-                )
+                Row(Modifier.fillMaxWidth().padding(top = 14.dp).height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Counter(classified.size, if (classified.size == 1) "lookup" else "lookups", Film.bone, Modifier.weight(1f))
+                    Counter(trackers.size, "to trackers", if (trackers.isEmpty()) Film.bone else Film.high, Modifier.weight(1f))
+                    Counter(before, "before any choice", if (before > 0) Film.leak else Film.bone, Modifier.weight(1f))
+                }
+                // The orchestrator's own wording stays visible for developers; the banner above is the plain version.
+                if (LivePhase.of(p.step) != LivePhase.OTHER) {
+                    Text("Status: ${p.step}", style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.padding(top = 10.dp))
+                }
                 Timeline(classified, consent, p.sessionStartNanos, Modifier.weight(1f))
                 Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     SecondaryAction("Mark consent now", { vm.markConsentNow() }, Modifier.weight(1f))
-                    SecondaryAction("Stop audit", { vm.cancelAudit(); onBack() }, Modifier.weight(1f))
+                    SecondaryAction("Stop check", { vm.cancelAudit(); onBack() }, Modifier.weight(1f))
                 }
             }
             else -> {
-                Text("Preparing…", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 32.dp))
+                Text("Getting ready…", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 32.dp))
             }
         }
+    }
+}
+
+private fun planName(plan: AuditPlan) = when (plan) {
+    AuditPlan.SILENT -> "Don't touch"
+    AuditPlan.REJECT -> "Reject"
+    AuditPlan.ACCEPT -> "Accept"
+}
+
+/** One frame per run: finished runs are ticked, the current one is outlined in the brand gradient. */
+@Composable
+private fun RunFrames(plans: List<AuditPlan>, current: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier.fillMaxWidth().semantics { contentDescription = "Run ${current + 1} of ${plans.size}: ${planName(plans[current.coerceIn(plans.indices)])}" },
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        plans.forEachIndexed { i, plan ->
+            val shape = RoundedCornerShape(12.dp)
+            val done = i < current
+            val now = i == current
+            val fill by animateColorAsState(
+                when { now -> Brand.coral.copy(alpha = 0.12f); done -> Film.clear.copy(alpha = 0.10f); else -> Color.Transparent }, tween(300), label = "frame",
+            )
+            val weight by animateFloatAsState(if (now) 1.4f else 1f, tween(300), label = "frame-weight")
+            val border: Brush = when { now -> Brand.horizontal; done -> SolidColor(Film.clear.copy(alpha = 0.6f)); else -> SolidColor(FilmExtra.hairline) }
+            Row(
+                Modifier.weight(weight).heightIn(min = 48.dp).clip(shape).background(fill).border(if (now) 1.5.dp else 1.dp, border, shape).padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (done) GlyphIcon(Glyph.CHECK, Film.clear, size = 16.dp)
+                else Text("${i + 1}", style = MaterialTheme.typography.labelLarge, color = if (now) Brand.coral else Film.boneDim)
+                Spacer(Modifier.width(6.dp))
+                Text(planName(plan), style = MaterialTheme.typography.labelLarge, color = if (now) Film.bone else Film.boneDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+@Composable
+private fun Counter(value: Int, label: String, color: Color, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxHeight().clip(RoundedCornerShape(14.dp)).background(Film.raised).padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Text("$value", style = MaterialTheme.typography.headlineMedium, color = color)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
     }
 }
 
@@ -118,9 +196,18 @@ private fun Timeline(events: List<NetEvent>, consent: List<ConsentEvent>, start:
     val choiceKind = choiceEvent?.kind
     val state = rememberLazyListState()
     LaunchedEffect(rows.size) { if (rows.isNotEmpty()) state.animateScrollToItem(rows.lastIndex) }
-    LazyColumn(modifier.fillMaxWidth(), state = state) {
+    LazyColumn(modifier.fillMaxWidth().padding(top = 8.dp), state = state) {
         if (consent.any { it.kind == ConsentKind.SCREEN_APPEARED || it.kind == ConsentKind.MANUAL_MARK }) {
             item { Note("Consent screen detected and sent to on-device review", Film.scan) }
+        }
+        if (rows.isEmpty()) {
+            item {
+                Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(Film.scan))
+                    Spacer(Modifier.width(10.dp))
+                    Note("No lookups yet. They appear here as the app tries to reach addresses.")
+                }
+            }
         }
         items(rows) { r ->
             when (r) {
@@ -154,7 +241,7 @@ fun TimelineRow(e: NetEvent, start: Long, beforeConsent: Boolean, afterRefusal: 
 
 @Composable
 private fun StatusDotColor(color: androidx.compose.ui.graphics.Color) {
-    androidx.compose.foundation.layout.Box(
+    Box(
         Modifier.size(8.dp).clip(CircleShape).background(color),
     )
 }
