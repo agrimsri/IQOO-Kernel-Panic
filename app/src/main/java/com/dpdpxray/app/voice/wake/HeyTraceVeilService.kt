@@ -117,7 +117,10 @@ class HeyTraceVeilService : Service() {
 
         override fun onResult(json: String) {
             if (!WakeRuntime.state.value.processesAudio) return
-            if (!WakePhrase.detect(json).accepted) return
+            val heard = WakePhrase.detect(json)
+            // Calibration aid: the outcome and confidence only, never what was said.
+            if (heard.reason != WakeHeard.Reason.NO_MATCH) Log.i(TAG, "wake ${heard.reason} conf=${heard.confidence}")
+            if (!heard.accepted) return
             val state = transition(WakeEvent.Heard(SystemClock.elapsedRealtime()))
             if (state is WakeState.Responding) {
                 respond()

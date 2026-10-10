@@ -125,7 +125,7 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
         override val samplePrefix = "Sample audit, not a live result. "
         override val inconclusive = "Network visibility was low, so this audit is inconclusive. "
         override val noTrackers = "None of this audit's findings name a known tracker."
-        override fun childrenFound(c9: Finding) = "This audit recorded ${c9.checkId.code}, ${c9.title.lowercase()}: ${c9.explanation}"
+        override fun childrenFound(c9: Finding) = "This audit recorded ${c9.checkId.code}, “${c9.title}”: ${c9.explanation}"
         override fun childrenAbsent(label: String, entities: List<String>) =
             "This audit recorded no sign that $label is aimed at children, so check C9 did not apply. " +
                 "TraceVeil cannot say it is suitable for children; that needs a review beyond this audit." +
@@ -137,9 +137,9 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
         override fun deviceIds(type: EvidenceType) =
             "It also flagged that device identifiers are likely shared before consent (${type.name.lowercase()})."
         override fun screenProblems(found: List<Finding>) =
-            "On the consent screen this audit recorded: ${found.joinToString("; ") { "${it.checkId.code} ${it.title.lowercase()}" }}."
-        override fun found(f: Finding) = "This audit recorded ${f.checkId.code}, ${f.title.lowercase()}."
-        override fun notRecorded(id: CheckId) = "This audit did not record ${id.code} (${id.title.lowercase()}) in its captured evidence."
+            "On the consent screen this audit recorded: ${found.joinToString("; ") { "${it.checkId.code} “${it.title}”" }}."
+        override fun found(f: Finding) = "This audit recorded ${f.checkId.code}, “${f.title}”."
+        override fun notRecorded(id: CheckId) = "This audit did not record ${id.code} (“${id.title}”) in its captured evidence."
         override fun notRecordedMany(ids: List<CheckId>) =
             "This audit did not record ${ids.joinToString(", ") { it.code }} in its captured evidence."
         override fun planNotRun(plan: AuditPlan) = "This audit did not run ${plan.label}, so it has no evidence about that."
