@@ -137,3 +137,12 @@ ConsentLens-1 is TraceVeil's own string-role model (`app/src/main/assets/consent
 | TraceVeil's own lexicon and LeakyShop dialog strings | this repository | MIT | Ours. |
 
 The model weights are derived from these strings; no source string is shipped in the APK except the hand-written demo phrases in `consentlens_meta.json`.
+
+## Hardware-signed evidence — 11 October 2026
+
+No library was added. The signing and verification code uses only the JDK's `java.security` and the existing kotlinx serialization; the DER reader is TraceVeil's own.
+
+| Material | Source / terms | Handling |
+| --- | --- | --- |
+| Google hardware attestation root certificates (`core/src/main/resources/evidence/google-attestation-roots.json`) | Google's published root list, downloaded unmodified on 11 October 2026 from https://android.googleapis.com/attestation/root, the list that [Android's key attestation page](https://developer.android.com/privacy-and-security/security-key-attestation#root_certificate) says to use as trust anchors. SHA-256 `b79beef96dd68073f1975bab90970ae85d1ae56d451a819ece6bff3d4e253ab4` | Public certificates, used only as verification trust anchors. Recheck the list when Google adds a root; details in [docs/SIGNED_EVIDENCE.md](docs/SIGNED_EVIDENCE.md) |
+| Three real attestation chains (`core/src/test/resources/evidence/keyattestation/`) | [android/keyattestation](https://github.com/android/keyattestation) `testdata/`, commit `3f550f94a9e3c010dda7cdcad8bca764cd76d4f4`, [Apache License 2.0](https://github.com/android/keyattestation/blob/3f550f94a9e3c010dda7cdcad8bca764cd76d4f4/LICENSE) | Test inputs only, not in the APK or the CLI. Kept unmodified, with the licence copied next to them and a SOURCE.txt naming each file |
