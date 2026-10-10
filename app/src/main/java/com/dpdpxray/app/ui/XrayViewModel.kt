@@ -40,6 +40,12 @@ import com.dpdpxray.app.report.SampleReport
 import com.dpdpxray.core.attribution.SdkAttribution
 import com.dpdpxray.core.attribution.SdkGroup
 import com.dpdpxray.core.audit.PhaseAssigner
+import com.dpdpxray.core.datasafety.DataSafetyParser
+import com.dpdpxray.core.datasafety.PlayLabelCheck
+import com.dpdpxray.core.datasafety.PlayLabelComparator
+import com.dpdpxray.core.datasafety.PlayLabelExport
+import com.dpdpxray.core.datasafety.PlayLabelRecord
+import com.dpdpxray.core.datasafety.PlayLabelReport
 import com.dpdpxray.core.export.AuditBackups
 import com.dpdpxray.core.export.AuditBundles
 import com.dpdpxray.core.export.BackupFormatException
@@ -202,6 +208,44 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { SdkAttribution(graph.catalog(), graph.fixCatalog).groups(bundle.result, bundle.sessions) }.getOrDefault(emptyList())
 
     fun fixTemplate(id: String): FixTemplate? = graph.fixCatalog.template(id)
+
+    /**
+     * "Play label vs what we saw": the attached Play Data safety label set against this audit's SDK groups. Offline and
+     * deterministic; it is never part of the score or the findings.
+     */
+    fun playLabelCheck(record: PlayLabelRecord, groups: List<SdkGroup>): PlayLabelCheck =
+        PlayLabelComparator(graph.catalog()).compare(record.parsed, groups)
+
+    /** Saves [text] (pasted, read from a file, or the demo label) as this check's Play label. Nothing is fetched or sent. */
+    fun attachPlayLabel(bundle: AuditBundle, text: String, source: String) = viewModelScope.launch {
+        val trimmed = text.trim().take(DataSafetyParser.MAX_CHARS)
+        if (trimmed.isEmpty()) { _toast.value = "The label text is empty"; return@launch }
+        val record = PlayLabelRecord(trimmed, source, System.currentTimeMillis())
+        val saved = withContext(Dispatchers.IO) { runCatching { graph.repository.savePlayLabel(bundle.meta.id, record) }.isSuccess }
+        if (!saved) { _toast.value = "Could not save the label with this check"; return@launch }
+        _bundle.update { b -> if (b?.meta?.id == bundle.meta.id) b.copy(playLabel = record) else b }
+        _toast.value = if (record.parsed.readable) "Label saved with this check" else "Saved, but no Data safety statement was found in that text"
+    }
+
+    /** Reads a text file the person picked with Android's file picker (at most 256 KB) and attaches it as the label. */
+    fun attachPlayLabelFile(bundle: AuditBundle, uri: android.net.Uri) = viewModelScope.launch {
+        val text = withContext(Dispatchers.IO) {
+            runCatching { ctx.contentResolver.openInputStream(uri)?.use { CheckBackups.readBounded(it, MAX_LABEL_FILE_BYTES) }?.toString(Charsets.UTF_8) }.getOrNull()
+        }
+        if (text == null) { _toast.value = "Could not read that file as text (the limit is 256 KB)"; return@launch }
+        attachPlayLabel(bundle, text, PlayLabelRecord.FILE)
+    }
+
+    fun removePlayLabel(bundle: AuditBundle) = viewModelScope.launch {
+        withContext(Dispatchers.IO) { runCatching { graph.repository.deletePlayLabel(bundle.meta.id) } }
+        _bundle.update { b -> if (b?.meta?.id == bundle.meta.id) b.copy(playLabel = null) else b }
+        _toast.value = "Label removed from this check"
+    }
+
+    /** The attached label with its comparison for exports; the label alone if the comparison cannot be built. */
+    private fun playLabelExport(bundle: AuditBundle, groups: List<SdkGroup>): PlayLabelExport? = bundle.playLabel?.let { rec ->
+        runCatching { PlayLabelExport.of(rec, playLabelCheck(rec, groups)) }.getOrElse { PlayLabelExport.of(rec, null) }
+    }
 
     private val _backup = MutableStateFlow<BackupUi>(BackupUi.Idle)
     /** Progress and outcome of the last "Back up my checks" or "Restore from a backup". */
@@ -442,9 +486,10 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun exportAuditJson(bundle: AuditBundle, share: Boolean) = viewModelScope.launch {
         val groups = withContext(Dispatchers.Default) { sdkGroups(bundle) }
+        val label = withContext(Dispatchers.Default) { playLabelExport(bundle, groups) }
         val file = runCatching {
             withContext(Dispatchers.IO) {
-                AuditJsonExport.write(bundle, BuildConfig.VERSION_NAME, lensProfile().name, SdkAttributionExport(groups = groups))
+                AuditJsonExport.write(bundle, BuildConfig.VERSION_NAME, lensProfile().name, SdkAttributionExport(groups = groups), playLabel = label)
             }
         }
             .getOrElse { _toast.value = "Could not build the audit data export"; return@launch }
@@ -473,7 +518,11 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
             val built = MarkdownReport.build(bundle.result, bundle.sessions, fixesFor(bundle), graph.citations(), profile)
             if (bundle.meta.sample) SampleReport.annotate(built, bundle.sessions) else built
         }.getOrElse { graph.repository.markdownFile(bundle.meta.id).takeIf { it.exists() }?.readText().orEmpty() }
-        return EvidenceReport.annotate(md, bundle.sessions, bundle.meta.timingProfile, sample = bundle.meta.sample)
+        // "Play label vs what we saw", when a label is attached: its own section, separate from the findings and score.
+        val withLabel = bundle.playLabel?.let { rec ->
+            runCatching { PlayLabelReport.insertInto(md, PlayLabelReport.markdown(rec, playLabelCheck(rec, sdkGroups(bundle)))) }.getOrNull()
+        } ?: md
+        return EvidenceReport.annotate(withLabel, bundle.sessions, bundle.meta.timingProfile, sample = bundle.meta.sample)
     }
 
     fun copy(label: String, text: String) {
@@ -483,6 +532,9 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
 
     fun updateSettings(transform: (com.dpdpxray.app.data.XraySettings) -> com.dpdpxray.app.data.XraySettings) = graph.settings.update(transform)
 }
+
+/** Largest text file accepted as a Play label (a label is a few hundred characters). */
+private const val MAX_LABEL_FILE_BYTES = 256L * 1024
 
 /** "Back up my checks" / "Restore from a backup" progress, shown on the card that started it. */
 sealed interface BackupUi {

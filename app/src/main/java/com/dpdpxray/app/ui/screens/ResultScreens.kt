@@ -220,6 +220,9 @@ fun ResultsScreen(
                         Text(it, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 10.dp))
                     }
                 }
+                // "Play label vs what we saw" (separate from the score): the card in developer mode, one line in everyday mode.
+                if (lensSettings.audience == Audience.DEVELOPER) PlayLabelCard(vm, b, sdkGroups, Modifier.padding(top = 12.dp))
+                else PlayLabelEverydayLine(vm, b, sdkGroups)
 
                 // The server map has its own open section, so nobody has to find it inside "Evidence and limits".
                 GroupHeader("Where it connects")
