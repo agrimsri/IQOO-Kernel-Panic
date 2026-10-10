@@ -17,6 +17,7 @@ class PolicyTest {
         assertNull(p.maxHigh)
         assertTrue(p.requireFreshState)
         assertEquals(false, p.allowInconclusive)
+        assertEquals(false, p.allowNotEstablished)
         assertEquals(listOf(AuditPlan.ACCEPT, AuditPlan.REJECT, AuditPlan.SILENT), p.requirePlans)
         assertEquals(p, Policy.parse("{}"))
     }
@@ -39,7 +40,10 @@ class PolicyTest {
 
     @Test
     fun `effective policy round-trips through its JSON`() {
-        val p = Policy(failOn = listOf(CheckId.C1), minScore = 60, maxHigh = 2, requireFreshState = false, allowInconclusive = true, requirePlans = emptyList())
+        val p = Policy(
+            failOn = listOf(CheckId.C1), minScore = 60, maxHigh = 2, requireFreshState = false, allowInconclusive = true,
+            allowNotEstablished = true, requirePlans = emptyList(),
+        )
         assertEquals(p, Policy.parse(p.toJson().toString()))
     }
 
@@ -60,6 +64,7 @@ class PolicyTest {
         bad("""{"minScore": "85"}""", "whole number")
         bad("""{"maxHigh": -1}""", "maxHigh must be between 0")
         bad("""{"requireFreshState": "yes"}""", "true or false")
+        bad("""{"allowNotEstablished": 1}""", "allowNotEstablished must be true or false")
         bad("""{"requirePlans": ["LATER"]}""", "unknown plan \"LATER\"")
         bad("""[1]""", "JSON object")
         bad("""{broken""", "not valid JSON")

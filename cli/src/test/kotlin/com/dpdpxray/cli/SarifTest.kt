@@ -82,8 +82,11 @@ class SarifTest {
 
     @Test
     fun `a clean bundle gives a valid run with no results`() {
-        val (r, root) = sarif(SampleBundles.FIXED)
-        assertEquals(Exit.PASS, r.exit)
+        // Declared child-facing so C9 can be tested; otherwise the default policy fails it as NOT ESTABLISHED.
+        val child = SampleBundles.fixed().let { b -> b.copy(sessions = b.sessions.map { it.copy(childFacing = true) }) }
+        CliHarness.write(dir, "fixed-child.json", child)
+        val (r, root) = sarif("fixed-child.json")
+        assertEquals(r.toString(), Exit.PASS, r.exit)
         val run = root["runs"]!!.jsonArray.single().jsonObject
         assertTrue(run["results"]!!.jsonArray.isEmpty())
         assertTrue(run.obj("tool").obj("driver")["rules"]!!.jsonArray.isEmpty())

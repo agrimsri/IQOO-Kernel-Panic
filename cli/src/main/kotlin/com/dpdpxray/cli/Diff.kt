@@ -28,7 +28,13 @@ data class Unchanged(val old: Finding, val new: Finding) {
  * skewed by rule changes between the two exports. Findings are matched by check id.
  */
 class BundleDiff(val old: LoadedBundle, val new: LoadedBundle, val oldResult: AuditResult, val newResult: AuditResult) {
-    val resolved: List<Finding> = oldResult.findings.filter { o -> newResult.findings.none { it.checkId == o.checkId } }
+    private val gone: List<Finding> = oldResult.findings.filter { o -> newResult.findings.none { it.checkId == o.checkId } }
+
+    /** Old findings the new capture could not have observed (a plan or choice is missing): not resolved, NOT ESTABLISHED. */
+    val notEstablished: List<Pair<Finding, String>> = gone.mapNotNull { f -> Coverage.untested(f.checkId, new.bundle.sessions)?.let { f to it } }
+
+    /** Old findings the new capture could observe and did not see. */
+    val resolved: List<Finding> = gone.filter { f -> notEstablished.none { it.first.checkId == f.checkId } }
     val added: List<Finding> = newResult.findings.filter { n -> oldResult.findings.none { it.checkId == n.checkId } }
     val unchanged: List<Unchanged> = newResult.findings.mapNotNull { n -> oldResult.findings.firstOrNull { it.checkId == n.checkId }?.let { Unchanged(it, n) } }
 
@@ -41,7 +47,8 @@ class BundleDiff(val old: LoadedBundle, val new: LoadedBundle, val oldResult: Au
             unchanged.filter { it.new.severity.ordinal < it.old.severity.ordinal }
                 .forEach { add("${it.new.checkId.code} severity rose from ${it.old.severity.label} to ${it.new.severity.label}") }
             scoreDelta?.takeIf { it < 0 }?.let { add("score fell from ${oldResult.score} to ${newResult.score}") }
-            if (newResult.band == ScoreBand.INCONCLUSIVE && oldResult.band != ScoreBand.INCONCLUSIVE) {
+            notEstablished.forEach { (f, why) -> add("${f.checkId.code} NOT ESTABLISHED in the new capture ($why), so it cannot count as resolved") }
+            if (newResult.band == ScoreBand.INCONCLUSIVE) {
                 add("the new result is inconclusive (low network visibility), so it cannot show the release did not regress")
             }
         }
@@ -60,6 +67,7 @@ object DiffText {
         val delta = d.scoreDelta?.let { if (it >= 0) " (+$it)" else " ($it)" } ?: ""
         appendLine("Score: ${Wording.score(d.oldResult)} → ${Wording.score(d.newResult)}$delta")
         section("Resolved", d.resolved.map { row(it) })
+        section("Not established in the new capture", d.notEstablished.map { (f, why) -> row(f) + "  [NOT ESTABLISHED: $why]" })
         section("New", d.added.map { row(it) })
         section("Unchanged", d.unchanged.map { u -> row(u.new) + (if (u.changes.isEmpty()) "" else "  [${u.changes.joinToString("; ")}]") })
         appendLine()
@@ -67,7 +75,7 @@ object DiffText {
             appendLine("Result: REGRESSION (exit 1)")
             d.regressions.forEach { appendLine("  - $it") }
         } else {
-            appendLine("Result: no regression (no new finding at Low severity or above, and the score did not fall; exit 0)")
+            appendLine("Result: no regression (no new finding at Low severity or above, no severity rise, the score did not fall and every old finding was testable; exit 0)")
         }
         appendLine(Wording.LOOKUP_CAVEAT)
         appendLine("A resolved finding means it was not seen in the new capture; that covers only what the new run observed.")
@@ -99,6 +107,9 @@ object DiffJson {
         put("new", side(d.new, d.newResult))
         put("scoreDelta", d.scoreDelta)
         put("resolved", JsonArray(d.resolved.map(CheckJson::finding)))
+        put("notEstablished", JsonArray(d.notEstablished.map { (f, why) ->
+            buildJsonObject { put("checkId", f.checkId.code); put("title", f.title); put("reason", why) }
+        }))
         put("added", JsonArray(d.added.map(CheckJson::finding)))
         put("unchanged", JsonArray(d.unchanged.map { u ->
             buildJsonObject {
@@ -120,6 +131,7 @@ object DiffJson {
         put("sample", b.sample)
         put("score", r.score)
         put("band", r.band.name)
+        put("bandText", Wording.band(r.band))
         put("storedScore", b.bundle.result.score)
         put("checks", JsonArray(r.findings.map { JsonPrimitive(it.checkId.code) }))
     }

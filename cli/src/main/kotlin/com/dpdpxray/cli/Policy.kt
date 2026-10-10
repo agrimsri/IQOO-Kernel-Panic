@@ -17,12 +17,14 @@ import kotlinx.serialization.json.put
  * Release-gate rules, read from policy.json. Every key is optional and falls back to the default shown here:
  *
  * - failOn ["C2", "C9"]: fail when the re-evaluated result contains any of these checks (the two Critical checks).
+ * - allowNotEstablished false: a failOn check the captured plans could not test (NOT ESTABLISHED) fails the gate;
+ *   set true to report it without failing.
  * - minScore null: no score threshold unless set (0–100).
  * - maxHigh null: no limit unless set; counts findings at High severity or above (High + Critical).
  * - requireFreshState true: every plan must have started from an approved fresh reset; "not recorded" does not count.
  * - allowInconclusive false: an inconclusive result (low network visibility) cannot pass.
- * - requirePlans ["ACCEPT", "REJECT", "SILENT"]: these plans must be captured, and an Accept or Reject plan that showed
- *   a consent screen must have recorded that choice (otherwise behaviour after the choice was not tested).
+ * - requirePlans ["ACCEPT", "REJECT", "SILENT"]: these plans must be captured, and an Accept or Reject plan counts only
+ *   when that choice was recorded (with no consent screen, or no recorded choice, behaviour after it was not tested).
  *
  * Unknown keys are an error, so a typo cannot silently weaken the gate. Keys starting with "_" or "$" are comments.
  */
@@ -33,6 +35,7 @@ data class Policy(
     val requireFreshState: Boolean = true,
     val allowInconclusive: Boolean = false,
     val requirePlans: List<AuditPlan> = AuditPlan.entries.toList(),
+    val allowNotEstablished: Boolean = false,
 ) {
     fun toJson(): JsonObject = buildJsonObject {
         put("failOn", JsonArray(failOn.map { JsonPrimitive(it.code) }))
@@ -40,12 +43,13 @@ data class Policy(
         put("maxHigh", maxHigh)
         put("requireFreshState", requireFreshState)
         put("allowInconclusive", allowInconclusive)
+        put("allowNotEstablished", allowNotEstablished)
         put("requirePlans", JsonArray(requirePlans.map { JsonPrimitive(it.name) }))
     }
 
     companion object {
         val DEFAULT_FAIL_ON = listOf(CheckId.C2, CheckId.C9)
-        val KEYS = listOf("failOn", "minScore", "maxHigh", "requireFreshState", "allowInconclusive", "requirePlans")
+        val KEYS = listOf("failOn", "minScore", "maxHigh", "requireFreshState", "allowInconclusive", "allowNotEstablished", "requirePlans")
 
         /** Throws [UsageException] with a plain reason when the policy cannot be used. */
         fun parse(text: String): Policy {
@@ -62,6 +66,7 @@ data class Policy(
             root["maxHigh"]?.let { p = p.copy(maxHigh = optionalInt(it, "maxHigh", 0..Int.MAX_VALUE)) }
             root["requireFreshState"]?.let { p = p.copy(requireFreshState = bool(it, "requireFreshState")) }
             root["allowInconclusive"]?.let { p = p.copy(allowInconclusive = bool(it, "allowInconclusive")) }
+            root["allowNotEstablished"]?.let { p = p.copy(allowNotEstablished = bool(it, "allowNotEstablished")) }
             root["requirePlans"]?.let { p = p.copy(requirePlans = strings(it, "requirePlans").map(::plan).distinct()) }
             return p
         }

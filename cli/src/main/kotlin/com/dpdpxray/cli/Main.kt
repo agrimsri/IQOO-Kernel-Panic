@@ -20,10 +20,18 @@ object Exit {
 }
 
 fun main(args: Array<String>) {
-    // UTF-8 everywhere: CI logs and report files are UTF-8 even when the platform default is not.
-    val out = PrintStream(FileOutputStream(FileDescriptor.out), true, "UTF-8")
-    val err = PrintStream(FileOutputStream(FileDescriptor.err), true, "UTF-8")
-    exitProcess(TraceVeilCi(out, err).run(args))
+    val code = try {
+        // UTF-8 everywhere: CI logs and report files are UTF-8 even when the platform default is not.
+        val out = PrintStream(FileOutputStream(FileDescriptor.out), true, "UTF-8")
+        val err = PrintStream(FileOutputStream(FileDescriptor.err), true, "UTF-8")
+        TraceVeilCi(out, err).run(args)
+    } catch (t: Throwable) {
+        // Anything that escapes (even a JVM Error) is an internal error, exit 2: an uncaught throwable would exit 1,
+        // the code for a policy violation.
+        runCatching { System.err.println("traceveil-ci: internal error: ${t.message ?: t.javaClass.name}") }
+        Exit.USAGE
+    }
+    exitProcess(code)
 }
 
 /**
@@ -55,9 +63,10 @@ class TraceVeilCi(
         err.println("traceveil-ci: ${e.message}")
         err.println("Run \"traceveil-ci --help\" for usage.")
         Exit.USAGE
-    } catch (e: Exception) {
-        // Never let a crash look like a policy result: the JVM would exit 1, the code for a violation.
-        err.println("traceveil-ci: internal error: ${e.message ?: e.javaClass.name}")
+    } catch (e: Throwable) {
+        // Never let a crash (an exception or a JVM Error) look like a policy result: the JVM would exit 1, the code for
+        // a violation.
+        runCatching { err.println("traceveil-ci: internal error: ${e.message ?: e.javaClass.name}") }
         Exit.USAGE
     }
 
@@ -68,7 +77,7 @@ class TraceVeilCi(
             val f = resolve(path)
             if (!f.isFile) throw UsageException("policy file not found: $path")
             Policy.parse(f.readText(Charsets.UTF_8)) to "policy file ${LoadedBundle.displayPath(f, cwd)}"
-        } ?: (Policy() to "defaults (failOn C2, C9; requireFreshState; requirePlans ACCEPT, REJECT, SILENT; inconclusive fails)")
+        } ?: (Policy() to "defaults (failOn C2, C9; not-established fails; requireFreshState; requirePlans ACCEPT, REJECT, SILENT; inconclusive fails)")
         val bundles = load(a.positional)
         val checks = bundles.map { gate.check(it, policy) }
         val text = CheckText.render(checks, policy, policySource)
@@ -168,10 +177,12 @@ class TraceVeilCi(
             |check  Re-evaluates each traceveil.audit.v1 bundle (from TraceVeil's Report screen: "Export audit data
             |       (JSON)") with this build's rules, shows stored and re-evaluated scores, and applies the policy.
             |diff   Compares two bundles (e.g. last release and this one): resolved, new and unchanged findings and
-            |       the score change. A new finding at Low severity or above, or a lower score, is a regression.
+            |       the score change. A new finding at Low severity or above, a lower score, an inconclusive new
+            |       result, or an old finding the new capture could not test (NOT ESTABLISHED) is a regression.
             |
             |Policy keys (all optional; defaults in brackets):
             |  failOn            ["C2", "C9"]   fail when the re-evaluated result has any of these checks
+            |  allowNotEstablished [false]      a failOn check the plans could not test fails unless true
             |  minScore          [none]         fail when the score is below this (0-100)
             |  maxHigh           [none]         fail when more findings than this are High or Critical
             |  requireFreshState [true]         every plan must have started from an approved fresh reset

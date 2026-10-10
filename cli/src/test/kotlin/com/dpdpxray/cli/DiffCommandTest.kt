@@ -27,11 +27,12 @@ class DiffCommandTest {
     fun `fixing the leaky build resolves every finding`() {
         val r = run(dir, "diff", SampleBundles.LEAKY, SampleBundles.FIXED)
         assertEquals(r.toString(), Exit.PASS, r.exit)
-        assertTrue(r.out, r.out.contains("Score: 21/100 · At risk → 100/100 · DPDP-ready (+79)"))
+        assertTrue(r.out, r.out.contains("Score: 21/100 · below 60 → 100/100 · 85–100 band (+79)"))
         assertTrue(r.out, r.out.contains("Resolved (5)"))
         assertTrue(r.out, r.out.contains("  C2     Critical  OBSERVED  Trackers contacted after the user refused"))
         assertTrue(r.out, r.out.contains("New (0)\n  none"))
         assertTrue(r.out, r.out.contains("Unchanged (0)\n  none"))
+        assertTrue(r.out, r.out.contains("Not established in the new capture (0)\n  none"))
         assertTrue(r.out, r.out.contains("Warning: the bundles are for different packages (com.leakyshop.demo → com.leakyshop.demo.fixed)"))
         assertTrue(r.out, r.out.contains("Result: no regression"))
     }
@@ -79,8 +80,36 @@ class DiffCommandTest {
         write(dir, "quiet.json", quiet)
         val r = run(dir, "diff", SampleBundles.FIXED, "quiet.json")
         assertEquals(r.toString(), Exit.VIOLATION, r.exit)
-        assertTrue(r.out, r.out.contains("Score: 100/100 · DPDP-ready → Inconclusive (score not established)\n"))
+        assertTrue(r.out, r.out.contains("Score: 100/100 · 85–100 band → Inconclusive (score not established)\n"))
         assertTrue(r.out, r.out.contains("the new result is inconclusive"))
+    }
+
+    @Test
+    fun `two inconclusive captures are still a regression`() {
+        val quiet = SampleBundles.fixed().let { b -> b.copy(sessions = b.sessions.map { it.copy(netEvents = emptyList()) }) }
+        write(dir, "quiet.json", quiet)
+        write(dir, "quiet2.json", quiet)
+        val r = run(dir, "diff", "quiet.json", "quiet2.json")
+        assertEquals(r.toString(), Exit.VIOLATION, r.exit)
+        assertTrue(r.out, r.out.contains("Score: Inconclusive (score not established) → Inconclusive (score not established)"))
+        assertTrue(r.out, r.out.contains("  - the new result is inconclusive"))
+    }
+
+    @Test
+    fun `a finding the new capture could not observe is not resolved`() {
+        val noReject = SampleBundles.leaky().let { b -> b.copy(sessions = b.sessions.filter { it.plan != AuditPlan.REJECT }) }
+        write(dir, "no-reject.json", noReject)
+        val r = run(dir, "diff", SampleBundles.LEAKY, "no-reject.json")
+        assertEquals(r.toString(), Exit.VIOLATION, r.exit)
+        assertTrue(r.out, r.out.contains("Resolved (0)\n  none"))
+        assertTrue(r.out, r.out.contains("Not established in the new capture (1)"))
+        assertTrue(r.out, r.out.contains("  C2     Critical  OBSERVED  Trackers contacted after the user refused  [NOT ESTABLISHED: no Reject choice was recorded"))
+        assertTrue(r.out, r.out.contains("  - C2 NOT ESTABLISHED in the new capture (no Reject choice was recorded"))
+
+        val json = Json.parseToJsonElement(run(dir, "diff", SampleBundles.LEAKY, "no-reject.json", "--format", "json").out).jsonObject
+        assertTrue(json["resolved"]!!.jsonArray.isEmpty())
+        assertEquals("C2", json["notEstablished"]!!.jsonArray.single().jsonObject["checkId"]!!.jsonPrimitive.content)
+        assertEquals("true", json["regression"]!!.jsonPrimitive.content)
     }
 
     @Test

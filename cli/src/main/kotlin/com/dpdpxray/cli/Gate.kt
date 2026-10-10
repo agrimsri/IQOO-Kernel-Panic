@@ -11,6 +11,7 @@ import com.dpdpxray.core.model.CheckId
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.Finding
 import com.dpdpxray.core.model.ScoreBand
+import com.dpdpxray.core.model.ScreenAudit
 import com.dpdpxray.core.model.Severity
 import com.dpdpxray.core.rules.RulesEngine
 import com.dpdpxray.core.trackers.TrackerCatalog
@@ -65,6 +66,29 @@ data class PlanCoverage(val plan: AuditPlan, val consentScreenSeen: Boolean, val
     }
 }
 
+/** What a capture could and could not show, per check. Shared by `check` (failOn) and `diff` (resolved or not). */
+object Coverage {
+    /** The consent-screen review the rules engine uses (the first plan's screen that was judged a consent screen). */
+    fun reviewedScreen(sessions: List<AuditSession>): ScreenAudit? = sessions.mapNotNull { it.screenAudit }.firstOrNull { it.isConsentScreen }
+
+    /** Why the captured plans could not show [id] at all, or null when they could. Unknown stays unknown. */
+    fun untested(id: CheckId, sessions: List<AuditSession>): String? {
+        if (sessions.isEmpty()) return "no plans were captured"
+        val historyUnknown = sessions.all { it.appDataKept && !it.consentScreenSeen }
+        return when (id) {
+            CheckId.C2 -> "no Reject choice was recorded, so behaviour after refusal was not observed"
+                .takeIf { sessions.none { it.consentChoice?.kind == ConsentKind.REJECT } }
+            CheckId.C1, CheckId.C10, CheckId.NC -> "every plan ran on the app's kept data without a consent screen (consent history unknown)"
+                .takeIf { historyUnknown }
+            CheckId.C3, CheckId.C4, CheckId.C5, CheckId.C6, CheckId.C7, CheckId.C8 -> "no consent screen was reviewed"
+                .takeIf { sessions.none { it.screenAudit?.isConsentScreen == true } }
+            CheckId.C9 -> "the app was not declared child-facing in this capture and no consent screen was reviewed for child-audience signals"
+                .takeIf { sessions.none { it.childFacing } && reviewedScreen(sessions)?.childAudienceSignals == null }
+            else -> null
+        }
+    }
+}
+
 enum class RuleStatus(val label: String) { PASS("PASS"), FAIL("FAIL"), NOT_ESTABLISHED("NOT ESTABLISHED"), OFF("OFF") }
 
 data class RuleOutcome(val rule: String, val status: RuleStatus, val message: String)
@@ -102,7 +126,7 @@ class Gate(private val engine: RulesEngine = RulesEngine(TrackerCatalog.loadDefa
         val coverage = b.sessions.map(PlanCoverage::of)
         val outcomes = buildList {
             add(inconclusive(current, policy))
-            policy.failOn.forEach { add(failOn(it, current, b.sessions)) }
+            policy.failOn.forEach { add(failOn(it, current, b.sessions, policy)) }
             add(minScore(current, policy))
             add(maxHigh(current, policy))
             add(freshState(coverage, policy))
@@ -120,29 +144,25 @@ class Gate(private val engine: RulesEngine = RulesEngine(TrackerCatalog.loadDefa
         )
     }
 
-    private fun failOn(id: CheckId, r: AuditResult, sessions: List<AuditSession>): RuleOutcome {
+    /**
+     * A finding fails the rule. A check the captured plans could not test is NOT ESTABLISHED, and that fails too unless
+     * the policy sets allowNotEstablished: a gate never passes a check by the absence of evidence it could not collect.
+     */
+    private fun failOn(id: CheckId, r: AuditResult, sessions: List<AuditSession>, p: Policy): RuleOutcome {
         val rule = "failOn ${id.code}"
         r.findings.firstOrNull { it.checkId == id }?.let { f ->
             return RuleOutcome(rule, RuleStatus.FAIL, "${id.code} ${f.title} (${f.severity.label}, ${f.evidenceType.name} evidence)")
         }
-        untested(id, sessions)?.let { why -> return RuleOutcome(rule, RuleStatus.NOT_ESTABLISHED, "${id.code} could not be tested: $why") }
-        val context = if (id == CheckId.C9 && sessions.none { it.childFacing }) " (the app was not declared child-facing in this capture)" else ""
-        return RuleOutcome(rule, RuleStatus.PASS, "no ${id.code} finding in the captured evidence$context")
-    }
-
-    /** Why the captured plans could not show [id] at all, or null when they could. Unknown stays unknown. */
-    private fun untested(id: CheckId, sessions: List<AuditSession>): String? {
-        if (sessions.isEmpty()) return "no plans were captured"
-        val historyUnknown = sessions.all { it.appDataKept && !it.consentScreenSeen }
-        return when (id) {
-            CheckId.C2 -> "no Reject choice was recorded, so behaviour after refusal was not observed"
-                .takeIf { sessions.none { it.consentChoice?.kind == ConsentKind.REJECT } }
-            CheckId.C1, CheckId.C10, CheckId.NC -> "every plan ran on the app's kept data without a consent screen (consent history unknown)"
-                .takeIf { historyUnknown }
-            CheckId.C3, CheckId.C4, CheckId.C5, CheckId.C6, CheckId.C7, CheckId.C8 -> "no consent screen was reviewed"
-                .takeIf { sessions.none { it.screenAudit?.isConsentScreen == true } }
-            else -> null
+        Coverage.untested(id, sessions)?.let { why ->
+            val text = "${id.code} NOT ESTABLISHED: $why"
+            return if (p.allowNotEstablished) RuleOutcome(rule, RuleStatus.NOT_ESTABLISHED, "$text (reported, not failed: allowNotEstablished is true)")
+            else RuleOutcome(rule, RuleStatus.FAIL, "$text; a failOn check that could not be tested fails unless allowNotEstablished is true")
         }
+        val context = if (id == CheckId.C9) {
+            if (sessions.any { it.childFacing }) " (the app was declared child-facing in this capture)"
+            else " (not declared child-facing; the consent-screen review found ${if (Coverage.reviewedScreen(sessions)?.childAudienceSignals == true) "" else "no "}child-audience signals)"
+        } else ""
+        return RuleOutcome(rule, RuleStatus.PASS, "no ${id.code} finding in the captured evidence$context")
     }
 
     private fun minScore(r: AuditResult, p: Policy): RuleOutcome {
@@ -181,9 +201,14 @@ class Gate(private val engine: RulesEngine = RulesEngine(TrackerCatalog.loadDefa
             val runs = c.filter { it.plan == plan }
             if (runs.isEmpty()) { problems += "${plan.label} was not captured"; continue }
             val expected = when (plan) { AuditPlan.ACCEPT -> ConsentKind.ACCEPT; AuditPlan.REJECT -> ConsentKind.REJECT; AuditPlan.SILENT -> null }
-            if (expected != null && runs.none { it.choice == expected || !it.consentScreenSeen }) {
+            // An Accept or Reject plan covers its choice only when that choice was recorded; no consent screen is no choice.
+            if (expected != null && runs.none { it.choice == expected }) {
                 val word = expected.name.lowercase().replaceFirstChar { it.uppercase() }
-                problems += "${plan.label}: a consent screen appeared but no $word choice was recorded, so behaviour after it was not observed"
+                problems += if (runs.none { it.consentScreenSeen }) {
+                    "${plan.label}: no consent screen appeared, so no $word choice was recorded and behaviour after it was not observed"
+                } else {
+                    "${plan.label}: a consent screen appeared but no $word choice was recorded, so behaviour after it was not observed"
+                }
             }
         }
         val names = p.requirePlans.joinToString { it.label }

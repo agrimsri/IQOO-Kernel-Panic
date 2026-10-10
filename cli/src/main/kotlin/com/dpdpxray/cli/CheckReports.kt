@@ -19,7 +19,15 @@ object Wording {
         "This is an automated technical check, not legal advice or a compliance certificate."
 
     fun score(r: AuditResult): String =
-        if (r.band == ScoreBand.INCONCLUSIVE || r.score == null) "Inconclusive (score not established)" else "${r.score}/100 · ${r.band.label}"
+        if (r.band == ScoreBand.INCONCLUSIVE || r.score == null) "Inconclusive (score not established)" else "${r.score}/100 · ${band(r.band)}"
+
+    /** The score band as a plain range; never a readiness or compliance label. Thresholds as in the core rules engine. */
+    fun band(b: ScoreBand): String = when (b) {
+        ScoreBand.READY -> "85–100 band"
+        ScoreBand.NEEDS_WORK -> "60–84 band"
+        ScoreBand.AT_RISK -> "below 60"
+        ScoreBand.INCONCLUSIVE -> "inconclusive"
+    }
 
     fun evidence(t: EvidenceType): String = t.name
 
@@ -164,6 +172,7 @@ object CheckJson {
     private fun result(r: AuditResult) = buildJsonObject {
         put("score", r.score)
         put("band", r.band.name)
+        put("bandText", Wording.band(r.band))
         put("checks", JsonArray(r.findings.map { JsonPrimitive(it.checkId.code) }))
     }
 
