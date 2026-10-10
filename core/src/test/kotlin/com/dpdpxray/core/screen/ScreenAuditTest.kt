@@ -3,6 +3,7 @@ package com.dpdpxray.core.screen
 import com.dpdpxray.core.model.AuditSource
 import com.dpdpxray.core.model.RejectOption
 import com.dpdpxray.core.model.ScreenAudit
+import com.dpdpxray.core.model.UiNode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -21,6 +22,34 @@ class ScreenAuditTest {
         assertTrue("rejectOption" in a.observedFields)
         assertNull(a.languageOptions)
         assertEquals(AuditSource.DETERMINISTIC, a.source)
+    }
+
+    /**
+     * Compose buttons, as seen live on LeakyShop 1.1: the tappable node has no text of its own and its label sits on a
+     * non-clickable child. A visible "Reject" button like that must read as VISIBLE, not as "only Manage".
+     */
+    @Test
+    fun `a Compose button whose label sits on a child is still read as a visible Reject`() {
+        fun button(label: String) = UiNode(className = "android.view.View", isClickable = true,
+            children = listOf(UiNode(className = "android.widget.TextView", text = label)))
+        val dialog = UiNode(className = "android.view.View", children = listOf(
+            UiNode(className = "android.widget.TextView", text = "We value your privacy"),
+            UiNode(className = "android.widget.TextView", text = "We use your data to personalise offers, measure the app and show relevant ads."),
+            UiNode(className = "android.view.View", isCheckable = true, isChecked = true, isClickable = true,
+                children = listOf(UiNode(className = "android.widget.TextView", text = "Share usage data to improve offers"))),
+            UiNode(className = "android.widget.TextView", text = "Manage", isClickable = true),
+            button("Reject"),
+            button("Accept & Continue"),
+        ))
+        assertEquals(RejectOption.VISIBLE, DeterministicScreenAuditor.audit(dialog).rejectOption)
+
+        // The same shape without the Reject button (LeakyShop 1.0) still reads as HIDDEN behind Manage.
+        val leaky = dialog.copy(children = dialog.children.filterNot { n -> n.children.any { it.text == "Reject" } })
+        assertEquals(RejectOption.HIDDEN, DeterministicScreenAuditor.audit(leaky).rejectOption)
+
+        // A clickable container that wraps the whole dialog is not mistaken for one button.
+        val wrapped = UiNode(className = "android.view.View", isClickable = true, children = listOf(leaky))
+        assertEquals(RejectOption.HIDDEN, DeterministicScreenAuditor.audit(wrapped).rejectOption)
     }
 
     @Test
