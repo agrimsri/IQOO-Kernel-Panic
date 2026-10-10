@@ -46,7 +46,10 @@ import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
 
 /** Line glyphs drawn on a 24-unit grid, so the app needs no icon files and every icon shares one stroke weight. */
-enum class Glyph { APK, ASK, SAMPLE, CAMERA, VPN, WATCHER, RESET, PRIVATE_DNS, AI, SPEAKER_ON, SPEAKER_OFF, CHECK, LOCK, PLAY, BOOK }
+enum class Glyph {
+    APK, ASK, SAMPLE, CAMERA, VPN, WATCHER, RESET, PRIVATE_DNS, AI, SPEAKER_ON, SPEAKER_OFF, CHECK, LOCK, PLAY, BOOK,
+    HOME, SEARCH, REPORTS, MORE, CHEVRON_RIGHT, CHEVRON_DOWN, INFO, WARN, SETTINGS, BELL, CLOCK,
+}
 
 @Composable
 fun GlyphIcon(glyph: Glyph, tint: Color, modifier: Modifier = Modifier, size: Dp = 24.dp) {
@@ -130,6 +133,54 @@ fun DrawScope.drawGlyph(g: Glyph, tint: Color) {
             shape { m(8f, 11f); l(8f, 8f); c(8f, 3.5f, 16f, 3.5f, 16f, 8f); l(16f, 11f) }
         }
         Glyph.PLAY -> shape { m(8f, 5.5f); l(18.5f, 12f); l(8f, 18.5f); close() }
+        Glyph.HOME -> {
+            shape { m(3.5f, 11.5f); l(12f, 4f); l(20.5f, 11.5f) }
+            shape { m(6f, 9.8f); l(6f, 20f); l(18f, 20f); l(18f, 9.8f) }
+            shape { m(10f, 20f); l(10f, 14.5f); l(14f, 14.5f); l(14f, 20f) }
+        }
+        Glyph.SEARCH -> {
+            ring(10.5f, 10.5f, 6.5f)
+            line(15.3f, 15.3f, 20.5f, 20.5f)
+        }
+        Glyph.REPORTS -> {
+            box(5f, 4.5f, 19f, 21f, 2.5f)
+            box(9f, 3f, 15f, 6.5f, 1.2f)
+            line(8.5f, 11f, 15.5f, 11f); line(8.5f, 14.5f, 15.5f, 14.5f); line(8.5f, 18f, 12.5f, 18f)
+        }
+        Glyph.MORE -> {
+            box(4f, 4f, 10.5f, 10.5f, 2f); box(13.5f, 4f, 20f, 10.5f, 2f)
+            box(4f, 13.5f, 10.5f, 20f, 2f); box(13.5f, 13.5f, 20f, 20f, 2f)
+        }
+        Glyph.CHEVRON_RIGHT -> shape { m(9f, 5.5f); l(15.5f, 12f); l(9f, 18.5f) }
+        Glyph.CHEVRON_DOWN -> shape { m(5.5f, 9f); l(12f, 15.5f); l(18.5f, 9f) }
+        Glyph.INFO -> {
+            ring(12f, 12f, 9f)
+            line(12f, 11f, 12f, 16.5f)
+            dot(12f, 7.6f, 1.3f)
+        }
+        Glyph.WARN -> {
+            shape { m(12f, 3.5f); l(21f, 19.5f); l(3f, 19.5f); close() }
+            line(12f, 9.5f, 12f, 14f)
+            dot(12f, 16.6f, 1.2f)
+        }
+        Glyph.SETTINGS -> {
+            ring(12f, 12f, 3.2f)
+            ring(12f, 12f, 6.8f)
+            (0 until 8).forEach { i ->
+                val a = Math.toRadians(i * 45.0)
+                val cx = kotlin.math.cos(a).toFloat()
+                val cy = kotlin.math.sin(a).toFloat()
+                line(12f + 6.8f * cx, 12f + 6.8f * cy, 12f + 9.3f * cx, 12f + 9.3f * cy)
+            }
+        }
+        Glyph.BELL -> {
+            shape { m(6f, 16.5f); l(6f, 11f); c(6f, 7.5f, 8.5f, 5f, 12f, 5f); c(15.5f, 5f, 18f, 7.5f, 18f, 11f); l(18f, 16.5f); l(19.5f, 18f); l(4.5f, 18f); close() }
+            shape { m(10f, 20.5f); c(10.8f, 21.6f, 13.2f, 21.6f, 14f, 20.5f) }
+        }
+        Glyph.CLOCK -> {
+            ring(12f, 12f, 8.5f)
+            shape { m(12f, 7.5f); l(12f, 12f); l(15f, 14f) }
+        }
         Glyph.BOOK -> {
             shape {
                 m(12f, 6.5f); c(10f, 5f, 6.5f, 4.5f, 3.5f, 5f); l(3.5f, 18.5f); c(6.5f, 18f, 10f, 18.5f, 12f, 20f)

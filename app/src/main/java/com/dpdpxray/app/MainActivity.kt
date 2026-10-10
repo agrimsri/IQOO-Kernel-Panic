@@ -10,13 +10,19 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -54,9 +60,15 @@ import com.dpdpxray.app.ui.screens.FindingDetailScreen
 import com.dpdpxray.app.ui.screens.FixesScreen
 import com.dpdpxray.app.ui.screens.HomeScreen
 import com.dpdpxray.app.ui.screens.LiveAuditScreen
+import com.dpdpxray.app.ui.screens.MoreScreen
+import com.dpdpxray.app.ui.screens.ReportsScreen
 import com.dpdpxray.app.ui.screens.ReportScreen
 import com.dpdpxray.app.ui.screens.ResultsScreen
 import com.dpdpxray.app.ui.screens.SettingsScreen
+import com.dpdpxray.app.ui.shell.AppBottomBar
+import com.dpdpxray.app.ui.shell.AppTab
+import com.dpdpxray.app.ui.shell.AppTabs
+import com.dpdpxray.app.ui.shell.openTab
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.XrayTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -112,13 +124,27 @@ class MainActivity : ComponentActivity() {
             )
             XrayTheme(stageMode = settings.stageMode) {
                 CompositionLocalProvider(LocalGuide provides guide) {
-                Box(Modifier.fillMaxSize().background(Film.base).safeDrawingPadding()) {
-                    val nav = rememberNavController()
+                val nav = rememberNavController()
+                val entry by nav.currentBackStackEntryAsState()
+                val route = entry?.destination?.route
+                // The bar belongs to the five top-level screens only, and steps aside while the keyboard is open.
+                val tab = AppTabs.tabOf(route)
+                val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+                val selectTab: (AppTab) -> Unit = { target ->
+                    // Same gate as Home's "Check an app": without the VPN and watcher, Home shows what is missing.
+                    if (target == AppTab.CHECK && !vm.prepareAudit()) nav.openTab(AppTab.HOME) else nav.openTab(target)
+                }
+                Scaffold(
+                    containerColor = Film.base,
+                    contentColor = Film.bone,
+                    contentWindowInsets = WindowInsets.safeDrawing,
+                    bottomBar = { if (tab != null && !keyboardOpen) AppBottomBar(tab, selectTab) },
+                ) { padding ->
+                Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                     val progress by vm.progress.collectAsState()
                     val start = remember { OnboardingGate.startRoute(vm.settings.value.onboardingDone, vm.progress.value is AuditProgress.Running) }
-                    val entry by nav.currentBackStackEntryAsState()
                     // Guidance never talks over the voice copilot.
-                    LaunchedEffect(entry?.destination?.route) { guideVoice.suppressed = entry?.destination?.route == AuditRoutes.VOICE }
+                    LaunchedEffect(route) { guideVoice.suppressed = route == AuditRoutes.VOICE }
                     LaunchedEffect(Unit) {
                         // If an audit is still running when the UI comes back, show it.
                         if (progress is AuditProgress.Running) nav.navigate("live")
@@ -151,6 +177,21 @@ class MainActivity : ComponentActivity() {
                                 onApk = apkCheck(),
                                 onHowItWorks = { nav.navigate(OnboardingGate.ONBOARDING) },
                                 onLive = { nav.navigate("live") },
+                                onAllReports = { nav.openTab(AppTab.REPORTS) },
+                            )
+                        }
+                        composable(AppTabs.REPORTS) {
+                            ReportsScreen(vm, onOpen = { nav.navigate("results/$it") })
+                        }
+                        composable(AppTabs.MORE) {
+                            MoreScreen(
+                                vm,
+                                onSettings = { nav.navigate("settings") },
+                                onLab = { nav.navigate("lab") },
+                                onCamera = { nav.navigate("camera") },
+                                onVoice = { nav.navigate(AuditRoutes.voice(it)) },
+                                onHowItWorks = { nav.navigate(OnboardingGate.ONBOARDING) },
+                                onOpen = { nav.navigate("results/$it") },
                             )
                         }
                         composable("pick?q={q}", arguments = listOf(navArgument("q") { type = NavType.StringType; defaultValue = "" })) { e ->
@@ -195,7 +236,7 @@ class MainActivity : ComponentActivity() {
                         composable("settings") { SettingsScreen(vm, onBack = { nav.popBackStack() }) }
                         composable(ApkGuardRoutes.HUB) {
                             ApkGuardHubScreen(
-                                onBack = { nav.popBackStack() },
+                                onBack = null,
                                 onOpenApp = { nav.navigate(ApkGuardRoutes.app(it)) },
                                 onOpenFile = { nav.navigate(ApkGuardRoutes.file(it)) },
                             )
@@ -228,6 +269,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     HeyTraceVeilHooks(nav)
+                }
                 }
                 }
             }

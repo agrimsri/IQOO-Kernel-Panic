@@ -66,9 +66,7 @@ class ExplanationTest {
 
     @Test
     fun `markdown markers from the model are not shown literally`() {
-        val e = Explanations.fromModel("**क्या गलत है:** सहमति मना की।
-* **What to change:** delay the SDK.", c1, law, true, "m")
-        assertEquals("क्या गलत है: सहमति मना की।
-What to change: delay the SDK.", e.text)
+        val e = Explanations.fromModel("**क्या गलत है:** सहमति मना की।\n* **What to change:** delay the SDK.", c1, law, true, "m")
+        assertEquals("क्या गलत है: सहमति मना की।\nWhat to change: delay the SDK.", e.text)
     }
 }

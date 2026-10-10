@@ -11,6 +11,32 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import com.dpdpxray.app.ui.components.Callout
+import com.dpdpxray.app.ui.components.ChipFlow
+import com.dpdpxray.app.ui.components.CollapsibleCard
+import com.dpdpxray.app.ui.components.GroupHeader
+import com.dpdpxray.app.ui.components.Hairline
+import com.dpdpxray.app.ui.components.IconBadge
+import com.dpdpxray.app.ui.components.LearnMore
+import com.dpdpxray.app.ui.components.SectionCard
+import com.dpdpxray.app.ui.components.SwitchRow
+import com.dpdpxray.app.ui.guide.Glyph
+import com.dpdpxray.app.ui.guide.GlyphIcon
+import com.dpdpxray.app.ui.theme.Radii
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,8 +57,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -85,7 +109,7 @@ import java.util.Locale
 // --- hub ------------------------------------------------------------------------------------------------------------
 
 @Composable
-fun ApkGuardHubScreen(onBack: () -> Unit, onOpenApp: (String) -> Unit, onOpenFile: (String) -> Unit) {
+fun ApkGuardHubScreen(onBack: (() -> Unit)?, onOpenApp: (String) -> Unit, onOpenFile: (String) -> Unit) {
     val ctx = LocalContext.current
     val store = remember(ctx) { ctx.graph.settings }
     val settings by store.settings.collectAsState()
@@ -103,45 +127,90 @@ fun ApkGuardHubScreen(onBack: () -> Unit, onOpenApp: (String) -> Unit, onOpenFil
 
     Column(Modifier.fillMaxSize()) {
         TopBar("APK Guard", onBack)
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp)) {
-            item {
-                Text("Check an app's powers before you install or open it.", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(4.dp))
-                Note("APK Guard explains what an app can do from what Android shows about it: permissions, special services, where it came from and who signed it. It is not an antivirus and cannot say whether an app is harmful. Keep Google Play Protect on as well (Play Store › your profile › Play Protect).")
-                Spacer(Modifier.height(14.dp))
-                PrimaryAction("Check an APK file", { picker.launch(arrayOf(IncomingApk.APK_MIME, "application/octet-stream")) })
-                Spacer(Modifier.height(6.dp))
-                Note("Got an app file on WhatsApp or in Files? Tap it and choose TraceVeil, or share it to TraceVeil. TraceVeil only reads the file; it never installs it.")
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
+            item(key = "intro") {
+                SectionCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconBadge(Glyph.APK, Film.scan, size = 44.dp)
+                        Spacer(Modifier.width(14.dp))
+                        Text(
+                            "Check an app's powers before you install or open it.", style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f).semantics { heading() },
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Note("Reads permissions, special services, where an app came from and who signed it.")
+                    Spacer(Modifier.height(10.dp))
+                    ChipFlow {
+                        Tag("Not an antivirus", Film.warn)
+                        Tag("Reads only, never installs", Film.scan)
+                        Tag("Stays on this phone", Film.clear)
+                    }
+                    LearnMore(Modifier.padding(top = 4.dp)) {
+                        Note("APK Guard explains what an app can do from what Android shows about it: permissions, special services, where it came from and who signed it. It is not an antivirus and cannot say whether an app is harmful. Keep Google Play Protect on as well (Play Store › your profile › Play Protect).")
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    PrimaryAction("Check an APK file", { picker.launch(arrayOf(IncomingApk.APK_MIME, "application/octet-stream")) })
+                    Spacer(Modifier.height(10.dp))
+                    Note("Got an app file on WhatsApp or in Files? Tap it and choose TraceVeil, or share it to TraceVeil. TraceVeil only reads the file; it never installs it.")
+                }
             }
-            item {
-                SectionTitle("New-install alerts")
-                Note("While TraceVeil is running, Android tells it when a new app is installed, and TraceVeil shows a notification asking you to check that app before you open it. Android keeps TraceVeil running in the background only while its consent watcher (accessibility service) is switched on; otherwise alerts appear only while TraceVeil is still open or recently used. TraceVeil never starts an audit, a VPN or anything else by itself.")
-                if (!notificationsAllowed) Note("Notifications are off for TraceVeil, so new-install alerts cannot appear.", Film.warn)
-                GuardToggle(
-                    "Speak APK Guard alerts",
-                    "Reads new-install alerts aloud with an offline voice already installed on this phone. Nothing is sent off the phone. Without an offline voice the alert stays silent.",
-                    settings.speakApkGuardAlerts,
-                ) { v -> store.update { it.copy(speakApkGuardAlerts = v) } }
-                SecondaryAction("Alert notification settings", { openAlertSettings(ctx) }, Modifier.fillMaxWidth())
+            item(key = "alerts") {
+                SectionCard(Modifier.padding(top = 16.dp), title = "New-install alerts", glyph = Glyph.BELL) {
+                    Note("While TraceVeil is running, it shows a notification asking you to check each newly installed app before you open it.")
+                    LearnMore {
+                        Note("While TraceVeil is running, Android tells it when a new app is installed, and TraceVeil shows a notification asking you to check that app before you open it. Android keeps TraceVeil running in the background only while its consent watcher (accessibility service) is switched on; otherwise alerts appear only while TraceVeil is still open or recently used. TraceVeil never starts an audit, a VPN or anything else by itself.")
+                    }
+                    if (!notificationsAllowed) {
+                        Callout("Notifications are off for TraceVeil, so new-install alerts cannot appear.", Modifier.padding(bottom = 8.dp))
+                    }
+                    Hairline()
+                    SwitchRow(
+                        "Speak APK Guard alerts",
+                        "Reads new-install alerts aloud with an offline voice already installed on this phone. Nothing is sent off the phone. Without an offline voice the alert stays silent.",
+                        settings.speakApkGuardAlerts,
+                        { v -> store.update { it.copy(speakApkGuardAlerts = v) } },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    SecondaryAction("Alert notification settings", { openAlertSettings(ctx) }, Modifier.fillMaxWidth())
+                }
             }
-            item {
-                SectionTitle("Check an installed app")
+            item(key = "installed-header") {
+                GroupHeader("Check an installed app")
                 OutlinedTextField(
                     value = query, onValueChange = { query = it }, singleLine = true,
-                    placeholder = { Text("Search by name or package") }, modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Search by name or package") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = Film.boneDim) },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, contentDescription = "Clear search", tint = Film.boneDim) }
+                    },
+                    shape = RoundedCornerShape(Radii.button),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Film.scan, unfocusedBorderColor = Film.line, cursorColor = Film.scan),
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                GuardToggle("Show system apps", "Apps that came with the phone.", showSystem) { showSystem = it }
+                SwitchRow("Show system apps", "Apps that came with the phone.", showSystem, { showSystem = it })
                 Note("Newest installs first. Apps without a launcher screen are listed too.")
+                Spacer(Modifier.height(8.dp))
             }
             val list = apps
-            if (list == null) item { Note("Loading installed apps…") }
+            if (list == null) item(key = "loading") { LoadingRow("Loading installed apps…") }
             else {
                 val q = query.trim()
                 val shown = list.filter { (showSystem || !it.isSystem) && (q.isEmpty() || it.label.contains(q, true) || it.packageName.contains(q, true)) }
-                if (shown.isEmpty()) item { Note("No matching apps.") }
+                if (shown.isEmpty()) item(key = "none") { Note("No matching apps.") }
                 items(shown, key = { it.packageName }) { app -> InstalledRow(app) { onOpenApp(app.packageName) } }
             }
         }
+    }
+}
+
+/** A small spinner with a line of text, for screens that are reading something from the phone. */
+@Composable
+private fun LoadingRow(text: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        CircularProgressIndicator(Modifier.size(20.dp), color = Film.scan, strokeWidth = 2.dp)
+        Spacer(Modifier.width(12.dp))
+        Note(text)
     }
 }
 
@@ -153,8 +222,13 @@ private fun InstalledRow(app: ApkInspector.ListedApp, onClick: () -> Unit) {
             runCatching { ctx.packageManager.getApplicationIcon(app.packageName).toBitmap(96, 96).asImageBitmap() }.getOrNull()
         }
     }
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        icon?.let { Image(it, contentDescription = null, modifier = Modifier.size(40.dp)) } ?: Spacer(Modifier.size(40.dp))
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(RoundedCornerShape(Radii.small)).clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        icon?.let { Image(it, contentDescription = null, modifier = Modifier.size(44.dp).clip(RoundedCornerShape(Radii.small))) }
+            ?: Spacer(Modifier.size(44.dp).clip(RoundedCornerShape(Radii.small)).background(Film.raised))
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(app.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -170,6 +244,8 @@ private fun InstalledRow(app: ApkInspector.ListedApp, onClick: () -> Unit) {
             if (!app.hasLauncher) Tag("No launcher screen", Film.warn)
             if (app.isSystem) Tag("System", Film.boneDim)
         }
+        Spacer(Modifier.width(6.dp))
+        GlyphIcon(Glyph.CHEVRON_RIGHT, Film.boneDim, size = 18.dp)
     }
 }
 
@@ -207,9 +283,9 @@ fun ApkGuardResultScreen(
         TopBar("APK Guard", onBack)
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp)) {
             when (val s = state) {
-                ResultState.Loading -> Note(if (subject is ApkGuardSubject.File) "Reading the APK file… Nothing is installed." else "Reading what Android shows about this app…")
+                ResultState.Loading -> LoadingRow(if (subject is ApkGuardSubject.File) "Reading the APK file… Nothing is installed." else "Reading what Android shows about this app…")
                 is ResultState.Failed -> {
-                    Note(s.reason, Film.warn)
+                    Callout(s.reason)
                     Spacer(Modifier.height(12.dp))
                     SecondaryAction("Back", onBack, Modifier.fillMaxWidth())
                 }
@@ -247,23 +323,31 @@ private fun ReadyResult(
 
     IdentityCard(app)
     Spacer(Modifier.height(16.dp))
-    Text(
-        report.summary.headline.pick(hindi),
-        style = MaterialTheme.typography.titleLarge,
-        color = if (report.summary.reviewCarefully > 0) Film.high else Film.bone,
-    )
-    Spacer(Modifier.height(4.dp))
-    Note(report.summary.disclaimer.pick(hindi))
-    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        LanguageChip("English", !hindi) { onLanguage(false) }
-        LanguageChip("हिंदी", hindi) { onLanguage(true) }
+    SectionCard {
+        Text(
+            report.summary.headline.pick(hindi),
+            style = MaterialTheme.typography.titleLarge,
+            color = if (report.summary.reviewCarefully > 0) Film.high else Film.bone,
+            modifier = Modifier.semantics { heading() },
+        )
+        Spacer(Modifier.height(6.dp))
+        Note(report.summary.disclaimer.pick(hindi))
+        val counts = ApkSeverity.entries.mapNotNull { sev -> report.signals.count { it.severity == sev }.takeIf { it > 0 }?.let { sev to it } }
+        if (counts.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            ChipFlow { counts.forEach { (sev, n) -> Tag("$n · ${sev.label.pick(hindi)}", severityColor(sev)) } }
+        }
+        Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LanguageChip("English", !hindi) { onLanguage(false) }
+            LanguageChip("हिंदी", hindi) { onLanguage(true) }
+        }
     }
 
     ApkSeverity.entries.forEach { severity ->
         val group = report.signals.filter { it.severity == severity }
         if (group.isNotEmpty()) {
             SectionTitle("${severity.label.pick(hindi)} · ${group.size}")
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { group.forEach { SignalCard(it, hindi) } }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { group.forEach { SignalCard(it, hindi) } }
         }
     }
 
@@ -275,26 +359,35 @@ private fun ReadyResult(
         if (!launchable) Note("This app has no launcher screen, so TraceVeil cannot start it for an audit.")
         if (onQuarantine != null && ApkGuardRoutes.quarantineOffered(installed = true, packageName = facts.packageName, ownPackage = ctx.packageName)) {
             // Opens the quarantine explainer only; nothing is blocked until Start is tapped there.
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             SecondaryAction("Run in quarantine (network blocked)", { onQuarantine(facts.packageName) }, Modifier.fillMaxWidth())
             Spacer(Modifier.height(4.dp))
             Note("Cuts only this app's internet and records what it tries to reach. Not a malware verdict.")
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
         SecondaryAction("Open Android app settings", { DeviceChecks.openAppInfo(ctx, facts.packageName) }, Modifier.fillMaxWidth())
     } else {
         facts.installedTwin?.let {
             SecondaryAction("Check the installed \"${it.label}\"", { onOpenInstalled(facts.packageName) }, Modifier.fillMaxWidth())
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
         }
-        RuleRow(Film.scan) {
-            Text(if (hindi) "अगर आपको अब भी इस फ़ाइल पर भरोसा है" else "If you still trust this file", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(4.dp))
+        CollapsibleCard(
+            if (hindi) "अगर आपको अब भी इस फ़ाइल पर भरोसा है" else "If you still trust this file",
+            summary = if (hindi) "TraceVeil ऐप इंस्टॉल नहीं करता। आगे कैसे बढ़ें, यह देखें।" else "TraceVeil does not install apps. See how to continue, if you choose to.",
+            glyph = Glyph.INFO,
+        ) {
             Note(CONTINUE_WITH_INSTALLER.pick(hindi), Film.bone)
         }
     }
     Spacer(Modifier.height(16.dp))
-    Note("APK Guard rules v${ApkRiskRules.VERSION}. Sources: Google Play Protect developer guidance; CERT-In advisory CICA-2026-3492; Cyber Swachhta Kendra SpyMax alert; McAfee Labs SpyLoan research. Nothing about this check leaves the phone.")
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        GlyphIcon(Glyph.LOCK, Film.clear, size = 18.dp)
+        Spacer(Modifier.width(8.dp))
+        Note("Nothing about this check leaves the phone.", Film.clear)
+    }
+    LearnMore(label = "Rules and sources") {
+        Note("APK Guard rules v${ApkRiskRules.VERSION}. Sources: Google Play Protect developer guidance; CERT-In advisory CICA-2026-3492; Cyber Swachhta Kendra SpyMax alert; McAfee Labs SpyLoan research. Nothing about this check leaves the phone.")
+    }
 }
 
 private val CONTINUE_WITH_INSTALLER = Bilingual(
@@ -305,32 +398,37 @@ private val CONTINUE_WITH_INSTALLER = Bilingual(
 @Composable
 private fun IdentityCard(app: InspectedApp) {
     val facts = app.facts
-    RuleRow(Film.scan) {
+    SectionCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             val icon = remember(app) { app.icon?.asImageBitmap() }
-            icon?.let { Image(it, contentDescription = null, modifier = Modifier.size(44.dp)) }
-            if (icon != null) Spacer(Modifier.width(12.dp))
+            if (icon != null) Image(icon, contentDescription = null, modifier = Modifier.size(52.dp).clip(RoundedCornerShape(Radii.small)))
+            else IconBadge(Glyph.APK, Film.scan, size = 52.dp)
+            Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(facts.label ?: "No app name", style = MaterialTheme.typography.titleMedium)
+                Text(facts.label ?: "No app name", style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
                 Text(facts.packageName, fontFamily = Mono, fontSize = 12.5.sp, color = Film.boneDim)
             }
         }
+        Spacer(Modifier.height(12.dp))
+        Hairline()
         Spacer(Modifier.height(8.dp))
         Field("Version", listOfNotNull(facts.versionName, facts.versionCode?.let { "($it)" }).joinToString(" ").ifEmpty { "Not reported" })
-        Field("Built for Android API", facts.targetSdk?.toString() ?: "Not reported")
         Field("Installed from", ApkFactsMapper.originLabel(facts.origin))
         app.initiatingPackage?.let { Field("Install started by", it) }
         if (!app.isSystemApp) app.firstInstallTime?.let { Field("First installed", date(it)) }
-        if (app.fileSizeBytes != null) Field("File", listOfNotNull(app.fileName, ApkFactsMapper.size(app.fileSizeBytes)).joinToString(" · "))
-        Fingerprints("Signing certificate SHA-256", facts.certSha256)
-        app.fileSha256?.let { Fingerprints("File SHA-256", listOf(it)) }
+        LearnMore(label = "Technical details", openLabel = "Hide technical details") {
+            Field("Built for Android API", facts.targetSdk?.toString() ?: "Not reported")
+            if (app.fileSizeBytes != null) Field("File", listOfNotNull(app.fileName, ApkFactsMapper.size(app.fileSizeBytes)).joinToString(" · "))
+            Fingerprints("Signing certificate SHA-256", facts.certSha256)
+            app.fileSha256?.let { Fingerprints("File SHA-256", listOf(it)) }
+        }
     }
 }
 
 @Composable
 private fun Field(name: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Text(name, style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.width(132.dp))
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Text(name, style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.width(132.dp).padding(top = 2.dp))
         Text(value, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
     }
 }
@@ -351,50 +449,40 @@ private fun Fingerprints(name: String, hexes: List<String>) {
 @Composable
 private fun SignalCard(s: ApkSignal, hindi: Boolean) {
     RuleRow(severityColor(s.severity)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        ChipFlow {
             Tag(s.severity.label.pick(hindi), severityColor(s.severity))
             Tag(if (hindi) s.evidence.label.hi else s.evidence.label.en.uppercase(Locale.ROOT), evidenceColor(s.evidence))
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(10.dp))
         Text(s.title.pick(hindi), style = MaterialTheme.typography.titleMedium)
-        s.state?.let { Text(it.pick(hindi), style = MaterialTheme.typography.labelMedium, color = Film.bone) }
-        Text(s.detail.pick(hindi), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
-        Spacer(Modifier.height(6.dp))
-        Text(if (hindi) "आप क्या कर सकते हैं" else "What you can do", style = MaterialTheme.typography.labelMedium, color = Film.scan)
-        Text(s.advice.pick(hindi), style = MaterialTheme.typography.bodyMedium)
-        if (s.proof.isNotEmpty()) {
-            Spacer(Modifier.height(6.dp))
-            Text(s.proof.joinToString("\n"), fontFamily = Mono, fontSize = 11.5.sp, lineHeight = 16.sp, color = Film.boneDim)
-        }
-        s.basis?.let {
-            Spacer(Modifier.height(4.dp))
-            Text("Why this is a signal: $it", style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
+        s.state?.let { Text(it.pick(hindi), style = MaterialTheme.typography.labelMedium, color = Film.bone, modifier = Modifier.padding(top = 2.dp)) }
+        Text(s.detail.pick(hindi), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 4.dp))
+        Spacer(Modifier.height(10.dp))
+        Text(if (hindi) "आप क्या कर सकते हैं" else "What you can do", style = MaterialTheme.typography.labelLarge, color = Film.scan)
+        Text(s.advice.pick(hindi), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 2.dp))
+        if (s.proof.isNotEmpty() || s.basis != null) {
+            LearnMore(Modifier.padding(top = 4.dp), label = if (hindi) "सबूत देखें" else "Show proof", openLabel = if (hindi) "सबूत छिपाएँ" else "Hide proof") {
+                if (s.proof.isNotEmpty()) Text(s.proof.joinToString("\n"), fontFamily = Mono, fontSize = 12.sp, lineHeight = 17.sp, color = Film.boneDim)
+                s.basis?.let { Text("Why this is a signal: $it", style = MaterialTheme.typography.labelMedium, color = Film.boneDim) }
+            }
         }
     }
 }
 
 @Composable
 private fun LanguageChip(text: String, selected: Boolean, onClick: () -> Unit) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = if (selected) Film.base else Film.bone,
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) Film.scan else Film.raised)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-    )
-}
-
-@Composable
-private fun GuardToggle(title: String, detail: String, value: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(detail, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
-        }
-        Switch(checked = value, onCheckedChange = onChange, colors = SwitchDefaults.colors(checkedTrackColor = Film.scan, checkedThumbColor = Film.base))
+    val shape = RoundedCornerShape(24.dp)
+    Box(
+        Modifier
+            .heightIn(min = 48.dp)
+            .clip(shape)
+            .background(if (selected) Film.scan else Film.base)
+            .border(1.dp, if (selected) Film.scan else Film.line, shape)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 18.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = MaterialTheme.typography.labelLarge, color = if (selected) Film.base else Film.bone)
     }
 }
 

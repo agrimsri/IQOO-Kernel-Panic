@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
@@ -64,7 +65,13 @@ import com.dpdpxray.app.netproof.NetworkProofCard
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.EndpointMapIntegration
 import com.dpdpxray.app.ui.screens.map.EndpointMapCard
+import com.dpdpxray.app.ui.components.Callout
+import com.dpdpxray.app.ui.components.ChipFlow
 import com.dpdpxray.app.ui.components.CodeBlock
+import com.dpdpxray.app.ui.components.CollapsibleCard
+import com.dpdpxray.app.ui.components.GroupHeader
+import com.dpdpxray.app.ui.components.LearnMore
+import com.dpdpxray.app.ui.components.SectionCard
 import com.dpdpxray.app.ui.components.ConsentLine
 import com.dpdpxray.app.ui.components.Note
 import com.dpdpxray.app.ui.components.PrimaryAction
@@ -93,7 +100,9 @@ import com.dpdpxray.core.model.EvidenceType
 import com.dpdpxray.core.model.Finding
 import com.dpdpxray.core.model.ScoreBand
 import com.dpdpxray.core.model.Severity
+import com.dpdpxray.core.score.ConfidenceGrade
 import com.dpdpxray.core.score.ConfidenceGrader
+import com.dpdpxray.core.score.ConfidenceLevel
 import java.io.File
 
 @Composable
@@ -101,7 +110,13 @@ private fun WithBundle(vm: XrayViewModel, id: String, content: @Composable (Audi
     LaunchedEffect(id) { vm.open(id) }
     val bundle by vm.bundle.collectAsState()
     val b = bundle
-    if (b == null || b.meta.id != id) Note("Opening audit…") else content(b)
+    if (b == null || b.meta.id != id) {
+        Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(Modifier.size(20.dp), color = Film.scan, strokeWidth = 2.dp)
+            Spacer(Modifier.width(12.dp))
+            Note("Opening audit…")
+        }
+    } else content(b)
 }
 
 @Composable
@@ -115,12 +130,18 @@ fun ResultsScreen(
         Column(Modifier.fillMaxSize()) {
             TopBar(b.meta.targetLabel, onBack)
             Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-                ScorePanel(b)
+                val grade = remember(b.meta.id) { if (b.meta.sample) null else ConfidenceGrader.gradeAudit(b.sessions) }
+                ScorePanel(b, grade)
+                Text(headline(r.findings), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 16.dp))
+                // Coverage caveats stay in view, above anything the reader might act on.
                 val gaps = AuditPlanCoverage.gaps(b.sessions)
-                gaps.forEach { Note(it, Film.warn) }
-                AuditPlanCoverage.freshStateHint(b.sessions)?.let { Note(it, Film.warn) }
-                SeverityStrip(r.findings)
-                Text(headline(r.findings), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 12.dp))
+                val freshHint = AuditPlanCoverage.freshStateHint(b.sessions)
+                if (gaps.isNotEmpty() || freshHint != null) {
+                    Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        gaps.forEach { Callout(it) }
+                        freshHint?.let { Callout(it) }
+                    }
+                }
 
                 val fixCount = vm.fixesFor(b).size
                 val facts = ResultFacts(
@@ -138,47 +159,88 @@ fun ResultsScreen(
                         NextAction.REPORT -> onReport()
                     }
                 }
-                SectionTitle("Evidence coverage")
-                if (b.meta.sample) Note("Synthetic sample: capture confidence was not measured.", Film.warn)
-                else Note(ConfidenceGrader.gradeAudit(b.sessions).summary)
-                NetworkProofCard(AuditNetworkReadings.proof(b.sessions, b.networkReadings))
 
-                SectionTitle("Endpoint evidence")
-                if (b.meta.sample) Note("Synthetic sample: example IPs do not establish real locations.", Film.warn)
-                val mapSettings by vm.settings.collectAsState()
-                val mapCatalog = remember(vm, mapSettings.firstPartyDomains) { vm.graph.catalog() }
-                val mapOwners = remember(mapCatalog) { EndpointMapIntegration.owners(mapCatalog) }
-                EndpointMapCard(b.sessions, mapCatalog, owners = mapOwners)
-
-                SectionTitle("Before / after")
-                val comparison by produceState<AuditComparisonResult?>(null, b.meta.id) { value = vm.previousComparison(b) }
-                when (val change = comparison) {
-                    null -> Note("Checking earlier saved audits…")
-                    is AuditComparisonResult.Unavailable -> Note(change.reason)
-                    is AuditComparisonResult.Available -> RuleRow(Film.scan) {
-                        val delta = if (change.scoreDelta > 0) "+${change.scoreDelta}" else change.scoreDelta.toString()
-                        Text("$delta points since the previous audit", style = MaterialTheme.typography.titleMedium)
-                        Note("Same package and audit plans. Previous audit: ${java.time.Instant.ofEpochMilli(change.previousTimeMs).atZone(java.time.ZoneId.systemDefault())}.")
-                        Note("${change.noLongerRecorded.size} findings no longer recorded" +
-                            change.noLongerRecorded.takeIf { it.isNotEmpty() }?.joinToString(prefix = ": ") { it.code }.orEmpty())
-                        if (change.newlyRecorded.isNotEmpty()) Note("New findings: ${change.newlyRecorded.joinToString { it.code }}", Film.warn)
-                        Note("Capture coverage can differ. A finding not repeated is not proof it was fixed or that the app is safe.")
+                GroupHeader("Findings") {
+                    if (r.findings.isNotEmpty()) Text("${r.findings.size}", style = MaterialTheme.typography.labelLarge, color = Film.boneDim)
+                }
+                if (r.findings.isEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        GlyphIcon(Glyph.CHECK, Film.clear, size = 20.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Note("No consent problems in the captured evidence.", Film.clear)
                     }
                 }
-
-                SectionTitle("Findings")
-                if (r.findings.isEmpty()) Note("No consent problems in the captured evidence.", Film.clear)
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    r.findings.forEach { f -> FindingRow(f) { onFinding(f.checkId) } }
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    r.findings.forEach { f -> FindingRow(f, ResultSources.of(f, b.sessions)) { onFinding(f.checkId) } }
                 }
 
-                SectionTitle("Timeline")
-                PlanTimelines(vm, b)
+                GroupHeader("Evidence and limits")
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CollapsibleCard(
+                        "Evidence coverage",
+                        summary = if (b.meta.sample) "Synthetic sample: capture confidence was not measured." else grade?.summary,
+                        summaryColor = if (b.meta.sample) Film.warn else Film.boneDim,
+                        glyph = Glyph.WATCHER,
+                    ) {
+                        if (b.meta.sample) Note("Synthetic sample: capture confidence was not measured.", Film.warn)
+                        else grade?.let { Note(it.summary) }
+                        NetworkProofCard(AuditNetworkReadings.proof(b.sessions, b.networkReadings))
+                    }
 
-                val notes = b.sessions.flatMap { s -> s.notes.map { "${s.plan.label}: $it" } }.distinct()
-                if (notes.isNotEmpty()) {
-                    SectionTitle("Audit notes")
-                    notes.forEach { Note("• $it") }
+                    CollapsibleCard(
+                        "Endpoint evidence",
+                        summary = if (b.meta.sample) "Synthetic sample: example IPs do not establish real locations." else "Where lookups were answered, and who runs those services",
+                        summaryColor = if (b.meta.sample) Film.warn else Film.boneDim,
+                        glyph = Glyph.PRIVATE_DNS,
+                    ) {
+                        if (b.meta.sample) Note("Synthetic sample: example IPs do not establish real locations.", Film.warn)
+                        val mapSettings by vm.settings.collectAsState()
+                        val mapCatalog = remember(vm, mapSettings.firstPartyDomains) { vm.graph.catalog() }
+                        val mapOwners = remember(mapCatalog) { EndpointMapIntegration.owners(mapCatalog) }
+                        EndpointMapCard(b.sessions, mapCatalog, owners = mapOwners)
+                    }
+
+                    val comparison by produceState<AuditComparisonResult?>(null, b.meta.id) { value = vm.previousComparison(b) }
+                    val change = comparison
+                    CollapsibleCard(
+                        "Before / after",
+                        summary = when (change) {
+                            null -> "Checking earlier saved audits…"
+                            is AuditComparisonResult.Unavailable -> change.reason
+                            is AuditComparisonResult.Available -> "${if (change.scoreDelta > 0) "+${change.scoreDelta}" else change.scoreDelta.toString()} points since the previous audit"
+                        },
+                        glyph = Glyph.RESET,
+                    ) {
+                        when (change) {
+                            null -> Note("Checking earlier saved audits…")
+                            is AuditComparisonResult.Unavailable -> Note(change.reason)
+                            is AuditComparisonResult.Available -> {
+                                val delta = if (change.scoreDelta > 0) "+${change.scoreDelta}" else change.scoreDelta.toString()
+                                Text("$delta points since the previous audit", style = MaterialTheme.typography.titleMedium)
+                                Note("Same package and audit plans. Previous audit: ${java.time.Instant.ofEpochMilli(change.previousTimeMs).atZone(java.time.ZoneId.systemDefault())}.")
+                                Note("${change.noLongerRecorded.size} findings no longer recorded" +
+                                    change.noLongerRecorded.takeIf { it.isNotEmpty() }?.joinToString(prefix = ": ") { it.code }.orEmpty())
+                                if (change.newlyRecorded.isNotEmpty()) Note("New findings: ${change.newlyRecorded.joinToString { it.code }}", Film.warn)
+                                Note("Capture coverage can differ. A finding not repeated is not proof it was fixed or that the app is safe.")
+                            }
+                        }
+                    }
+
+                    CollapsibleCard(
+                        "Timeline",
+                        summary = "Each run's lookups, with the moment of the consent choice marked",
+                        glyph = Glyph.CLOCK,
+                        initiallyOpen = true,
+                    ) {
+                        PlanTimelines(vm, b)
+                    }
+
+                    val notes = b.sessions.flatMap { s -> s.notes.map { "${s.plan.label}: $it" } }.distinct()
+                    if (notes.isNotEmpty()) {
+                        CollapsibleCard("Audit notes", summary = if (notes.size == 1) "1 note from the check" else "${notes.size} notes from the check", glyph = Glyph.SAMPLE) {
+                            notes.forEach { Note("• $it") }
+                        }
+                    }
                 }
                 Spacer(Modifier.height(32.dp))
             }
@@ -202,9 +264,12 @@ private fun headline(findings: List<Finding>): String {
     }
 }
 
-/** Score, band and capture profile in one panel. A thin meter fills to the score; inconclusive shows a dashed track. */
+/**
+ * The score hero: big number in its band colour, a meter, chips for sample data, evidence confidence and capture
+ * timing, then the severity summary. Inconclusive shows "?" and a dashed track, never a zero.
+ */
 @Composable
-private fun ScorePanel(b: AuditBundle) {
+private fun ScorePanel(b: AuditBundle, grade: ConfidenceGrade?) {
     val r = b.result
     val color = bandColor(r.band)
     val inconclusive = r.band == ScoreBand.INCONCLUSIVE
@@ -216,7 +281,6 @@ private fun ScorePanel(b: AuditBundle) {
                 Text(r.band.label, style = MaterialTheme.typography.titleLarge, color = color)
                 Text("DPDP readiness out of 100", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
             }
-            if (b.meta.sample) Tag("Sample data", Film.boneDim)
         }
         var shown by remember(b.meta.id) { mutableStateOf(false) }
         LaunchedEffect(b.meta.id) { shown = true }
@@ -230,16 +294,34 @@ private fun ScorePanel(b: AuditBundle) {
                 if (fill > 0f) drawLine(color, Offset(h / 2, h / 2), Offset(h / 2 + (size.width - h) * fill, h / 2), h, StrokeCap.Round)
             }
         }
-        if (!b.meta.sample) {
-            val preview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW
-            Row(Modifier.padding(top = 12.dp)) {
-                Tag(if (preview) "Fast Preview · limited evidence" else if (b.meta.timingProfile == AuditTimingPolicy.NORMAL) "Normal capture" else "Timing unknown", if (preview) Film.warn else Film.boneDim)
+        val preview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW
+        ChipFlow(Modifier.padding(top = 14.dp)) {
+            if (b.meta.sample) Tag("Sample data", Film.warn)
+            if (grade != null) Tag("Evidence confidence: ${grade.level.label}", confidenceColor(grade.level))
+            else if (b.meta.sample) Tag("Confidence not measured", Film.boneDim)
+            if (!b.meta.sample) {
+                Tag(
+                    if (preview) "Fast Preview · limited evidence" else if (b.meta.timingProfile == AuditTimingPolicy.NORMAL) "Normal capture" else "Timing unknown",
+                    if (preview) Film.warn else Film.boneDim,
+                )
             }
-            Spacer(Modifier.height(4.dp))
-            Note(AuditTimingPolicy.coverageHint(b.meta.timingProfile), if (preview) Film.warn else Film.boneDim)
         }
+        if (!b.meta.sample) {
+            if (b.meta.timingProfile == AuditTimingPolicy.NORMAL) {
+                LearnMore(label = "About this capture") { Note(AuditTimingPolicy.coverageHint(b.meta.timingProfile)) }
+            } else {
+                Spacer(Modifier.height(10.dp))
+                Note(AuditTimingPolicy.coverageHint(b.meta.timingProfile), if (preview) Film.warn else Film.boneDim)
+            }
+        }
+        SeverityStrip(r.findings)
     }
-    Spacer(Modifier.height(8.dp))
+}
+
+private fun confidenceColor(level: ConfidenceLevel) = when (level) {
+    ConfidenceLevel.HIGH -> Film.clear
+    ConfidenceLevel.MEDIUM -> Film.warn
+    ConfidenceLevel.LOW -> Film.high
 }
 
 private fun nextGlyph(a: NextAction) = when (a) {
@@ -294,30 +376,43 @@ private fun ResultGuidePanel(facts: ResultFacts, onAction: (NextAction) -> Unit)
     }
 }
 
+/** Severity summary inside the score card: a proportional strip, then one chip per severity present. */
 @Composable
 private fun SeverityStrip(findings: List<Finding>) {
     val counts = Severity.entries.associateWith { s -> findings.count { it.severity == s } }.filterValues { it > 0 }
     if (counts.isEmpty()) return
-    Row(Modifier.fillMaxWidth().padding(top = 12.dp).height(10.dp)) {
-        counts.forEach { (s, n) -> Box(Modifier.weight(n.toFloat()).height(10.dp).background(severityColor(s))) }
+    Spacer(Modifier.height(14.dp))
+    Box(Modifier.fillMaxWidth().height(1.dp).background(FilmExtra.hairline))
+    Text("Findings by severity", style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
+    Row(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))) {
+        counts.forEach { (s, n) -> Box(Modifier.weight(n.toFloat()).height(8.dp).background(severityColor(s))) }
     }
-    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        counts.forEach { (s, n) -> Text("$n ${s.label.lowercase()}", style = MaterialTheme.typography.labelMedium, color = severityColor(s)) }
+    ChipFlow(Modifier.padding(top = 10.dp)) {
+        counts.forEach { (s, n) -> Tag("$n ${s.label.lowercase()}", severityColor(s)) }
     }
 }
 
+/** A finding as a card: severity and evidence chips, the title, who was contacted. Tapping opens the evidence. */
 @Composable
-private fun FindingRow(f: Finding, onClick: () -> Unit) {
+private fun FindingRow(f: Finding, source: ResultSource, onClick: () -> Unit) {
     RuleRow(severityColor(f.severity), onClick = onClick) {
-        Text(f.title, style = MaterialTheme.typography.titleMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ChipFlow(Modifier.weight(1f)) {
+                Tag(f.severity.label, severityColor(f.severity))
+                Tag(source.label, sourceColor(source))
+            }
+            GlyphIcon(Glyph.CHEVRON_RIGHT, Film.boneDim, size = 18.dp)
+        }
+        Text(f.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 10.dp))
+        if (f.entities.isNotEmpty()) Text(f.entities.joinToString(), style = MaterialTheme.typography.bodyMedium, color = severityColor(f.severity), modifier = Modifier.padding(top = 2.dp))
         Text(
-            "${f.severity.label}, ${if (f.evidenceType == EvidenceType.OBSERVED) "observed on device" else "inferred (see source)"}" +
-                (if (f.penaltyBand.name != "NONE") ", ${f.penaltyBand.label.substringBefore(" (")}" else ""),
-            style = MaterialTheme.typography.bodyMedium, color = Film.boneDim,
+            (if (f.evidenceType == EvidenceType.OBSERVED) "Observed on device" else "Inferred") +
+                (if (f.penaltyBand.name != "NONE") " · ${f.penaltyBand.label.substringBefore(" (")}" else ""),
+            style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.padding(top = 4.dp),
         )
-        if (f.entities.isNotEmpty()) Text(f.entities.joinToString(), style = MaterialTheme.typography.bodyMedium, color = severityColor(f.severity))
     }
 }
+
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -373,8 +468,8 @@ fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: ()
         Column(Modifier.fillMaxSize()) {
             TopBar(f.checkId.code, onBack)
             Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-                Text(f.title, style = MaterialTheme.typography.headlineMedium, color = severityColor(f.severity))
-                Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(f.title, style = MaterialTheme.typography.headlineSmall, color = severityColor(f.severity), modifier = Modifier.semantics { heading() })
+                ChipFlow(Modifier.padding(vertical = 12.dp)) {
                     Tag(f.severity.label, severityColor(f.severity))
                     Tag(ResultSources.of(f, b.sessions).label, sourceColor(ResultSources.of(f, b.sessions)))
                     if (f.penaltyBand.name != "NONE") Tag(f.penaltyBand.label.substringBefore(" ("), Film.boneDim)
@@ -464,8 +559,8 @@ fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: ()
 
 /** Observed, AI-inferred, documentation-inferred and fallback text each keep one colour everywhere. */
 private fun sourceColor(s: ResultSource) = when (s) {
-    ResultSource.OBSERVED -> Film.clear
-    ResultSource.AI_INFERRED -> Film.scan
+    ResultSource.OBSERVED -> Film.scan
+    ResultSource.AI_INFERRED -> Brand.rose
     ResultSource.INFERRED -> Film.warn
     ResultSource.FALLBACK -> Film.boneDim
 }
@@ -482,25 +577,26 @@ fun FixesScreen(vm: XrayViewModel, id: String, onBack: () -> Unit) {
         val fixes = vm.fixesFor(b)
         Column(Modifier.fillMaxSize()) {
             TopBar("How to fix", onBack)
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Note("Copy a fix and paste it into your project (with clipboard sync, straight into Android Studio on your laptop). Then rebuild and audit again.")
                 fixes.forEach { fix ->
-                    SectionTitle(fix.title)
-                    if (!fix.verified) Note("Check the exact API for your SDK version in the vendor docs.", Film.warn)
-                    fix.manifest?.let { m ->
-                        Text("AndroidManifest.xml", style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
-                        CodeBlock(m)
-                        TextButton(onClick = { vm.copy("manifest", m) }) { Text("Copy manifest change", color = Film.scan) }
+                    SectionCard(title = fix.title, glyph = Glyph.BOOK) {
+                        if (!fix.verified) Callout("Check the exact API for your SDK version in the vendor docs.", Modifier.padding(bottom = 8.dp))
+                        fix.manifest?.let { m ->
+                            Text("AndroidManifest.xml", style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
+                            CodeBlock(m)
+                            TextButton(onClick = { vm.copy("manifest", m) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Copy manifest change", color = Film.scan) }
+                        }
+                        fix.code?.let { c ->
+                            Text("Code", style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
+                            CodeBlock(c)
+                            TextButton(onClick = { vm.copy("code", c) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Copy code", color = Film.scan) }
+                        }
+                        fix.steps.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp)) }
+                        fix.docUrl?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Film.scan, modifier = Modifier.padding(top = 8.dp)) }
                     }
-                    fix.code?.let { c ->
-                        Text("Code", style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
-                        CodeBlock(c)
-                        TextButton(onClick = { vm.copy("code", c) }) { Text("Copy code", color = Film.scan) }
-                    }
-                    fix.steps.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 2.dp)) }
-                    fix.docUrl?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Film.scan, modifier = Modifier.padding(top = 6.dp)) }
                 }
-                Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(20.dp))
             }
         }
     }
@@ -511,21 +607,31 @@ fun ReportScreen(vm: XrayViewModel, id: String, onBack: () -> Unit) {
     WithBundle(vm, id) { b ->
         Column(Modifier.fillMaxSize()) {
             TopBar("Report", onBack)
-            Column(Modifier.padding(horizontal = 20.dp)) {
-                PrimaryAction("Save PDF to Downloads", { vm.exportPdf(b, share = false) })
-                Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SecondaryAction("Share PDF", { vm.exportPdf(b, share = true) }, Modifier.weight(1f))
-                    SecondaryAction("Save Markdown", { vm.saveMarkdown(b) }, Modifier.weight(1f))
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                SectionCard(title = "Save to this phone", glyph = Glyph.SAMPLE) {
+                    PrimaryAction("Save PDF to Downloads", { vm.exportPdf(b, share = false) })
+                    Spacer(Modifier.height(10.dp))
+                    SecondaryAction("Save Markdown", { vm.saveMarkdown(b) }, Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(10.dp))
+                    SecondaryAction("Save interactive report (HTML)", { vm.exportHtml(b, share = false) }, Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(10.dp))
+                    SecondaryAction("Export audit data (JSON)", { vm.exportAuditJson(b, share = false) }, Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(10.dp))
+                    Note("Saved files land in Downloads/TraceVeil, ready to share or move to your laptop. The HTML report opens offline in any browser.")
                 }
-                SecondaryAction("Save interactive report (HTML)", { vm.exportHtml(b, share = false) }, Modifier.fillMaxWidth().padding(top = 10.dp))
-                TextButton(onClick = { vm.exportHtml(b, share = true) }) { Text("Share interactive report", color = Film.scan) }
-                SecondaryAction("Export audit data (JSON)", { vm.exportAuditJson(b, share = false) }, Modifier.fillMaxWidth())
-                TextButton(onClick = { vm.exportAuditJson(b, share = true) }) { Text("Share audit data (JSON)", color = Film.scan) }
-                Note("Saved files land in Downloads/TraceVeil, ready to share or move to your laptop. The HTML report opens offline in any browser.")
-                Note("Audit data (JSON) is this audit's full evidence (lookups, consent-screen text, device model) for TraceVeil CI on a laptop or build server. Review it before sharing it or committing it to a repository.")
-            }
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp)) {
-                Text(vm.markdown(b), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                SectionCard(title = "Share", glyph = Glyph.ASK) {
+                    SecondaryAction("Share PDF", { vm.exportPdf(b, share = true) }, Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(10.dp))
+                    SecondaryAction("Share interactive report", { vm.exportHtml(b, share = true) }, Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(10.dp))
+                    SecondaryAction("Share audit data (JSON)", { vm.exportAuditJson(b, share = true) }, Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(10.dp))
+                    Callout("Audit data (JSON) is this audit's full evidence (lookups, consent-screen text, device model) for TraceVeil CI on a laptop or build server. Review it before sharing it or committing it to a repository.")
+                }
+                CollapsibleCard("Report preview", summary = "The Markdown report, limits included", glyph = Glyph.REPORTS) {
+                    Text(vm.markdown(b), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                }
+                Spacer(Modifier.height(16.dp))
             }
         }
     }

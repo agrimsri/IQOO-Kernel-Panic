@@ -9,6 +9,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.semantics.Role
+import com.dpdpxray.app.ui.components.Callout
+import com.dpdpxray.app.ui.components.CollapsibleCard
+import com.dpdpxray.app.ui.guide.Glyph
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -145,7 +154,16 @@ private fun Explainer(
             Text(QuarantineText.EXPLAINER, style = MaterialTheme.typography.bodyLarge)
 
             SectionTitle("How it works")
-            QuarantineText.STEPS.forEachIndexed { i, s -> Text("${i + 1}. $s", style = MaterialTheme.typography.bodyMedium) }
+            QuarantineText.STEPS.forEachIndexed { i, s ->
+                Row(verticalAlignment = Alignment.Top) {
+                    Box(
+                        Modifier.size(28.dp).clip(CircleShape).background(Film.scan.copy(alpha = 0.13f)),
+                        contentAlignment = Alignment.Center,
+                    ) { Text("${i + 1}", style = MaterialTheme.typography.labelLarge, color = Film.scan) }
+                    Spacer(Modifier.width(12.dp))
+                    Text(s, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(top = 3.dp))
+                }
+            }
             Spacer(Modifier.height(4.dp))
             RuleRow(Film.leak) {
                 Text("Only internet is blocked", style = MaterialTheme.typography.titleMedium)
@@ -159,9 +177,9 @@ private fun Explainer(
             Note("You can stop earlier at any time. Stopping gives the app its internet back.")
 
             Spacer(Modifier.height(8.dp))
-            if (!watcherOn) Note("The TraceVeil watcher is off in Accessibility settings, so permission dialogs and settings screens will not be recorded. Network attempts still will.", Film.warn)
-            if (label == null) Note("This app is not installed on this phone.", Film.leak)
-            (error ?: failure)?.let { Note(it, Film.leak) }
+            if (!watcherOn) Callout("The TraceVeil watcher is off in Accessibility settings, so permission dialogs and settings screens will not be recorded. Network attempts still will.")
+            if (label == null) Callout("This app is not installed on this phone.", color = Film.leak)
+            (error ?: failure)?.let { Callout(it, color = Film.leak) }
             if (!vpnReady) {
                 PrimaryAction("Allow VPN permission", { VpnService.prepare(ctx)?.let { vpnLauncher.launch(it) } ?: onRefresh() })
                 Note("Android asks once. In a quarantine run the VPN covers only the app you choose.")
@@ -176,8 +194,10 @@ private fun Explainer(
                 SecondaryAction("Last run ${DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(r.startedAtEpochMs))} · view report", { onView(r) }, Modifier.fillMaxWidth())
             }
 
-            SectionTitle("What this cannot see")
-            QuarantineReports.LIMITS.forEach { Note("• $it") }
+            Spacer(Modifier.height(8.dp))
+            CollapsibleCard("What this cannot see", summary = "Limits of a quarantine run: read these before drawing conclusions", glyph = Glyph.INFO) {
+                QuarantineReports.LIMITS.forEach { Note("• $it") }
+            }
         }
     }
 }
@@ -233,7 +253,7 @@ private fun LiveView(run: QuarantineRunState.Running, live: QuarantineObservatio
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             SecondaryAction("Open the app", { DeviceChecks.launch(ctx, run.targetPackage) }, Modifier.weight(1f))
             PrimaryAction("Stop and restore internet", { QuarantineController.stop() }, Modifier.weight(1.4f))
         }
@@ -320,7 +340,7 @@ private fun ReportView(report: QuarantineReport, saved: Boolean, path: String?, 
                 exportNote?.let { Note(it) }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             SecondaryAction("App info", { runCatching { DeviceChecks.openAppInfo(ctx, report.targetPackage) } }, Modifier.weight(1f))
             SecondaryAction("Run again", onAgain, Modifier.weight(1f))
             PrimaryAction("Done", onDone, Modifier.weight(1f))
@@ -398,16 +418,17 @@ private fun Signal(color: Color, title: String, evidence: QuarantineEvidence, bo
 
 @Composable
 private fun Choice(text: String, selected: Boolean, onClick: () -> Unit) {
-    val color = if (selected) Film.scan else Film.boneDim
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = if (selected) Film.base else Film.bone,
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
+    val shape = RoundedCornerShape(24.dp)
+    Box(
+        Modifier
+            .heightIn(min = 48.dp)
+            .clip(shape)
             .background(if (selected) Film.scan else Film.raised)
-            .border(1.dp, color, RoundedCornerShape(6.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-    )
+            .border(1.dp, if (selected) Film.scan else Film.line, shape)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 18.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = MaterialTheme.typography.labelLarge, color = if (selected) Film.base else Film.bone)
+    }
 }

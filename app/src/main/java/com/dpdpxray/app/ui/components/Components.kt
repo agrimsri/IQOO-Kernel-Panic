@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,41 +36,66 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dpdpxray.app.ui.theme.Film
+import com.dpdpxray.app.ui.theme.FilmExtra
 import com.dpdpxray.app.ui.theme.Mono
+import com.dpdpxray.app.ui.theme.Radii
 
+/**
+ * The app bar every inner screen shares: 64dp tall, a 48dp back button when there is somewhere to go back to, and the
+ * title as a heading for TalkBack. Tab screens pass `onBack = null`, so their title lines up with the content.
+ */
 @Composable
 fun TopBar(title: String, onBack: (() -> Unit)?, trailing: @Composable () -> Unit = {}) {
-    Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Film.bone) }
-        else Spacer(Modifier.width(12.dp))
-        Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(start = 4.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (onBack != null) {
+            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Film.bone)
+            }
+            Spacer(Modifier.width(4.dp))
+        } else {
+            Spacer(Modifier.width(16.dp))
+        }
+        Text(
+            title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).semantics { heading() },
+        )
         trailing()
     }
 }
 
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
-    Text(text, style = MaterialTheme.typography.titleMedium, color = Film.bone, modifier = modifier.padding(top = 20.dp, bottom = 8.dp))
+    Text(
+        text, style = MaterialTheme.typography.titleMedium, color = Film.bone,
+        modifier = modifier.padding(top = 24.dp, bottom = 8.dp).semantics { heading() },
+    )
 }
 
 /** A row with a coloured rule on its left edge: the rule colour is the meaning (severity, category, status). */
 @Composable
 fun RuleRow(color: Color, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable () -> Unit) {
+    val shape = RoundedCornerShape(Radii.row)
     Row(
         modifier
             .fillMaxWidth()
             .height(IntrinsicSize.Min)
-            .clip(RoundedCornerShape(6.dp))
+            .clip(shape)
             .background(Film.raised)
+            .border(1.dp, FilmExtra.hairline, shape)
             .let { if (onClick != null) it.clickable(onClick = onClick) else it },
     ) {
         Box(Modifier.width(4.dp).fillMaxHeight().background(color))
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp).weight(1f)) { content() }
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp).weight(1f)) { content() }
     }
 }
 
@@ -78,13 +105,16 @@ fun StatusDot(ok: Boolean?, modifier: Modifier = Modifier) {
     Box(modifier.size(10.dp).clip(CircleShape).background(c))
 }
 
+/** A small label chip: tinted fill, soft outline, text in the meaning colour. */
 @Composable
-fun Tag(text: String, color: Color) {
+fun Tag(text: String, color: Color, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(10.dp)
     Text(
         text,
         style = MaterialTheme.typography.labelMedium,
         color = color,
-        modifier = Modifier.border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
+        modifier = modifier.clip(shape).background(color.copy(alpha = 0.12f)).border(1.dp, color.copy(alpha = 0.45f), shape)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
     )
 }
 
@@ -95,29 +125,37 @@ fun HostText(host: String, color: Color = Film.bone) {
 
 @Composable
 fun CodeBlock(code: String, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(Radii.small)
     Box(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(Color(0xFF0B1722))
-            .border(1.dp, Film.line, RoundedCornerShape(6.dp)).horizontalScroll(rememberScrollState()).padding(12.dp),
+        modifier.fillMaxWidth().clip(shape).background(Color(0xFF0B1722))
+            .border(1.dp, Film.line, shape).horizontalScroll(rememberScrollState()).padding(12.dp),
     ) {
         Text(code, fontFamily = Mono, fontSize = 12.5.sp, lineHeight = 18.sp, color = Film.bone)
     }
 }
 
+/** The main action of a section: filled scan colour, dark text, at least 56dp tall (text may wrap, never clips). */
 @Composable
 fun PrimaryAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     Button(
-        onClick = onClick, enabled = enabled, modifier = modifier.fillMaxWidth().height(54.dp),
-        shape = RoundedCornerShape(8.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Film.scan, contentColor = Film.base, disabledContainerColor = Film.line),
-    ) { Text(text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold) }
+        onClick = onClick, enabled = enabled, modifier = modifier.fillMaxWidth().heightIn(min = 56.dp),
+        shape = RoundedCornerShape(Radii.button),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Film.scan, contentColor = Film.base, disabledContainerColor = Film.line, disabledContentColor = Film.boneDim,
+        ),
+    ) { Text(text, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center) }
 }
 
+/** A secondary action: outlined, light text, same corner radius as [PrimaryAction], at least 52dp tall. */
 @Composable
 fun SecondaryAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     OutlinedButton(
-        onClick = onClick, enabled = enabled, modifier = modifier.height(48.dp), shape = RoundedCornerShape(8.dp),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = Film.bone),
-    ) { Text(text, style = MaterialTheme.typography.labelLarge) }
+        onClick = onClick, enabled = enabled, modifier = modifier.heightIn(min = 52.dp), shape = RoundedCornerShape(Radii.button),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (enabled) Film.boneDim.copy(alpha = 0.55f) else Film.line),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Film.bone, disabledContentColor = Film.boneDim),
+    ) { Text(text, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center) }
 }
 
 /**

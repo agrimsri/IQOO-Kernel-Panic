@@ -69,8 +69,7 @@ object Explanations {
     /** Model text without markdown emphasis, headings or bullet markers, which the result screen would show literally. */
     fun plain(text: String?): String = text.orEmpty()
         .replace("**", "").replace("__", "")
-        .lines().joinToString("
-") { it.trimStart().removePrefix("#").removePrefix("#").removePrefix("* ").removePrefix("- ").trimEnd() }
+        .lines().joinToString("\n") { it.trimStart().removePrefix("#").removePrefix("#").removePrefix("* ").removePrefix("- ").trimEnd() }
         .trim()
 
     private fun firstSentences(s: String, n: Int): String =
