@@ -145,6 +145,26 @@ class ApkGuardMappingTest {
         assertTrue(alert.spokenHi.contains("2"))
     }
 
+    // --- permission profile model card ---------------------------------------------------------------------------
+
+    @Test fun `the result screen adds one inferred model card and keeps every rule signal`() {
+        val facts = com.dpdpxray.core.apk.ApkFacts(
+            packageName = "com.traceveil.riskdemo", label = "TEST Challan", versionName = "1.0", versionCode = 1, targetSdk = 35,
+            permissions = setOf("android.permission.INTERNET", "android.permission.READ_SMS", "android.permission.RECEIVE_SMS"),
+            origin = InstallOrigin(InstallSource.NOT_INSTALLED),
+        )
+        val rules = ApkRiskRules.evaluate(facts)
+        val shown = ApkGuardModel.withModelCard(rules)
+        val cards = shown.signals.filter { it.id == com.dpdpxray.core.apk.ApkModelSignal.ID }
+        assertEquals(1, cards.size)
+        assertEquals(com.dpdpxray.core.apk.ApkEvidence.INFERRED, cards.single().evidence)
+        assertTrue(cards.single().severity != com.dpdpxray.core.apk.ApkSeverity.REVIEW_CAREFULLY)
+        assertEquals(rules.signals, shown.signals - cards.toSet())
+        assertEquals(rules.summary, shown.summary)
+        // Loaded once and reused.
+        assertTrue(ApkGuardModel.permissionRisk() === ApkGuardModel.permissionRisk())
+    }
+
     @Test fun `long or empty labels stay readable`() {
         assertEquals("New app installed: com.x.app — check it before you open it", InstallAlertPolicy.alert(" ", ApkRiskRules.summary(emptyList()), "com.x.app").title)
         assertTrue(InstallAlertPolicy.alert("A".repeat(200), ApkRiskRules.summary(emptyList())).title.length < 120)

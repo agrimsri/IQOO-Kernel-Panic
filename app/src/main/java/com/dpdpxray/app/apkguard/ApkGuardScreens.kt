@@ -214,14 +214,15 @@ fun ApkGuardResultScreen(
     }
 }
 
+// Runs on Dispatchers.IO (see ApkGuardResultScreen), so the model's one-time load never blocks the main thread.
 private suspend fun load(ctx: Context, subject: ApkGuardSubject): ResultState = when (subject) {
     is ApkGuardSubject.Installed -> ApkInspector.readInstalled(ctx, subject.packageName)
-        ?.let { ResultState.Ready(it, ApkRiskRules.evaluate(it.facts)) }
+        ?.let { ResultState.Ready(it, ApkGuardModel.withModelCard(ApkRiskRules.evaluate(it.facts))) }
         ?: ResultState.Failed("This app is not installed, or Android did not let TraceVeil read it.")
     is ApkGuardSubject.File -> when (val r = ApkFileChecks.await(subject.key)) {
         null -> ResultState.Failed("This file check is no longer in memory, for example because TraceVeil was closed. Open the APK file again from WhatsApp or Files.")
         is ArchiveRead.Failed -> ResultState.Failed(r.reason)
-        is ArchiveRead.Ok -> ResultState.Ready(r.app, ApkRiskRules.evaluate(r.app.facts))
+        is ArchiveRead.Ok -> ResultState.Ready(r.app, ApkGuardModel.withModelCard(ApkRiskRules.evaluate(r.app.facts)))
     }
 }
 
