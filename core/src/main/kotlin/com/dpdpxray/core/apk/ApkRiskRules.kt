@@ -27,9 +27,9 @@ object ApkRiskRules {
 
     private const val BASIS_PLAY_PROTECT = "Google Play Protect developer guidance treats SMS, notification-listener and accessibility access as high risk for apps sideloaded from the internet."
     private const val BASIS_CERT_IN = "CERT-In advisory CICA-2026-3492 (March 2026) on fake RTO/e-Challan apps: multi-stage install, SMS and call access, VPN request, OTP forwarding."
-    private const val BASIS_SPYMAX = "Cyber Swachhta Kendra SpyMax alert (June 2025): fake apps that obtained contacts, SMS, OTPs and notification content."
-    private const val BASIS_SPYLOAN = "McAfee Labs SpyLoan research (November 2024): loan apps that requested contacts and files and misused them for coercion."
-    private const val BASIS_FILES = "Police and CERT-In advisories (2025-2026) describe fake challan, pension and wedding-invitation apps shared as APK files in messages."
+    private const val BASIS_SPYMAX = "Cyber Swachhta Kendra SpyMax alert (June 2025): fake apps that could access contacts, SMS, OTPs and notification content."
+    private const val BASIS_SPYLOAN = "McAfee Labs SpyLoan research (November 2024): loan apps that requested sensitive permissions; reported harms included harassment and extortion."
+    private const val BASIS_FILES = "CERT-In (2026) and police-reported cases (2025-2026) describe fake challan, pension and wedding-invitation apps shared as APK files in messages."
 
     private fun bi(en: String, hi: String) = Bilingual(en, hi)
 
@@ -376,8 +376,8 @@ object ApkRiskRules {
         if (otp.isNotEmpty() && control.isNotEmpty()) add(ApkSignal(
             "combo_otp_screen_control", ApkSeverity.REVIEW_CAREFULLY, ApkEvidence.OBSERVED,
             bi("Combination: can see OTPs and act on or cover your screen", "मेल: OTP देख सकता है और स्क्रीन पर काम कर सकता है या उसे ढक सकता है"),
-            bi("${src.en}, and it asks ${otp.joinToString(" and ") { it.en }} together with ${control.joinToString(" and ") { it.en }}. Together, these could let an app read a one-time password and act on or cover your screen. Public cyber-safety advisories about fake bank and challan apps describe this combination. This does not prove this app does so.",
-                "${src.hi}, और यह ${otp.joinToString(" और ") { it.hi }} के साथ ${control.joinToString(" और ") { it.hi }} माँगता है। ये मिलकर किसी ऐप को OTP पढ़ने और आपकी स्क्रीन पर काम करने या उसे ढकने दे सकते हैं। नकली बैंक और चालान ऐप्स पर सरकारी साइबर-सुरक्षा चेतावनियों में यही मेल बताया गया है। इससे यह साबित नहीं होता कि यह ऐप ऐसा करता है।"),
+            bi("${src.en}, and it asks ${otp.joinToString(" and ") { it.en }} together with ${control.joinToString(" and ") { it.en }}. Together, these could let an app read a one-time password and act on or cover your screen. Google Play Protect guidance treats these accesses as high risk for apps installed from the internet, and CERT-In has warned about fake challan apps that forward OTPs. This does not prove this app does so.",
+                "${src.hi}, और यह ${otp.joinToString(" और ") { it.hi }} के साथ ${control.joinToString(" और ") { it.hi }} माँगता है। ये मिलकर किसी ऐप को OTP पढ़ने और आपकी स्क्रीन पर काम करने या उसे ढकने दे सकते हैं। Google Play Protect की गाइडलाइन इंटरनेट से इंस्टॉल ऐप्स में इन अनुमतियों को ज़्यादा जोखिम वाला मानती है, और CERT-In ने OTP आगे भेजने वाले नकली चालान ऐप्स के बारे में चेतावनी दी है। इससे यह साबित नहीं होता कि यह ऐप ऐसा करता है।"),
             otpAdvice,
             sms + listeners.map { proof(it) } + accessibility.map { proof(it) } + listOfNotNull(OVERLAY.takeIf { overlay }),
             basis = "$BASIS_PLAY_PROTECT $BASIS_CERT_IN",
@@ -412,8 +412,8 @@ object ApkRiskRules {
             add(ApkSignal(
                 "combo_contacts_files", ApkSeverity.WORTH_KNOWING, ApkEvidence.OBSERVED,
                 bi("Combination: your contacts and your photos or files", "मेल: आपके कॉन्टैक्ट और आपकी फ़ोटो या फ़ाइलें"),
-                bi("${src.en}, and it asks for your contacts together with ${what.en}. Research on predatory loan apps describes misuse of exactly this kind of access. This does not prove this app does so.",
-                    "${src.hi}, और यह आपके कॉन्टैक्ट के साथ ${what.hi} माँगता है। लोन ऐप्स पर हुई रिसर्च में ठीक इसी तरह की अनुमतियों के ग़लत इस्तेमाल का ज़िक्र है। इससे यह साबित नहीं होता कि यह ऐप ऐसा करता है।"),
+                bi("${src.en}, and it asks for your contacts together with ${what.en}. Research on predatory loan apps describes misuse of this kind of access. This does not prove this app does so.",
+                    "${src.hi}, और यह आपके कॉन्टैक्ट के साथ ${what.hi} माँगता है। लोन ऐप्स पर हुई रिसर्च में इस तरह की अनुमतियों के ग़लत इस्तेमाल का ज़िक्र है। इससे यह साबित नहीं होता कि यह ऐप ऐसा करता है।"),
                 bi("Deny contacts and file access unless the app's main job needs them. Do not let anyone pressure you into granting access for a loan.",
                     "जब तक ऐप के मुख्य काम के लिए ज़रूरी न हो, कॉन्टैक्ट और फ़ाइल की अनुमति न दें। लोन के लिए किसी के दबाव में अनुमति न दें।"),
                 contacts + files,
