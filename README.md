@@ -288,7 +288,7 @@ TraceVeil's home screen lists every item under **Before you audit**, with a butt
 6. **Report and export:**
    - **Save PDF to Downloads**, **Share PDF**, or **Save Markdown**.
    - Files go to `Downloads/TraceVeil`.
-   - **Export audit data (JSON)** feeds `traceveil-ci`, a laptop/CI release gate: see [CI mode](docs/CI_MODE.md).
+   - **Export audit data (JSON)** feeds `traceveil-ci`, a laptop/CI release gate: see [CI and TraceVeil Runner](#ci-and-traceveil-runner).
 7. **Camera check:** photograph or choose a screenshot of any consent screen, including one on another device, for an instant dark-pattern review.
 
 Other tools:
@@ -298,6 +298,20 @@ Other tools:
   - *Load AI when an audit starts.*
   - **Your own domains**: long-press a host on any timeline so your own backend is never counted as a tracker.
 - **Open sample audit:** a complete, clearly labelled sample result, so you can explore the app before setting anything up.
+
+### CI and TraceVeil Runner
+
+`traceveil-ci` (in `cli/`, plain Kotlin/JVM, `./gradlew :cli:installDist`) turns TraceVeil's evidence into a release gate with exit codes 0 pass, 1 policy violation, 2 error:
+
+- **`traceveil-ci run`: TraceVeil Runner, hands-free on a test phone.** One command on a laptop or a self-hosted CI runner installs the build on a USB-connected test phone (`--apk`), has TraceVeil run the full consent audit there by itself (Silent, Reject and Accept plans, the agent tapping the choices), copies the evidence back over adb and applies the policy. It adds an automatic privacy gate to every alpha/beta build: testers check features, but nobody can see an SDK lookup 0.1 s after Reject. Off by default on the phone; it needs *Settings → Developer automation*, a pairing token and an allowlist of test apps it may reset. Setup, security model and limits: [TraceVeil Runner](docs/ci/RUNNER.md); CI example: [github-runner-example.yml](docs/ci/github-runner-example.yml).
+- **`traceveil-ci check` / `diff`:** re-check exported bundles with the latest rules and compare releases, with JSON and SARIF output: [CI mode](docs/CI_MODE.md).
+
+```sh
+export TRACEVEIL_TOKEN='token from Settings > Developer automation'
+cli/build/install/traceveil-ci/bin/traceveil-ci run --package com.example.app --apk app-beta.apk --mode full --policy docs/ci/traceveil-policy.json
+```
+
+A pass describes what one run on one phone observed; it is not a compliance certificate.
 
 ## The LeakyShop test app
 
@@ -349,7 +363,7 @@ adb push gemma-4-E2B-it.litertlm /sdcard/Android/data/com.dpdpxray.app/files/mod
 ## Roadmap
 
 - Payload-level evidence for debug builds the developer controls.
-- A CI mode: run the rules engine against a capture file in a pull request.
+- TraceVeil Runner on emulators (it is designed for a physical phone over USB; emulators are untested).
 - More languages for the consent lexicon and notices (Tamil, Telugu, Bengali, Marathi).
 - Tracker catalogue updates from a signed, offline-verifiable list.
 - Checks for consent-manager integrations and withdrawal flows deeper in app settings.

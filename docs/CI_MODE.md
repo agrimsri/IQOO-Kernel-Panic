@@ -2,7 +2,7 @@
 
 TraceVeil captures consent evidence on a real phone: the DNS lookups an app makes before and after a consent choice, and what its consent screen shows. **TraceVeil CI** lets a team use that evidence in its release pipeline. The phone exports the audit as one JSON file; the team commits it next to the release; a small command-line tool, `traceveil-ci`, re-checks it with the latest rules and fails the build when the team's policy is violated.
 
-What it is not: CI does not capture anything, install the app or talk to a phone. It reads the evidence a person captured and exported. It sends nothing over the network. A pass is not a compliance certificate and a failure is not a legal verdict: a DNS lookup is an attempt to contact a host, not proof that personal data was sent, and the evidence covers one phone during one run.
+What it is not: `check` and `diff` do not capture anything, install the app or talk to a phone. They read the evidence a person captured and exported. (To have a USB-connected test phone run the audit hands-free first, use `traceveil-ci run`: see [TraceVeil Runner](ci/RUNNER.md).) It sends nothing over the network. A pass is not a compliance certificate and a failure is not a legal verdict: a DNS lookup is an attempt to contact a host, not proof that personal data was sent, and the evidence covers one phone during one run.
 
 ## The flow
 
@@ -60,6 +60,7 @@ The tool is plain Kotlin/JVM on top of TraceVeil's `core` module (Java 17, no An
 ```text
 traceveil-ci check <bundle.json>... [--policy policy.json] [--format text|json|sarif] [--out file]
 traceveil-ci diff <old.json> <new.json> [--format text|json] [--out file]
+traceveil-ci run --package <pkg> [options]     # TraceVeil Runner: see ci/RUNNER.md
 traceveil-ci --help | --version
 ```
 

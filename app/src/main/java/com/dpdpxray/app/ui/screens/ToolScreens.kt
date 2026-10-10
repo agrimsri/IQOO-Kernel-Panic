@@ -52,6 +52,7 @@ import com.dpdpxray.app.ai.BackendKind
 import com.dpdpxray.app.ai.AnswerCheckReport
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.ai.ModelFiles
+import com.dpdpxray.app.automation.DeveloperAutomationSection
 import com.dpdpxray.app.ui.CameraCheckState
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.CodeBlock
@@ -303,6 +304,9 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit) {
             SectionCard(title = "Hey TraceVeil (experimental)", glyph = Glyph.ASK) {
                 HeyTraceVeilSection(s.heyTraceVeil, { v -> vm.updateSettings { it.copy(heyTraceVeil = v) } }, showTitle = false)
             }
+
+            // TraceVeil Runner (off by default): see automation/DeveloperAutomationSection.kt.
+            SectionCard(title = "Developer automation", glyph = Glyph.SETTINGS) { DeveloperAutomationSection(vm) }
 
             SectionCard(title = "Privacy", glyph = Glyph.LOCK, accent = Film.clear) {
                 val ctx = LocalContext.current

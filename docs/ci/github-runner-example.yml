@@ -1,0 +1,93 @@
+# TraceVeil Runner on a self-hosted GitHub Actions runner with a USB test phone (example workflow).
+# Copy it to .github/workflows/traceveil-device-gate.yml to use it. Setup and security model: docs/ci/RUNNER.md.
+#
+# Every push to main or a release branch builds the app under test, installs it on the test phone, runs TraceVeil's
+# full consent audit there hands-free (Silent, Reject and Accept plans) and fails the job when the policy is violated.
+# The evidence (bundle.json, status.json) is kept as an artifact and the findings go to code scanning as SARIF.
+#
+# Runner machine: a self-hosted runner (Linux, macOS or Windows with Git Bash) labelled "android-usb", with Java 17,
+# Android platform-tools (adb) on PATH, and the test phone connected over USB with USB debugging allowed for this
+# computer ("Always allow"). Do the one-time phone setup in docs/ci/RUNNER.md: Developer automation on, the app under
+# test on the reset allowlist, the VPN allowed once, the consent watcher switched on by you, Shizuku for full runs.
+#
+# Repository settings: secret TRACEVEIL_TOKEN = the pairing token from TraceVeil > Settings > Developer automation;
+# optional variable TRACEVEIL_DEVICE = the phone's adb serial (needed only when several phones are connected).
+#
+# As shipped it builds this repository's LeakyShop demo app (leaky flavour), which is made to look up tracker hosts
+# after Reject, so the gate is expected to fail on C2. Replace the build step, APK path and package with your own app.
+# Emulators are future work: the Runner has not been tested on one.
+name: TraceVeil device gate
+
+on:
+  push:
+    branches: [main, 'release/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write # needed to upload SARIF to code scanning
+
+# One phone runs one check at a time: queue the runs instead of cancelling a check in progress.
+concurrency:
+  group: traceveil-test-phone
+  cancel-in-progress: false
+
+jobs:
+  device-gate:
+    name: Consent audit on the test phone
+    runs-on: [self-hosted, android-usb]
+    timeout-minutes: 30
+    env:
+      TRACEVEIL_TOKEN: ${{ secrets.TRACEVEIL_TOKEN }}
+      ANDROID_SERIAL: ${{ vars.TRACEVEIL_DEVICE }}
+      APP_PACKAGE: com.leakyshop.demo
+      APP_APK: leakyshop/build/outputs/apk/leaky/debug/leakyshop-leaky-debug.apk
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7, same pin as checks.yml
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6, same pin as checks.yml
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build the app under test and traceveil-ci
+        run: ./gradlew :leakyshop:assembleLeakyDebug :cli:installDist --no-daemon --console=plain
+
+      - name: Show the connected phone
+        run: adb devices
+
+      # Exit codes: 0 pass, 1 policy violation, 2 no phone, a refusal on the phone (the log says what to fix there),
+      # or timeout. Any non-zero code fails the job. The token comes from TRACEVEIL_TOKEN and is never printed.
+      - name: Run the consent audit on the phone and gate the build
+        run: |
+          cli/build/install/traceveil-ci/bin/traceveil-ci run \
+            --package "$APP_PACKAGE" \
+            --apk "$APP_APK" \
+            --mode full \
+            --policy docs/ci/traceveil-policy.json \
+            --timeout 300 \
+            --out traceveil-out \
+            --sarif traceveil.sarif
+
+      - name: Keep the evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4 # pin to a commit SHA as checks.yml does once you adopt the workflow
+        with:
+          name: traceveil-evidence
+          path: traceveil-out/
+          if-no-files-found: ignore
+
+      # Code scanning needs GitHub Advanced Security on private repositories; the gate itself (exit code) works without.
+      - name: Upload SARIF to code scanning
+        if: ${{ !cancelled() && hashFiles('traceveil.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4 # pin to a commit SHA once you adopt the workflow
+        with:
+          sarif_file: traceveil.sarif
+          category: traceveil-device

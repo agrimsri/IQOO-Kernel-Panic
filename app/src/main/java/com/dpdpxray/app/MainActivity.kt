@@ -39,6 +39,7 @@ import com.dpdpxray.app.apkguard.ApkGuardSubject
 import androidx.navigation.navArgument
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.data.Audience
+import com.dpdpxray.app.automation.AutomationIntents
 import com.dpdpxray.app.quarantine.QuarantineRoutes
 import com.dpdpxray.app.quarantine.QuarantineScreen
 import com.dpdpxray.app.quarantine.navigateToQuarantine
@@ -85,10 +86,14 @@ class MainActivity : ComponentActivity() {
     /** APK Guard route requested by an opened/shared APK file or a new-install notification. */
     private val apkGuardRoute = MutableStateFlow<String?>(null)
 
+    /** Developer automation: a check started by TraceVeil Runner shows its live screen (automation/AutomationActivity). */
+    private val openLiveCheck = MutableStateFlow(false)
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         ApkGuardIntents.route(this, intent)?.let { apkGuardRoute.value = it }
+        if (AutomationIntents.opensLive(intent)) openLiveCheck.value = true
     }
     /** Launcher shortcut, "Hey Google" App Action or wake-word notification request, consumed once. */
     private val assistantFeatures = Channel<AssistantFeature>(Channel.CONFLATED)
@@ -101,6 +106,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         if (savedInstanceState == null) apkGuardRoute.value = ApkGuardIntents.route(this, intent)
+        if (savedInstanceState == null && AutomationIntents.opensLive(intent)) openLiveCheck.value = true
         if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
         }
@@ -295,6 +301,14 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     HeyTraceVeilHooks(nav)
+                    val liveCheck by openLiveCheck.collectAsState()
+                    LaunchedEffect(liveCheck) {
+                        // Only a check that is actually running is shown; otherwise the request is ignored.
+                        if (liveCheck) {
+                            openLiveCheck.value = false
+                            if (vm.progress.value is AuditProgress.Running) nav.navigate("live") { launchSingleTop = true }
+                        }
+                    }
                 }
                 }
                 }

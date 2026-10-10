@@ -38,7 +38,10 @@ fun main(args: Array<String>) {
  * `traceveil-ci check <bundle.json>... [--policy policy.json] [--format text|json|sarif] [--out file]`
  * `traceveil-ci diff <old.json> <new.json> [--format text|json] [--out file]`
  *
- * Exit codes: 0 pass (diff: no regression), 1 policy violation (diff: regression), 2 usage or unreadable input.
+ * `traceveil-ci run --package <pkg> [options]` (see [RunCommand]): runs the audit on a USB-connected phone first.
+ *
+ * Exit codes: 0 pass (diff: no regression), 1 policy violation (diff: regression), 2 usage or unreadable input
+ * (run: also device, phone-side refusal or timeout).
  * With --out, the chosen format is written to the file and the text report still goes to stdout for the CI log.
  */
 class TraceVeilCi(
@@ -46,6 +49,10 @@ class TraceVeilCi(
     private val err: PrintStream,
     private val cwd: File = File("").absoluteFile,
     gateFactory: Lazy<Gate> = lazy { Gate() },
+    private val env: Map<String, String> = System.getenv(),
+    private val adbFactory: (String) -> Adb = ::ProcessAdb,
+    private val clock: RunClock = SystemRunClock,
+    private val newRunId: () -> String = { RunIds.generate(clock.nowMs()) },
 ) {
     private val gate: Gate by gateFactory
     private val pretty = Json { prettyPrint = true }
@@ -57,6 +64,7 @@ class TraceVeilCi(
             "-V", "--version", "version" -> { out.println("${CliInfo.NAME} ${CliInfo.version}"); Exit.PASS }
             "check" -> check(Args.parse(args.drop(1), setOf("--policy", "--format", "--out")))
             "diff" -> diff(Args.parse(args.drop(1), setOf("--format", "--out")))
+            "run" -> RunCommand(out, err, cwd, { gate }, env, adbFactory, clock, newRunId).run(args.drop(1))
             else -> throw UsageException("unknown command \"${args[0]}\"")
         }
     } catch (e: UsageException) {
@@ -172,6 +180,9 @@ class TraceVeilCi(
             |Usage:
             |  traceveil-ci check <bundle.json>... [--policy policy.json] [--format text|json|sarif] [--out file]
             |  traceveil-ci diff <old.json> <new.json> [--format text|json] [--out file]
+            |  traceveil-ci run --package <pkg> [--device SERIAL] [--apk file.apk] [--mode full|quick] [--token T]
+            |                   [--policy policy.json] [--timeout 300] [--out traceveil-out] [--adb path]
+            |                   [--format text|json] [--sarif file] [--child-facing]
             |  traceveil-ci --help | --version
             |
             |check  Re-evaluates each traceveil.audit.v1 bundle (from TraceVeil's Report screen: "Export audit data
@@ -179,6 +190,13 @@ class TraceVeilCi(
             |diff   Compares two bundles (e.g. last release and this one): resolved, new and unchanged findings and
             |       the score change. A new finding at Low severity or above, a lower score, an inconclusive new
             |       result, or an old finding the new capture could not test (NOT ESTABLISHED) is a regression.
+            |
+            |run    TraceVeil Runner: starts the audit on a USB-connected test phone over adb (Developer automation
+            |       must be on in TraceVeil's Settings), waits for it, copies bundle.json to --out/<run id>/ and gates
+            |       it like check. The pairing token comes from --token or TRACEVEIL_TOKEN; the phone comes from
+            |       --device, ANDROID_SERIAL or the only connected phone; adb from --adb, ADB or PATH. --apk installs
+            |       the build first with adb install -r. Exit 2 also covers device problems, a refusal on the phone
+            |       and --timeout. Setup and security model: docs/ci/RUNNER.md.
             |
             |Policy keys (all optional; defaults in brackets):
             |  failOn            ["C2", "C9"]   fail when the re-evaluated result has any of these checks
@@ -190,7 +208,8 @@ class TraceVeilCi(
             |  requirePlans      ["ACCEPT", "REJECT", "SILENT"]  plans that must be captured with their choice recorded
             |
             |--out writes the chosen format to a file; the text report still goes to stdout.
-            |Exit codes: 0 pass (diff: no regression), 1 policy violation (diff: regression), 2 usage or unreadable input.
+            |Exit codes: 0 pass (diff: no regression), 1 policy violation (diff: regression), 2 usage or unreadable input
+            |(run: also no device, a refusal or failure on the phone, or a timeout).
             |A DNS lookup is an attempt to contact a host, not proof that personal data was sent.
             |
         """.trimMargin()
