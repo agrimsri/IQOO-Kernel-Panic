@@ -53,6 +53,9 @@ object AnswerCheck {
         fun outcome(id: String): LlmOutcome? = byId[id]?.second
         val out = mutableListOf<String>()
 
+        results.firstNotNullOfOrNull { (_, outcome) -> EncoderPlan.missingEncoder(outcome.describe()) }?.let {
+            out += "The model never ran: the engine asked for a ${it.label} encoder this bundle does not contain. Reload the model; this build only requests encoders for inputs the app sends."
+        }
         when {
             ok("app") == true && ok("legacy") == false -> out += "Fixed on this phone: the app's settings answer and the old settings do not, so the earlier empty replies came from the old conversation settings."
             ok("app") == true -> out += "The app's settings answer, but the old settings also answered this short prompt, so this check does not reproduce the earlier failure. Next, open a finding explanation and a Camera Check and read 'Last problem'."

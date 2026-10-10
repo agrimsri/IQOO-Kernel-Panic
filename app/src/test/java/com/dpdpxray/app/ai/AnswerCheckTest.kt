@@ -37,6 +37,17 @@ class AnswerCheckTest {
     }
 
     @Test
+    fun `a missing encoder is named instead of blaming the sampler or thinking settings`() {
+        val missing = LlmOutcome.Failed(
+            "com.google.ai.edge.litertlm.LiteRtLmJniException",
+            "Failed to create conversation: NOT_FOUND: TF_LITE_AUDIO_ENCODER_HW not found in the model.",
+        )
+        val all = AnswerCheck.cases(canReadImages = true).map { it to (missing as LlmOutcome) }
+        val c = AnswerCheck.conclude(all)
+        assertTrue(c.first(), c.first().contains("audio encoder"))
+    }
+
+    @Test
     fun `every check is bounded so a broken setting cannot run for minutes`() {
         AnswerCheck.cases(canReadImages = true).forEach { assertTrue(it.id, (it.options.maxOutputTokens ?: Int.MAX_VALUE) <= 512) }
     }

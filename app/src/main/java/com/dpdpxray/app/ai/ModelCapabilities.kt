@@ -17,18 +17,23 @@ data class ModelCapabilities(val inputs: Set<ModelCapability>, val basis: String
 
     fun describe(): String = inputs.sortedBy { it.ordinal }.joinToString { it.label } + " ($basis)"
 
+    /** Drops one input, e.g. when the bundle turns out to have no encoder for it. */
+    fun without(capability: ModelCapability, reason: String): ModelCapabilities =
+        if (capability !in inputs) this else ModelCapabilities(inputs - capability, "$basis, $reason")
+
     companion object {
         private val MULTIMODAL_FAMILIES = listOf("gemma-4", "gemma4", "gemma_4", "gemma-3n", "gemma3n", "gemma_3n")
 
         /**
-         * Conservative table from the file name. Gemma 4 and Gemma 3n GPU/CPU bundles take text, images and audio.
-         * NPU-compiled bundles and unknown families are text-only until a vision-capable bundle is verified on the phone.
+         * Conservative table from the file name. Gemma 4 and Gemma 3n GPU/CPU bundles take text and images. Audio is never
+         * assumed: the app sends no audio to the model, and some published bundles (the Gemma 4 E2B GPU bundle on the iQOO 15)
+         * ship without an audio encoder. NPU-compiled bundles and unknown families are text-only until verified on the phone.
          */
         fun fromFileName(name: String): ModelCapabilities = when {
             ModelSelection.isNpuCompiled(name) ->
                 ModelCapabilities(setOf(ModelCapability.TEXT), "NPU bundle: treated as text-only until image input is verified on this phone")
             MULTIMODAL_FAMILIES.any { name.contains(it, ignoreCase = true) } ->
-                ModelCapabilities(ModelCapability.entries.toSet(), "file name: Gemma 4 / Gemma 3n multimodal family")
+                ModelCapabilities(setOf(ModelCapability.TEXT, ModelCapability.VISION), "file name: Gemma 4 / Gemma 3n family")
             else -> ModelCapabilities(setOf(ModelCapability.TEXT), "file name: unrecognised family, treated as text-only")
         }
 
@@ -41,6 +46,36 @@ data class ModelCapabilities(val inputs: Set<ModelCapability>, val basis: String
             },
             "bundle metadata",
         )
+    }
+}
+
+enum class EncoderTarget { GPU, CPU }
+
+/**
+ * Which input encoders LiteRT-LM is asked to build. An encoder the bundle does not contain makes every conversation fail
+ * ("NOT_FOUND: TF_LITE_AUDIO_ENCODER_HW not found in the model"), so only encoders for inputs the app actually sends are
+ * requested: images when the bundle can read them, audio never.
+ */
+data class EncoderPlan(val vision: EncoderTarget?, val audio: EncoderTarget?) {
+    companion object {
+        fun of(kind: BackendKind, caps: ModelCapabilities) = EncoderPlan(
+            vision = when {
+                !caps.canReadImages -> null
+                kind == BackendKind.CPU -> EncoderTarget.CPU
+                else -> EncoderTarget.GPU
+            },
+            audio = null,
+        )
+
+        private val MISSING_SECTION = Regex("TF_LITE_(AUDIO|VISION)_[A-Z_]+ not found")
+
+        /** The input whose encoder LiteRT-LM reported missing, so the model can be reopened without it. */
+        fun missingEncoder(message: String?): ModelCapability? =
+            when (message?.let { MISSING_SECTION.find(it) }?.groupValues?.get(1)) {
+                "AUDIO" -> ModelCapability.AUDIO
+                "VISION" -> ModelCapability.VISION
+                else -> null
+            }
     }
 }
 

@@ -101,10 +101,15 @@ class LlmEngine(private val context: Context) {
             }
             unloadLocked()
             _status.value = LlmStatus.Loading(kind)
-            val caps = ModelCapabilities.fromFileName(file.name)
+            var caps = ModelCapabilities.fromFileName(file.name)
             val start = SystemClock.elapsedRealtime()
-            val result = runCatching {
-                Engine(engineConfig(file, kind, caps)).also { it.initialize() }
+            var result = runCatching { openChecked(file, kind, caps) }
+            // A bundle without an encoder we asked for only fails once a conversation is created; reopen once without it.
+            val missing = EncoderPlan.missingEncoder(result.exceptionOrNull()?.message)
+            if (missing != null && missing in caps.inputs) {
+                Log.w(TAG, "bundle has no ${missing.label} encoder; reopening without it")
+                caps = caps.without(missing, "bundle has no ${missing.label} encoder")
+                result = runCatching { openChecked(file, kind, caps) }
             }
             result.onSuccess {
                 engine = it
@@ -120,25 +125,36 @@ class LlmEngine(private val context: Context) {
         }
     }
 
-    /** GPU and CPU keep the settings the app has always used. NPU bundles only get encoders they declare they need. */
-    private fun engineConfig(file: File, kind: BackendKind, caps: ModelCapabilities) = when (kind) {
-        BackendKind.NPU -> EngineConfig(
+    /** Initialises the engine and creates one throwaway conversation, which is where LiteRT-LM reports missing encoders. */
+    private fun openChecked(file: File, kind: BackendKind, caps: ModelCapabilities): Engine {
+        val e = Engine(engineConfig(file, kind, caps))
+        try {
+            e.initialize()
+            e.createConversation(conversationConfig(AnswerCheck.SYSTEM, AskOptions())).use { }
+            return e
+        } catch (t: Throwable) {
+            runCatching { e.close() }
+            throw t
+        }
+    }
+
+    /** Only encoders for inputs the app sends and the bundle can read are requested (see [EncoderPlan]). */
+    private fun engineConfig(file: File, kind: BackendKind, caps: ModelCapabilities): EngineConfig {
+        val encoders = EncoderPlan.of(kind, caps)
+        return EngineConfig(
             modelPath = file.absolutePath,
             backend = backendFor(kind),
-            visionBackend = if (caps.canReadImages) Backend.GPU() else null,
-            audioBackend = if (ModelCapability.AUDIO in caps.inputs) Backend.CPU() else null,
+            visionBackend = encoders.vision?.let(::encoderBackend),
+            audioBackend = encoders.audio?.let(::encoderBackend),
             // NPU bundles are compiled for a fixed context (e.g. "ekv1280"); let the bundle decide instead of forcing 4096.
-            maxNumTokens = null,
+            maxNumTokens = if (kind == BackendKind.NPU) null else 4096,
             cacheDir = context.cacheDir.path,
         )
-        else -> EngineConfig(
-            modelPath = file.absolutePath,
-            backend = backendFor(kind),
-            visionBackend = if (kind == BackendKind.CPU) Backend.CPU() else Backend.GPU(),
-            audioBackend = Backend.CPU(),
-            maxNumTokens = 4096,
-            cacheDir = context.cacheDir.path,
-        )
+    }
+
+    private fun encoderBackend(target: EncoderTarget): Backend = when (target) {
+        EncoderTarget.GPU -> Backend.GPU()
+        EncoderTarget.CPU -> Backend.CPU()
     }
 
     suspend fun unload() = mutex.withLock { withContext(Dispatchers.Default) { unloadLocked() } }
