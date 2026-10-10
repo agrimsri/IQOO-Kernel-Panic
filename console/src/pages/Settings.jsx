@@ -51,7 +51,7 @@ export default function Settings({ onImport }) {
 
         <Fade className="span-5" delay={0.04}><Card title="What TraceVeil does not claim" icon={Scale} style={{ height: "100%" }}>
           <div className="stack-sm">
-            <Truth icon={Scale}>Not legal advice. Legal text is context, not a verdict. The DPDP Act's main provisions commence on 13 May 2027; findings describe readiness.</Truth>
+            <Truth icon={Scale}>Not legal advice. Legal text is context, not a verdict. Each audit is read under the legal lens named in its export (else the global baseline). Under India's DPDP Act, whose main provisions commence on 13 May 2027, findings describe readiness.</Truth>
             <Truth icon={ShieldAlert}>Not a malware verdict. APK Guard reads what an APK declares and Quarantine records one run; neither calls an app safe, unsafe or malicious.</Truth>
             <Truth icon={Lock}>A DNS lookup is an attempt to contact a host, not proof that personal data was sent. Payloads are never decrypted.</Truth>
             <Truth>Scores cover captured evidence on one device during the recorded runs. 100 means no finding in that evidence, not a certificate. Unknown stays unknown, never zero.</Truth>

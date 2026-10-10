@@ -1,5 +1,7 @@
 package com.dpdpxray.cli
 
+import com.dpdpxray.core.law.LawRelation
+import com.dpdpxray.core.law.LensView
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.EvidenceType
@@ -37,6 +39,15 @@ object Wording {
     }
 
     fun firstEvidence(f: Finding): String = f.evidence.firstOrNull() ?: "(no evidence line recorded)"
+
+    /** The lens score with the neutral band range; a reading of the findings, never a legal verdict. */
+    fun lensScore(v: LensView): String =
+        if (v.band == ScoreBand.INCONCLUSIVE || v.score == null) "inconclusive (score not established)" else "${v.score}/100 · ${band(v.band)}"
+
+    fun lensCodes(v: LensView, r: LawRelation): String =
+        v.findings.filter { it.relation == r }.joinToString { it.finding.checkId.code }.ifEmpty { "none" }
+
+    const val LENS_CAVEAT = "A reading of the findings under this lens, not a legal verdict."
 
     fun choice(c: PlanCoverage): String = when {
         c.choice == ConsentKind.ACCEPT -> "Accept recorded"
@@ -96,6 +107,7 @@ object CheckText {
         } else {
             appendLine("Score:    ${Wording.score(c.current)} (re-evaluated; same as stored in the bundle)")
         }
+        lens(c)
         appendLine()
         findingsTable(c.current.findings)
         appendLine()
@@ -106,6 +118,15 @@ object CheckText {
         appendLine()
         if (c.passed) appendLine("Result: PASS (no policy violations)")
         else appendLine("Result: FAIL (${plural(c.violations.size, "policy violation")})")
+    }
+
+    private fun StringBuilder.lens(c: BundleCheck) {
+        val v = c.lens
+        val p = v.profile
+        appendLine("Lens:     ${p.name} (${v.id.name}, ${c.lensSource.text}) · ${p.laws}")
+        appendLine("          ${p.relationLabel(LawRelation.REQUIRED)}: ${Wording.lensCodes(v, LawRelation.REQUIRED)} · Context: ${Wording.lensCodes(v, LawRelation.CONTEXT)} · " +
+            "Not applicable: ${Wording.lensCodes(v, LawRelation.NOT_APPLICABLE)}")
+        appendLine("          Under this lens: ${Wording.lensScore(v)} (not-applicable findings skipped). ${Wording.LENS_CAVEAT}")
     }
 
     fun StringBuilder.findingsTable(findings: List<Finding>) {
@@ -165,8 +186,34 @@ object CheckJson {
         put("rules", buildJsonArray {
             c.outcomes.forEach { o -> add(buildJsonObject { put("rule", o.rule); put("status", o.status.name); put("message", o.message) }) }
         })
+        put("legalLens", lens(c))
         put("warnings", JsonArray(c.warnings.map(::JsonPrimitive)))
         put("passed", c.passed)
+    }
+
+    private fun lens(c: BundleCheck) = buildJsonObject {
+        val v = c.lens
+        put("profile", v.id.name)
+        put("name", v.profile.name)
+        put("laws", v.profile.laws)
+        put("kind", v.profile.kind.name)
+        put("source", c.lensSource.name.lowercase())
+        put("score", v.score)
+        put("band", v.band.name)
+        put("bandText", Wording.band(v.band))
+        put("notApplicable", JsonArray(v.notApplicable.map { JsonPrimitive(it.finding.checkId.code) }))
+        put("relations", buildJsonArray {
+            v.findings.forEach { lf ->
+                add(buildJsonObject {
+                    put("checkId", lf.finding.checkId.code)
+                    put("relation", lf.relation.name)
+                    put("mapped", lf.mapped)
+                    put("note", lf.mapping.note)
+                    put("refs", JsonArray(lf.mapping.refs.map(::JsonPrimitive)))
+                })
+            }
+        })
+        put("caveat", Wording.LENS_CAVEAT)
     }
 
     private fun result(r: AuditResult) = buildJsonObject {

@@ -285,6 +285,9 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit, onCheckup: (() -> Unit
                 Hairline()
                 SwitchRow("Load AI when an audit starts", "Loads Gemma automatically if it is installed.", s.autoLoadModel, { v -> vm.updateSettings { it.copy(autoLoadModel = v) } })
             }
+            SectionCard(title = "Legal lens", glyph = Glyph.BOOK) {
+                LegalLensSection(vm, s.legalProfile)
+            }
             SectionCard(title = "Voice and guidance", glyph = Glyph.SPEAKER_ON) {
                 SwitchRow("Spoken guidance", "Reads each guide step aloud with an installed offline voice. Off by default; nothing leaves the phone.", s.spokenGuidance, { v -> vm.updateSettings { it.copy(spokenGuidance = v) } })
                 Hairline()
@@ -327,7 +330,7 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit, onCheckup: (() -> Unit
                 )
             }
             SectionCard(title = "Not legal advice", glyph = Glyph.BOOK) {
-                Note("Results are an automated technical assessment with citations to the DPDP Act 2023 and DPDP Rules 2025.")
+                Note("Results are an automated technical assessment. Legal passages come from the selected legal lens (India's DPDP Act 2023 and Rules 2025, the EU GDPR and ePrivacy Directive, UK GDPR and PECR, California's CCPA, US COPPA, Brazil's LGPD or Singapore's PDPA) and are context, not a verdict.")
             }
             Spacer(Modifier.height(16.dp))
         }

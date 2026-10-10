@@ -102,6 +102,15 @@ h4 { font: 600 11px/1.2 var(--mono); letter-spacing: .14em; text-transform: uppe
 .ev-observed { color: var(--observed); background: rgba(188, 248, 236, .08); border-color: rgba(188, 248, 236, .45); }
 .ev-inferred { color: var(--inferred); background: rgba(250, 162, 117, .08); border-color: rgba(250, 162, 117, .45); }
 .ev-unknown { color: var(--unknown); background: rgba(159, 160, 195, .08); border-color: rgba(159, 160, 195, .45); }
+/* legal lens: relation of a finding to the selected law (not a verdict) */
+.rel-required { color: var(--accent); background: rgba(127, 211, 230, .08); border-color: rgba(127, 211, 230, .45); }
+.rel-context { color: var(--unknown); background: rgba(159, 160, 195, .08); border-color: rgba(159, 160, 195, .45); }
+.rel-na { color: var(--dim); background: transparent; border-color: var(--line); border-style: dashed; }
+.lens-score { margin: 10px 0 0; color: var(--dim); }
+.lens-score strong { color: var(--text); font-weight: 600; }
+.lens-note { margin: 8px 0 4px; font-size: 14px; }
+.compare-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; font-size: 13.5px; }
+.compare-list .chip { margin-right: 4px; }
 .conf-high { color: var(--clear); } .conf-medium { color: var(--medium); } .conf-low { color: var(--high); }
 .chips-key { margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font-size: 13px; color: var(--dim); }
 

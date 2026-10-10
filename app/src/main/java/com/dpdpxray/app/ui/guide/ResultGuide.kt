@@ -102,7 +102,7 @@ object ResultGuide {
     }
 
     private fun bandHi(band: ScoreBand) = when (band) {
-        ScoreBand.READY -> "DPDP-ready"
+        ScoreBand.READY -> "तैयार"
         ScoreBand.NEEDS_WORK -> "सुधार की ज़रूरत"
         ScoreBand.AT_RISK -> "जोखिम में"
         ScoreBand.INCONCLUSIVE -> "अनिर्णायक"

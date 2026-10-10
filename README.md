@@ -10,14 +10,14 @@ Current team setup and work split: [teammate handoff](docs/TEAM_HANDOFF.md), [ac
 
 **Testing safety:** audit configuration defaults to keeping data and manual consent choices. The setup screen presets automation/reset only for the two controlled demo apps. Clearing another test app's data requires an explicit reset choice and Shizuku; keep that choice off for personal apps. Real-app observation is limited: it does not inspect encrypted payloads or provide comprehensive fraud protection, automatic permission interception or a background wake word. DNS observations and scores are not legal certification.
 
-**An on-device privacy auditor for Android apps, built around India's Digital Personal Data Protection (DPDP) Act 2023.**
+**An on-device privacy auditor for Android apps. It checks consent first, then reads the evidence through a legal lens: India's DPDP Act 2023 (its first and deepest corpus), the EU, the UK, California, US children's law, Brazil, Singapore, or a global good-practice baseline.**
 
 Point TraceVeil at any app installed on your phone. It shows you:
 - which tracking companies the app contacts;
 - whether it does so **before** the user has agreed to anything;
 - whether it **keeps doing it after the user says no**.
 
-It reviews the app's consent screen for potential dark patterns, provides relevant DPDP passages and developer fix templates, and exports a PDF report. Findings are technical signals for review, not determinations that an app broke the law. The evidence workflow can be used internationally; the current legal corpus is India-specific and voice UI supports English/Hindi.
+It reviews the app's consent screen for potential dark patterns, provides the relevant legal passages for the selected lens and developer fix templates, and exports a PDF report. Findings are technical signals for review, not determinations that an app broke the law. The evidence workflow is the same in every country; the legal lens changes which law is quoted (see [Legal lenses](#legal-lenses)). Voice UI supports English/Hindi.
 
 Audit analysis, saved reports and the default voice copilot run on the phone without a cloud-answer fallback. Capture relays the target app's DNS queries. Network Proof shows qualified UID/DNS estimates, not a measured guarantee of zero uploads. Speech-pack downloads require a user action and provider connectivity; they are not cloud speech recognition. Reports leave the device when you choose to share them.
 
@@ -67,6 +67,8 @@ TraceVeil observes DNS lookups on the phone and relates them to recorded consent
 
 ## What TraceVeil checks
 
+The table shows the India lens (DPDP basis and the Act's penalty ceilings). Other lenses cite their own law and show no penalty figures.
+
 | Check | What it means | DPDP basis | Penalty ceiling |
 |---|---|---|---|
 | **C1** | Tracker hosts looked up **before** any consent choice (catalogue match) | s.4(1), s.6(1) | up to ₹50 crore |
@@ -96,9 +98,26 @@ Each finding is labelled either:
 - **observed**: seen on the device during the audit;
 - **inferred**: derived from SDK documentation or AI review.
 
-All findings combine into a **DPDP readiness score** out of 100, with bands from *At risk* to *DPDP-ready*.
+All findings combine into a **consent readiness score** out of 100, with bands from *At risk* to *Ready*. It is a consent-first standard (tracking waits for a clear opt-in) and stays the headline under every legal lens.
 
-> Penalty ceilings are the statutory maximums in the DPDP Act Schedule, not predicted fines. TraceVeil is a technical assessment tool, **not legal advice**.
+> Penalty ceilings are the statutory maximums in the DPDP Act Schedule, not predicted fines, and appear only under the India lens. TraceVeil is a technical assessment tool, **not legal advice**.
+
+### Legal lenses
+
+"Is this only for India?" No. The observed findings are the same everywhere; a lens reads them against one law and marks each check **Required** (the law sets a rule the check tests), **Context** (relevant, but not strictly required, or only in some cases) or **Not applicable**, with a short note and the cited text. A "score under this lens" leaves out the not-applicable findings; it is a reading of the evidence, never a legal verdict.
+
+| Lens | Law | How it differs |
+|---|---|---|
+| India | DPDP Act 2023 and DPDP Rules 2025 | Consent-first; main provisions commence 13 May 2027, so findings describe readiness |
+| EU / EEA | GDPR and ePrivacy Directive Art. 5(3) | Storing or reading information on the device needs prior consent unless strictly necessary |
+| UK | UK GDPR and PECR reg. 6 (as amended by the Data (Use and Access) Act 2025) | As the EU, plus a narrow exception for aggregate service-improvement analytics; an English-only notice is not applicable |
+| California | CCPA as amended by the CPRA | Opt-out model: tracking before a choice is context, tracking after an opt-out is required, under-16s must opt in, Global Privacy Control must be honoured |
+| US children | COPPA (16 CFR Part 312) | Verifiable parental consent for under-13s in child-directed apps; banner design checks are not applicable |
+| Brazil | LGPD and ECA Digital (Lei 15.211/2025) | Consent is one of several legal bases; profiling to target ads at children is barred |
+| Singapore | PDPA 2012 | Consent, deemed consent or an exception; no language rule |
+| Global baseline | Good practice, not law | Used when the region has no lens |
+
+The lens is chosen in Settings (default: the phone's region, else the global baseline), named on results and in every export (Markdown, PDF, HTML and the JSON bundle's `legalProfile`), and `traceveil-ci check --profile <id>` applies it in CI. Passages carry their source URL, retrieval date and a verbatim flag; verbatim text was copied from official publishers (EUR-Lex, EDPB, ICO, the California Privacy Protection Agency, eCFR, Planalto, Singapore Statutes Online, PDPC). The mapping is data in `core/src/main/resources/law/`, so a new check can be mapped by adding entries; until then it shows a generic context note.
 
 ## Screenshots
 
@@ -120,7 +139,7 @@ All findings combine into a **DPDP readiness score** out of 100, with bands from
 | A leaky consent screen | A compliant consent screen | After the fix |
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/leakyshop-consent.png" width="240"> | <img src="docs/screenshots/leakyshop-fixed-consent.png" width="240"> | <img src="docs/screenshots/fixed-result.png" width="240"> |
-| Pre-ticked box, no Reject button (it's hidden behind "Manage"). | Equal Accept and Reject buttons, off-by-default toggles, withdrawal notice, three languages. | The same audit on the fixed app: **100, DPDP-ready**. |
+| Pre-ticked box, no Reject button (it's hidden behind "Manage"). | Equal Accept and Reject buttons, off-by-default toggles, withdrawal notice, three languages. | The same audit on the fixed app: **100, Ready**. |
 
 ## How an audit works
 
@@ -172,7 +191,7 @@ A **quick audit** runs one plan (open the app and accept) in about 40 seconds.
   - Deterministic checks on the accessibility tree are merged with the AI's screenshot review.
   - When they disagree, the tree wins and the disagreement is shown, never hidden.
 - **The law, verbatim.**
-  - The relevant DPDP sections (s.4, 5, 6, 9, Rule 3 and the Schedule) ship with the app.
+  - The relevant DPDP sections (s.4, 5, 6, 9, Rule 3 and the Schedule) ship with the app, and so do the cited passages of every other legal lens, each marked verbatim or summary with its source.
   - Each finding cites its own sections.
   - Free-text questions are answered by BM25 retrieval, optionally upgraded with EmbeddingGemma semantic search.
 
@@ -200,6 +219,7 @@ kernel-panic/
 | `manifest` | Allow-list of SDK manifest collection switches with their vendor sources (check C13) |
 | `fixes` | Fix catalogue: SDK-specific code and manifest changes plus UI fixes |
 | `dpdp` | Verbatim DPDP corpus, BM25 retriever, citation service |
+| `law` | Legal lenses: per-jurisdiction check mapping, sourced passages, score under a lens, lens-neutral explanations |
 | `report` | JSON and Markdown report generation |
 
 **65 unit tests** cover the DNS codec, tracker matching, lexicon, phase assignment, every rule, screen auditing, fixes, citations and reports.
@@ -320,7 +340,7 @@ A pass describes what one run on one phone observed; it is not a compliance cert
 | Flavour | Behaviour | TraceVeil result |
 |---|---|---|
 | **leaky** | Starts the "SDKs" on launch, pre-ticks a sharing box, hides Reject behind "Manage", and keeps tracking after refusal | **21, At risk**: C2 critical, plus C1, C3, C4 and C10 |
-| **fixed** | Waits for consent, uses off-by-default toggles, gives Accept and Reject equal weight, offers three languages, explains withdrawal | **100, DPDP-ready** |
+| **fixed** | Waits for consent, uses off-by-default toggles, gives Accept and Reject equal weight, offers three languages, explains withdrawal | **100, Ready** |
 
 Neither build's consent dialog links a privacy policy, so a live audit that captures the dialog's tree also lists C15 (*info*, no score change) for both. LeakyShop bundles no real SDK and asks for no Android permission, so C13 and C14 do not fire for it.
 
@@ -376,6 +396,7 @@ adb push gemma-4-E2B-it.litertlm /sdcard/Android/data/com.dpdpxray.app/files/mod
 - **Shizuku API/provider 13.1.5:** MIT License (separate from the Shizuku app).
 - **Gemma models:** Gemma Terms of Use (not bundled).
 - **DPDP Act 2023 and DPDP Rules 2025:** text from Government of India publications.
+- **Other legal lenses:** short passages quoted from official publications (EUR-Lex, EDPB, ICO, California Privacy Protection Agency, eCFR, Planalto, Singapore Statutes Online, PDPC), each with its URL and retrieval date in `core/src/main/resources/law/passages.json`.
 
 See the [attribution register](ATTRIBUTIONS.md) for licence evidence and remaining release checks, and [repository checks](docs/REPOSITORY_CHECKS.md) for CI and the read-only commit-date checker.
 

@@ -1,5 +1,6 @@
 package com.dpdpxray.cli
 
+import com.dpdpxray.core.law.LegalProfile
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.io.File
@@ -62,7 +63,7 @@ class TraceVeilCi(
             null -> throw UsageException("no command given")
             "-h", "--help", "help" -> { out.print(USAGE); Exit.PASS }
             "-V", "--version", "version" -> { out.println("${CliInfo.NAME} ${CliInfo.version}"); Exit.PASS }
-            "check" -> check(Args.parse(args.drop(1), setOf("--policy", "--format", "--out")))
+            "check" -> check(Args.parse(args.drop(1), setOf("--policy", "--format", "--out", "--profile")))
             "diff" -> diff(Args.parse(args.drop(1), setOf("--format", "--out")))
             "run" -> RunCommand(out, err, cwd, { gate }, env, adbFactory, clock, newRunId).run(args.drop(1))
             else -> throw UsageException("unknown command \"${args[0]}\"")
@@ -86,8 +87,11 @@ class TraceVeilCi(
             if (!f.isFile) throw UsageException("policy file not found: $path")
             Policy.parse(f.readText(Charsets.UTF_8)) to "policy file ${LoadedBundle.displayPath(f, cwd)}"
         } ?: (Policy() to "defaults (failOn C2, C9; not-established fails; requireFreshState; requirePlans ACCEPT, REJECT, SILENT; inconclusive fails)")
+        val profile = a.options["--profile"]?.let { id ->
+            LegalProfile.parse(id) ?: throw UsageException("unknown legal profile \"$id\" (use ${LegalProfile.entries.joinToString("|") { it.name }})")
+        }
         val bundles = load(a.positional)
-        val checks = bundles.map { gate.check(it, policy) }
+        val checks = bundles.map { gate.check(it, policy, profile) }
         val text = CheckText.render(checks, policy, policySource)
         emit(a, format, text) {
             when (format) {
@@ -178,7 +182,7 @@ class TraceVeilCi(
             |TraceVeil CI: gate a release on consent evidence captured on a phone with TraceVeil.
             |
             |Usage:
-            |  traceveil-ci check <bundle.json>... [--policy policy.json] [--format text|json|sarif] [--out file]
+            |  traceveil-ci check <bundle.json>... [--policy policy.json] [--profile id] [--format text|json|sarif] [--out file]
             |  traceveil-ci diff <old.json> <new.json> [--format text|json] [--out file]
             |  traceveil-ci run --package <pkg> [--device SERIAL] [--apk file.apk] [--mode full|quick] [--token T]
             |                   [--policy policy.json] [--timeout 300] [--out traceveil-out] [--adb path]
@@ -207,6 +211,10 @@ class TraceVeilCi(
             |  allowInconclusive [false]        an inconclusive result (low network visibility) fails unless true
             |  requirePlans      ["ACCEPT", "REJECT", "SILENT"]  plans that must be captured with their choice recorded
             |
+            |--profile reads the findings under a legal lens: INDIA, EU, UK, US_CALIFORNIA, US_CHILDREN, BRAZIL,
+            |       SINGAPORE or GLOBAL_BASELINE (case and - or _ do not matter). Default: the bundle's legalProfile, else
+            |       GLOBAL_BASELINE. The lens shows which findings each law requires, treats as context or does not
+            |       cover, and a score without the not-applicable ones. It never changes the policy result.
             |--out writes the chosen format to a file; the text report still goes to stdout.
             |Exit codes: 0 pass (diff: no regression), 1 policy violation (diff: regression), 2 usage or unreadable input
             |(run: also no device, a refusal or failure on the phone, or a timeout).

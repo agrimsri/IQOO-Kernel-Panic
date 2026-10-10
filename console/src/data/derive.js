@@ -1,6 +1,6 @@
 // Turns stored export bundles into what the pages show. Pure functions, memoised per record.
 // Phases follow core PhaseAssigner; host classification follows core TrackerCatalog (see model.js).
-import { planInfo, sevInfo, classifyHost, TRACKING, CHECKS, QUERY_TYPE, PROTOCOL_LABEL, companyOfEntity } from "./model";
+import { planInfo, sevInfo, classifyHost, TRACKING, CHECKS, QUERY_TYPE, PROTOCOL_LABEL, companyOfEntity, lensOf } from "./model";
 
 const S = 1e9;
 const KEPT_DATA_NOTES = ["App data was not cleared", "Could not clear app data"];
@@ -58,6 +58,7 @@ function buildAuditView(rec) {
     networkReadings: Array.isArray(b.networkReadings) ? b.networkReadings : [],
     gaps,
     plansKey: sessions.map((s) => s.plan).sort().join(","),
+    lens: lensOf(b),
   };
 }
 

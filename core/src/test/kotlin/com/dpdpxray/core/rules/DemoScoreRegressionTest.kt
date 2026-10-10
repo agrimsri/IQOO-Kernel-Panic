@@ -88,7 +88,7 @@ class DemoScoreRegressionTest {
 
     /**
      * Shaped like the recorded iQOO full audits (audit-1791570081266: 21 / At risk with C2, C1, C3, C4, C10;
-     * audit-1791570260617: 100 / DPDP-ready): only the tree-observed screen fields are known. Test data, not a replay.
+     * audit-1791570260617: 100 / Ready, shown then as "DPDP-ready"): only the tree-observed screen fields are known. Test data, not a replay.
      */
     private val deviceScreen = ScreenAudit(
         isConsentScreen = true, preTicked = true, rejectOption = RejectOption.HIDDEN,

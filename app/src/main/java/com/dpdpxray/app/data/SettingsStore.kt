@@ -28,6 +28,11 @@ data class XraySettings(
     val autoCheckNewApps: Boolean = true,
     /** Auto-guard: weekly phone checkup notification. On by default. */
     val weeklyCheckup: Boolean = true,
+    /**
+     * The legal lens (a core LegalProfile name such as "EU"). Empty means automatic: picked from the device region, else
+     * the global baseline. It changes which law results quote, never the evidence or the consent-first score.
+     */
+    val legalProfile: String = "",
 )
 
 /** Read side of the stored settings, so the mapping can be tested without Android. */
@@ -61,6 +66,7 @@ internal object SettingsCodec {
         audience = Audience.of(kv.getString("audience", defaults.audience.code)),
         autoCheckNewApps = kv.getBoolean("auto_check_new_apps", defaults.autoCheckNewApps),
         weeklyCheckup = kv.getBoolean("weekly_checkup", defaults.weeklyCheckup),
+        legalProfile = kv.getString("legal_profile", defaults.legalProfile),
     )
 
     fun write(s: XraySettings, sink: SettingsSink) {
@@ -76,6 +82,7 @@ internal object SettingsCodec {
         sink.putString("audience", s.audience.code)
         sink.putBoolean("auto_check_new_apps", s.autoCheckNewApps)
         sink.putBoolean("weekly_checkup", s.weeklyCheckup)
+        sink.putString("legal_profile", s.legalProfile)
     }
 }
 

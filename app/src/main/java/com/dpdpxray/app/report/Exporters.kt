@@ -16,6 +16,7 @@ import android.text.TextPaint
 import androidx.core.content.FileProvider
 import com.dpdpxray.core.dpdp.CitationService
 import com.dpdpxray.core.fixes.FixTemplate
+import com.dpdpxray.core.law.LegalProfile
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.report.HtmlCoverage
@@ -230,6 +231,8 @@ object HtmlExporter {
     fun build(
         result: AuditResult, sessions: List<AuditSession>, timingProfile: String?, sample: Boolean,
         fixes: List<FixTemplate>, citations: CitationService, catalog: TrackerCatalog,
+        /** The legal lens selected in Settings; it changes the quoted law, never the evidence. */
+        profile: LegalProfile = LegalProfile.INDIA,
     ): String = HtmlReport.build(
         result, sessions, fixes, citations, catalog,
         HtmlCoverage(
@@ -239,6 +242,7 @@ object HtmlExporter {
             sample = sample,
             sampleNotes = if (sample) sessions.flatMap { it.notes }.distinct() else emptyList(),
         ),
+        profile = profile,
     )
 
     fun write(html: String, out: File): File {

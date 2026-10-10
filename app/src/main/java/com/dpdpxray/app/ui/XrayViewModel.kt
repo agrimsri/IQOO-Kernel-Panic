@@ -22,6 +22,8 @@ import com.dpdpxray.app.data.AuditBundle
 import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.data.AuditComparison
 import com.dpdpxray.app.data.AuditComparisonResult
+import com.dpdpxray.app.data.LegalLensSetting
+import com.dpdpxray.app.data.LensChoice
 import com.dpdpxray.app.data.SampleAudit
 import com.dpdpxray.app.BuildConfig
 import com.dpdpxray.app.graph
@@ -34,6 +36,10 @@ import com.dpdpxray.app.report.SampleReport
 import com.dpdpxray.core.audit.PhaseAssigner
 import com.dpdpxray.core.dpdp.Passage
 import com.dpdpxray.core.fixes.FixTemplate
+import com.dpdpxray.core.law.LegalLens
+import com.dpdpxray.core.law.LegalProfile
+import com.dpdpxray.core.law.LensPassage
+import com.dpdpxray.core.law.asLensPassage
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.CheckId
 import com.dpdpxray.core.model.Finding
@@ -168,6 +174,19 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun citationsFor(f: Finding): List<Passage> = citationCache[f.checkId.name + f.explanation.hashCode()]
         ?: withContext(Dispatchers.Default) { graph.citations().cite(f, 3) }.also { citationCache[f.checkId.name + f.explanation.hashCode()] = it }
 
+    /** The bundled legal lenses (profiles, check mapping and passages). */
+    val legal: LegalLens get() = LegalLens.default
+
+    /** The legal lens in use: the Settings choice, else the device region, else the global baseline. */
+    fun lensChoice(setting: String = settings.value.legalProfile): LensChoice =
+        LegalLensSetting.resolve(setting, java.util.Locale.getDefault().country)
+
+    fun lensProfile(): LegalProfile = lensChoice().profile
+
+    /** Legal text for a finding under [profile]: India keeps its DPDP citations; other lenses show their mapped passages. */
+    suspend fun lensPassagesFor(f: Finding, profile: LegalProfile): List<LensPassage> =
+        if (profile == LegalProfile.INDIA) citationsFor(f).map { it.asLensPassage() } else legal.passages(profile, f.checkId.code)
+
     /** Network events of a session, classified and placed before/after the consent choice, for the timeline. */
     fun timeline(session: AuditSession): List<NetEvent> {
         return EvidenceUi(graph.catalog(), graph.corpus).timeline(session)
@@ -276,7 +295,10 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     fun exportHtml(bundle: AuditBundle, share: Boolean) = viewModelScope.launch {
         val file = runCatching {
             val html = withContext(Dispatchers.Default) {
-                HtmlExporter.build(bundle.result, bundle.sessions, bundle.meta.timingProfile, bundle.meta.sample, fixesFor(bundle), graph.citations(), graph.catalog())
+                HtmlExporter.build(
+                    bundle.result, bundle.sessions, bundle.meta.timingProfile, bundle.meta.sample, fixesFor(bundle), graph.citations(), graph.catalog(),
+                    profile = lensProfile(),
+                )
             }
             withContext(Dispatchers.IO) { HtmlExporter.write(html, File(bundle.dir, "TraceVeil-${bundle.meta.targetLabel.filter { it.isLetterOrDigit() }}.html")) }
         }.getOrElse { _toast.value = "Could not build the HTML report"; return@launch }
@@ -289,7 +311,7 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Audit data as a traceveil.audit.v1 JSON bundle for TraceVeil CI; it leaves the phone only when saved or shared. */
     fun exportAuditJson(bundle: AuditBundle, share: Boolean) = viewModelScope.launch {
-        val file = runCatching { withContext(Dispatchers.IO) { AuditJsonExport.write(bundle, BuildConfig.VERSION_NAME) } }
+        val file = runCatching { withContext(Dispatchers.IO) { AuditJsonExport.write(bundle, BuildConfig.VERSION_NAME, lensProfile().name) } }
             .getOrElse { _toast.value = "Could not build the audit data export"; return@launch }
         if (share) ExportManager.share(ctx, file, AuditJsonExport.MIME)
         else {
@@ -298,8 +320,18 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun markdown(bundle: AuditBundle): String = EvidenceReport.annotate(
-        graph.repository.markdownFile(bundle.meta.id).takeIf { it.exists() }?.readText().orEmpty(), bundle.sessions, bundle.meta.timingProfile, sample = bundle.meta.sample)
+    /**
+     * The Markdown (and PDF) report under the selected legal lens, built from the saved result like the HTML export. The
+     * report saved at audit time is the fallback if that fails. Call off the main thread: citations may use the
+     * on-device embedding model.
+     */
+    fun markdown(bundle: AuditBundle, profile: LegalProfile = lensProfile()): String {
+        val md = runCatching {
+            val built = MarkdownReport.build(bundle.result, bundle.sessions, fixesFor(bundle), graph.citations(), profile)
+            if (bundle.meta.sample) SampleReport.annotate(built, bundle.sessions) else built
+        }.getOrElse { graph.repository.markdownFile(bundle.meta.id).takeIf { it.exists() }?.readText().orEmpty() }
+        return EvidenceReport.annotate(md, bundle.sessions, bundle.meta.timingProfile, sample = bundle.meta.sample)
+    }
 
     fun copy(label: String, text: String) {
         ExportManager.copy(ctx, label, text)

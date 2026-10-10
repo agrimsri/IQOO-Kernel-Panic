@@ -6,7 +6,7 @@ import { EvidenceChip, SeverityBadge, BandBadge, PlanTag, SampleBadge, CodeBlock
 import ConsentLanes from "../components/ConsentLanes";
 import { useData } from "../data/DataContext";
 import { flattenTree } from "../data/derive";
-import { sevInfo, bandInfo, fmtDate, fmtS, plural, fixesForFinding, passageFor, refLabel, CATEGORY_LABEL, PHASE, planInfo } from "../data/model";
+import { sevInfo, bandInfo, fmtDate, fmtS, plural, fixesForFinding, passageFor, refLabel, CATEGORY_LABEL, PHASE, planInfo, LENS, LENS_ORDER, lensMapping, relationLabel, lensPassageFor, lensExplanation, lensScore, PASSAGE_KIND } from "../data/model";
 import { navigate } from "../lib/router";
 
 export default function AuditDetail({ id }) {
@@ -56,7 +56,8 @@ export default function AuditDetail({ id }) {
               {Object.entries(a.sevCounts).sort((x, y) => sevInfo(x[0]).rank - sevInfo(y[0]).rank).map(([s, n]) => <SeverityBadge key={s} severity={s} count={n} />)}
               {!a.findings.length && <span className="small muted">No finding in the captured evidence</span>}
             </div>
-            <p className="pill-src" style={{ marginTop: 12, textAlign: "center" }}>100 minus severity weights; inferred findings count half. Not a certificate.</p>
+            <p className="pill-src" style={{ marginTop: 12, textAlign: "center" }}>Consent readiness: 100 minus severity weights; inferred findings count half. Not a certificate.</p>
+            <LensLine a={a} />
           </Card>
         </Fade>
 
@@ -70,7 +71,7 @@ export default function AuditDetail({ id }) {
       <div className="section-title"><ListChecks size={18} /><h2>Findings</h2><span className="badge">{a.findings.length}</span><span className="grow" /></div>
       <div className="grid g-12">
         <div className="span-8 stack">
-          {a.findings.length ? a.findings.map((f, i) => <FindingCard key={`${f.checkId}${i}`} f={f} index={i} onRef={setRef} />) : (
+          {a.findings.length ? a.findings.map((f, i) => <FindingCard key={`${f.checkId}${i}`} f={f} index={i} onRef={setRef} lens={a.lens.id} />) : (
             <Card className="good"><EmptyState icon={CheckCircle2} title="No findings in the captured evidence" body="TraceVeil found nothing to flag in these runs. That covers what was captured on this device during these plans; it is not a certificate that the app is compliant or safe." /></Card>
           )}
         </div>
@@ -87,8 +88,8 @@ export default function AuditDetail({ id }) {
         <Fade className="span-12"><HostsCard a={a} /></Fade>
       </div>
 
-      <Sheet open={!!ref} onClose={() => setRef(null)} title={ref ? refLabel(ref) : ""}>
-        {ref && <RefBody id={ref} />}
+      <Sheet open={!!ref} onClose={() => setRef(null)} title={ref ? (lensPassageFor(ref)?.source || refLabel(ref)) : ""}>
+        {ref && (lensPassageFor(ref) ? <LensRefBody p={lensPassageFor(ref)} /> : <RefBody id={ref} />)}
       </Sheet>
     </div>
   );
@@ -145,12 +146,30 @@ function evidenceLine(line) {
   return <><b>{line.slice(0, i)}</b>{line.slice(i)}</>;
 }
 
-function FindingCard({ f, index, onRef }) {
+/** The legal lens named in the bundle (else the global baseline) and the score under it. Not a verdict. */
+function LensLine({ a }) {
+  const p = LENS[a.lens.id];
+  const score = lensScore(a.findings, a.lens.id);
+  const na = a.findings.filter((f) => lensMapping(a.lens.id, f.checkId).relation === "NOT_APPLICABLE").map((f) => f.checkId);
+  const from = a.lens.source === "bundle" ? "named in the export" : a.lens.source === "unknown" ? `the export names "${a.lens.named}", unknown here` : "the export names no lens";
+  return (
+    <div className="lens-line" data-lens={a.lens.id} style={{ marginTop: 10, textAlign: "center" }}>
+      <div className="small"><b>Legal lens: {p.name}</b> <span className="muted">({from})</span></div>
+      <div className="small text-2">Under this lens: {score == null ? "inconclusive" : `${score}/100`}{na.length ? ` · skips ${na.join(", ")} (not applicable)` : ""}</div>
+      <p className="pill-src" style={{ marginTop: 4 }}>{p.laws}. A reading of the findings, not a legal verdict.</p>
+    </div>
+  );
+}
+
+function FindingCard({ f, index, onRef, lens }) {
   const [all, setAll] = useState(false);
   const [fixOpen, setFixOpen] = useState(index === 0);
   const fixes = fixesForFinding(f);
   const s = sevInfo(f.severity);
   const lines = all ? f.evidence : f.evidence.slice(0, 3);
+  const m = lensMapping(lens, f.checkId);
+  const expl = lensExplanation(f.explanation, lens);
+  const refs = lens === "INDIA" ? f.dpdpRefs : (m.refs || []);
   return (
     <section className="finding" style={{ "--c": s.color }} data-tour={`finding-${index}`}>
       <div className="f-head">
@@ -162,11 +181,13 @@ function FindingCard({ f, index, onRef }) {
             <EvidenceChip type={f.evidenceType} />
             {f.confidence < 1 && <span className="pill-src">confidence {Math.round(f.confidence * 100)}%</span>}
             <span className="row" style={{ gap: 4 }}>{f.plans.map((p) => <PlanTag key={p} plan={p} withLabel={false} />)}</span>
+            <span className={`lens-rel rel-${m.relation.toLowerCase()}`} title={m.note}>{LENS[lens].name}: {relationLabel(lens, m.relation)}</span>
           </div>
         </div>
       </div>
       <div className="f-body">
-        <p className="f-expl">{f.explanation}</p>
+        <p className="f-expl">{expl.text}</p>
+        {expl.citesIndia && <p className="small muted">This explanation cites India's DPDP Act; the selected lens's law is listed below.</p>}
         {f.evidence.length > 0 && (
           <div>
             <Hud>Evidence · {f.evidence.length} line{f.evidence.length === 1 ? "" : "s"}</Hud>
@@ -174,11 +195,15 @@ function FindingCard({ f, index, onRef }) {
             {f.evidence.length > 3 && <button className="link small" style={{ marginTop: 6 }} onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show all ${f.evidence.length}`}</button>}
           </div>
         )}
-        {f.dpdpRefs.length > 0 && (
+        <p className="small text-2" style={{ margin: 0 }}><Scale size={13} className="muted" /> <b>{LENS[lens].name}:</b> {m.note}</p>
+        {refs.length > 0 && (
           <div className="refs"><Scale size={14} className="muted" /><span className="small muted">Legal context:</span>
-            {f.dpdpRefs.map((r) => <button key={r} className="ref" onClick={() => onRef(r)} title={passageFor(r)?.title || r}>{refLabel(r)}</button>)}
+            {refs.map((r) => <button key={r} className="ref" onClick={() => onRef(r)} title={(lensPassageFor(r) || passageFor(r))?.title || r}>{lensPassageFor(r)?.source || refLabel(r)}</button>)}
           </div>
         )}
+        <details className="compare-laws"><summary className="small muted">Compare laws</summary>
+          <ul className="small">{LENS_ORDER.map((id) => { const x = lensMapping(id, f.checkId); return <li key={id}><b>{LENS[id].name}</b>: {relationLabel(id, x.relation)}. <span className="text-2">{x.note}</span></li>; })}</ul>
+        </details>
         {fixes.length > 0 && (
           <div className="fix">
             <button className="fix-toggle" onClick={() => setFixOpen(!fixOpen)}>{fixOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}<Wrench size={15} />How to fix · {fixes.length}</button>
@@ -254,6 +279,20 @@ function HostsCard({ a }) {
       </div>
       <p className="pill-src" style={{ marginTop: 10 }}>A lookup shows the app tried to contact a host. Payloads are not decrypted, so a lookup is not proof that personal data was sent.</p>
     </Card>
+  );
+}
+
+function LensRefBody({ p }) {
+  return (
+    <div className="stack">
+      <Hud tone="cyan">{p.source}</Hud>
+      <h3>{p.title}</h3>
+      <blockquote lang={p.language} style={{ margin: 0, paddingLeft: 14, borderLeft: "2px solid var(--line-2)", color: "var(--text-2)" }}>{p.text}</blockquote>
+      {p.englishSummary && <p className="small text-2">English summary, not an official translation: {p.englishSummary}</p>}
+      <p className="small muted">{p.verbatim ? "Verbatim" : "Summary, not verbatim"}{p.kind !== "LAW" ? ` · ${PASSAGE_KIND[p.kind] || p.kind}` : ""}{p.retrieved ? ` · read ${p.retrieved}` : ""}</p>
+      {p.url && <a className="link small row" style={{ gap: 6 }} href={p.url} target="_blank" rel="noreferrer noopener"><ExternalLink size={13} />Official source</a>}
+      <Truth>Legal text is context, not a verdict. This is not legal advice. Confirm applicability with a qualified reviewer.</Truth>
+    </div>
   );
 }
 
