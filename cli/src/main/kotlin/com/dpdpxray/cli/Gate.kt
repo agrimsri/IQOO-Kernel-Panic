@@ -4,6 +4,9 @@ import com.dpdpxray.core.export.AuditBundleV1
 import com.dpdpxray.core.export.AuditBundles
 import com.dpdpxray.core.export.BundleFormatException
 import com.dpdpxray.core.export.BundleMeta
+import com.dpdpxray.core.law.LegalLens
+import com.dpdpxray.core.law.LegalProfile
+import com.dpdpxray.core.law.LensView
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
@@ -93,7 +96,13 @@ enum class RuleStatus(val label: String) { PASS("PASS"), FAIL("FAIL"), NOT_ESTAB
 
 data class RuleOutcome(val rule: String, val status: RuleStatus, val message: String)
 
-/** One bundle checked against a policy: both the result stored in the bundle and the re-evaluated one. */
+/** Where the legal lens of a check came from: the --profile option, the bundle's own legalProfile, or the default. */
+enum class LensSource(val text: String) { OPTION("from --profile"), BUNDLE("from the bundle"), DEFAULT("default: the bundle names no lens") }
+
+/**
+ * One bundle checked against a policy: both the result stored in the bundle and the re-evaluated one. [lens] reads the
+ * re-evaluated findings under a legal lens; it never changes the policy outcome, which stays on the consent-first result.
+ */
 class BundleCheck(
     val source: LoadedBundle,
     val stored: AuditResult,
@@ -101,6 +110,8 @@ class BundleCheck(
     val coverage: List<PlanCoverage>,
     val outcomes: List<RuleOutcome>,
     val warnings: List<String>,
+    val lens: LensView,
+    val lensSource: LensSource,
 ) {
     val passed: Boolean get() = outcomes.none { it.status == RuleStatus.FAIL }
     val violations: List<RuleOutcome> get() = outcomes.filter { it.status == RuleStatus.FAIL }
@@ -116,13 +127,23 @@ class BundleCheck(
 }
 
 /** Re-evaluates bundles with this build's rules engine and default tracker catalogue, then applies a policy. */
-class Gate(private val engine: RulesEngine = RulesEngine(TrackerCatalog.loadDefault())) {
+class Gate(
+    private val engine: RulesEngine = RulesEngine(TrackerCatalog.loadDefault()),
+    private val legal: LegalLens = LegalLens.default,
+) {
 
     fun reevaluate(bundle: AuditBundleV1): AuditResult = engine.evaluate(bundle.sessions)
 
-    fun check(source: LoadedBundle, policy: Policy): BundleCheck {
+    /** [profile] (from --profile) wins; else the bundle's legalProfile; else the global baseline. */
+    fun check(source: LoadedBundle, policy: Policy, profile: LegalProfile? = null): BundleCheck {
         val b = source.bundle
         val current = reevaluate(b)
+        val named = LegalProfile.parse(b.legalProfile)
+        val (lensId, lensSource) = when {
+            profile != null -> profile to LensSource.OPTION
+            named != null -> named to LensSource.BUNDLE
+            else -> LegalProfile.DEFAULT to LensSource.DEFAULT
+        }
         val coverage = b.sessions.map(PlanCoverage::of)
         val outcomes = buildList {
             add(inconclusive(current, policy))
@@ -132,7 +153,10 @@ class Gate(private val engine: RulesEngine = RulesEngine(TrackerCatalog.loadDefa
             add(freshState(coverage, policy))
             add(requirePlans(coverage, policy))
         }
-        return BundleCheck(source, b.result, current, coverage, outcomes, warnings(source))
+        val warnings = warnings(source) + listOfNotNull(
+            b.legalProfile?.takeIf { named == null }?.let { "the bundle names legal lens \"$it\", which this version does not know; using ${lensId.name}" },
+        )
+        return BundleCheck(source, b.result, current, coverage, outcomes, warnings, legal.view(current, lensId), lensSource)
     }
 
     private fun inconclusive(r: AuditResult, p: Policy): RuleOutcome = when {
