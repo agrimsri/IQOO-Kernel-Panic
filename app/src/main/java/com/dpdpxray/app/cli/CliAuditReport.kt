@@ -1,7 +1,9 @@
 package com.dpdpxray.app.cli
 
 import com.dpdpxray.app.data.AuditBundle
+import com.dpdpxray.core.audit.PhaseAssigner
 import com.dpdpxray.core.model.ConsentKind
+import com.dpdpxray.core.trackers.TrackerCatalog
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -21,7 +23,8 @@ object CliAuditReport {
 
     private fun strings(items: Iterable<String>): JsonElement = JsonArray(items.map { JsonPrimitive(it) })
 
-    fun build(requestId: String, bundle: AuditBundle): String {
+    /** [catalog] adds `observedTrackers` (every catalogue entity looked up, by consent phase); omitted when null. */
+    fun build(requestId: String, bundle: AuditBundle, catalog: TrackerCatalog? = null): String {
         val first = bundle.sessions.firstOrNull()
         val obj = buildJsonObject {
             put("schemaVersion", SCHEMA_VERSION)
@@ -54,8 +57,27 @@ object CliAuditReport {
                     put("notes", strings(s.notes))
                 }
             }))
+            if (catalog != null) put("observedTrackers", observedTrackers(bundle, catalog))
         }
         return pretty.encodeToString(JsonObject.serializer(), obj)
+    }
+
+    /** Hostname lookups only: an entry says the app looked the tracker up, not what data was sent. */
+    private fun observedTrackers(bundle: AuditBundle, catalog: TrackerCatalog): JsonArray {
+        val hits = bundle.sessions.flatMap { s ->
+            PhaseAssigner.assign(s.netEvents, s.consentEvents).mapNotNull { e ->
+                val info = catalog.classify(e.hostname, e.cnameChain)
+                info.entity?.let { Triple(it, info.category, e.phase) }
+            }
+        }
+        return JsonArray(hits.groupBy { it.first }.toSortedMap().map { (entity, rows) ->
+            buildJsonObject {
+                put("entity", entity)
+                put("category", rows.first().second.name)
+                put("lookups", rows.size)
+                put("phases", strings(rows.map { it.third.name }.distinct().sorted()))
+            }
+        })
     }
 
     fun status(requestId: String, state: String, step: String? = null, auditId: String? = null, error: String? = null, now: Long = System.currentTimeMillis()): String =

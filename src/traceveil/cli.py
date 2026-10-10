@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
 
-from . import (audit, EXIT_DEVICE, EXIT_PASS, EXIT_POLICY, EXIT_USAGE, __version__, adb, config, egress, netenv, report, shizuku)
+from . import (audit, EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_POLICY, EXIT_USAGE, __version__, adb, config, egress,
+               netenv, report, sdks, shizuku)
 
 
 def _common(default) -> argparse.ArgumentParser:
@@ -39,6 +41,14 @@ def _parser() -> argparse.ArgumentParser:
     a.add_argument("--resume", metavar="REQUEST_ID", help="fetch the result of an earlier request instead of starting a new audit")
     a.add_argument("--json", action="store_true", help="print the JSON report instead of the summary")
     a.add_argument("--out", help="also write the JSON report to this file")
+
+    k = sub.add_parser("sdks", parents=[shared], help="list tracking SDKs bundled in an APK and compare them with an audit's live lookups")
+    k.add_argument("--apk", required=True, help="APK to inspect (no phone needed for this part)")
+    k.add_argument("--report", help="audit report to compare with: a JSON file, or a request id saved under output.dir")
+    k.add_argument("--package", help="also read the app's requested permissions from the phone (needs adb)")
+    k.add_argument("--fail-on-consent", action="store_true", help="exit 1 if a bundled SDK was looked up before consent or after Reject")
+    k.add_argument("--json", action="store_true", help="print the JSON inventory instead of the summary")
+    k.add_argument("--out", help="also write the JSON inventory to this file")
 
     e = sub.add_parser("env", parents=[shared], help="network-environment snapshot (VPN/proxy/geography signals)")
     e.add_argument("--check-vpn", choices=config.CHECK_VPN_MODES, help="off | warn | fail (exit 5 on a likely VPN/proxy)")
@@ -116,6 +126,47 @@ def cmd_audit(args, cfg, dev: adb.Device) -> int:
                            wait_s=args.wait, resume=args.resume, as_json=args.json, out_file=args.out)
 
 
+def _load_report(ref: str, cfg) -> dict:
+    path = Path(ref)
+    if not path.exists():
+        path = Path(cfg["output"]["dir"]) / f"{ref}.json"
+    if not path.exists():
+        raise FileNotFoundError(f"no audit report at {ref} or {path}")
+    rep = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(rep, dict) or "findings" not in rep:
+        raise ValueError(f"{path} is not a traceveil audit report")
+    return rep
+
+
+def cmd_sdks(args, cfg, dev=None) -> int:
+    try:
+        rep = _load_report(args.report, cfg) if args.report else None
+    except (OSError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    perms = None
+    if args.package:
+        dev = dev or adb.connect(args.adb or cfg["device"]["adb"] or None, args.serial or cfg["device"]["serial"] or None, args.timeout)
+        dump = dev.shell(f"dumpsys package {args.package}")
+        if "Unable to find package" in dump or f"Package [{args.package}]" not in dump:
+            print(f"error: {args.package} is not installed on the device", file=sys.stderr)
+            return EXIT_DEVICE
+        perms = sdks.parse_requested_permissions(dump)
+    try:
+        inv = sdks.build(Path(args.apk), sdks.load_signatures(), rep, perms)
+    except sdks.ApkError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_INCONCLUSIVE
+    print(report.dumps(inv) if args.json else sdks.summary(inv))
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(report.dumps(inv), encoding="utf-8")
+    flagged = sdks.needs_attention(inv) if args.fail_on_consent else []
+    if flagged:
+        print(f"policy: {len(flagged)} bundled SDK(s) looked up before consent or after Reject: {', '.join(flagged)}", file=sys.stderr)
+    return EXIT_FINDINGS if flagged else EXIT_PASS
+
+
 def cmd_init(args, cfg, dev=None) -> int:
     target = Path("traceveil.toml")
     if target.exists() and not args.force:
@@ -136,6 +187,8 @@ def main(argv: list[str] | None = None) -> int:
         cfg = config.load(args.config)
         if args.command == "init":
             return cmd_init(args, cfg)
+        if args.command == "sdks":
+            return cmd_sdks(args, cfg)
         dev = adb.connect(args.adb or cfg["device"]["adb"] or None, args.serial or cfg["device"]["serial"] or None, args.timeout)
         return {"doctor": cmd_doctor, "env": cmd_env, "audit": cmd_audit}[args.command](args, cfg, dev)
     except config.ConfigError as e:
