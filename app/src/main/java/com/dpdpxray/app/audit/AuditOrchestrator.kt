@@ -17,6 +17,7 @@ import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.data.SessionNetworkReadings
 import com.dpdpxray.app.netproof.UidTx
 import com.dpdpxray.app.report.EvidenceReport
+import com.dpdpxray.core.model.AppManifestFacts
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.ConsentEvent
@@ -47,7 +48,14 @@ data class AuditConfig(
     val autoDrive: Boolean = false,
     /** Explicit developer-test approval; never inferred from Shizuku being available. */
     val resetAppData: Boolean = false,
-)
+    val fastPreview: Boolean = false,
+) {
+    init {
+        require(!fastPreview || plans == listOf(AuditPlan.ACCEPT)) {
+            "Fast Preview is a single Accept-plan check, not a Full audit."
+        }
+    }
+}
 
 sealed interface AuditProgress {
     data object Idle : AuditProgress
@@ -75,11 +83,6 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
     private val planCapture = PlanCaptureRecorder(UidTx::now, CaptureBus::reset, CaptureBus::snapshot, SystemClock::elapsedRealtimeNanos)
 
     private data class CapturedPlan(val session: AuditSession, val upload: SessionNetworkReadings)
-
-    private data class Timing(val waitConsentMs: Long, val dwellMs: Long, val observeMs: Long, val silentMs: Long)
-
-    private fun timing() = if (graph.settings.settings.value.fastDemo) Timing(12_000, 1_500, 8_000, 12_000)
-    else Timing(20_000, 2_500, 15_000, 25_000)
 
     @Synchronized
     fun start(config: AuditConfig) {
@@ -120,9 +123,11 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
                 _progress.value = AuditProgress.Running(config, 0, config.plans.first(), "Loading on-device AI model")
                 graph.llm.load(BackendKind.GPU)
             }
+            // C13: allow-listed SDK facts from the installed manifest, read once (read-only; null when unreadable).
+            val manifest = withContext(Dispatchers.IO) { runCatching { ManifestFactsReader.read(context, config.targetPackage) }.getOrNull() }
             config.plans.mapIndexed { i, plan ->
                 ConsentPlanRetry.capture(plan, config.targetPackage, { config.resetAppData && ShizukuBridge.hasPermission() }, { it.session }) { attempt ->
-                    runPlan(config, plan, i, auditId, dir, attempt)
+                    runPlan(config, plan, i, auditId, dir, attempt, manifest)
                 }.let { attempts ->
                     if (attempts.size == 1) attempts else attempts.mapIndexed { attempt, captured ->
                         val note = if (attempt == 0) "Consent screen missed; first attempt retained and one fresh-state demo retry requested."
@@ -142,30 +147,37 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         val catalog = graph.catalog()
         val result = RulesEngine(catalog).evaluate(sessions)
         val fixes = graph.fixCatalog.fixesFor(result, catalog)
-        val markdown = EvidenceReport.annotate(MarkdownReport.build(result, sessions, fixes, graph.citations()), sessions)
+        val timingProfile = AuditTimingPolicy.profile(config)
+        val markdown = EvidenceReport.annotate(MarkdownReport.build(result, sessions, fixes, graph.citations()), sessions, timingProfile)
         val meta = AuditMeta(
             id = auditId, targetPackage = config.targetPackage, targetLabel = config.targetLabel,
             createdAtMs = System.currentTimeMillis(), score = result.score, band = result.band,
             findingCount = result.findings.size, plans = config.plans.map { it.label },
+            timingProfile = timingProfile,
+            inconclusiveReason = com.dpdpxray.core.rules.Inconclusive.reason(result.findings)?.name,
         )
         graph.repository.save(meta, sessions, result, markdown, capturedPlans.map { it.upload })
         _progress.value = AuditProgress.Done(auditId)
         returnToXray()
     }
 
-    private suspend fun runPlan(config: AuditConfig, plan: AuditPlan, index: Int, auditId: String, dir: File, attempt: Int = 0): CapturedPlan = coroutineScope {
-        val t = timing()
+    private suspend fun runPlan(
+        config: AuditConfig, plan: AuditPlan, index: Int, auditId: String, dir: File, attempt: Int = 0, manifest: AppManifestFacts? = null,
+    ): CapturedPlan = coroutineScope {
+        val t = AuditTimingPolicy.forAudit(config)
         val pkg = config.targetPackage
         val sessionId = "$auditId-${plan.name}" + if (attempt == 0) "" else "-retry-$attempt"
         val notes = mutableListOf<String>()
+        if (config.fastPreview) notes += AuditTimingPolicy.coverageHint(AuditTimingPolicy.FAST_PREVIEW)
         fun step(s: String, start: Long = 0) {
             _progress.value = AuditProgress.Running(config, index, plan, s, start)
         }
 
         step(if (config.resetAppData) "Resetting authorised test app ${config.targetLabel}" else "Keeping ${config.targetLabel}'s current data")
+        var freshState = false // true only when an approved reset actually cleared the app's data
         if (config.resetAppData && ShizukuBridge.hasPermission()) {
             val stopped = ShizukuBridge.forceStop(pkg)
-            if (stopped.isSuccess) ShizukuBridge.clearAppData(pkg).onFailure { notes += "Could not clear app data: ${it.message}" }
+            if (stopped.isSuccess) ShizukuBridge.clearAppData(pkg).onSuccess { freshState = true }.onFailure { notes += "Could not clear app data: ${it.message}" }
             else notes += "Could not clear app data because stopping the test app failed: ${stopped.exceptionOrNull()?.message}"
         } else {
             notes += "App data was not cleared (reset not approved or Shizuku not authorised) — results reflect the app's current state."
@@ -221,12 +233,27 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
                     ).await(45_000)
                     if (chosen == null) notes += "No consent choice was recorded within 45 s."
                 }
-                step("Observing traffic after the choice", t0)
-                delay(t.observeMs)
+                step(if (ConsentBus.choiceMade) "Observing traffic after the recorded choice" else "Observing traffic without a verified consent choice", t0)
+                t.observe(plan)
             }
             AuditPlan.SILENT -> {
                 step("Observing without touching the app", t0)
-                delay(t.silentMs)
+                t.observe(plan)
+            }
+        }
+
+        // C12: Home, confirm the app left the screen, keep capturing. Added after the window above, never taken from it.
+        var backgroundStartedNanos: Long? = null
+        if (t.backgroundMs > 0) {
+            step("Sending ${config.targetLabel} to the background", t0)
+            when (val o = backgroundStep(pkg).run()) {
+                is BackgroundStep.Outcome.Confirmed -> {
+                    backgroundStartedNanos = o.atNanos
+                    notes += BackgroundStep.confirmedNote(o.atNanos - t0, t.backgroundMs)
+                    step("Watching ${config.targetLabel} in the background", t0)
+                    delay(t.backgroundMs)
+                }
+                is BackgroundStep.Outcome.NotConfirmed -> notes += BackgroundStep.notConfirmedNote(o.reason)
             }
         }
 
@@ -264,9 +291,21 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             privateDnsActive = DeviceChecks.privateDnsActive(context),
             notes = notes,
             captureHealth = snapshot.health,
+            freshState = freshState,
+            backgroundStartedNanos = backgroundStartedNanos,
+            permissionDialogsWatched = ConsentAccessibilityService.instance != null,
+            manifestFacts = manifest,
         )
         CapturedPlan(session, capturedBoundary.reading)
     }
+
+    /** The background step wired to the accessibility service (Home action and window list) on the main thread. */
+    private fun backgroundStep(pkg: String) = BackgroundStep(
+        pressHome = { withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.pressHome() == true } },
+        targetOnScreen = { withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.packageOnScreen(pkg) } },
+        clockNanos = SystemClock::elapsedRealtimeNanos,
+        pause = { delay(it) },
+    )
 
     private suspend fun startCapture(config: AuditConfig) {
         CaptureBus.reset()

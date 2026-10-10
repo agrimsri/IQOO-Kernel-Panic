@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcuts and App Actions synonyms ("Hey Google, open TraceVeil …"). -->
+<resources>
+    <string name="shortcut_check_app_short">Check app</string>
+    <string name="shortcut_check_app_long">Check an app</string>
+    <string name="shortcut_check_apk_short">Check APK</string>
+    <string name="shortcut_check_apk_long">Check an APK file</string>
+    <string name="shortcut_ask_last_check_short">Last check</string>
+    <string name="shortcut_ask_last_check_long">Ask about my last check</string>
+
+    <string-array name="shortcut_check_app_synonyms">
+        <item>check an app</item>
+        <item>check app</item>
+        <item>audit an app</item>
+        <item>scan an app</item>
+    </string-array>
+    <string-array name="shortcut_check_apk_synonyms">
+        <item>check an APK file</item>
+        <item>check an APK</item>
+        <item>check APK</item>
+        <item>scan an APK</item>
+    </string-array>
+    <string-array name="shortcut_ask_last_check_synonyms">
+        <item>ask about my last check</item>
+        <item>my last check</item>
+        <item>last check</item>
+        <item>latest audit</item>
+    </string-array>
+</resources>

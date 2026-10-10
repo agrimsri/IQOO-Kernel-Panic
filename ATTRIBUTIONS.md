@@ -43,7 +43,7 @@ TrackerControl, PCAPdroid and Exodus references are idea/research inputs only. N
 
 | Material | Source / terms | Integration handling |
 | --- | --- | --- |
-| Optional GeoLite2 Country data | [MaxMind GeoLite EULA](https://www.maxmind.com/en/geolite/eula) and MaxMind's [display guidance](https://support.maxmind.com/knowledge-base/articles/sell-or-display-data-from-geolite-databases-and-web-services), both read 10 October 2026; details in [Yashvi's attribution notes](docs/ATTRIBUTION.md) | **Not in Git, the APK or any release.** Used only from a copy on the phone (`files/geo/GeoLite2-Country.mmdb`); with no copy every country stays unknown. **Attribution is required** and is shown on the card whenever the data is used: "This product includes GeoLite Data created by MaxMind, available from https://www.maxmind.com". MaxMind's guidance also asks for it in documentation that mentions use of GeoLite data, which is why this line appears here. **Permission is conditional, not a blanket ban:** application use and display to outside users is allowed with attribution; copyrightable elements are under CC BY-SA 4.0; giving the database file to a third party beyond what that licence allows needs MaxMind's written consent and the same duties on the recipient (EULA §3, §6); no identifying households, individuals or street addresses (§5). **Update duty:** use the newest release and stop using and destroy versions older than 30 days after an update (§6), so the card shows the build date and warns past 30 days. **Version in use:** built 2026-09-29, 8,423,789 bytes, SHA-256 `ff539785596f72ac2a07048f08506b38134bcf3b568182fd65f4534817bf91d7`, taken from the TrackerControl checkout the team supplied, not downloaded under a project MaxMind account. Each user should obtain their own copy. |
+| Optional GeoLite2 Country data | [MaxMind GeoLite EULA](https://www.maxmind.com/en/geolite/eula) and MaxMind's [display guidance](https://support.maxmind.com/knowledge-base/articles/sell-or-display-data-from-geolite-databases-and-web-services), both read 10 October 2026; details in [Yashvi's attribution notes](docs/ATTRIBUTION.md) | **Not in Git, the APK or any release.** Used only from a copy on the phone (`files/geo/GeoLite2-Country.mmdb`), and preferred when present; with no copy the bundled DB-IP Lite table below places countries. **Attribution is required** and is shown on the card whenever the data is used: "This product includes GeoLite Data created by MaxMind, available from https://www.maxmind.com". MaxMind's guidance also asks for it in documentation that mentions use of GeoLite data, which is why this line appears here. **Permission is conditional, not a blanket ban:** application use and display to outside users is allowed with attribution; copyrightable elements are under CC BY-SA 4.0; giving the database file to a third party beyond what that licence allows needs MaxMind's written consent and the same duties on the recipient (EULA §3, §6); no identifying households, individuals or street addresses (§5). **Update duty:** use the newest release and stop using and destroy versions older than 30 days after an update (§6), so the card shows the build date and warns past 30 days. **Version in use:** built 2026-09-29, 8,423,789 bytes, SHA-256 `ff539785596f72ac2a07048f08506b38134bcf3b568182fd65f4534817bf91d7`, taken from the TrackerControl checkout the team supplied, not downloaded under a project MaxMind account. Each user should obtain their own copy. |
 | Existing `geo/world.svg` | [amCharts SVG directory](https://www.amcharts.com/svg-maps/) and [GeoMap](https://github.com/takuseno/GeoMap); [CC BY-NC 4.0 legal code](https://creativecommons.org/licenses/by-nc/4.0/legalcode.en) | amCharts identifies its SVG maps as non-commercial. Geometry stays unchanged; visible credits name both sources, licence and styling change. Not cleared for commercial use or an assumed prize-competition exemption; reassess that scope before broader distribution. |
 | MaxMind format specification | [Primary specification](https://maxmind.github.io/MaxMind-DB/) | Yashvi wrote the reader; no added reader library or competitor implementation. |
 | Company facts / statutory context | A5's cited `trackers.json`; [official Act](https://www.indiacode.nic.in/bitstream/123456789/22037/2/a2023-22.pdf) and [commencement notification](https://upload.indiacode.nic.in/showfile?actid=AC_CEN_45_0_00003_2023-22_1763464807080&filename=c56ceae6c383460ca69577428d36828b.pdf&type=hindinotification) | Mount with the catalogue's single sourced owner mapping. DPDP context is jurisdiction-specific readiness, with commencement/exception warnings; no new corpus citation ID or applicability verdict. |
@@ -68,6 +68,17 @@ All read on 10 October 2026 and cited in the catalogue with their quotes; each s
 
 CleverTap is deliberately unresolved (three entities in three countries, no headquarters named). 22 catalogue entities were not researched and show "Not established".
 
+## Bundled IP-to-country table (DB-IP Lite) — 10 October 2026
+
+| Item | Detail |
+| --- | --- |
+| Material | DB-IP [IP to Country Lite](https://db-ip.com/db/download/ip-to-country-lite), October 2026 MMDB edition (`DBIP-Country-Lite`, built 2026-10-01), 8,348,509 bytes, SHA-256 `dbd70ccfa2a13627eaf4913d19920a1a229f1b3c5439ac01c509995b6364202a` |
+| Licence | [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/), as stated on DB-IP's download page (read 10 October 2026). Redistribution is allowed with attribution |
+| Required notice | "IP Geolocation by DB-IP (https://db-ip.com)", printed with the licence on the endpoint map card whenever this table placed the countries, and in this register |
+| Location | `app/src/main/assets/geo/dbip-country-lite.mmdb.gz` (gzip -9 -n of the unmodified file); inside the APK as `assets/geo/dbip-country-lite.mmdb`. Details, APK impact and update steps in [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md) |
+| Intended use | Offline country placement of IP addresses in DNS answers on the endpoint map, labelled Inferred and approximate. No network access; not used to locate the person |
+| Decision | Bundled on the owner's instruction for the finale build, 10 October 2026, because the licence permits redistribution with attribution (unlike GeoLite2, which stays a user-provided option) |
+
 ## Optional online voice (Sarvam Bulbul) — 10 October 2026
 
 | Item | Detail |
@@ -81,3 +92,48 @@ CleverTap is deliberately unresolved (three entities in three countries, no head
 | Tested 10 October 2026 | Two real calls through the app's own `SarvamTts` code, with the real grounded answers: English (497 characters, request `20261010_73884898-bf84-475b-8666-9c7884686da7`, about 32 s of 22,050 Hz mono 16-bit WAV) and Hindi (101 characters, request `20261010_dc25fd6b-1ef9-452f-a25b-60059e3db971`, about 11 s). About 600 characters in total, roughly ₹1.8 at the listed price. Not yet confirmed on the phone: audible playback of the online voice. |
 | Not yet read | Sarvam's terms, data-retention and training policy. **No team sign-off is recorded.** Do not describe the product as "uploads nothing" while this is enabled, and do not enable it for a real-app audit. |
 
+## Optional "Hey TraceVeil" wake word (Vosk) — 10 October 2026
+
+Experimental, off by default; see [docs/HEY_TRACEVEIL.md](docs/HEY_TRACEVEIL.md). Intended use: offline keyword spotting for one phrase while the user has explicitly started listening.
+
+| Component | Pinned version | Source and licence | Handling |
+| --- | --- | --- | --- |
+| Vosk Android (`com.alphacephei:vosk-android`) | 0.3.75 | [Maven Central](https://repo1.maven.org/maven2/com/alphacephei/vosk-android/0.3.75/), [vosk-api COPYING](https://github.com/alphacep/vosk-api/blob/master/COPYING), Apache License 2.0 (POM and COPYING read 10 October 2026) | Runtime dependency; bundles `libvosk.so` (about 10 MB per ABI). Native/transitive notice review (Kaldi, OpenFST and the math libraries inside the native library) is still needed for a release. |
+| JNA (`net.java.dev.jna:jna`, aar) | 5.18.1, pulled by Vosk | [Published POM](https://repo1.maven.org/maven2/net/java/dev/jna/jna/5.18.1/jna-5.18.1.pom) and [LICENSE](https://github.com/java-native-access/jna/blob/master/LICENSE): Apache-2.0 OR LGPL-2.1-or-later | Used under Apache-2.0. Bundles `libjnidispatch.so`. |
+| Vosk small US-English model | `vosk-model-small-en-us-0.15` | [alphacephei.com model list](https://alphacephei.com/vosk/models), listed as Apache 2.0 | **Not in Git or the APK.** Downloaded only after the user taps Download, from the official URL, into the app's own storage. Checked against the official list's MD5 (`09ab50cc…`) and a SHA-256 (`30f26242…`) computed from a copy whose size and MD5 matched that list. |
+
+## Trained models: datasets and derived weights — 10 October 2026
+
+Raw data is not in Git or the APK; only the trained weights are bundled. Full details, citations and SHA-256 values are in [ml/DATA_SOURCES.md](ml/DATA_SOURCES.md); licences were read on 10 October 2026.
+
+| Material | Source / terms | Handling |
+| --- | --- | --- |
+| NATICUSdroid (training) and TUANDROMD (cross-dataset test) | UCI Machine Learning Repository, DOIs 10.24432/C5FS64 and 10.24432/C5560H; both CC BY 4.0 | Credited in `core/src/main/resources/ml/apk_permission_risk.json` and the model card, with the changes we made (name normalisation, dropped columns). |
+| EasyPrivacy and EasyList | The EasyList authors (https://easylist.to/); dual GPL-3.0-or-later / CC BY-SA 3.0, used under CC BY-SA 3.0 | Attribution "The EasyList authors (https://easylist.to/)". The derived `core/src/main/resources/ml/tracker_hostname.json` is shared under CC BY-SA 3.0, not MIT. |
+| Majestic Million | Majestic (https://majestic.com/); CC BY 3.0 | Attribution to Majestic in the TrackerLens weights file and model card. |
+| AOSP platform manifests; Public Suffix List | Apache-2.0; MPL-2.0 | Training only (permission names and levels; registrable-domain grouping). Nothing from them is shipped. |
+| DuckDuckGo Tracker Radar | CC BY-NC-SA 4.0 | Considered, **not used** (non-commercial only). |
+
+## ConsentLens-1 on the NPU: runtime libraries and training data — 10 October 2026
+
+ConsentLens-1 is TraceVeil's own string-role model (`app/src/main/assets/consentlens/consentlens_int8.tflite`, about 50 KB). Its card is [ml/consentlens/MODEL_CARD.md](ml/consentlens/MODEL_CARD.md).
+
+| Component | Pinned version | Source and licence | Handling |
+| --- | --- | --- | --- |
+| LiteRT (`com.google.ai.edge.litert:litert`, with `litert-api`) | 1.4.2 | [Google Maven](https://dl.google.com/android/maven2/com/google/ai/edge/litert/litert/1.4.2/litert-1.4.2.pom); Apache License 2.0 ([LiteRT LICENSE](https://github.com/google-ai-edge/LiteRT/blob/main/LICENSE)) | Runtime dependency (Interpreter API); bundles `libtensorflowlite_jni.so`. Retain the Apache-2.0 notice. |
+| Qualcomm AI Engine Direct delegate for LiteRT (`com.qualcomm.qti:qnn-litert-delegate`) | 2.50.0 | [Maven Central](https://repo1.maven.org/maven2/com/qualcomm/qti/qnn-litert-delegate/2.50.0/); proprietary Qualcomm Technologies licence. The POM names "Qualcomm AI Hub Model License" ([PDF](https://softwarecenter.qualcomm.com/api/download/software/licenses/ai_model_hub/v1/LICENSE.pdf)); the AAR carries its own `LICENSE.pdf` | Runtime dependency; bundles `libQnnTFLiteDelegate.so` and `libqnn_delegate_jni.so` (arm64-v8a only). |
+| Qualcomm QNN runtime (`com.qualcomm.qti:qnn-runtime`) | 2.50.0 (must equal the delegate version) | [Maven Central](https://repo1.maven.org/maven2/com/qualcomm/qti/qnn-runtime/2.50.0/); the AAR's `LICENSE.pdf` is Qualcomm's **"AI Stack License"** (Terms and Conditions of Use); third-party notices in the AAR's `NOTICE.txt` | Bundles the HTP backend (`libQnnHtp.so`, `libQnnHtpPrepare.so`, `libQnnSystem.so`) and the HTP V69/V73/V75/V79/V81 stub and skel libraries. The DSP and GPU backends and HTP V68 are excluded from the APK (`app/build.gradle.kts`); ConsentLens never selects them. |
+
+**Licence decision (as relayed in the ConsentLens work brief, 10 October 2026):** the product owner approved accepting Qualcomm's AI Stack License for the QNN runtime and the LiteRT QNN delegate from Maven Central, including redistribution inside the TraceVeil app. The agent that integrated them did not accept anything on anyone's behalf beyond that recorded approval; the owner should confirm it in this register. What the runtime licence text (read from the 2.50.0 AAR) grants and requires, in short: use and copy to develop your applications, and **distribute only in object code as incorporated in your application** (never standalone); no reverse engineering; keep Qualcomm's proprietary notices; comply with third-party notices; it lists prohibited uses (none of which is consent-screen text classification). Open items before a public release: read the delegate AAR's own `LICENSE.pdf` (its text could not be extracted locally) and ship Qualcomm's `NOTICE.txt` third-party notices with the app.
+
+**Training data (all real, openly licensed UI strings; the processed set is committed as `ml/consentlens/data/consentlens_dataset.jsonl` with source, file, string key and language per row, and pinned revisions in `ml/consentlens/data/sources.json`):**
+
+| Source | Revision | Licence | Required handling |
+| --- | --- | --- | --- |
+| AOSP PermissionController strings (`platform/packages/modules/Permission`) | `26231a7eac744c7d2a8fea4740926620f56b20c6` | Apache-2.0 | Copyright The Android Open Source Project; keep the licence notice with the derived dataset. |
+| AOSP framework strings (`platform/frameworks/base`, `core/res`) | `1cdfff555f4a21f71ccc978290e2e212e2f8b168` | Apache-2.0 | As above. |
+| Klaro! consent manager translations (`kiprotect/klaro`, `src/translations`) | `db9f1aca906a392990c58c58475366a091012ea7` | BSD-3-Clause | Retain "Copyright (c) 2019-2020, KIProtect GmbH" and contributors, the licence conditions and disclaimer. |
+| tarteaucitron.js translations (`AmauriC/tarteaucitron.js`, `lang/`) | `07254bb6ff2858e2ab6a9b45c391d655a55a9c54` | MIT | Retain the MIT copyright and permission notice. |
+| TraceVeil's own lexicon and LeakyShop dialog strings | this repository | MIT | Ours. |
+
+The model weights are derived from these strings; no source string is shipped in the APK except the hand-written demo phrases in `consentlens_meta.json`.

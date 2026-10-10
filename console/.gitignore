@@ -1,0 +1,5 @@
+node_modules/
+dist/
+*.log
+.vite/
+# dist-single/ is committed on purpose: it is the one-file offline build.

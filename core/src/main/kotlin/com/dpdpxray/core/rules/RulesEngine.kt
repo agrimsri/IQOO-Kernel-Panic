@@ -1,9 +1,10 @@
 package com.dpdpxray.core.rules
 
-import com.dpdpxray.core.audit.PhaseAssigner
+import com.dpdpxray.core.manifest.SdkManifestCatalog
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
+import com.dpdpxray.core.model.Category
 import com.dpdpxray.core.model.CheckId
 import com.dpdpxray.core.model.EvidenceType
 import com.dpdpxray.core.model.Finding
@@ -14,6 +15,8 @@ import com.dpdpxray.core.model.RejectOption
 import com.dpdpxray.core.model.ScoreBand
 import com.dpdpxray.core.model.ScreenAudit
 import com.dpdpxray.core.model.Severity
+import com.dpdpxray.core.trackers.AppOwner
+import com.dpdpxray.core.trackers.AppOwners
 import com.dpdpxray.core.trackers.TrackerCatalog
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -21,13 +24,28 @@ import kotlin.math.roundToInt
 /**
  * Turns raw audit sessions into DPDP findings. Deterministic: same sessions in, same findings out.
  * The AI layer only enriches explanations; it never decides whether a finding exists.
+ *
+ * Context (G1): servers of the company that publishes the audited app are first-party data collection, not third-party
+ * trackers ([CheckId.S1]); and a plan that ran on the app's kept data without showing a consent screen cannot tell
+ * whether consent was given earlier, so its tracker lookups are reported under [CheckId.U1] instead of as "before
+ * consent". Plans that started from an approved fresh reset are judged exactly as before.
  */
-class RulesEngine(private val catalog: TrackerCatalog) {
+class RulesEngine(
+    private val catalog: TrackerCatalog,
+    owners: AppOwners = AppOwners.default,
+    sdkCatalog: SdkManifestCatalog = SdkManifestCatalog.default,
+) {
 
-    private data class Ctx(val session: AuditSession, val events: List<NetEvent>)
+    private val classifier = SessionClassifier(catalog, owners)
+    private val extended = ExtendedChecks(catalog, sdkCatalog) { s, e, relation -> describe(Ctx(s, emptyList(), null), e, relation) }
+
+    private data class Ctx(val session: AuditSession, val events: List<NetEvent>, val owner: AppOwner?) {
+        /** Kept data and no consent screen in this plan: consent may have been given before the audit (e.g. at sign-up). */
+        val historyUnknown: Boolean get() = session.appDataKept && !session.consentScreenSeen
+    }
 
     fun evaluate(sessions: List<AuditSession>): AuditResult {
-        val ctx = sessions.map { s -> Ctx(s, classify(PhaseAssigner.assign(s.netEvents, s.consentEvents))) }
+        val ctx = sessions.map { s -> Ctx(s, classifier.classify(s), classifier.ownerOf(s)) }
         val findings = mutableListOf<Finding>()
 
         val allEvents = ctx.flatMap { it.events }
@@ -42,29 +60,27 @@ class RulesEngine(private val catalog: TrackerCatalog) {
         if (screen != null) findings += screenChecks(screen, screenPlans)
         c9Children(ctx, screen)?.let { findings += it }
         c10AdIds(ctx)?.let { findings += it }
+        consentHistoryUnknown(ctx)?.let { findings += it }
+        sameCompany(ctx)?.let { findings += it }
+        // C11–C15 and V1 (ExtendedChecks): only from evidence the session recorded; silent when it was not recorded.
+        findings += extended.evaluate(ctx.map { PlanEvidence(it.session, it.events, it.owner, it.historyUnknown) })
 
         val (score, band) = ScoreCalculator.compute(findings)
         return AuditResult(findings.sortedWith(compareBy({ it.severity.ordinal }, { it.checkId.ordinal })), score, band)
     }
 
-    private fun classify(events: List<NetEvent>) = events.map { e ->
-        if (e.entity != null) e else {
-            val info = catalog.classify(e.hostname, e.cnameChain)
-            e.copy(entity = info.entity, category = info.category, disguisedVia = e.disguisedVia ?: info.disguisedVia)
-        }
-    }
-
     private fun preConsent(e: NetEvent) = e.phase == Phase.BEFORE_CONSENT || e.phase == Phase.NO_CONSENT_SEEN
 
     private fun c1BeforeConsent(ctx: List<Ctx>): Finding? {
-        val hits = ctx.flatMap { c -> c.events.filter { it.category.isTracking && preConsent(it) }.map { c to it } }
+        val hits = ctx.filterNot { it.historyUnknown }
+            .flatMap { c -> c.events.filter { it.category.isTracking && preConsent(it) }.map { c to it } }
         if (hits.isEmpty()) return null
         val entities = hits.mapNotNull { it.second.entity }.distinct()
         return Finding(
             checkId = CheckId.C1, severity = Severity.HIGH, evidenceType = EvidenceType.OBSERVED,
             title = CheckId.C1.title,
-            explanation = "The app contacted ${entities.joinToString()} before the user made any consent choice. " +
-                "Under the DPDP Act, personal data may be processed only with consent (or a legitimate use), " +
+            explanation = "The app looked up hosts the tracker catalogue lists for ${entities.joinToString()} before the user " +
+                "made any consent choice. $CATALOGUE_MATCH Under the DPDP Act, personal data may be processed only with consent (or a legitimate use), " +
                 "and consent must be given by a clear affirmative action before processing starts.",
             evidence = hits.map { (c, e) -> describe(c, e) }.distinct().take(MAX_EVIDENCE),
             plans = hits.map { it.first.session.plan }.distinct(),
@@ -76,16 +92,23 @@ class RulesEngine(private val catalog: TrackerCatalog) {
 
     private fun noConsentMechanism(ctx: List<Ctx>): Finding? {
         if (ctx.any { it.session.consentScreenSeen }) return null
-        val trackers = ctx.flatMap { it.events.filter { e -> e.category.isTracking } }
+        // A plan that kept the app's data may simply not repeat a consent screen the user already answered.
+        val checked = ctx.filterNot { it.historyUnknown }
+        val trackers = checked.flatMap { it.events.filter { e -> e.category.isTracking } }
         if (trackers.isEmpty()) return null
         return Finding(
             checkId = CheckId.NC, severity = Severity.HIGH, evidenceType = EvidenceType.OBSERVED,
             title = CheckId.NC.title,
-            explanation = "No consent request or privacy notice was detected, yet the app contacted " +
-                "${trackers.mapNotNull { it.entity }.distinct().joinToString()}. DPDP requires a notice (s.5) and valid consent (s.6), " +
-                "and the Data Fiduciary must be able to prove both (s.6(10)).",
-            evidence = listOf("No consent screen detected in ${ctx.joinToString { it.session.plan.label }}."),
-            plans = ctx.map { it.session.plan }.distinct(),
+            explanation = "No consent screen or privacy notice was seen during this capture " +
+                "(${checked.joinToString { c -> c.session.plan.label + (captured(c.session)?.let { ", $it" } ?: "") }}), yet the app looked up hosts the tracker " +
+                "catalogue lists for ${trackers.mapNotNull { it.entity }.distinct().joinToString()}. This covers only the captured " +
+                "window: the app may ask for consent later or elsewhere (for example at sign-up), which this audit cannot see. " +
+                "DPDP requires a notice (s.5) and valid consent (s.6) before processing, and the Data Fiduciary must be able " +
+                "to prove both (s.6(10)).",
+            evidence = checked.map { c ->
+                "No consent screen seen in ${c.session.plan.label}" + (captured(c.session)?.let { " during the $it captured" } ?: "") + "."
+            },
+            plans = checked.map { it.session.plan }.distinct(),
             dpdpRefs = listOf("s5(1)", "s6(1)", "s6(10)"),
             penaltyBand = PenaltyBand.RESIDUAL_50,
         )
@@ -98,8 +121,8 @@ class RulesEngine(private val catalog: TrackerCatalog) {
         return Finding(
             checkId = CheckId.C2, severity = Severity.CRITICAL, evidenceType = EvidenceType.OBSERVED,
             title = CheckId.C2.title,
-            explanation = "The user refused consent, but the app still contacted ${entities.joinToString()}. " +
-                "Consent must be free and specific; processing based on a refused consent has no lawful ground.",
+            explanation = "The user refused consent, but the app still looked up hosts the tracker catalogue lists for " +
+                "${entities.joinToString()}. $CATALOGUE_MATCH Consent must be free and specific; processing based on a refused consent has no lawful ground.",
             evidence = hits.map { (c, e) -> describe(c, e) }.distinct().take(MAX_EVIDENCE),
             plans = hits.map { it.first.session.plan }.distinct(),
             dpdpRefs = listOf("s4(1)", "s6(1)"),
@@ -114,7 +137,8 @@ class RulesEngine(private val catalog: TrackerCatalog) {
         fun add(id: CheckId, sev: Severity, field: String, explanation: String, evidence: String, refs: List<String>) {
             out += Finding(
                 checkId = id, severity = sev, evidenceType = ev(field), title = id.title, explanation = explanation,
-                evidence = listOf(evidence) + a.conflicts.filter { it.startsWith(field) }.map { "Note: tree and AI disagree — $it" },
+                evidence = listOf(evidence) + a.conflicts.filter { it.startsWith(field) }.map { "Note: tree and AI disagree — $it" } +
+                    lensSupport(a, field),
                 plans = plans, dpdpRefs = refs, penaltyBand = PenaltyBand.RESIDUAL_50,
                 confidence = if (ev(field) == EvidenceType.OBSERVED) 1.0 else a.confidence,
             )
@@ -157,6 +181,13 @@ class RulesEngine(private val catalog: TrackerCatalog) {
         return out
     }
 
+    /** Names the on-device model and the on-screen strings behind a field ConsentLens inferred (INFERRED, not observed). */
+    private fun lensSupport(a: ScreenAudit, field: String): List<String> {
+        val lens = a.consentLens ?: return emptyList()
+        if (field !in lens.inferredFields) return emptyList()
+        return listOf("AI-inferred by ${lens.modelId} (on-device model) from: " + lens.support[field].orEmpty().joinToString("; "))
+    }
+
     private fun c9Children(ctx: List<Ctx>, screen: ScreenAudit?): Finding? {
         val declared = ctx.any { it.session.childFacing }
         val signalled = screen?.childAudienceSignals == true
@@ -168,8 +199,8 @@ class RulesEngine(private val catalog: TrackerCatalog) {
             checkId = CheckId.C9, severity = Severity.CRITICAL,
             evidenceType = if (declared) EvidenceType.OBSERVED else EvidenceType.INFERRED,
             title = CheckId.C9.title,
-            explanation = "This app ${if (declared) "is declared child-facing" else "looks aimed at children"} and contacts " +
-                "${entities.joinToString()}. DPDP bars tracking, behavioural monitoring and targeted advertising directed at " +
+            explanation = "This app ${if (declared) "is declared child-facing" else "looks aimed at children"} and looks up " +
+                "hosts the tracker catalogue lists for ${entities.joinToString()}. $CATALOGUE_MATCH DPDP bars tracking, behavioural monitoring and targeted advertising directed at " +
                 "children, and requires verifiable parental consent.",
             evidence = hits.map { (c, e) -> describe(c, e) }.distinct().take(MAX_EVIDENCE),
             plans = hits.map { it.first.session.plan }.distinct(),
@@ -181,8 +212,11 @@ class RulesEngine(private val catalog: TrackerCatalog) {
     }
 
     private fun c10AdIds(ctx: List<Ctx>): Finding? {
-        val hits = ctx.flatMap { c ->
-            c.events.filter { preConsent(it) && catalog.classify(it.hostname, it.cnameChain).collectsAdIdAtInit }.map { c to it }
+        val hits = ctx.filterNot { it.historyUnknown }.flatMap { c ->
+            c.events.filter {
+                preConsent(it) && it.category != Category.FIRST_PARTY_SAME_COMPANY &&
+                    catalog.classify(it.hostname, it.cnameChain).collectsAdIdAtInit
+            }.map { c to it }
         }
         if (hits.isEmpty()) return null
         val entities = hits.mapNotNull { it.second.entity }.distinct()
@@ -190,13 +224,64 @@ class RulesEngine(private val catalog: TrackerCatalog) {
             checkId = CheckId.C10, severity = Severity.MEDIUM, evidenceType = EvidenceType.INFERRED,
             title = CheckId.C10.title,
             explanation = "Per vendor documentation, ${entities.joinToString()} read a device or advertising identifier when they " +
-                "initialise. They were contacted before consent, so identifiers were likely shared without consent. " +
+                "initialise. They were looked up before consent, so identifiers were likely shared without consent. " +
                 "(Inferred from SDK behaviour; payloads were not inspected.)",
             evidence = hits.map { (c, e) -> describe(c, e) }.distinct().take(MAX_EVIDENCE),
             plans = hits.map { it.first.session.plan }.distinct(),
             dpdpRefs = listOf("s6(1)"),
             penaltyBand = PenaltyBand.RESIDUAL_50,
             confidence = 0.7,
+            entities = entities,
+        )
+    }
+
+    /** Kept-data plans without a consent screen: earlier consent cannot be checked, so nothing here is "before consent". */
+    private fun consentHistoryUnknown(ctx: List<Ctx>): Finding? {
+        val unknown = ctx.filter { it.historyUnknown }
+        if (unknown.isEmpty()) return null
+        val hits = unknown.flatMap { c -> c.events.filter { it.category.isTracking }.map { c to it } }
+        val entities = hits.mapNotNull { it.second.entity }.distinct()
+        val state = unknown.map { it.session.plan }.distinct()
+            .map { "${it.label}: the app kept its data (it did not start from an approved fresh reset) and no consent screen appeared." }
+        val lookups = if (hits.isEmpty()) listOf("No third-party tracker lookups were recorded in these plans.")
+            else hits.map { (c, e) -> describe(c, e, "consent history unknown") }.distinct()
+        return Finding(
+            checkId = CheckId.U1, severity = Severity.INFO, evidenceType = EvidenceType.OBSERVED,
+            title = CheckId.U1.title,
+            explanation = "This app kept its data from earlier use and no consent screen appeared during this run, so consent " +
+                "may have been given earlier (for example at sign-up). TraceVeil cannot check that history, so these lookups " +
+                "are not treated as made before consent and do not change the score. " +
+                (if (entities.isEmpty()) "No third-party tracker lookups were recorded in these plans. "
+                else "Third-party tracker lookups are listed below for review: ${entities.joinToString()}. ") +
+                "To test first-launch consent, audit a test install with an approved reset.",
+            evidence = (state + lookups).take(MAX_EVIDENCE),
+            plans = unknown.map { it.session.plan }.distinct(),
+            dpdpRefs = emptyList(),
+            penaltyBand = PenaltyBand.NONE,
+            entities = entities,
+        )
+    }
+
+    /** Catalogued tracking services of the app's own publisher: first-party data collection, shown but not penalised. */
+    private fun sameCompany(ctx: List<Ctx>): Finding? {
+        val hits = ctx.flatMap { c -> c.events.filter { it.category == Category.FIRST_PARTY_SAME_COMPANY }.map { c to it } }
+        if (hits.isEmpty()) return null
+        val owners = hits.mapNotNull { it.first.owner }.distinctBy { it.packageName }
+        val company = owners.map { it.company }.distinct().joinToString()
+        val entities = hits.mapNotNull { it.second.entity }.distinct()
+        return Finding(
+            checkId = CheckId.S1, severity = Severity.INFO, evidenceType = EvidenceType.INFERRED,
+            title = CheckId.S1.title,
+            explanation = "The app's cited listing names its developer as " +
+                owners.joinToString { "\"${it.quote}\" (${it.app}, ${it.source}, read ${it.asOf})" } +
+                ", and these lookups went to servers the tracker catalogue attributes to the same company ($company). They are treated as " +
+                "first-party data collection by the app's own company, not as third-party tracking, so the consent checks " +
+                "and the score do not count them. A lookup is an attempt to contact a host, not proof that personal data was " +
+                "sent. Some laws still require consent for first-party analytics or advertising; this audit does not assess that.",
+            evidence = hits.map { (c, e) -> describeSameCompany(c, e) }.distinct().take(MAX_EVIDENCE),
+            plans = hits.map { it.first.session.plan }.distinct(),
+            dpdpRefs = emptyList(),
+            penaltyBand = PenaltyBand.NONE,
             entities = entities,
         )
     }
@@ -217,18 +302,32 @@ class RulesEngine(private val catalog: TrackerCatalog) {
         )
     }
 
-    private fun describe(c: Ctx, e: NetEvent): String {
+    private fun describe(c: Ctx, e: NetEvent, relation: String? = null): String {
         val sinceLaunch = secs(e.tNanos - c.session.startedAtNanos)
         val choice = c.session.consentChoice
         val rel = when {
-            choice == null && e.phase == Phase.NO_CONSENT_SEEN -> "no consent was ever requested"
+            relation != null -> relation
+            choice == null && e.phase == Phase.NO_CONSENT_SEEN -> "no consent screen seen in this capture" + (captured(c.session)?.let { " ($it)" } ?: "")
             choice == null -> "the user had not chosen yet"
             e.tNanos < choice.tNanos -> "${secs(choice.tNanos - e.tNanos)} s before the consent choice"
             else -> "${secs(e.tNanos - choice.tNanos)} s after the user chose ${choice.kind.name.lowercase()}"
         }
         val who = e.entity?.let { " ($it)" } ?: ""
         val via = e.viaPackage?.let { " via $it" } ?: ""
-        return "${e.hostname}$who$via${alias(e)} — $sinceLaunch s after launch, $rel [${c.session.plan.label}]"
+        val match = e.entity?.let { " — catalogue match: ${e.category.name.lowercase().replace('_', ' ')}" } ?: ""
+        return "${e.hostname}$who$via${alias(e)}$match — looked up $sinceLaunch s after launch, $rel [${c.session.plan.label}]"
+    }
+
+    /** How long the plan was watched ("35.3 s"), so consent claims stay inside the capture window; null if unrecorded. */
+    private fun captured(s: AuditSession): String? = (s.endedAtNanos - s.startedAtNanos).takeIf { it > 0 }?.let { "${secs(it)} s" }
+
+    private fun describeSameCompany(c: Ctx, e: NetEvent): String {
+        val label = c.owner?.let { SessionClassifier.sameCompanyLabel(it.company) } ?: "Same company as the app"
+        val purpose = classifier.catalogueCategory(e).name.lowercase().replace('_', ' ')
+        val who = e.entity?.let { " ($it)" } ?: ""
+        val via = e.viaPackage?.let { " via $it" } ?: ""
+        return "${e.hostname}$who$via${alias(e)} — $label; catalogued as $purpose — " +
+            "${secs(e.tNanos - c.session.startedAtNanos)} s after launch [${c.session.plan.label}]"
     }
 
     /** " — alias observed: a → b → tracker" up to the alias that decided the classification, or "" if none did. */
@@ -244,14 +343,22 @@ class RulesEngine(private val catalog: TrackerCatalog) {
 
     companion object {
         const val MIN_EVENTS = 2
+
+        /** Network findings rest on DNS lookups matched against the tracker catalogue, never on inspected payloads. */
+        const val CATALOGUE_MATCH = "Each lookup is a catalogue match: the app tried to reach a host the tracker catalogue " +
+            "lists as a tracking endpoint. It shows an attempt to contact, not proof that personal data was sent."
         const val MAX_EVIDENCE = 12
     }
 }
 
 object ScoreCalculator {
-    /** 100 minus severity weights (inferred findings count half); V0 makes the result inconclusive. */
+    /**
+     * 100 minus severity weights (inferred findings count half). The result is inconclusive, with no score, when too few
+     * lookups were captured (V0) or when third-party trackers were looked up but consent history is unknown (U1 with
+     * entities): a kept-data run cannot tell whether consent came first, so it must never read as "Ready".
+     */
     fun compute(findings: List<Finding>): Pair<Int?, ScoreBand> {
-        if (findings.any { it.checkId == CheckId.V0 }) return null to ScoreBand.INCONCLUSIVE
+        if (Inconclusive.reason(findings) != null) return null to ScoreBand.INCONCLUSIVE
         val penalty = findings.sumOf { f -> f.severity.weight * if (f.evidenceType == EvidenceType.INFERRED) 0.5 else 1.0 }
         val score = (100 - penalty).coerceAtLeast(0.0).roundToInt()
         val band = when {
@@ -260,5 +367,25 @@ object ScoreCalculator {
             else -> ScoreBand.AT_RISK
         }
         return score to band
+    }
+}
+
+/** Why a result has no score. Screens, reports and spoken summaries word "Inconclusive" by this reason. */
+object Inconclusive {
+    enum class Reason(val en: String, val hi: String) {
+        LOW_VISIBILITY(
+            "Inconclusive: too little was captured to judge this app.",
+            "अनिर्णायक: इस ऐप को परखने लायक पर्याप्त नहीं दिखा।",
+        ),
+        CONSENT_HISTORY_UNKNOWN(
+            "Inconclusive: the app kept its data, so whether consent came before these tracker lookups is unknown.",
+            "अनिर्णायक: ऐप ने अपना डेटा रखा, इसलिए यह पता नहीं कि ट्रैकर लुकअप से पहले सहमति ली गई थी या नहीं।",
+        ),
+    }
+
+    fun reason(findings: List<Finding>): Reason? = when {
+        findings.any { it.checkId == CheckId.V0 } -> Reason.LOW_VISIBILITY
+        findings.any { it.checkId == CheckId.U1 && it.entities.isNotEmpty() } -> Reason.CONSENT_HISTORY_UNKNOWN
+        else -> null
     }
 }

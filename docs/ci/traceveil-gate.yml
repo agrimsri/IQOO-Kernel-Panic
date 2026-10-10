@@ -1,0 +1,75 @@
+# TraceVeil CI gate (example workflow). Copy it to .github/workflows/traceveil-gate.yml to use it.
+#
+# It builds the traceveil-ci command-line tool from this repository, re-checks the committed TraceVeil audit
+# bundles (traceveil.audit.v1 JSON exported from the phone's Report screen) with the latest rules, fails the job
+# when the policy is violated, compares this release with the previous one, and uploads the findings to GitHub
+# code scanning as SARIF. CI does not capture anything itself: the evidence comes from a phone. See docs/CI_MODE.md.
+#
+# As shipped it points at the synthetic samples in docs/samples so it runs out of the box. Replace the paths with
+# your own exported bundles, e.g. privacy/traceveil/release-1.4.0.json.
+name: TraceVeil gate
+
+on:
+  pull_request:
+    paths: ['docs/samples/**', 'docs/ci/**', 'privacy/traceveil/**']
+  push:
+    branches: [main]
+    paths: ['docs/samples/**', 'docs/ci/**', 'privacy/traceveil/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write # needed to upload SARIF to code scanning
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Space-separated bundles to gate (bash expands globs such as privacy/traceveil/*.json).
+  TRACEVEIL_BUNDLES: docs/samples/leakyshop-fixed_sample.json
+  TRACEVEIL_POLICY: docs/ci/traceveil-policy.json
+  # Optional release-to-release check: the previous release's bundle and this release's bundle. Leave empty to skip.
+  TRACEVEIL_PREVIOUS: docs/samples/leakyshop-leaky_sample.json
+  TRACEVEIL_CURRENT: docs/samples/leakyshop-fixed_sample.json
+
+jobs:
+  gate:
+    name: Gate on TraceVeil evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7, same pin as checks.yml
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6, same pin as checks.yml
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build traceveil-ci
+        run: ./gradlew :cli:installDist --no-daemon --console=plain
+
+      # Exit codes: 0 pass, 1 policy violation (fails the job), 2 usage or unreadable bundle (fails the job).
+      # The text report goes to the log; the SARIF file is uploaded below even when the gate fails.
+      - name: Gate the release on the committed bundles
+        run: |
+          cli/build/install/traceveil-ci/bin/traceveil-ci check $TRACEVEIL_BUNDLES \
+            --policy "$TRACEVEIL_POLICY" --format sarif --out traceveil.sarif
+
+      # A new finding at Low severity or above, a lower score or an inconclusive new result exits 1.
+      - name: Compare with the previous release
+        if: ${{ !cancelled() && env.TRACEVEIL_PREVIOUS != '' && env.TRACEVEIL_CURRENT != '' }}
+        run: cli/build/install/traceveil-ci/bin/traceveil-ci diff "$TRACEVEIL_PREVIOUS" "$TRACEVEIL_CURRENT"
+
+      # Code scanning needs GitHub Advanced Security on private repositories. Pin this action to a commit SHA as
+      # checks.yml does once you adopt the workflow.
+      - name: Upload SARIF to code scanning
+        if: ${{ !cancelled() && hashFiles('traceveil.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: traceveil.sarif
+          category: traceveil

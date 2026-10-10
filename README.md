@@ -10,14 +10,14 @@ Current team setup and work split: [teammate handoff](docs/TEAM_HANDOFF.md), [ac
 
 **Testing safety:** audit configuration defaults to keeping data and manual consent choices. The setup screen presets automation/reset only for the two controlled demo apps. Clearing another test app's data requires an explicit reset choice and Shizuku; keep that choice off for personal apps. Real-app observation is limited: it does not inspect encrypted payloads or provide comprehensive fraud protection, automatic permission interception or a background wake word. DNS observations and scores are not legal certification.
 
-**An on-device privacy auditor for Android apps, built around India's Digital Personal Data Protection (DPDP) Act 2023.**
+**An on-device privacy auditor for Android apps. It checks consent first, then reads the evidence through a legal lens: India's DPDP Act 2023 (its first and deepest corpus), the EU, the UK, California, US children's law, Brazil, Singapore, or a global good-practice baseline.**
 
 Point TraceVeil at any app installed on your phone. It shows you:
 - which tracking companies the app contacts;
 - whether it does so **before** the user has agreed to anything;
 - whether it **keeps doing it after the user says no**.
 
-It reviews the app's consent screen for potential dark patterns, provides relevant DPDP passages and developer fix templates, and exports a PDF report. Findings are technical signals for review, not determinations that an app broke the law. The evidence workflow can be used internationally; the current legal corpus is India-specific and voice UI supports English/Hindi.
+It reviews the app's consent screen for potential dark patterns, provides the relevant legal passages for the selected lens and developer fix templates, and exports a PDF report. Findings are technical signals for review, not determinations that an app broke the law. The evidence workflow is the same in every country; the legal lens changes which law is quoted (see [Legal lenses](#legal-lenses)). Voice UI supports English/Hindi.
 
 Audit analysis, saved reports and the default voice copilot run on the phone without a cloud-answer fallback. Capture relays the target app's DNS queries. Network Proof shows qualified UID/DNS estimates, not a measured guarantee of zero uploads. Speech-pack downloads require a user action and provider connectivity; they are not cloud speech recognition. Reports leave the device when you choose to share them.
 
@@ -67,10 +67,12 @@ TraceVeil observes DNS lookups on the phone and relates them to recorded consent
 
 ## What TraceVeil checks
 
+The table shows the India lens (DPDP basis and the Act's penalty ceilings). Other lenses cite their own law and show no penalty figures.
+
 | Check | What it means | DPDP basis | Penalty ceiling |
 |---|---|---|---|
-| **C1** | Trackers contacted **before** any consent choice | s.4(1), s.6(1) | up to ₹50 crore |
-| **C2** | Trackers contacted **after the user refused** | s.4(1), s.6(1) | up to ₹50 crore |
+| **C1** | Tracker hosts looked up **before** any consent choice (catalogue match) | s.4(1), s.6(1) | up to ₹50 crore |
+| **C2** | Tracker hosts looked up **after the user refused** (catalogue match) | s.4(1), s.6(1) | up to ₹50 crore |
 | **C3** | A consent option is pre-ticked | s.6(1), "clear affirmative action" | up to ₹50 crore |
 | **C4** | No way to refuse, or refusal hidden behind "Manage" | s.6(1), s.6(4) | up to ₹50 crore |
 | **C5** | One button bundles several purposes | s.6(1), Rule 3(b) | up to ₹50 crore |
@@ -79,16 +81,43 @@ TraceVeil observes DNS lookups on the phone and relates them to recorded consent
 | **C8** | Notice offered only in English | s.5(3), s.6(3) | up to ₹50 crore |
 | **C9** | Tracking in an app used by children | s.9(1), s.9(3) | **up to ₹200 crore** |
 | **C10** | Ad or device IDs likely shared before consent (*inferred*) | s.6(1) | up to ₹50 crore |
-| **NC** | No consent mechanism at all, yet trackers are contacted | s.5(1), s.6(1), s.6(10) | up to ₹50 crore |
+| **NC** | No consent screen seen during the capture, yet tracker hosts are looked up | s.5(1), s.6(1), s.6(10) | up to ₹50 crore |
 | **V0** | Too few network lookups to judge, so the result is **inconclusive** (never "clean") | — | — |
+| **U1** | The app kept its data and showed no consent screen, so consent history is unknown (*info*) | — | — |
+| **S1** | Servers of the app's own publisher contacted: first-party collection, not third-party tracking (*info*) | — | — |
+| **C11** | A tracker reached only through a CNAME alias of another name, before consent or after refusal (*info*: the lookup is already scored in C1/C2) | — | — |
+| **C12** | Tracker hosts looked up after the app was confirmed in the background (*info*: lookups before consent or after refusal are already scored) | — | — |
+| **C13** | A bundled SDK (Firebase Analytics, Crashlytics, Facebook SDK) whose documented manifest switches leave collection on by default (*low, inferred*) | s.6(1) | — |
+| **C14** | Android permission dialog naming the app before any consent screen or notice (*low*; notification-only prompts are *info*) | s.5(1), as context | — |
+| **C15** | The captured consent screen names no privacy policy or notice (*info*) | — | — |
+| **V1** | Capture health shows lookups TraceVeil could not see: encrypted or TCP DNS, Private DNS on, dropped or unreadable lookups (*info*) | — | — |
+
+The checks from C11 on use evidence the phone records since this version: DNS replies (alias chains), a 10-second background window after each plan's observation (Home pressed, app confirmed off screen), Android's own permission dialogs, the installed manifest's documented SDK switches (only allow-listed names are read; vendor sources are cited in `core/src/main/resources/sdk/manifest_flags.json`), the consent screen's accessibility tree and capture-health counters. When that evidence was not recorded, the check is *not established*, never passed. A DNS lookup is scored once, so C11 and C12 add context without moving the score.
 
 Each finding is labelled either:
 - **observed**: seen on the device during the audit;
 - **inferred**: derived from SDK documentation or AI review.
 
-All findings combine into a **DPDP readiness score** out of 100, with bands from *At risk* to *DPDP-ready*.
+All findings combine into a **consent readiness score** out of 100, with bands from *At risk* to *Ready*. It is a consent-first standard (tracking waits for a clear opt-in) and stays the headline under every legal lens.
 
-> Penalty ceilings are the statutory maximums in the DPDP Act Schedule, not predicted fines. TraceVeil is a technical assessment tool, **not legal advice**.
+> Penalty ceilings are the statutory maximums in the DPDP Act Schedule, not predicted fines, and appear only under the India lens. TraceVeil is a technical assessment tool, **not legal advice**.
+
+### Legal lenses
+
+"Is this only for India?" No. The observed findings are the same everywhere; a lens reads them against one law and marks each check **Required** (the law sets a rule the check tests), **Context** (relevant, but not strictly required, or only in some cases) or **Not applicable**, with a short note and the cited text. A "score under this lens" leaves out the not-applicable findings; it is a reading of the evidence, never a legal verdict.
+
+| Lens | Law | How it differs |
+|---|---|---|
+| India | DPDP Act 2023 and DPDP Rules 2025 | Consent-first; main provisions commence 13 May 2027, so findings describe readiness |
+| EU / EEA | GDPR and ePrivacy Directive Art. 5(3) | Storing or reading information on the device needs prior consent unless strictly necessary |
+| UK | UK GDPR and PECR reg. 6 (as amended by the Data (Use and Access) Act 2025) | As the EU, plus a narrow exception for aggregate service-improvement analytics; an English-only notice is not applicable |
+| California | CCPA as amended by the CPRA | Opt-out model: tracking before a choice is context, tracking after an opt-out is required, under-16s must opt in, Global Privacy Control must be honoured |
+| US children | COPPA (16 CFR Part 312) | Verifiable parental consent for under-13s in child-directed apps; banner design checks are not applicable |
+| Brazil | LGPD and ECA Digital (Lei 15.211/2025) | Consent is one of several legal bases; profiling to target ads at children is barred |
+| Singapore | PDPA 2012 | Consent, deemed consent or an exception; no language rule |
+| Global baseline | Good practice, not law | Used when the region has no lens |
+
+The lens is chosen in Settings (default: the phone's region, else the global baseline), named on results and in every export (Markdown, PDF, HTML and the JSON bundle's `legalProfile`), and `traceveil-ci check --profile <id>` applies it in CI. Passages carry their source URL, retrieval date and a verbatim flag; verbatim text was copied from official publishers (EUR-Lex, EDPB, ICO, the California Privacy Protection Agency, eCFR, Planalto, Singapore Statutes Online, PDPC). The mapping is data in `core/src/main/resources/law/`, so a new check can be mapped by adding entries; until then it shows a generic context note.
 
 ## Screenshots
 
@@ -110,7 +139,7 @@ All findings combine into a **DPDP readiness score** out of 100, with bands from
 | A leaky consent screen | A compliant consent screen | After the fix |
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/leakyshop-consent.png" width="240"> | <img src="docs/screenshots/leakyshop-fixed-consent.png" width="240"> | <img src="docs/screenshots/fixed-result.png" width="240"> |
-| Pre-ticked box, no Reject button (it's hidden behind "Manage"). | Equal Accept and Reject buttons, off-by-default toggles, withdrawal notice, three languages. | The same audit on the fixed app: **100, DPDP-ready**. |
+| Pre-ticked box, no Reject button (it's hidden behind "Manage"). | Equal Accept and Reject buttons, off-by-default toggles, withdrawal notice, three languages. | The same audit on the fixed app: **100, Ready**. |
 
 ## How an audit works
 
@@ -128,7 +157,7 @@ All findings combine into a **DPDP readiness score** out of 100, with bands from
  │ • taps Reject / Accept       │                     │
  └──────────────┬───────────────┘                     ▼
                 │ screenshot          ┌──────────────────────────────┐
-                ▼                     │ Rules engine C1–C10, NC, V0  │
+                ▼                     │ Rules engine C1–C15, NC, V0–1│
  ┌──────────────────────────────┐     │ + readiness score            │
  │ On-device Gemma (optional)   │───▶ └────────────┬─────────────────┘
  │ constrained-JSON screen review│                 ▼
@@ -162,7 +191,7 @@ A **quick audit** runs one plan (open the app and accept) in about 40 seconds.
   - Deterministic checks on the accessibility tree are merged with the AI's screenshot review.
   - When they disagree, the tree wins and the disagreement is shown, never hidden.
 - **The law, verbatim.**
-  - The relevant DPDP sections (s.4, 5, 6, 9, Rule 3 and the Schedule) ship with the app.
+  - The relevant DPDP sections (s.4, 5, 6, 9, Rule 3 and the Schedule) ship with the app, and so do the cited passages of every other legal lens, each marked verbatim or summary with its source.
   - Each finding cites its own sections.
   - Free-text questions are answered by BM25 retrieval, optionally upgraded with EmbeddingGemma semantic search.
 
@@ -172,7 +201,8 @@ A **quick audit** runs one plan (open the app and accept) in about 40 seconds.
 kernel-panic/
 ├── core/        Pure Kotlin/JVM library: all the logic, fully unit-tested
 ├── app/         The Android app (Jetpack Compose)
-└── leakyshop/   A small test app with "leaky" and "fixed" flavours
+├── leakyshop/   A small test app with "leaky" and "fixed" flavours
+└── riskdemo/    A harmless TEST app with fake-challan-style signals (see riskdemo/README.md)
 ```
 
 ### `core/`: the auditing brain (no Android dependencies)
@@ -185,9 +215,11 @@ kernel-panic/
 | `consent` | Consent-screen lexicon in English, Hindi and Kannada |
 | `audit` | Phase assigner: places each lookup before the choice, after accept, or after refusal |
 | `screen` | UI-tree formatter, deterministic screen auditor, AI response parser, merge logic, the constrained-JSON prompt and schema |
-| `rules` | Rules engine C1–C10, NC, V0 and the score calculator |
+| `rules` | Rules engine C1–C15, NC, V0, V1, U1, S1 and the score calculator |
+| `manifest` | Allow-list of SDK manifest collection switches with their vendor sources (check C13) |
 | `fixes` | Fix catalogue: SDK-specific code and manifest changes plus UI fixes |
 | `dpdp` | Verbatim DPDP corpus, BM25 retriever, citation service |
+| `law` | Legal lenses: per-jurisdiction check mapping, sourced passages, score under a lens, lens-neutral explanations |
 | `report` | JSON and Markdown report generation |
 
 **65 unit tests** cover the DNS codec, tracker matching, lexicon, phase assignment, every rule, screen auditing, fixes, citations and reports.
@@ -232,6 +264,7 @@ cd IQOO-Kernel-Panic
 ./gradlew :core:test                 # run the 65 unit tests
 ./gradlew :app:assembleDebug         # build TraceVeil
 ./gradlew :leakyshop:assembleLeakyDebug :leakyshop:assembleFixedDebug   # build the test apps
+./gradlew :riskdemo:assembleDebug     # build the harmless TEST Challan demo app
 ```
 
 ### Install
@@ -266,7 +299,7 @@ TraceVeil's home screen lists every item under **Before you audit**, with a butt
    - Turn on **This app is used by children** to add the Section 9 check.
 3. **Watch the live timeline:**
    - Each lookup appears with its time, company and category.
-   - Trackers contacted before a choice, or after a refusal, turn red.
+   - Tracker hosts looked up before a choice, or after a refusal, turn red.
    - **Mark consent now** records a consent moment by hand for screens that expose no text, such as games or canvas-drawn UI.
 4. **Read the result:**
    - The score and its band.
@@ -275,6 +308,7 @@ TraceVeil's home screen lists every item under **Before you audit**, with a butt
 6. **Report and export:**
    - **Save PDF to Downloads**, **Share PDF**, or **Save Markdown**.
    - Files go to `Downloads/TraceVeil`.
+   - **Export audit data (JSON)** feeds `traceveil-ci`, a laptop/CI release gate: see [CI and TraceVeil Runner](#ci-and-traceveil-runner).
 7. **Camera check:** photograph or choose a screenshot of any consent screen, including one on another device, for an instant dark-pattern review.
 
 Other tools:
@@ -285,6 +319,20 @@ Other tools:
   - **Your own domains**: long-press a host on any timeline so your own backend is never counted as a tracker.
 - **Open sample audit:** a complete, clearly labelled sample result, so you can explore the app before setting anything up.
 
+### CI and TraceVeil Runner
+
+`traceveil-ci` (in `cli/`, plain Kotlin/JVM, `./gradlew :cli:installDist`) turns TraceVeil's evidence into a release gate with exit codes 0 pass, 1 policy violation, 2 error:
+
+- **`traceveil-ci run`: TraceVeil Runner, hands-free on a test phone.** One command on a laptop or a self-hosted CI runner installs the build on a USB-connected test phone (`--apk`), has TraceVeil run the full consent audit there by itself (Silent, Reject and Accept plans, the agent tapping the choices), copies the evidence back over adb and applies the policy. It adds an automatic privacy gate to every alpha/beta build: testers check features, but nobody can see an SDK lookup 0.1 s after Reject. Off by default on the phone; it needs *Settings → Developer automation*, a pairing token and an allowlist of test apps it may reset. Setup, security model and limits: [TraceVeil Runner](docs/ci/RUNNER.md); CI example: [github-runner-example.yml](docs/ci/github-runner-example.yml).
+- **`traceveil-ci check` / `diff`:** re-check exported bundles with the latest rules and compare releases, with JSON and SARIF output: [CI mode](docs/CI_MODE.md).
+
+```sh
+export TRACEVEIL_TOKEN='token from Settings > Developer automation'
+cli/build/install/traceveil-ci/bin/traceveil-ci run --package com.example.app --apk app-beta.apk --mode full --policy docs/ci/traceveil-policy.json
+```
+
+A pass describes what one run on one phone observed; it is not a compliance certificate.
+
 ## The LeakyShop test app
 
 `leakyshop/` is a tiny shopping app built to exercise every check. It contains **no real SDKs**: it performs the same DNS lookups that AppsFlyer, the Meta SDK and Firebase Analytics make, and sends no data.
@@ -292,7 +340,9 @@ Other tools:
 | Flavour | Behaviour | TraceVeil result |
 |---|---|---|
 | **leaky** | Starts the "SDKs" on launch, pre-ticks a sharing box, hides Reject behind "Manage", and keeps tracking after refusal | **21, At risk**: C2 critical, plus C1, C3, C4 and C10 |
-| **fixed** | Waits for consent, uses off-by-default toggles, gives Accept and Reject equal weight, offers three languages, explains withdrawal | **100, DPDP-ready** |
+| **fixed** | Waits for consent, uses off-by-default toggles, gives Accept and Reject equal weight, offers three languages, explains withdrawal | **100, Ready** |
+
+Neither build's consent dialog links a privacy policy, so a live audit that captures the dialog's tree also lists C15 (*info*, no score change) for both. LeakyShop bundles no real SDK and asks for no Android permission, so C13 and C14 do not fire for it.
 
 It is a safe, repeatable way to see each finding fire, and to check that the suggested fixes make them go away.
 
@@ -333,7 +383,7 @@ adb push gemma-4-E2B-it.litertlm /sdcard/Android/data/com.dpdpxray.app/files/mod
 ## Roadmap
 
 - Payload-level evidence for debug builds the developer controls.
-- A CI mode: run the rules engine against a capture file in a pull request.
+- TraceVeil Runner on emulators (it is designed for a physical phone over USB; emulators are untested).
 - More languages for the consent lexicon and notices (Tamil, Telugu, Bengali, Marathi).
 - Tracker catalogue updates from a signed, offline-verifiable list.
 - Checks for consent-manager integrations and withdrawal flows deeper in app settings.
@@ -346,6 +396,7 @@ adb push gemma-4-E2B-it.litertlm /sdcard/Android/data/com.dpdpxray.app/files/mod
 - **Shizuku API/provider 13.1.5:** MIT License (separate from the Shizuku app).
 - **Gemma models:** Gemma Terms of Use (not bundled).
 - **DPDP Act 2023 and DPDP Rules 2025:** text from Government of India publications.
+- **Other legal lenses:** short passages quoted from official publications (EUR-Lex, EDPB, ICO, California Privacy Protection Agency, eCFR, Planalto, Singapore Statutes Online, PDPC), each with its URL and retrieval date in `core/src/main/resources/law/passages.json`.
 
 See the [attribution register](ATTRIBUTIONS.md) for licence evidence and remaining release checks, and [repository checks](docs/REPOSITORY_CHECKS.md) for CI and the read-only commit-date checker.
 

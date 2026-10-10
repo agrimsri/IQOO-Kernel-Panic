@@ -7,11 +7,18 @@ import com.dpdpxray.core.model.NetEvent
 import com.dpdpxray.core.model.Phase
 import com.dpdpxray.core.trackers.TrackerCatalog
 
-/** Where country lookups come from. The database file is never bundled: it is provisioned on the phone. */
+/**
+ * Where country lookups come from: the DB-IP Lite table bundled with the app, or the person's own GeoLite2 file on
+ * the phone ([GeoTableChoice]). [Loaded.notes] carry anything the map must say about how the table was chosen.
+ */
 sealed interface GeoSource {
     data object NotInstalled : GeoSource
     data class Unreadable(val reason: String) : GeoSource
-    data class Loaded(val lookup: IpCountryLookup) : GeoSource
+    data class Loaded(
+        val lookup: IpCountryLookup,
+        val origin: TableOrigin = TableOrigin.USER_FILE,
+        val notes: List<String> = emptyList(),
+    ) : GeoSource
 }
 
 /**

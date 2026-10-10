@@ -41,6 +41,15 @@ android {
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        // ConsentLens NPU: the Hexagon skel libraries must exist as files in nativeLibraryDir (the QNN delegate's
+        // skel directory), so native libraries are extracted at install time, as Google's LiteRT NPU guide requires.
+        jniLibs.useLegacyPackaging = true
+        // QNN backends and Hexagon versions ConsentLens never loads (it uses only the HTP backend on the SoCs in
+        // NpuBackendPolicy.HTP_ARCH: V69, V73, V75, V79, V81). The delegate opens a backend library only when selected.
+        jniLibs.excludes += listOf(
+            "**/libQnnDsp.so", "**/libQnnDspV66Skel.so", "**/libQnnDspV66Stub.so", "**/libQnnGpu.so",
+            "**/libQnnHtpV68Skel.so", "**/libQnnHtpV68Stub.so",
+        )
     }
 }
 
@@ -66,6 +75,12 @@ dependencies {
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
     implementation(libs.litertlm.android)
+    implementation(libs.vosk.android)
+    // ConsentLens-1 on the NPU: LiteRT runtime + Qualcomm QNN TFLite delegate and HTP runtime (arm64-v8a only).
+    implementation(libs.litert)
+    implementation(libs.qnn.litert.delegate)
+    implementation(libs.qnn.runtime)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

@@ -8,6 +8,7 @@ import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.AuditSource
 import com.dpdpxray.core.model.CheckId
+import com.dpdpxray.core.model.Severity
 import com.dpdpxray.core.model.ConsentEvent
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.NetEvent
@@ -90,6 +91,16 @@ class FixesCitationsReportTest {
         val cs = CitationService(DpdpCorpus.loadDefault())
         val bare = result.findings.first().copy(dpdpRefs = emptyList(), title = "Tracking of children", explanation = "children tracking advertising")
         assertEquals("s9(3)", cs.cite(bare, 3).first().id)
+    }
+
+    @Test
+    fun `info findings without references get no legal text`() {
+        val cs = CitationService(DpdpCorpus.loadDefault())
+        val info = result.findings.first().copy(
+            checkId = CheckId.U1, severity = Severity.INFO, dpdpRefs = emptyList(), title = CheckId.U1.title,
+            explanation = "Consent may have been given earlier; children tracking advertising withdraw consent",
+        )
+        assertTrue(cs.cite(info, 3).isEmpty())
     }
 
     @Test

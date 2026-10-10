@@ -1,0 +1,313 @@
+{
+ "model": "tracker_hostname",
+ "version": "1.0.0",
+ "tolerance": 1e-06,
+ "samples": [
+  {
+   "source": "held-out test (positive)",
+   "host": "geekbackyard.com",
+   "logit": -3.9993484935396095,
+   "probability": 0.017997720943742586
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "breakableinsurance.com",
+   "logit": -4.218109945683652,
+   "probability": 0.014512730975688013
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "stroeerdigitalmedia.de",
+   "logit": -1.5555886381708661,
+   "probability": 0.17428056031243752
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "backlink-test.de",
+   "logit": -3.980645442341402,
+   "probability": 0.018331272198395834
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "idx.lat",
+   "logit": -3.239766684109157,
+   "probability": 0.03769635320859635
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "westsideglobe.com",
+   "logit": -3.013381948816756,
+   "probability": 0.04682496966287791
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "surfform.com",
+   "logit": -1.86515262272255,
+   "probability": 0.1341036014670254
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "mapbasin.com",
+   "logit": -2.646235341367018,
+   "probability": 0.06622142165808657
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "autoid.com",
+   "logit": -3.126965174504331,
+   "probability": 0.04200857050782643
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "lockview.cn",
+   "logit": -5.4452415057505705,
+   "probability": 0.004298242707618714
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "lr-ingest.com",
+   "logit": -1.3113948716656951,
+   "probability": 0.21225352522812402
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "sensic.net",
+   "logit": -1.2016481617625159,
+   "probability": 0.23118214745672133
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "polymorphicads.jp",
+   "logit": -3.954377768796988,
+   "probability": 0.0188099946222444
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "rewardangels.com",
+   "logit": -1.8410440953047422,
+   "probability": 0.13692785605364172
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "attr-2p.com",
+   "logit": -2.0789999510489756,
+   "probability": 0.11115473249095598
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "consciouscheese.com",
+   "logit": -1.1355169163339198,
+   "probability": 0.24314441111545787
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "sedotracker.de",
+   "logit": 0.7674964492490499,
+   "probability": 0.6829790767767738
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "reactful.com",
+   "logit": -2.5176104762859453,
+   "probability": 0.07463280459701016
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "rutarget.ru",
+   "logit": -1.4858528962003446,
+   "probability": 0.1845450010966568
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "simplehitcounter.com",
+   "logit": 2.6917195298066012,
+   "probability": 0.93653626054796
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "intrastats.com",
+   "logit": 0.9491953618927464,
+   "probability": 0.7209533300126961
+  },
+  {
+   "source": "held-out test (positive)",
+   "host": "hypestat.com",
+   "logit": 0.5339249028556237,
+   "probability": 0.6303980670829397
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "69hub.pl",
+   "logit": -5.402497527936595,
+   "probability": 0.0044851079075045675
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "communitycatalyst.org",
+   "logit": -4.629396577918893,
+   "probability": 0.009666297793998796
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "foosball-society.com",
+   "logit": -5.66585251259653,
+   "probability": 0.003450249512995101
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "natrue.org",
+   "logit": -5.947769704327694,
+   "probability": 0.0026048558044886286
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "tokyo-solamachi.jp",
+   "logit": -4.5697332779808,
+   "probability": 0.010254478968150061
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "iaac.net",
+   "logit": -3.2013534209320094,
+   "probability": 0.039114822927111374
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "sermonaudio.com",
+   "logit": -3.517389332720627,
+   "probability": 0.028821480780706996
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "rba.gov.au",
+   "logit": -8.115243033064951,
+   "probability": 0.0002988580233153563
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "moon7wheres.xyz",
+   "logit": -6.0173506639379335,
+   "probability": 0.002430194906134074
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "familyrelationships.gov.au",
+   "logit": -8.763195912583432,
+   "probability": 0.0001563595672998411
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "poxolo.com",
+   "logit": -3.8491870039699756,
+   "probability": 0.020852937882349386
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "superfortuneworld.nl",
+   "logit": -6.911635351206685,
+   "probability": 0.0009951361630853124
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "rona34.com",
+   "logit": -3.1668375231307087,
+   "probability": 0.04043293538905655
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "solarjackpot.it",
+   "logit": -6.931480257384512,
+   "probability": 0.0009756015185328754
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "foxreno.com",
+   "logit": -4.538047323685364,
+   "probability": 0.010581111376111278
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "neonwin.id",
+   "logit": -5.072838956854736,
+   "probability": 0.00622560890301624
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "luxewomentravel.org",
+   "logit": -8.326674856116682,
+   "probability": 0.00024191677349004795
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "artinfo.com",
+   "logit": -4.358409265526686,
+   "probability": 0.012636993370439038
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "lobstermania2.net",
+   "logit": -3.427145447366596,
+   "probability": 0.031457789090892876
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "getfoureyes.com",
+   "logit": -2.829608720339452,
+   "probability": 0.05574499032667131
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "huntsvilleal.gov",
+   "logit": -5.553011192070228,
+   "probability": 0.0038608053800117045
+  },
+  {
+   "source": "held-out test (negative)",
+   "host": "nextchoice.it",
+   "logit": -7.184681163547907,
+   "probability": 0.0007575363863038026
+  },
+  {
+   "source": "upper case, trailing dot, subdomain (scored on its site)",
+   "host": "  Region1.App-Measurement.COM. ",
+   "logit": -0.052495158585856516,
+   "probability": 0.4868792233377432
+  },
+  {
+   "source": "single label",
+   "host": "localhost",
+   "logit": -4.111602967086821,
+   "probability": 0.016117466287518596
+  },
+  {
+   "source": "empty",
+   "host": "",
+   "logit": -3.1156757552906154,
+   "probability": 0.04246525663269533
+  },
+  {
+   "source": "digits",
+   "host": "203-0-113-7.static.example.net",
+   "logit": -2.2897183683215325,
+   "probability": 0.09197806857194087
+  },
+  {
+   "source": "long random label",
+   "host": "x9f2k1q8z7w3v6b5n4m0.cloudfront.net",
+   "logit": -2.2667662343467674,
+   "probability": 0.09391302312752704
+  },
+  {
+   "source": "country second-level site",
+   "host": "smetrics.example.co.in",
+   "logit": -3.354881198958939,
+   "probability": 0.03373568619454838
+  },
+  {
+   "source": "two-letter TLD without second level",
+   "host": "tracker.example.io",
+   "logit": -1.683261765569224,
+   "probability": 0.15666404028615835
+  }
+ ]
+}

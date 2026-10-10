@@ -49,4 +49,16 @@ class LlmOutcomeTest {
         assertEquals("Failed: java.lang.RuntimeException: boom", LlmOutcome.Failed("java.lang.RuntimeException", "boom").describe())
         assertEquals("Empty reply (channels: thought)", LlmOutcome.Empty(setOf("thought")).describe())
     }
+
+    @Test
+    fun `describe reports hidden thinking, channel source and skipped calls by count and name only`() {
+        assertEquals("Text (2 chars); thinking text hidden (40 chars)", LlmOutcome.Text("OK", hiddenThinkingChars = 40).describe())
+        assertEquals("Text (2 chars, from channel:final)", LlmOutcome.Text("OK", "channel:final").describe())
+        assertEquals(
+            "Empty reply (channels: thought); only thinking text (12 chars), not used as an answer",
+            LlmOutcome.Empty(setOf("thought"), 12).describe(),
+        )
+        assertEquals("Not sent: text-only model", LlmOutcome.Skipped("text-only model").describe())
+        assertNull(LlmOutcome.Skipped("x").textOrNull)
+    }
 }

@@ -1,7 +1,7 @@
 [
   {
     "id": "firebase-analytics", "kind": "sdk", "title": "Firebase Analytics: start collection only after consent",
-    "appliesTo": ["C1", "C2", "C9", "C10"],
+    "appliesTo": ["C1", "C2", "C9", "C10", "C13"],
     "manifest": "<application>\n    <meta-data\n        android:name=\"firebase_analytics_collection_enabled\"\n        android:value=\"false\" />\n</application>",
     "code": "// After the user taps Accept for analytics:\nFirebase.analytics.setAnalyticsCollectionEnabled(true)\n\n// If the user refuses or withdraws:\nFirebase.analytics.setAnalyticsCollectionEnabled(false)",
     "steps": ["Use the manifest flag, not a runtime call in Application.onCreate — a runtime call races the automatic first_open event.", "Persist the user's choice and re-apply it on every launch."],
@@ -9,7 +9,7 @@
   },
   {
     "id": "crashlytics", "kind": "sdk", "title": "Firebase Crashlytics: opt-in crash reporting",
-    "appliesTo": ["C1", "C2", "C9"],
+    "appliesTo": ["C1", "C2", "C9", "C13"],
     "manifest": "<meta-data\n    android:name=\"firebase_crashlytics_collection_enabled\"\n    android:value=\"false\" />",
     "code": "// After consent:\nFirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(true)",
     "steps": ["If you rely on a legitimate use for crash reporting, document it in your notice."],
@@ -17,7 +17,7 @@
   },
   {
     "id": "facebook", "kind": "sdk", "title": "Meta (Facebook) SDK: delay initialisation and app events",
-    "appliesTo": ["C1", "C2", "C9", "C10"],
+    "appliesTo": ["C1", "C2", "C9", "C10", "C13"],
     "manifest": "<meta-data android:name=\"com.facebook.sdk.AutoInitEnabled\" android:value=\"false\" />\n<meta-data android:name=\"com.facebook.sdk.AutoLogAppEventsEnabled\" android:value=\"false\" />\n<meta-data android:name=\"com.facebook.sdk.AdvertiserIDCollectionEnabled\" android:value=\"false\" />",
     "code": "// After the user taps Accept:\nFacebookSdk.setAutoInitEnabled(true)\nFacebookSdk.fullyInitialize()\nFacebookSdk.setAutoLogAppEventsEnabled(true)\nFacebookSdk.setAdvertiserIDCollectionEnabled(true)",
     "steps": ["If you call AppEventsLogger.activateApp(), make sure the SDK is initialised first — with auto-init off it is not."],
@@ -135,5 +135,19 @@
     "manifest": null, "code": null,
     "steps": ["Remove or disable ad and behavioural-tracking SDKs for children (s.9(3)).", "Obtain verifiable consent from a parent before processing a child's data (s.9(1))."],
     "docUrl": null, "verified": true
+  },
+  {
+    "id": "ui-permission-notice", "kind": "ui", "title": "Explain and ask for consent before asking for a permission",
+    "appliesTo": ["C14"],
+    "manifest": null, "code": null,
+    "steps": ["Show your notice and consent screen before the first runtime-permission request, and request each permission in context, when the user starts the feature that needs it.", "Before the system dialog, explain in your own screen why the permission is needed (Android's shouldShowRequestPermissionRationale pattern).", "Keep the app usable when the user declines the permission."],
+    "docUrl": "https://developer.android.com/training/permissions/requesting", "verified": true
+  },
+  {
+    "id": "ui-privacy-link", "kind": "ui", "title": "Link the privacy policy from the consent screen",
+    "appliesTo": ["C15"],
+    "manifest": null, "code": null,
+    "steps": ["Add a visible \"Privacy policy\" link or text to the consent screen, in each language the notice offers.", "Point it at the same policy you list in Play Console; Google Play requires a privacy policy link or text within the app."],
+    "docUrl": "https://support.google.com/googleplay/android-developer/answer/10144311", "verified": true
   }
 ]

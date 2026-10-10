@@ -1,6 +1,8 @@
 package com.dpdpxray.app.ai
 
 import android.content.Context
+import com.dpdpxray.core.consentlens.ConsentLensAugmenter
+import com.dpdpxray.core.consentlens.ConsentRoleClassifier
 import com.dpdpxray.core.dpdp.DpdpCorpus
 import com.dpdpxray.core.dpdp.Passage
 import com.dpdpxray.core.dpdp.PassageRetriever
@@ -17,17 +19,29 @@ import com.google.ai.edge.litertlm.EmbeddingEngineConfig
 import com.google.ai.edge.litertlm.EmbeddingOptions
 import com.google.ai.edge.litertlm.InputData
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.sqrt
 
-/** Consent-screen review: accessibility-tree facts first, then the on-device VLM, merged with conflicts kept visible. */
-class AiScreenAuditor(private val llm: LlmEngine) {
+/**
+ * Consent-screen review: accessibility-tree facts first, then the on-device VLM, merged with conflicts kept visible.
+ * Finally ConsentLens-1 (if supplied) labels the strings the EN/HI/KN lexicon does not know; it only fills unknown
+ * fields as INFERRED evidence and never overrides an OBSERVED tree fact.
+ */
+class AiScreenAuditor(
+    private val llm: LlmEngine,
+    private val lens: ConsentRoleClassifier? = null,
+    private val lensThreshold: () -> Double = { ConsentLensAugmenter.DEFAULT_THRESHOLD },
+) {
     suspend fun audit(tree: UiNode?, screenshot: File?): ScreenAudit? {
         val det = tree?.let { DeterministicScreenAuditor.audit(it) }
         val vlm = if (llm.isReady) llm.auditConsentScreen(screenshot, tree?.let { UiTreeFormatter.format(it) } ?: "(tree unavailable)") else null
-        return when {
+        val merged = when {
             det != null -> ScreenAuditMerger.merge(det, vlm)
             else -> vlm
         }
+        if (merged == null || tree == null || lens == null) return merged
+        return withContext(Dispatchers.Default) { ConsentLensAugmenter.augment(merged, tree, lens, lensThreshold()) }
     }
 }
 
@@ -36,7 +50,9 @@ class FindingExplainer(private val llm: LlmEngine) {
     suspend fun explain(finding: Finding, passages: List<Passage>, hindi: Boolean): String? {
         val law = passages.joinToString("\n") { "[${it.id}] ${it.text}" }
         val system = "You explain privacy-compliance findings to Android developers in India. Use ONLY the facts and law " +
-            "text given. Never invent section numbers. Be concise and practical."
+            "text given. Never invent section numbers. Be concise and practical. Describe what was observed and what the law " +
+            "requires; do not call the app illegal, a violation, malicious or safe, and do not say data was sent: a DNS " +
+            "lookup is an attempt to contact a host. Plain sentences, no markdown."
         val prompt = buildString {
             appendLine("Finding: ${finding.title}")
             appendLine("Details: ${finding.explanation}")
