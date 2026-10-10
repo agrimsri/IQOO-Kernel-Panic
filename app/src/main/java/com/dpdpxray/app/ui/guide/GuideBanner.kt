@@ -130,7 +130,8 @@ fun GuideBanner(step: GuideStep, modifier: Modifier = Modifier, speak: Boolean =
         }
         if (guide != null) {
             Column(Modifier.padding(top = 4.dp, end = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                SpeakerToggle(spokenOn) { guide.setSpoken(it) }
+                // Reads this step once when tapped. Reading every step automatically is a separate choice in Settings.
+                SpeakerToggle(spokenOn) { speaker?.sayNow(step.key, spokenText, lang) }
                 LanguageToggle(lang) { guide.setLang(it) }
             }
         }
@@ -164,10 +165,10 @@ private fun PulseDot() {
 fun SpeakerToggle(on: Boolean, onChange: (Boolean) -> Unit) {
     val bg by animateColorAsState(if (on) Brand.coral.copy(alpha = 0.16f) else Film.raised.copy(alpha = 0f), tween(200), label = "speaker")
     Box(
-        Modifier.size(48.dp).toggleable(value = on, role = Role.Switch, onValueChange = onChange)
+        Modifier.size(48.dp).toggleable(value = on, role = Role.Button, onValueChange = onChange)
             .semantics {
-                contentDescription = "Spoken guidance"
-                stateDescription = if (on) "On" else "Off"
+                contentDescription = "Read this step aloud"
+                stateDescription = if (on) "Every step is read automatically" else "Tap to hear this step"
             },
         contentAlignment = Alignment.Center,
     ) {

@@ -70,3 +70,32 @@ private fun ModeTile(audience: Audience, selected: Boolean, lang: GuideLang, mod
         Text(ModeCopy.tagline(audience).pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
     }
 }
+
+/**
+ * The always-visible mode switch in Home's header: two segments, "Everyday" and "Developer". TraceVeil is built first
+ * for app developers; Everyday is the same engine with a simpler front door for people who use apps.
+ */
+@Composable
+fun ModePill(current: Audience, onChange: (Audience) -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(50)
+    Row(
+        modifier.clip(shape).background(Film.raised).border(1.dp, Film.line, shape).padding(3.dp).selectableGroup(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        listOf(Audience.USER to "Everyday\nI use apps", Audience.DEVELOPER to "Developer\nI build apps").forEach { (audience, label) ->
+            val on = audience == current
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (on) Film.base else Film.boneDim,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                maxLines = 2,
+                modifier = Modifier.weight(1f).clip(shape)
+                    .background(if (on) Brand.coral else Film.raised)
+                    .selectable(selected = on, role = Role.RadioButton, onClick = { if (!on) onChange(audience) })
+                    .heightIn(min = 36.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        }
+    }
+}

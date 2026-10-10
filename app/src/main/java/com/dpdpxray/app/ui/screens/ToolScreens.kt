@@ -292,7 +292,7 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit, onCheckup: (() -> Unit
                 LegalLensSection(vm, s.legalProfile)
             }
             SectionCard(title = "Voice and guidance", glyph = Glyph.SPEAKER_ON) {
-                SwitchRow("Spoken guidance", "Reads each guide step aloud with an installed offline voice. Off by default; nothing leaves the phone.", s.spokenGuidance, { v -> vm.updateSettings { it.copy(spokenGuidance = v) } })
+                SwitchRow("Read every step automatically", "Reads each guide step aloud as you move through TraceVeil, with an installed offline voice. Off by default: tap the speaker on any step to hear just that step; nothing leaves the phone.", s.spokenGuidance, { v -> vm.updateSettings { it.copy(spokenGuidance = v) } })
                 Hairline()
                 SwitchRow("Speak APK Guard alerts", "Reads new-install alerts aloud with an installed offline voice. Off by default.", s.speakApkGuardAlerts, { v -> vm.updateSettings { it.copy(speakApkGuardAlerts = v) } })
             }

@@ -140,6 +140,11 @@ fun HomeScreen(
                 GlyphIcon(Glyph.SETTINGS, Film.boneDim, size = 24.dp)
             }
         }
+        val modeSettings by vm.settings.collectAsState()
+        com.dpdpxray.app.ui.modes.ModePill(
+            modeSettings.audience, { a -> vm.updateSettings { it.copy(audience = a) } },
+            Modifier.fillMaxWidth().padding(top = 12.dp),
+        )
         Text("Apps promise. TraceVeil checks.", style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 8.dp))
 
         Spacer(Modifier.height(16.dp))

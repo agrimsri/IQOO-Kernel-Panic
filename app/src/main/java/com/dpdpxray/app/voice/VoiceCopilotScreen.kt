@@ -146,10 +146,10 @@ fun VoiceCopilotScreen(auditId: String, onBack: () -> Unit, vm: VoiceViewModel =
             SectionTitle("Speech output")
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Speak answers aloud", style = MaterialTheme.typography.titleMedium)
+                    Text("Also speak typed and tapped answers", style = MaterialTheme.typography.titleMedium)
                     Text(
                         if (s.cloudVoice) "Online voice is on: each answer's text (not your audio or the audit) is sent to Sarvam AI to make speech."
-                        else "Uses the phone's own offline voice.",
+                        else "Questions you ask by voice are always answered aloud. Uses the phone's own offline voice.",
                         style = MaterialTheme.typography.bodyMedium, color = if (s.cloudVoice) Film.high else Film.boneDim,
                     )
                 }

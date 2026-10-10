@@ -31,6 +31,9 @@ interface GuideSpeaker {
 
     /** Stops guidance speech. With a [key], stops only if that step is the one being read. */
     fun stop(key: String? = null)
+
+    /** Reads [text] now because the person asked (tapped the speaker), even if it was read a moment ago. */
+    fun sayNow(key: String, text: String, lang: GuideLang) = say(key, text, lang)
 }
 
 /**
@@ -71,6 +74,11 @@ class GuideVoice(context: Context) : GuideSpeaker {
             field = value
             if (value) stop()
         }
+
+    override fun sayNow(key: String, text: String, lang: GuideLang) {
+        dedupe.reset()
+        say(key, text, lang)
+    }
 
     override fun say(key: String, text: String, lang: GuideLang) {
         if (suppressed || text.isBlank()) return

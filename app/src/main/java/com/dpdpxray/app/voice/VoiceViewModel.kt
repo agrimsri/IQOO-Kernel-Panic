@@ -40,7 +40,8 @@ data class VoiceUiState(
     val micMessage: String? = null,
     val answering: Boolean = false,
     val answer: GroundedAnswer? = null,
-    val speakAnswers: Boolean = true,
+    /** Speak answers to typed or tapped questions too. Off by default: a question asked by voice is always answered aloud. */
+    val speakAnswers: Boolean = false,
     val speaking: Boolean = false,
     val voiceNote: String? = null,
     val cloudVoice: Boolean = false,
@@ -194,7 +195,7 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
             override fun onPartial(text: String) = _state.update { it.copy(transcript = text) }
             override fun onFinal(text: String) {
                 _state.update { it.copy(transcript = text) }
-                ask(text)
+                ask(text, byVoice = true)
             }
             override fun onError(code: Int) = _state.update { it.copy(
                 micMessage = MicAvailability.errorReason(code),
@@ -227,10 +228,10 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
         ask(text, q.intent)
     }
 
-    private fun ask(question: String, intent: CopilotIntent? = null) {
+    private fun ask(question: String, intent: CopilotIntent? = null, byVoice: Boolean = false) {
         // A command ("check Instagram", "open reports", "what did you find") is carried out, never just answered.
         if (intent == null && (assistant.hasPendingChoice || VoiceCommandParser.parse(question).command !is VoiceCommand.Question)) {
-            return command(question)
+            return command(question, byVoice)
         }
         val e = evidence ?: return
         val language = _state.value.language
@@ -246,16 +247,16 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (!answerGate.isCurrent(request)) return@launch
             _state.update { it.copy(answering = false, answer = answer, voiceNote = null, commandReply = null, choices = emptyList()) }
-            if (_state.value.speakAnswers) voice.speak(answer.spokenText, language)
+            if (_state.value.speakAnswers || byVoice) voice.speak(answer.spokenText, language)
         }
     }
 
-    private fun command(text: String) {
+    private fun command(text: String, byVoice: Boolean = false) {
         val request = answerGate.begin()
         answerJob?.cancel()
         voice.stop()
         _state.update { it.copy(answering = true, answer = null, commandReply = null, choices = emptyList()) }
-        assistant.submit(text, preferHindi = _state.value.language == CopilotLanguage.HI, focusAuditId = auditId, speak = _state.value.speakAnswers) { turn ->
+        assistant.submit(text, preferHindi = _state.value.language == CopilotLanguage.HI, focusAuditId = auditId, speak = _state.value.speakAnswers || byVoice) { turn ->
             if (!answerGate.isCurrent(request)) return@submit
             _state.update {
                 it.copy(
