@@ -7,11 +7,10 @@ import android.os.Looper
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -57,11 +56,18 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.control.DeviceChecks
 import com.dpdpxray.app.ui.XrayViewModel
+import com.dpdpxray.app.ui.components.FoldText
 import com.dpdpxray.app.ui.components.GroupHeader
+import com.dpdpxray.app.ui.components.cardSurface
+import com.dpdpxray.app.ui.components.gradientSweep
+import com.dpdpxray.app.ui.components.pressClickable
+import com.dpdpxray.app.ui.components.reveal
 import com.dpdpxray.app.ui.guide.ActionTile
 import com.dpdpxray.app.ui.guide.EmptyState
 import com.dpdpxray.app.ui.guide.Glyph
@@ -82,6 +88,8 @@ import com.dpdpxray.app.ui.modes.ModeGlyphIcon
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
+import com.dpdpxray.app.ui.theme.LocalReduceMotion
+import com.dpdpxray.app.ui.theme.Motion
 
 @Composable
 fun HomeScreen(
@@ -131,15 +139,7 @@ fun HomeScreen(
     val aiLine = aiStatusLine(llm)
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-        Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("TraceVeil", style = MaterialTheme.typography.headlineMedium, maxLines = 1, modifier = Modifier.semantics { heading() })
-                Box(Modifier.padding(top = 4.dp).size(width = 44.dp, height = 3.dp).clip(CircleShape).background(Brand.horizontal))
-            }
-            IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).semantics { contentDescription = "Settings" }) {
-                GlyphIcon(Glyph.SETTINGS, Film.boneDim, size = 24.dp)
-            }
-        }
+        HomeHeader(onSettings)
         val modeSettings by vm.settings.collectAsState()
         com.dpdpxray.app.ui.modes.ModePill(
             modeSettings.audience, { a -> vm.updateSettings { it.copy(audience = a) } },
@@ -150,21 +150,22 @@ fun HomeScreen(
         Spacer(Modifier.height(16.dp))
         GuideBanner(
             running?.let { GuideFlow.homeRunning(it.config.targetLabel) } ?: GuideFlow.home(pf),
+            Modifier.reveal(0),
             speak = running == null,
             action = running?.let { "Watch the check" to onLive },
         )
 
         if (todo.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
-            GettingReady(items, todo, aiLine, fix, onLab)
+            Box(Modifier.reveal(1)) { GettingReady(items, todo, aiLine, fix, onLab) }
         }
 
         Spacer(Modifier.height(16.dp))
-        Hero(canAudit = pf.canAudit, stepsLeft = todo.size) { if (vm.prepareAudit()) onAudit() }
+        Hero(canAudit = pf.canAudit, stepsLeft = todo.size, Modifier.reveal(2)) { if (vm.prepareAudit()) onAudit() }
 
         if (todo.isEmpty()) {
             Spacer(Modifier.height(12.dp))
-            ReadyPanel(items, aiLine, fix, onLab)
+            Box(Modifier.reveal(3)) { ReadyPanel(items, aiLine, fix, onLab) }
         }
 
         val latest = audits.firstOrNull()
@@ -174,10 +175,10 @@ fun HomeScreen(
             add(Tile("See a sample", "A labelled example result; no setup", Glyph.SAMPLE) { vm.openSample(onOpen) })
             add(Tile("Camera check", "Review a photo of a consent screen", Glyph.CAMERA, onCamera))
         }
-        GroupHeader("Quick actions")
+        GroupHeader("Quick actions", Modifier.reveal(4))
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            tiles.chunked(2).forEach { row ->
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            tiles.chunked(2).forEachIndexed { r, row ->
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).reveal(5 + r), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     row.forEach { t -> ActionTile(t.title, t.detail, t.glyph, t.onClick, Modifier.weight(1f).fillMaxHeight()) }
                     if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
@@ -199,12 +200,12 @@ fun HomeScreen(
         if (audits.isEmpty()) {
             EmptyState(
                 "No checks yet",
-                "Your checks will appear here. Start with a sample to see what a result looks like.",
+                "Your checks will appear here.",
                 action = "See a sample" to { vm.openSample(onOpen) },
             )
         }
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            audits.take(RECENT_ON_HOME).forEach { RecentCheckCard(it) { onOpen(it.id) } }
+            audits.take(RECENT_ON_HOME).forEachIndexed { i, a -> RecentCheckCard(a, Modifier.reveal(7 + i)) { onOpen(a.id) } }
         }
         if (audits.size > RECENT_ON_HOME) {
             OutlineAction("See all ${audits.size} checks in Reports", onAllReports, Modifier.padding(top = 12.dp), glyph = Glyph.REPORTS)
@@ -212,6 +213,27 @@ fun HomeScreen(
         Spacer(Modifier.height(24.dp))
     }
     if (showSampleFixtures) SampleFixturesDialog(vm, onOpen) { showSampleFixtures = false }
+}
+
+/**
+ * The Home title row: an optional brand [mark] before the name, the name with its short brand rule, and Settings.
+ * The mark slot is empty for now; pass a composable to show a logo there.
+ */
+@Composable
+internal fun HomeHeader(onSettings: () -> Unit, mark: (@Composable () -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (mark != null) {
+            mark()
+            Spacer(Modifier.width(12.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text("TraceVeil", style = MaterialTheme.typography.headlineMedium, maxLines = 1, modifier = Modifier.semantics { heading() })
+            Box(Modifier.padding(top = 4.dp).size(width = 44.dp, height = 3.dp).clip(CircleShape).background(Brand.horizontal))
+        }
+        IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).semantics { contentDescription = "Settings" }) {
+            GlyphIcon(Glyph.SETTINGS, Film.boneDim, size = 24.dp)
+        }
+    }
 }
 
 /** Home shows the newest few; the Reports tab lists them all. */
@@ -224,10 +246,11 @@ private data class Tile(val title: String, val detail: String, val glyph: Glyph,
  * behind it.
  */
 @Composable
-private fun Hero(canAudit: Boolean, stepsLeft: Int, onCheck: () -> Unit) {
+private fun Hero(canAudit: Boolean, stepsLeft: Int, modifier: Modifier = Modifier, onCheck: () -> Unit) {
     val shape = RoundedCornerShape(22.dp)
-    Box(Modifier.fillMaxWidth().clip(shape).background(Film.raised).border(1.dp, FilmExtra.hairline, shape)) {
-        Canvas(Modifier.matchParentSize()) {
+    Box(modifier.fillMaxWidth().cardSurface(22.dp, glow = Brand.coral).background(Brand.heroWash)) {
+        // The film grid sits in its own layer, so the slow sweep above it never redraws the grid.
+        Canvas(Modifier.matchParentSize().graphicsLayer()) {
             val step = 22.dp.toPx()
             var x = step
             while (x < size.width) { drawLine(FilmExtra.hairline, Offset(x, 0f), Offset(x, size.height), 1f); x += step }
@@ -239,6 +262,7 @@ private fun Hero(canAudit: Boolean, stepsLeft: Int, onCheck: () -> Unit) {
                 Offset(0f, line), Offset(size.width, line), 2.dp.toPx(),
             )
         }
+        Box(Modifier.matchParentSize().graphicsLayer().gradientSweep(color = Brand.peach, alpha = 0.06f, periodMs = 9000))
         Column(Modifier.padding(20.dp)) {
             ReadinessChip(canAudit, stepsLeft)
             Text(
@@ -249,7 +273,7 @@ private fun Hero(canAudit: Boolean, stepsLeft: Int, onCheck: () -> Unit) {
                 "TraceVeil watches one app's lookups while you accept or refuse its consent popup, then explains what it saw.",
                 style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 8.dp, bottom = 18.dp),
             )
-            GradientAction("Check an app", onCheck, glyph = Glyph.PLAY)
+            GradientAction("Check an app", onCheck, glyph = Glyph.PLAY, sweep = true)
             if (!canAudit) Text(
                 "Allow the VPN and turn on the consent watcher first (see Getting ready).",
                 style = MaterialTheme.typography.bodyMedium, color = Film.warn, modifier = Modifier.padding(top = 10.dp),
@@ -284,8 +308,7 @@ private fun ReadinessChip(canAudit: Boolean, stepsLeft: Int) {
 private fun AutomateCard(onClick: () -> Unit) {
     val shape = RoundedCornerShape(18.dp)
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 84.dp).clip(shape).background(Film.raised).border(1.dp, FilmExtra.hairline, shape)
-            .clickable(role = Role.Button, onClick = onClick).padding(16.dp),
+        Modifier.fillMaxWidth().heightIn(min = 84.dp).pressClickable(shape = shape, onClick = onClick).cardSurface(18.dp).padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(44.dp).clip(CircleShape).background(Film.scan.copy(alpha = 0.13f)), contentAlignment = Alignment.Center) {
@@ -331,9 +354,11 @@ private fun GettingReady(items: List<SetupItem>, todo: List<SetupItem>, aiLine: 
 @Composable
 private fun ReadyPanel(items: List<SetupItem>, aiLine: String, fix: (SetupKind) -> Unit, onLab: () -> Unit) {
     var open by rememberSaveable { mutableStateOf(false) }
-    Panel {
+    Panel(Modifier.animateContentSize(if (LocalReduceMotion.current) snap() else tween(Motion.MEDIUM, easing = Motion.emphasized))) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button) { open = !open },
+            Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                .clickable(role = Role.Button, onClickLabel = if (open) "Hide details" else "Show details") { open = !open }
+                .semantics { stateDescription = if (open) "Expanded" else "Collapsed" },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(32.dp).clip(CircleShape).background(Film.clear.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
@@ -345,8 +370,11 @@ private fun ReadyPanel(items: List<SetupItem>, aiLine: String, fix: (SetupKind) 
                 Text("VPN allowed and consent watcher on", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
             }
             Text(if (open) "Hide" else "Details", style = MaterialTheme.typography.labelLarge, color = Film.scan)
+            Spacer(Modifier.width(4.dp))
+            val turn by animateFloatAsState(if (open) 180f else 0f, if (LocalReduceMotion.current) snap() else tween(Motion.MEDIUM, easing = Motion.emphasized), label = "ready-chevron")
+            GlyphIcon(Glyph.CHEVRON_DOWN, Film.scan, Modifier.graphicsLayer { rotationZ = turn }, size = 16.dp)
         }
-        AnimatedVisibility(open, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+        if (open) {
             Column(Modifier.padding(top = 6.dp)) {
                 items.forEach { item -> SetupRow(item, number = null) { fix(item.kind) } }
                 AiRow(aiLine, onLab)
@@ -375,7 +403,7 @@ internal fun SetupRow(item: SetupItem, number: Int?, onFix: () -> Unit) {
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(item.title, style = MaterialTheme.typography.titleMedium)
-            Text(item.detail, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+            FoldText(item.detail)
         }
         if (item.fixable && !item.done) {
             Spacer(Modifier.width(8.dp))
