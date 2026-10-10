@@ -7,6 +7,7 @@ import com.dpdpxray.core.automation.AutomationStatuses
 import com.dpdpxray.core.automation.BundleSignatures
 import com.dpdpxray.core.automation.RefusalCode
 import com.dpdpxray.core.automation.RunState
+import com.dpdpxray.core.evidence.EvidenceSignatures
 import com.dpdpxray.core.model.ScoreBand
 import java.io.File
 
@@ -37,12 +38,14 @@ data class RunPlan(
 /** Anything that stops a run before a policy result: exit code 2. [fix] says what to change. */
 class RunFailure(message: String, val fix: String?, val status: AutomationStatus? = null) : Exception(message)
 
-class DeviceRunResult(val serial: String, val status: AutomationStatus, val bundleFile: File, val statusFile: File)
+/** [signatureFile] is bundle.json.sig.json copied from the phone, or null when the phone wrote none. */
+class DeviceRunResult(val serial: String, val status: AutomationStatus, val bundleFile: File, val statusFile: File, val signatureFile: File? = null)
 
 /**
  * Drives one run over adb: preflight (adb, phone, TraceVeil, optional install, target), the start intent, polling
- * status.json every [pollMs], and pulling bundle.json. It never changes a phone setting, grants a permission or
- * deletes anything on the phone; the phone itself decides whether to accept the request.
+ * status.json every [pollMs], and pulling bundle.json and, when the phone signed it, bundle.json.sig.json. It never
+ * changes a phone setting, grants a permission or deletes anything on the phone; the phone itself decides whether to
+ * accept the request.
  */
 class DeviceRunner(
     private val adb: Adb,
@@ -122,7 +125,27 @@ class DeviceRunner(
             )
         }
         log("Verified: bundle.json is signed with this run's pairing token")
-        return DeviceRunResult(s, status, bundleFile, statusFile)
+        return DeviceRunResult(s, status, bundleFile, statusFile, pullSignature(s, p, status))
+    }
+
+    /**
+     * Copies bundle.json.sig.json next to bundle.json. The phone writes it before marking the run done, and only when it
+     * can sign in secure hardware, so a missing file means "not signed", not an error; the gate decides what that means
+     * (requireSignature). Losing the phone here is an error like any other lost contact.
+     */
+    private fun pullSignature(s: String, p: RunPlan, status: AutomationStatus): File? {
+        val file = File(p.runDir, EvidenceSignatures.fileNameFor(AutomationContract.BUNDLE_FILE))
+        file.delete()
+        val r = call(AdbCommands.pullSignature(s, p.runId, file.absolutePath), PULL_MS)
+        if (r.ok && file.isFile) return file
+        file.delete()
+        if (AdbOutput.isMissingFile(r)) {
+            log("Signature: none on the phone (TraceVeil writes bundle.json.sig.json only when the phone can sign in secure hardware)")
+            return null
+        }
+        AdbOutput.transportProblem(r)?.let { throw RunFailure("Lost contact with $s while copying bundle.json.sig.json: $it.", FIX_USB, status) }
+        log("Warning:  could not copy bundle.json.sig.json from the phone: ${AdbOutput.firstLine(r)}")
+        return null
     }
 
     private fun call(args: List<String>, timeoutMs: Long): ExecResult = adb.exec(args, timeoutMs)

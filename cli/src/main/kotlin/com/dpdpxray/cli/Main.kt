@@ -75,7 +75,7 @@ class TraceVeilCi(
             "check" -> check(Args.parse(args.drop(1), setOf("--policy", "--format", "--out", "--profile", "--sig"), setOf(REQUIRE_SIGNATURE)))
             "diff" -> diff(Args.parse(args.drop(1), setOf("--format", "--out")))
             "verify" -> verify(Args.parse(args.drop(1), setOf("--sig", "--format", "--package", "--signer-sha256")))
-            "run" -> RunCommand(out, err, cwd, { gate }, env, adbFactory, clock, newRunId).run(args.drop(1))
+            "run" -> RunCommand(out, err, cwd, { gate }, env, adbFactory, clock, newRunId, trustedRoots).run(args.drop(1))
             else -> throw UsageException("unknown command \"${args[0]}\"")
         }
     } catch (e: UsageException) {
@@ -241,7 +241,7 @@ class TraceVeilCi(
             |  traceveil-ci diff <old.json> <new.json> [--format text|json] [--out file]
             |  traceveil-ci run --package <pkg> [--device SERIAL] [--apk file.apk] [--mode full|quick] [--token T]
             |                   [--policy policy.json] [--timeout 300] [--out traceveil-out] [--adb path]
-            |                   [--format text|json] [--sarif file] [--child-facing]
+            |                   [--format text|json] [--sarif file] [--child-facing] [--require-signature]
             |  traceveil-ci verify <bundle.json> [--sig file] [--format text|json] [--package pkg] [--signer-sha256 hex]
             |  traceveil-ci --help | --version
             |
@@ -255,8 +255,8 @@ class TraceVeilCi(
             |       result, or an old finding the new capture could not test (NOT ESTABLISHED) is a regression.
             |
             |run    TraceVeil Runner: starts the audit on a USB-connected test phone over adb (Developer automation
-            |       must be on in TraceVeil's Settings), waits for it, copies bundle.json to --out/<run id>/ and gates
-            |       it like check. The pairing token comes from --token or TRACEVEIL_TOKEN; the phone comes from
+            |       must be on in TraceVeil's Settings), waits for it, copies bundle.json (and bundle.json.sig.json when
+            |       the phone signed it) to --out/<run id>/ and gates it like check. The pairing token comes from --token or TRACEVEIL_TOKEN; the phone comes from
             |       --device, ANDROID_SERIAL or the only connected phone; adb from --adb, ADB or PATH. --apk installs
             |       the build first with adb install -r. Exit 2 also covers device problems, a refusal on the phone
             |       and --timeout. Setup and security model: docs/ci/RUNNER.md.
