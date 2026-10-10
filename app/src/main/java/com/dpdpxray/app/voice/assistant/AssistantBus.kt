@@ -21,6 +21,9 @@ sealed interface UiOutcome {
 
     /** An optional action was dropped because TraceVeil was not on screen. */
     data object Skipped : UiOutcome
+
+    /** Another check, of [app], was already running, so nothing was started. */
+    data class CheckRunning(val app: String) : UiOutcome
 }
 
 /** One piece of screen work; [hindi] is the language the user spoke, for the follow-up reply. */

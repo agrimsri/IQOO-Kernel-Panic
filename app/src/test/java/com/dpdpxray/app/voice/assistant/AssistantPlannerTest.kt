@@ -104,6 +104,17 @@ class AssistantPlannerTest {
         }
     }
 
+    @Test fun `a start the screen refused because another check runs says so instead of the planned reply`() {
+        val start = plan("check Instagram").action as AssistantAction.StartAudit
+        val planned = plan("check Instagram").reply
+        assertEquals(planned, AssistantPlanner.afterScreenWork(planned, start, UiOutcome.Done))
+        val busy = AssistantPlanner.afterScreenWork(planned, start, UiOutcome.CheckRunning("LeakyShop"))
+        assertEquals("A check of LeakyShop is already running. Wait for it to finish, then ask me again.", busy.en)
+        assertEquals(AssistantCopy.tapNotification, AssistantPlanner.afterScreenWork(planned, start, UiOutcome.NotReached()))
+        assertEquals(AssistantCopy.unlockFirst, AssistantPlanner.afterScreenWork(planned, start, UiOutcome.NotReached(locked = true)))
+        assertEquals(AssistantCopy.couldNotStart("no VPN"), AssistantPlanner.afterScreenWork(planned, start, UiOutcome.Failed("no VPN")))
+    }
+
     @Test fun `a voice command never starts a Full audit, Fast Preview or a reset`() {
         listOf("check Instagram", "check leaky shop", "audit spotify", "run a full audit of instagram", "reset and check instagram").forEach { text ->
             val action = plan(text).action

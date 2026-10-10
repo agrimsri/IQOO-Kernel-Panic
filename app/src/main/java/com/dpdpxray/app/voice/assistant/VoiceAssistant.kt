@@ -109,12 +109,7 @@ class VoiceAssistant private constructor(private val app: Application) {
             return Turn(step.reply, hindi, kind, step.choices, step.stopListening)
         }
         val outcome = perform(action, source, hindi)
-        val reply = when (outcome) {
-            UiOutcome.Done, UiOutcome.Skipped -> step.reply
-            UiOutcome.Unavailable -> AssistantCopy.screenMissing
-            is UiOutcome.Failed -> if (action is AssistantAction.StartAudit) AssistantCopy.couldNotStart(outcome.reason) else AssistantCopy.openApp
-            is UiOutcome.NotReached -> if (outcome.locked) AssistantCopy.unlockFirst else AssistantCopy.tapNotification
-        }
+        val reply = AssistantPlanner.afterScreenWork(step.reply, action, outcome)
         Log.i(TAG, "command $kind outcome=${outcome::class.simpleName}")
         return Turn(reply, hindi, kind, step.choices, step.stopListening, waiting = action.takeIf { outcome is UiOutcome.NotReached })
     }

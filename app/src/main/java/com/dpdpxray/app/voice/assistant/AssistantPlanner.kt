@@ -109,6 +109,15 @@ object AssistantPlanner {
     /** The user picked one of the two offered apps. */
     fun checkPicked(app: AppCandidate, ctx: AssistantContext): AssistantStep = startFor(app, ctx)
 
+    /** The reply once TraceVeil's screen tried [action]: the [planned] reply, or what stopped the work. */
+    fun afterScreenWork(planned: Said, action: AssistantAction, outcome: UiOutcome): Said = when (outcome) {
+        UiOutcome.Done, UiOutcome.Skipped -> planned
+        UiOutcome.Unavailable -> AssistantCopy.screenMissing
+        is UiOutcome.CheckRunning -> AssistantCopy.alreadyRunning(outcome.app)
+        is UiOutcome.Failed -> if (action is AssistantAction.StartAudit) AssistantCopy.couldNotStart(outcome.reason) else AssistantCopy.openApp
+        is UiOutcome.NotReached -> if (outcome.locked) AssistantCopy.unlockFirst else AssistantCopy.tapNotification
+    }
+
     private fun lastResult(ctx: AssistantContext): AssistantStep {
         val audit = ctx.audit ?: return AssistantStep(AssistantCopy.noSavedChecks)
         val summary = Said(
