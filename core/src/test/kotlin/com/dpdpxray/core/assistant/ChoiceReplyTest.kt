@@ -21,6 +21,13 @@ class ChoiceReplyTest {
         assertEquals(ChoiceReply.Picked(0), ChoiceReply.parse("instagram", options))
     }
 
+    @Test fun `a tapped option is picked even when its label holds a filler word`() {
+        // The copilot's chips send the label itself; "My" must not be stripped from "My Jio".
+        val jio = listOf(AppCandidate("My Jio", "com.jio.myjio"), AppCandidate("JioTV", "com.jio.jioplay.tv"))
+        assertEquals(ChoiceReply.Picked(0), ChoiceReply.parse("My Jio", jio))
+        assertEquals(ChoiceReply.Picked(1), ChoiceReply.parse("JioTV", jio))
+    }
+
     @Test fun `check verbs and filler around the name are ignored`() {
         // "दो" here is "do it", not "two": it must not pick WhatsApp Business.
         assertEquals(ChoiceReply.Picked(0), ChoiceReply.parse("व्हाट्सएप की जाँच कर दो", whatsapp))

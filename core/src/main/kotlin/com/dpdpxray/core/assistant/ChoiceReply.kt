@@ -47,6 +47,9 @@ sealed interface ChoiceReply {
         fun parse(text: String, options: List<AppCandidate>): ChoiceReply {
             val all = VoiceCommandParser.tokens(text)
             if (all.isEmpty()) return Unclear
+            // A tapped option or a label said in full ("My Jio"): matched before filler is stripped from it.
+            val said = AppNameMatcher.words(text).joinToString("")
+            options.indices.singleOrNull { AppNameMatcher.words(options[it].label).joinToString("") == said }?.let { return Picked(it) }
             val body = all.dropWhile { it in LEADING_NO }
             if (body.any { it in NEGATION }) return Cancel
             val rest = body.filterIndexed { i, w -> !(w == DO_IT && i > 0) && w !in STRIP }
