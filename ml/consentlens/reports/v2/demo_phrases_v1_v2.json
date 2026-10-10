@@ -1,0 +1,343 @@
+{
+ "note": "AI-lab demo phrases (hand-written; expected role is ours; some are in the training data). INT8 reference predictions of the app file (v1) and the exported v2 candidate.",
+ "v1_matches": 19,
+ "v2_matches": 19,
+ "rows": [
+  {
+   "lang": "en",
+   "text": "Decline optional tracking",
+   "expected": "REJECT",
+   "in_training_data": false,
+   "v1": [
+    "PURPOSE_NOTICE",
+    0.9961
+   ],
+   "v2": [
+    "PURPOSE_NOTICE",
+    0.8438
+   ]
+  },
+  {
+   "lang": "en",
+   "text": "Read our privacy notice",
+   "expected": "PRIVACY_LINK",
+   "in_training_data": false,
+   "v1": [
+    "PRIVACY_LINK",
+    0.9492
+   ],
+   "v2": [
+    "PRIVACY_LINK",
+    0.9922
+   ]
+  },
+  {
+   "lang": "en",
+   "text": "Add to cart",
+   "expected": "OTHER",
+   "in_training_data": false,
+   "v1": [
+    "OTHER",
+    0.9961
+   ],
+   "v2": [
+    "OTHER",
+    0.6641
+   ]
+  },
+  {
+   "lang": "hi",
+   "text": "सभी स्वीकार करें",
+   "expected": "ACCEPT",
+   "in_training_data": false,
+   "v1": [
+    "ACCEPT",
+    0.5
+   ],
+   "v2": [
+    "ACCEPT",
+    0.9727
+   ]
+  },
+  {
+   "lang": "hi",
+   "text": "हम विज्ञापन दिखाने के लिए आपके डेटा का उपयोग करते हैं",
+   "expected": "PURPOSE_NOTICE",
+   "in_training_data": false,
+   "v1": [
+    "PURPOSE_NOTICE",
+    0.9961
+   ],
+   "v2": [
+    "PURPOSE_NOTICE",
+    0.9961
+   ]
+  },
+  {
+   "lang": "de",
+   "text": "Alle ablehnen",
+   "expected": "REJECT",
+   "in_training_data": false,
+   "v1": [
+    "OTHER",
+    0.6562
+   ],
+   "v2": [
+    "OTHER",
+    0.5352
+   ]
+  },
+  {
+   "lang": "de",
+   "text": "Einstellungen anpassen",
+   "expected": "MANAGE",
+   "in_training_data": false,
+   "v1": [
+    "MANAGE",
+    0.9961
+   ],
+   "v2": [
+    "MANAGE",
+    0.9961
+   ]
+  },
+  {
+   "lang": "fr",
+   "text": "Tout accepter",
+   "expected": "ACCEPT",
+   "in_training_data": true,
+   "v1": [
+    "ACCEPT",
+    0.9961
+   ],
+   "v2": [
+    "ACCEPT",
+    0.9961
+   ]
+  },
+  {
+   "lang": "fr",
+   "text": "Vous pouvez retirer votre consentement à tout moment.",
+   "expected": "WITHDRAW_INFO",
+   "in_training_data": false,
+   "v1": [
+    "OTHER",
+    0.9961
+   ],
+   "v2": [
+    "WITHDRAW_INFO",
+    0.9961
+   ]
+  },
+  {
+   "lang": "es",
+   "text": "Rechazar todo",
+   "expected": "REJECT",
+   "in_training_data": false,
+   "v1": [
+    "REJECT",
+    0.9961
+   ],
+   "v2": [
+    "REJECT",
+    0.5781
+   ]
+  },
+  {
+   "lang": "es",
+   "text": "Usamos sus datos para mostrar anuncios personalizados.",
+   "expected": "PURPOSE_NOTICE",
+   "in_training_data": false,
+   "v1": [
+    "PURPOSE_NOTICE",
+    0.9961
+   ],
+   "v2": [
+    "PURPOSE_NOTICE",
+    0.9258
+   ]
+  },
+  {
+   "lang": "pt",
+   "text": "Aceitar todos",
+   "expected": "ACCEPT",
+   "in_training_data": true,
+   "v1": [
+    "ACCEPT",
+    0.9961
+   ],
+   "v2": [
+    "ACCEPT",
+    0.9961
+   ]
+  },
+  {
+   "lang": "pt",
+   "text": "Política de privacidade",
+   "expected": "PRIVACY_LINK",
+   "in_training_data": true,
+   "v1": [
+    "PRIVACY_LINK",
+    0.9961
+   ],
+   "v2": [
+    "PRIVACY_LINK",
+    0.9961
+   ]
+  },
+  {
+   "lang": "it",
+   "text": "Gestisci preferenze",
+   "expected": "MANAGE",
+   "in_training_data": false,
+   "v1": [
+    "MANAGE",
+    0.9961
+   ],
+   "v2": [
+    "MANAGE",
+    0.9922
+   ]
+  },
+  {
+   "lang": "ja",
+   "text": "すべて拒否",
+   "expected": "REJECT",
+   "in_training_data": false,
+   "v1": [
+    "REJECT",
+    0.9961
+   ],
+   "v2": [
+    "ACCEPT",
+    0.5977
+   ]
+  },
+  {
+   "lang": "ja",
+   "text": "同意する",
+   "expected": "ACCEPT",
+   "in_training_data": true,
+   "v1": [
+    "ACCEPT",
+    0.9961
+   ],
+   "v2": [
+    "ACCEPT",
+    0.8828
+   ]
+  },
+  {
+   "lang": "zh",
+   "text": "接受全部",
+   "expected": "ACCEPT",
+   "in_training_data": false,
+   "v1": [
+    "OTHER",
+    0.9492
+   ],
+   "v2": [
+    "ACCEPT",
+    0.9961
+   ]
+  },
+  {
+   "lang": "zh",
+   "text": "管理偏好设置",
+   "expected": "MANAGE",
+   "in_training_data": false,
+   "v1": [
+    "MANAGE",
+    0.9961
+   ],
+   "v2": [
+    "MANAGE",
+    0.9766
+   ]
+  },
+  {
+   "lang": "ar",
+   "text": "رفض الكل",
+   "expected": "REJECT",
+   "in_training_data": false,
+   "v1": [
+    "OTHER",
+    0.9961
+   ],
+   "v2": [
+    "OTHER",
+    0.6211
+   ]
+  },
+  {
+   "lang": "ar",
+   "text": "سياسة الخصوصية",
+   "expected": "PRIVACY_LINK",
+   "in_training_data": true,
+   "v1": [
+    "PRIVACY_LINK",
+    0.9961
+   ],
+   "v2": [
+    "PRIVACY_LINK",
+    0.9961
+   ]
+  },
+  {
+   "lang": "ko",
+   "text": "모두 거부",
+   "expected": "REJECT",
+   "in_training_data": true,
+   "v1": [
+    "REJECT",
+    0.9961
+   ],
+   "v2": [
+    "REJECT",
+    0.9766
+   ]
+  },
+  {
+   "lang": "ru",
+   "text": "Принять все",
+   "expected": "ACCEPT",
+   "in_training_data": false,
+   "v1": [
+    "ACCEPT",
+    0.9961
+   ],
+   "v2": [
+    "ACCEPT",
+    0.9922
+   ]
+  },
+  {
+   "lang": "tr",
+   "text": "Tümünü kabul et",
+   "expected": "ACCEPT",
+   "in_training_data": false,
+   "v1": [
+    "ACCEPT",
+    0.9961
+   ],
+   "v2": [
+    "OTHER",
+    0.7578
+   ]
+  },
+  {
+   "lang": "id",
+   "text": "Tolak semua",
+   "expected": "REJECT",
+   "in_training_data": false,
+   "v1": [
+    "REJECT",
+    0.8164
+   ],
+   "v2": [
+    "REJECT",
+    0.7305
+   ]
+  }
+ ]
+}

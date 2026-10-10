@@ -1,0 +1,82 @@
+{
+ "lolo": {
+  "single": {
+   "v1": 0.4513,
+   "s1": 0.4893,
+   "s2": 0.4813,
+   "s2_w160": 0.4918
+  },
+  "pairs": {
+   "v1+s1": {
+    "ensemble": 0.5051,
+    "better_member": 0.4893,
+    "gain": 0.0158
+   },
+   "v1+s2": {
+    "ensemble": 0.5063,
+    "better_member": 0.4813,
+    "gain": 0.025
+   },
+   "v1+s2_w160": {
+    "ensemble": 0.5071,
+    "better_member": 0.4918,
+    "gain": 0.0153
+   },
+   "s1+s2": {
+    "ensemble": 0.5054,
+    "better_member": 0.4893,
+    "gain": 0.0161
+   },
+   "s1+s2_w160": {
+    "ensemble": 0.5146,
+    "better_member": 0.4918,
+    "gain": 0.0228
+   },
+   "s2+s2_w160": {
+    "ensemble": 0.5213,
+    "better_member": 0.4918,
+    "gain": 0.0295
+   }
+  }
+ },
+ "seen": {
+  "single": {
+   "v1": 0.6486,
+   "s1": 0.6473,
+   "s2": 0.6741,
+   "s2_w160": 0.6843
+  },
+  "pairs": {
+   "v1+s1": {
+    "ensemble": 0.7048,
+    "better_member": 0.6486,
+    "gain": 0.0562
+   },
+   "v1+s2": {
+    "ensemble": 0.7002,
+    "better_member": 0.6741,
+    "gain": 0.0261
+   },
+   "v1+s2_w160": {
+    "ensemble": 0.6966,
+    "better_member": 0.6843,
+    "gain": 0.0123
+   },
+   "s1+s2": {
+    "ensemble": 0.7023,
+    "better_member": 0.6741,
+    "gain": 0.0282
+   },
+   "s1+s2_w160": {
+    "ensemble": 0.7013,
+    "better_member": 0.6843,
+    "gain": 0.017
+   },
+   "s2+s2_w160": {
+    "ensemble": 0.7171,
+    "better_member": 0.6843,
+    "gain": 0.0328
+   }
+  }
+ }
+}

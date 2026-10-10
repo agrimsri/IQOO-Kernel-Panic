@@ -1,0 +1,34 @@
+{
+ "cand": "s2_w160",
+ "criteria_all_pass": true,
+ "criteria": {
+  "Macro-F1 gain >= 0.03, seen languages": {
+   "value": "+0.060",
+   "pass": true,
+   "delta": 0.0597
+  },
+  "Macro-F1 gain >= 0.03, held-out languages": {
+   "value": "+0.058",
+   "pass": true,
+   "delta": 0.0584
+  },
+  "No role's F1 drops by more than 0.05": {
+   "value": "worst +0.011 (OTHER, seen)",
+   "pass": true
+  },
+  "Op types are a subset of v1's": {
+   "value": "no new op type",
+   "pass": true
+  },
+  "INT8 vs float agreement >= 98%": {
+   "value": "98.9% lowest seed and protocol (lowest single fold 98.7%)",
+   "pass": true
+  },
+  "Size <= 400 KB": {
+   "value": "271,720 bytes",
+   "pass": true
+  }
+ },
+ "worst_role_drop": 0.011299999999999977,
+ "note": "the ship decision itself is recorded in decision.json (write_v2_report.py); see v2_report.md"
+}
