@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -31,7 +31,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -44,6 +45,10 @@ import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.data.SampleAudit
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.ChipFlow
+import com.dpdpxray.app.ui.components.FoldText
+import com.dpdpxray.app.ui.components.cardSurface
+import com.dpdpxray.app.ui.components.pressClickable
+import com.dpdpxray.app.ui.components.reveal
 import com.dpdpxray.app.ui.components.Hairline
 import com.dpdpxray.app.ui.components.NavRow
 import com.dpdpxray.app.ui.components.Note
@@ -74,8 +79,8 @@ fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit) {
         TopBar("Reports", onBack = null)
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item(key = "intro") {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Note("Checks saved on this phone, newest first. Open one for its findings, evidence and exports.")
+                Column(Modifier.reveal(0), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FoldText("Checks saved on this phone, newest first. Open one for its findings, evidence and exports.")
                     val bands = ScoreBand.entries.mapNotNull { b -> audits.count { it.band == b }.takeIf { it > 0 }?.let { b to it } }
                     if (bands.isNotEmpty()) ChipFlow {
                         bands.forEach { (band, n) -> Tag("$n ${band.label}", bandColor(band)) }
@@ -86,11 +91,12 @@ fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit) {
             if (audits.isEmpty()) item(key = "empty") {
                 EmptyState(
                     "No checks yet",
-                    "Your checks will appear here. Start with a sample to see what a result looks like.",
+                    "Your checks will appear here.",
+                    Modifier.reveal(1),
                     action = "See a sample" to { vm.openSample(onOpen) },
                 )
             }
-            items(audits, key = { it.id }) { RecentCheckCard(it) { onOpen(it.id) } }
+            itemsIndexed(audits, key = { _, a -> a.id }) { i, a -> RecentCheckCard(a, Modifier.reveal(1 + i).animateItem()) { onOpen(a.id) } }
         }
     }
 }
@@ -115,10 +121,10 @@ fun MoreScreen(
     Column(Modifier.fillMaxSize()) {
         TopBar("More", onBack = null)
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            SectionCard(title = ModeCopy.title(settings.audience).en, glyph = Glyph.HOME) {
+            SectionCard(Modifier.reveal(0), title = ModeCopy.title(settings.audience).en, glyph = Glyph.HOME) {
                 ModeSwitch(settings.audience, { a -> vm.updateSettings { it.copy(audience = a) } })
             }
-            SectionCard(title = "Tools") {
+            SectionCard(Modifier.reveal(1), title = "Tools") {
                 NavRow("Camera check", "Review a photo of a consent screen", onCamera, glyph = Glyph.CAMERA)
                 if (latest != null) {
                     Hairline()
@@ -131,12 +137,12 @@ fun MoreScreen(
                 Hairline()
                 NavRow("How it works", "Replay the short introduction", onHowItWorks, glyph = Glyph.BOOK)
             }
-            SectionCard(title = "App") {
+            SectionCard(Modifier.reveal(2), title = "App") {
                 NavRow("Settings", "Text size, check timing, voice, your domains and privacy", onSettings, glyph = Glyph.SETTINGS)
                 Hairline()
                 NavRow("AI lab", aiStatusLine(llm), onLab, glyph = Glyph.AI)
             }
-            SectionCard(title = "About TraceVeil", glyph = Glyph.INFO) {
+            SectionCard(Modifier.reveal(3), title = "About TraceVeil", glyph = Glyph.INFO) {
                 Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium, color = Film.bone)
                 Note("Checks run on this phone. Results are an automated technical assessment, not legal advice.")
                 if (onTrust != null) {
@@ -185,12 +191,15 @@ internal fun SampleFixturesDialog(vm: XrayViewModel, onOpen: (String) -> Unit, o
  * as a small chip. Reads as one button to TalkBack.
  */
 @Composable
-internal fun RecentCheckCard(meta: AuditMeta, onClick: () -> Unit) {
+internal fun RecentCheckCard(meta: AuditMeta, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val color = bandColor(meta.band)
     val shape = RoundedCornerShape(Radii.tile)
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 80.dp).clip(shape).background(Film.raised).border(1.dp, FilmExtra.hairline, shape)
-            .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        modifier.fillMaxWidth().heightIn(min = 80.dp)
+            .pressClickable(shape = shape, onClick = onClick)
+            .cardSurface(Radii.tile)
+            .background(remember(color) { Brush.horizontalGradient(0f to color.copy(alpha = 0.08f), 0.4f to Color.Transparent) })
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ScoreChip(RecentChecks.scoreText(meta), color)
