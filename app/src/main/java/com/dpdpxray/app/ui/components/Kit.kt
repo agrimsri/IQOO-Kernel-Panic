@@ -280,6 +280,8 @@ fun Callout(
     detail: String? = null,
     /** Show only [text]'s first sentence and fold the rest behind More (ignored when [detail] is given). */
     fold: Boolean = false,
+    moreLabel: String = "More",
+    lessLabel: String = "Less",
 ) {
     val lead = if (fold && detail == null) remember(text) { leadSentence(text) } else text
     val more = detail ?: if (fold && lead.length < text.trim().length) text.trim().substring(lead.length).trim() else null
@@ -301,7 +303,7 @@ fun Callout(
                 var open by rememberSaveable(more) { mutableStateOf(false) }
                 Column(Modifier.animateContentSize(foldSpec())) {
                     if (open) Text(more, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 6.dp))
-                    DisclosureRow(open, "More", "Less", { open = !open }, color = color, glyph = null)
+                    DisclosureRow(open, moreLabel, lessLabel, { open = !open }, color = color, glyph = null)
                 }
             }
         }
