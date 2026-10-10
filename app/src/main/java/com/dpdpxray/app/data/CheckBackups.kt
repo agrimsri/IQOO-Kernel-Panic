@@ -1,6 +1,7 @@
 package com.dpdpxray.app.data
 
 import com.dpdpxray.app.report.AuditJsonExport
+import com.dpdpxray.core.datasafety.PlayLabelRecord
 import com.dpdpxray.core.export.AuditBackups
 import com.dpdpxray.core.export.AuditBundleV1
 import com.dpdpxray.core.export.AuditBundles
@@ -60,6 +61,7 @@ object CheckBackups {
             val ok = runCatching {
                 val meta = metaOf(bundle)
                 repo.save(meta, bundle.sessions, bundle.result, markdown(meta, bundle.sessions, bundle.result), readingsOf(bundle))
+                labelOf(bundle)?.let { repo.savePlayLabel(meta.id, it) }
             }.isSuccess
             if (ok) restored++ else failed++
         }
@@ -84,6 +86,9 @@ object CheckBackups {
             inconclusiveReason = m.inconclusiveReason,
         )
     }
+
+    /** The Play label attached to a backed-up check, or null when none was attached. */
+    fun labelOf(bundle: AuditBundleV1): PlayLabelRecord? = bundle.playLabel?.let { PlayLabelRecord(it.text, it.source, it.addedAtMs) }
 
     /** The saved per-plan upload readings; none (not recorded) when absent or unreadable, never invented. */
     fun readingsOf(bundle: AuditBundleV1): List<SessionNetworkReadings> = bundle.networkReadings?.let { arr ->

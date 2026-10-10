@@ -1,0 +1,7 @@
+Data safety
+(Demo label written by the TraceVeil team for the LeakyShop test app. It is not a Google Play listing.)
+No data shared with third parties
+This app may collect these data types
+App activity
+Data is encrypted in transit
+You can request that data be deleted
