@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from traceveil import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, adb, audit, config
+from traceveil import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, adb, audit, config, netwatch
 
 REPORT = {
     "schemaVersion": 1, "requestId": "REQ", "auditId": "audit-1", "completedAtMs": 1, "target": {"package": "com.x.y", "label": "X"},
@@ -38,11 +38,18 @@ class FakePhone:
         self.serial, self.adb = "SERX", "adb"
         self.broadcast, self.files, self.installed = broadcast, files or {}, installed
         self.gone_at, self.calls, self.reads = set(gone_at), [], 0
+        self.proc_net, self.dumpsys = "## tcp\n", "Packages:\n"
 
     def shell_checked(self, command):
         self.calls.append(command)
+        if command.startswith("pm list packages -U"):
+            return "package:com.x.y uid:10349\n"
         if command.startswith("pm list packages"):
             return "package:com.dpdpxray.app\n" if self.installed else ""
+        if command == netwatch.SAMPLE_CMD:
+            return self.proc_net
+        if command.startswith("dumpsys package"):
+            return self.dumpsys
         if command.startswith("am broadcast"):
             return self.broadcast
         if command == "echo ok" or command.startswith("cat "):
@@ -107,6 +114,23 @@ class AuditCommandTests(unittest.TestCase):
         # policy keeps app severities: fail_on=high still fails.
         self.assertEqual(EXIT_FINDINGS, self.run_audit(FakePhone(files=self.good_files()), policy="coppa")[0])
         self.assertEqual(EXIT_USAGE, self.run_audit(FakePhone(files=self.good_files()), lenses="mars")[0])
+
+    def test_sockets_are_sampled_during_the_audit_and_hidden_traffic_can_fail_it(self):
+        from tools.tests.test_traceveil_netwatch import line, proc_net
+        phone = FakePhone(files=self.good_files())
+        phone.proc_net = proc_net(tcp=[line(0, "1.1.1.1", 443), line(1, "52.95.110.1", 443, uid=999)])
+        self.cfg["audit"]["fail_on"] = "off"
+        code, i = self.run_audit(phone)
+        self.assertEqual(EXIT_PASS, code)
+        net = json.loads((Path(self.cfg["output"]["dir"]) / "REQ.json").read_text())["network"]
+        self.assertEqual(net["sampling"]["uid"], 10349)
+        self.assertGreaterEqual(net["sampling"]["samples"], 1)
+        self.assertEqual([(c["ip"], c["kind"]) for c in net["connections"]], [("1.1.1.1", "encrypted-dns")])  # other app ignored
+        self.assertIn("Network beyond DNS", i.out.getvalue())
+        code, i = self.run_audit(phone, fail_on_hidden=True)
+        self.assertEqual(EXIT_FINDINGS, code)
+        self.assertIn("--fail-on-hidden", i.out.getvalue())
+        self.assertNotIn("network", json.loads(self.run_audit(phone, watch_network=False, as_json=True)[1].out.getvalue()))
 
     def test_min_score_policy(self):
         self.cfg["audit"].update(fail_on="off", min_score=50)

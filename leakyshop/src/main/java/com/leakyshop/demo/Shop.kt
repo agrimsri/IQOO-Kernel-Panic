@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import com.appsflyer.AppsFlyerLib
 import com.mixpanel.android.mpmetrics.MixpanelAPI
 import com.onesignal.OneSignal
+import io.branch.referral.Branch
 import java.net.InetAddress
 import kotlin.concurrent.thread
 
@@ -54,6 +55,7 @@ import kotlin.concurrent.thread
  * the `fixed` flavor shows the DPDP-compliant pattern.
  * A few lookups go through demo stand-ins that borrow real SDK package names (com.appsflyer, com.mixpanel, com.onesignal,
  * io.sentry) so `traceveil sdks` can show "SDK found in APK" next to "tracker observed live"; the rest are plain app code.
+ * The io.branch stand-in resolves over DNS-over-HTTPS instead, to demonstrate traffic the DNS capture cannot see.
  */
 object SdkSimulator {
     const val FIREBASE_ANALYTICS = "app-measurement.com"
@@ -90,6 +92,7 @@ class ShopApp : Application() {
             SdkSimulator.touch(SdkSimulator.FIREBASE_ANALYTICS, SdkSimulator.FACEBOOK, SdkSimulator.CRASHLYTICS, SdkSimulator.AMPLITUDE, SdkSimulator.CLARITY)
             AppsFlyerLib.start()
             MixpanelAPI.track()
+            Branch.init() // resolves over DNS-over-HTTPS: invisible to the DNS capture, caught by the socket sampler
         } else if (Consent.accepted(this)) {
             SdkSimulator.touch(SdkSimulator.FIREBASE_ANALYTICS, SdkSimulator.FACEBOOK)
             MixpanelAPI.track()

@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, adb, laws
+from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, adb, laws, netwatch
 from .colors import PLAIN, Style
 from .netenv import OWN_PACKAGE
 
@@ -22,6 +22,7 @@ RECEIVER = f"{OWN_PACKAGE}/.cli.DebugAuditReceiver"
 REMOTE_REPORTS = f"/sdcard/Android/data/{OWN_PACKAGE}/files/reports"
 SCHEMA_VERSION = 1
 SEVERITY_ORDER = ["info", "low", "medium", "high", "critical"]
+NET_SAMPLE_S = 1.0  # socket sampling interval while an audit runs
 REQUIRED_KEYS = ("schemaVersion", "requestId", "auditId", "target", "score", "band", "findings", "sessions")
 
 
@@ -138,6 +139,8 @@ def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) ->
             lines.append(f"       {style.dim('trackers:')} {_names(f['entities'], style)}")
     if rep.get("lenses"):
         lines += laws.table(rep["lenses"], style)
+    if rep.get("network"):
+        lines += netwatch.summary_lines(rep["network"], style)
     for r in reasons:
         lines.append(f"  {style.warn('policy:')} {r}")
     lines.append(f"  report saved: {saved}")
@@ -170,7 +173,8 @@ def _wait_for_device(dev, io: Io, deadline: list[float], request_id: str) -> boo
 
 def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_drive: bool, reset: bool, wait_s: float,
               resume: str | None, as_json: bool, out_file: str | None, request_id: str | None = None,
-              fail_on_override: str | None = None, lenses=None, policy: str | None = None) -> int:
+              fail_on_override: str | None = None, lenses=None, policy: str | None = None,
+              watch_network: bool | None = None, fail_on_hidden: bool = False) -> int:
     request_id = resume or request_id or new_request_id()
     package = package or cfg["target"]["package"]
     if not resume and not package:
@@ -186,9 +190,20 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
     except adb.AdbDisconnected as e:
         return _fail(io, f"device disconnected before the audit started ({e}); reconnect and run again", EXIT_DEVICE)
 
+    sampler = None
+    if not resume and (cfg["audit"].get("watch_network", True) if watch_network is None else watch_network):
+        try:
+            uid = netwatch.uid_of(dev, package)
+            sampler = netwatch.Sampler(dev, uid, io.clock) if uid is not None else None
+        except adb.AdbError:
+            sampler = None
+    poll_s = min(io.poll_s, NET_SAMPLE_S) if sampler else io.poll_s
+
     deadline = [io.clock() + wait_s]
     last_step = ""
     while True:
+        if sampler:
+            sampler.sample()  # first, so even an audit that is already done gets one sample
         try:
             raw = dev.shell_checked(f"cat {shlex.quote(_remote(request_id, 'status.json'))}")
             state = _json_or_none(raw)
@@ -205,7 +220,7 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
         if io.clock() >= deadline[0]:
             return _fail(io, f"timed out after {wait_s:.0f}s (last step: {last_step or 'unknown'}). The audit was not cancelled; "
                              f"fetch it later with: traceveil audit --resume {request_id}", EXIT_TIMEOUT)
-        io.sleep(io.poll_s)
+        io.sleep(poll_s)
 
     try:
         text = dev.shell_checked(f"cat {shlex.quote(_remote(request_id, 'report.json'))}")
@@ -221,6 +236,12 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
         rep["lenses"] = laws.assess_all(rep, lenses or cfg["audit"]["lenses"], policy or cfg["audit"]["policy"])
     except ValueError as e:
         return _fail(io, str(e), EXIT_USAGE)
+    if sampler:
+        try:
+            vpn = netwatch.declares_vpn_service(dev.shell_checked(f"dumpsys package {shlex.quote(package)}"))
+        except adb.AdbError:
+            vpn = None
+        rep["network"] = netwatch.analyze(sampler.seen, rep, sampler.as_dict(poll_s), vpn)
     out_dir = Path(cfg["output"]["dir"])
     out_dir.mkdir(parents=True, exist_ok=True)
     saved = out_dir / f"{request_id}.json"
@@ -230,5 +251,8 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
         Path(out_file).write_text(json.dumps(rep, indent=2), encoding="utf-8")
     code, reasons = exit_for_report(laws.policy_view(rep["lenses"]), fail_on_override or cfg["audit"]["fail_on"],
                                     int(cfg["audit"]["min_score"]))
+    if fail_on_hidden and rep.get("network") and netwatch.hidden(rep["network"]):
+        reasons.append("the app made connections the DNS capture could not see (--fail-on-hidden)")
+        code = code if code != EXIT_PASS else EXIT_FINDINGS
     print(json.dumps(rep, indent=2) if as_json else summary(rep, reasons, saved, Style(io.color_out)), file=io.out)
     return code

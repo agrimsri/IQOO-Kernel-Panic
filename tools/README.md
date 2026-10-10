@@ -168,6 +168,28 @@ Config: `audit.lenses` (default `"all"`) and `audit.policy` (default `"INDIA"`, 
 
 Colours: severities (CRITICAL, HIGH, MEDIUM, LOW), scores, bands and tracker names are coloured on a terminal. `NO_COLOR=1` turns colours off; `FORCE_COLOR=1` keeps them in pipes.
 
+## 3c. Network beyond DNS: traffic the DNS capture cannot see
+
+TraceVeil captures plain DNS lookups. An SDK that uses **encrypted DNS** (DNS-over-HTTPS or -TLS), connects to a **hardcoded IP**, or sends DNS **straight to an outside resolver** makes no lookup the capture can read. It still has to open a socket, and `adb shell` can read every socket on the phone with its owner app from `/proc/net/{tcp,tcp6,udp,udp6}`. While an audit runs, the CLI samples the audited app's sockets once a second and matches each remote address against the addresses its visible lookups returned (`dnsAnswers` in the report):
+
+| Label | Meaning |
+|---|---|
+| `ENCRYPTED DNS` | port 853, or a public DNS-over-HTTPS resolver (Google, Cloudflare, Quad9, ...) on 443; also a lookup of a DoH resolver's name |
+| `DIRECT DNS` | plain DNS to an outside resolver, bypassing TraceVeil's relay |
+| `NO LOOKUP` | an address no visible lookup returned: hidden DNS, a hardcoded IP, or a lookup cached from before the capture |
+| `QUIC` | UDP 443 to an address no visible lookup returned |
+| `matched` | connected to an address a visible lookup returned: the tracker was **contacted**, not only looked up |
+
+An app that declares its own VPN service (`BIND_VPN_SERVICE`) is flagged too: Android runs one VPN at a time, so such a tunnel would also stop TraceVeil's capture.
+
+```bash
+traceveil audit --package com.example.app                    # "Network beyond DNS" section (on by default)
+traceveil audit --package com.example.app --fail-on-hidden   # CI: exit 1 when hidden traffic is found
+traceveil watch --package com.example.app --seconds 60 --report <request_id>   # sample while you use the app
+```
+
+Limits: sampling is once a second, so a connection opened and closed between samples is missed; Android shows closed (TIME_WAIT) connections without their app; only addresses and ports are read, never payload, and the hostnames inside encrypted DNS stay unknown. `--no-net-watch` or `audit.watch_network = false` turns sampling off. The LeakyShop leaky demo includes an `io.branch` stand-in that resolves over DNS-over-HTTPS to show this.
+
 ## 4. Exit codes (for scripts and CI)
 
 | Code | Meaning |

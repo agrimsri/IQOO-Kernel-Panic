@@ -14,7 +14,7 @@ DEFAULTS = {
     "device": {"serial": "", "adb": ""},
     "target": {"package": "", "apk_glob": "app/build/outputs/apk/debug/*.apk"},
     "audit": {"plans": ["silent", "reject", "accept"], "min_score": 0, "fail_on": "high",
-              "lenses": "all", "policy": "INDIA"},
+              "lenses": "all", "policy": "INDIA", "watch_network": True},
     "network": {"check_vpn": "warn", "online_ip": False, "endpoint": "", "cache_ttl_hours": 24, "redact_ip": True},
     "output": {"dir": ".traceveil/reports", "formats": ["json", "summary"]},
 }
@@ -35,6 +35,7 @@ min_score = 0
 fail_on = "high"
 lenses = "all"           # legal lenses (same rules as the app): "all" or e.g. ["INDIA", "EU", "UK", "US_CALIFORNIA"]
 policy = "INDIA"         # the lens whose score decides the exit code
+watch_network = true     # sample the app's sockets during the audit to find traffic the DNS capture cannot see
 
 [network]
 check_vpn = "warn"       # off | warn | fail

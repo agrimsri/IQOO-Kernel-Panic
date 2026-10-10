@@ -58,6 +58,7 @@ object CliAuditReport {
                 }
             }))
             if (catalog != null) put("observedTrackers", observedTrackers(bundle, catalog))
+            if (catalog != null) put("dnsAnswers", dnsAnswers(bundle, catalog))
         }
         return pretty.encodeToString(JsonObject.serializer(), obj)
     }
@@ -76,6 +77,22 @@ object CliAuditReport {
                 put("category", rows.first().second.name)
                 put("lookups", rows.size)
                 put("phases", strings(rows.map { it.third.name }.distinct().sorted()))
+            }
+        })
+    }
+
+    /**
+     * The addresses each looked-up name resolved to, so `traceveil` can match the app's live sockets to a lookup. A
+     * connection to an address no lookup returned points to DNS TraceVeil could not see (encrypted DNS, a hardcoded IP).
+     */
+    private fun dnsAnswers(bundle: AuditBundle, catalog: TrackerCatalog): JsonArray {
+        val byHost = sortedMapOf<String, MutableSet<String>>()
+        bundle.sessions.flatMap { it.netEvents }.forEach { e -> byHost.getOrPut(e.hostname.lowercase().trimEnd('.')) { sortedSetOf() } += e.answerIps }
+        return JsonArray(byHost.map { (host, ips) ->
+            buildJsonObject {
+                put("host", host)
+                put("entity", catalog.classify(host).entity?.let { JsonPrimitive(it) } ?: JsonNull)
+                put("ips", strings(ips))
             }
         })
     }
