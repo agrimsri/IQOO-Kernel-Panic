@@ -33,7 +33,10 @@ import com.dpdpxray.app.report.EvidenceReport
 import com.dpdpxray.app.report.HtmlExporter
 import com.dpdpxray.app.report.PdfExporter
 import com.dpdpxray.app.report.SampleReport
+import com.dpdpxray.core.attribution.SdkAttribution
+import com.dpdpxray.core.attribution.SdkGroup
 import com.dpdpxray.core.audit.PhaseAssigner
+import com.dpdpxray.core.export.SdkAttributionExport
 import com.dpdpxray.core.dpdp.Passage
 import com.dpdpxray.core.fixes.FixTemplate
 import com.dpdpxray.core.law.LegalLens
@@ -161,6 +164,12 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     fun delete(id: String) = viewModelScope.launch { graph.repository.delete(id) }
 
     fun fixesFor(bundle: AuditBundle): List<FixTemplate> = graph.fixCatalog.fixesFor(bundle.result, graph.catalog())
+
+    /** "Which SDK caused this?": the audit's lookups grouped by catalogue service, in order of the findings' weight. */
+    fun sdkGroups(bundle: AuditBundle): List<SdkGroup> =
+        runCatching { SdkAttribution(graph.catalog(), graph.fixCatalog).groups(bundle.result, bundle.sessions) }.getOrDefault(emptyList())
+
+    fun fixTemplate(id: String): FixTemplate? = graph.fixCatalog.template(id)
 
     suspend fun previousComparison(bundle: AuditBundle): AuditComparisonResult {
         val previousId = AuditComparison.previousId(bundle.meta, audits.value)
@@ -311,7 +320,12 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Audit data as a traceveil.audit.v1 JSON bundle for TraceVeil CI; it leaves the phone only when saved or shared. */
     fun exportAuditJson(bundle: AuditBundle, share: Boolean) = viewModelScope.launch {
-        val file = runCatching { withContext(Dispatchers.IO) { AuditJsonExport.write(bundle, BuildConfig.VERSION_NAME, lensProfile().name) } }
+        val groups = withContext(Dispatchers.Default) { sdkGroups(bundle) }
+        val file = runCatching {
+            withContext(Dispatchers.IO) {
+                AuditJsonExport.write(bundle, BuildConfig.VERSION_NAME, lensProfile().name, SdkAttributionExport(groups = groups))
+            }
+        }
             .getOrElse { _toast.value = "Could not build the audit data export"; return@launch }
         if (share) ExportManager.share(ctx, file, AuditJsonExport.MIME)
         else {

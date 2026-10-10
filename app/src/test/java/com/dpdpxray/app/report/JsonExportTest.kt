@@ -60,6 +60,17 @@ class JsonExportTest {
     }
 
     @Test
+    fun `the export can carry the SDK attribution, derived from the same audit`() {
+        val groups = com.dpdpxray.core.attribution.SdkAttribution(TrackerCatalog.loadDefault(), com.dpdpxray.core.fixes.FixCatalog.loadDefault())
+            .groups(result, sessions)
+        val export = com.dpdpxray.core.export.SdkAttributionExport(groups = groups)
+        val decoded = AuditBundles.decode(AuditBundles.encode(AuditJsonExport.build(bundle(), "1.1.0", sdkAttribution = export)))
+        assertEquals(export, decoded.sdkAttribution)
+        assertEquals(sessions, decoded.sessions)
+        assertNull(AuditBundles.decode(AuditBundles.encode(AuditJsonExport.build(bundle(), "1.1.0"))).sdkAttribution)
+    }
+
+    @Test
     fun `missing upload readings are exported as null, not as an empty measurement`() {
         val text = AuditBundles.encode(AuditJsonExport.build(bundle(), "1.1.0"))
         assertEquals(JsonNull, kotlinx.serialization.json.Json.parseToJsonElement(text).jsonObject["networkReadings"])
