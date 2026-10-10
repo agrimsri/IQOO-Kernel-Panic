@@ -98,6 +98,7 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
             privateDnsActive = DeviceChecks.privateDnsActive(ctx),
             modelFound = llmStatus.value !is LlmStatus.NoModel,
             modelLoaded = graph.llm.isReady,
+            otherVpnActive = DeviceChecks.otherVpnActive(ctx),
         )
     }
 

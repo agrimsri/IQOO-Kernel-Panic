@@ -180,7 +180,10 @@ private fun Explainer(
             if (!watcherOn) Callout("The TraceVeil watcher is off in Accessibility settings, so permission dialogs and settings screens will not be recorded. Network attempts still will.")
             if (label == null) Callout("This app is not installed on this phone.", color = Film.leak)
             (error ?: failure)?.let { Callout(it, color = Film.leak) }
-            if (!vpnReady) {
+            if (!vpnReady && com.dpdpxray.app.control.DeviceChecks.otherVpnActive(ctx)) {
+                Callout(com.dpdpxray.app.ui.AuditStartReadiness.OTHER_VPN)
+                PrimaryAction("Open VPN settings", { com.dpdpxray.app.control.DeviceChecks.openVpnSettings(ctx) })
+            } else if (!vpnReady) {
                 PrimaryAction("Allow VPN permission", { VpnService.prepare(ctx)?.let { vpnLauncher.launch(it) } ?: onRefresh() })
                 Note("Android asks once. In a quarantine run the VPN covers only the app you choose.")
             } else {

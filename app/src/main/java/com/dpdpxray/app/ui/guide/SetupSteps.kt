@@ -16,7 +16,8 @@ data class SetupItem(val kind: SetupKind, val need: SetupNeed, val done: Boolean
 /** Turns the existing readiness checks into one plain-language step each. Same checks, same meaning as before. */
 object SetupSteps {
     fun from(pf: Preflight): List<SetupItem> = listOf(
-        if (pf.vpnReady) SetupItem(SetupKind.VPN, SetupNeed.REQUIRED, true, "VPN allowed", "TraceVeil can watch the lookups of the app you check.", false)
+        if (pf.otherVpnActive) SetupItem(SetupKind.VPN, SetupNeed.REQUIRED, false, "Turn off your other VPN", "Android runs one VPN at a time. TraceVeil never switches yours off; turn it off for the check, then back on.", true)
+        else if (pf.vpnReady) SetupItem(SetupKind.VPN, SetupNeed.REQUIRED, true, "VPN allowed", "TraceVeil can watch the lookups of the app you check.", false)
         else SetupItem(SetupKind.VPN, SetupNeed.REQUIRED, false, "Allow the VPN", "Needed to watch the lookups of the app you check. Only that app.", true),
         if (pf.accessibilityOn) SetupItem(SetupKind.WATCHER, SetupNeed.REQUIRED, true, "Consent watcher on", "TraceVeil can see the consent popup during a check.", false)
         else SetupItem(SetupKind.WATCHER, SetupNeed.REQUIRED, false, "Turn on the consent watcher", "In Accessibility, switch on \"TraceVeil consent watcher\".", true),

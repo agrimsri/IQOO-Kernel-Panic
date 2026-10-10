@@ -122,7 +122,7 @@ fun HomeScreen(
     val running = progress as? AuditProgress.Running
     val fix: (SetupKind) -> Unit = { kind ->
         when (kind) {
-            SetupKind.VPN -> VpnService.prepare(ctx)?.let { vpnLauncher.launch(it) } ?: vm.refreshPreflight()
+            SetupKind.VPN -> if (DeviceChecks.otherVpnActive(ctx)) DeviceChecks.openVpnSettings(ctx) else VpnService.prepare(ctx)?.let { vpnLauncher.launch(it) } ?: vm.refreshPreflight()
             SetupKind.WATCHER -> DeviceChecks.openAccessibilitySettings(ctx)
             SetupKind.PRIVATE_DNS -> DeviceChecks.openPrivateDnsSettings(ctx)
             SetupKind.SHIZUKU -> vm.requestShizuku()

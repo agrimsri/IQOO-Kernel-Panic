@@ -21,6 +21,17 @@ class SetupAndRecentTest {
         }
     }
 
+    @Test fun `another app's VPN is never taken over, the user is asked to turn it off`() {
+        val other = Preflight(vpnReady = false, accessibilityOn = true, shizukuRunning = false, shizukuGranted = false,
+            privateDnsActive = false, modelFound = false, modelLoaded = false, otherVpnActive = true)
+        val vpn = SetupSteps.from(other).single { it.kind == SetupKind.VPN }
+        assertFalse(vpn.done)
+        assertEquals("Turn off your other VPN", vpn.title)
+        assertTrue(vpn.detail.contains("never switches yours off"))
+        assertEquals(com.dpdpxray.app.ui.AuditStartReadiness.OTHER_VPN, com.dpdpxray.app.ui.AuditStartReadiness.problem(other))
+        assertFalse(other.canAudit)
+    }
+
     @Test fun `todo lists required before recommended and skips optional`() {
         val todo = SetupSteps.todo(SetupSteps.from(pf(vpn = false, watcher = false, privateDns = true)))
         assertEquals(listOf(SetupKind.VPN, SetupKind.WATCHER, SetupKind.PRIVATE_DNS), todo.map { it.kind })

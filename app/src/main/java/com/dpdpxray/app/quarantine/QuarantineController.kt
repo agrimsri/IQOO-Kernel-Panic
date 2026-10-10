@@ -73,6 +73,7 @@ object QuarantineController {
         val app = context.applicationContext
         if (isActive) return "A quarantine run is already active. Stop it first."
         if (!QuarantineRoutes.isValidPackage(targetPackage) || targetPackage == app.packageName) return "This app cannot be quarantined."
+        if (com.dpdpxray.app.control.DeviceChecks.otherVpnActive(app)) return com.dpdpxray.app.ui.AuditStartReadiness.OTHER_VPN
         if (VpnService.prepare(app) != null) return "Allow the VPN permission first."
         val capture = CaptureBus.state.value
         if (capture is CaptureState.Running || capture is CaptureState.Starting || app.graph.orchestrator.progress.value is AuditProgress.Running) {
