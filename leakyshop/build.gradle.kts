@@ -22,6 +22,10 @@ android {
         //   TRACKERS_AFTER_REJECT  tracker lookups after "Reject all" (check C2)
         //   PRE_TICKED             the "Share usage data" box starts ticked (check C3)
         //   REJECT_ON_FIRST_SCREEN a Reject button on the first dialog instead of only behind "Manage" (check C4)
+        //   NAG_AFTER_REJECT       5 s after "Reject all", a second popup with a countdown, a big "Allow & save" button
+        //                          and a grey "No, I prefer paying more" text link (dark-pattern demo: nagging, false
+        //                          urgency, confirm shaming, interface interference). It contacts no host and the first
+        //                          popup is unchanged, so the score stays the same. leaky only.
         create("leaky") {
             dimension = "mode"
             buildConfigField("boolean", "COMPLIANT", "false")
@@ -29,6 +33,7 @@ android {
             buildConfigField("boolean", "TRACKERS_AFTER_REJECT", "true")
             buildConfigField("boolean", "PRE_TICKED", "true")
             buildConfigField("boolean", "REJECT_ON_FIRST_SCREEN", "false")
+            buildConfigField("boolean", "NAG_AFTER_REJECT", "true")
             resValue("string", "app_name", "LeakyShop")
         }
         create("fixed") {
@@ -39,6 +44,7 @@ android {
             buildConfigField("boolean", "TRACKERS_AFTER_REJECT", "false")
             buildConfigField("boolean", "PRE_TICKED", "false")
             buildConfigField("boolean", "REJECT_ON_FIRST_SCREEN", "true")
+            buildConfigField("boolean", "NAG_AFTER_REJECT", "false")
             resValue("string", "app_name", "LeakyShop Fixed")
         }
         // The demo UPDATE of the leaky build: same applicationId and debug signing, a higher versionCode, so
@@ -53,6 +59,7 @@ android {
             buildConfigField("boolean", "TRACKERS_AFTER_REJECT", "false")
             buildConfigField("boolean", "PRE_TICKED", "true")
             buildConfigField("boolean", "REJECT_ON_FIRST_SCREEN", "true")
+            buildConfigField("boolean", "NAG_AFTER_REJECT", "false")
             resValue("string", "app_name", "LeakyShop")
         }
     }
