@@ -74,104 +74,6 @@ val GuideLang.lessLabel: String get() = if (this == GuideLang.HI) "कम दि
 @Composable
 fun guideLang(): GuideLang = LocalGuide.current?.lang ?: GuideLang.EN
 
-/**
- * "Step N of M: what to do now". Reads the step aloud when spoken guidance is on and [speak] is true (screens whose
- * steps are already read by [GuideNarrator] pass false). The speaker and language buttons live on the banner itself.
- */
-@Composable
-fun GuideBanner(step: GuideStep, modifier: Modifier = Modifier, speak: Boolean = true, action: Pair<String, () -> Unit>? = null) {
-    val guide = LocalGuide.current
-    val lang = guide?.lang ?: GuideLang.EN
-    val spokenOn = guide?.spoken == true
-    val title = step.title.pick(lang)
-    val body = step.body.pick(lang)
-    val spokenText = step.spoken.pick(lang)
-    val speaker = guide?.speaker
-    if (speak && speaker != null) {
-        LaunchedEffect(step.key, spokenOn, lang) { if (spokenOn) speaker.say(step.key, spokenText, lang) }
-        DisposableEffect(step.key, speaker) { onDispose { speaker.stop(step.key) } }
-    }
-
-    val shape = RoundedCornerShape(Radii.card)
-    Row(
-        modifier.fillMaxWidth().clip(shape).background(Film.raised)
-            .semantics { liveRegion = LiveRegionMode.Polite },
-    ) {
-        Column(Modifier.weight(1f).padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StepTicks(step.index, step.total, step.tone)
-                Spacer(Modifier.width(10.dp))
-                Text(step.label(lang), style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
-                if (step.tone == GuideTone.WAIT) {
-                    Spacer(Modifier.width(8.dp))
-                    PulseDot()
-                }
-            }
-            AnimatedContent(
-                targetState = title to body,
-                transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(140)) },
-                label = "guide-step",
-            ) { (t, b) ->
-                Column {
-                    Text(t, style = MaterialTheme.typography.titleLarge, color = Film.bone, modifier = Modifier.padding(top = 6.dp))
-                    // Text diet: the first sentence shows; the rest folds behind "More" (the speaker still reads it all).
-                    if (b.isNotBlank()) FoldText(b, Modifier.padding(top = 4.dp), moreLabel = lang.moreLabel, lessLabel = lang.lessLabel)
-                }
-            }
-            if (spokenOn) guide.note?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Film.warn, modifier = Modifier.padding(top = 6.dp)) }
-            if (action != null) {
-                Spacer(Modifier.height(10.dp))
-                PillButton(action.first, action.second)
-            }
-        }
-        if (guide != null) {
-            Column(Modifier.padding(top = 4.dp, end = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                // Reads this step once when tapped. Reading every step automatically is a separate choice in Settings.
-                SpeakerToggle(spokenOn) { speaker?.sayNow(step.key, spokenText, lang) }
-                LanguageToggle(lang) { guide.setLang(it) }
-            }
-        }
-    }
-}
-
-/** Progress as small ticks: done steps dim, the current one in its tone colour, the rest as outlines. */
-@Composable
-private fun StepTicks(index: Int, total: Int, tone: GuideTone) {
-    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        (1..total).forEach { i ->
-            val target = when {
-                i < index -> Film.boneDim.copy(alpha = 0.55f)
-                i == index -> when (tone) { GuideTone.ACTION -> Brand.coral; GuideTone.CAUTION -> Film.warn; GuideTone.DONE -> Film.clear; else -> Film.scan }
-                else -> Film.line
-            }
-            val color by animateColorAsState(target, tween(300), label = "tick")
-            Box(Modifier.size(width = if (i == index) 18.dp else 10.dp, height = 4.dp).clip(CircleShape).background(color))
-        }
-    }
-}
-
-@Composable
-private fun PulseDot() {
-    BreathingDot(Film.scan, size = 7.dp)
-}
-
-@Composable
-fun SpeakerToggle(on: Boolean, onChange: (Boolean) -> Unit) {
-    val bg by animateColorAsState(if (on) Brand.coral.copy(alpha = 0.16f) else Film.raised.copy(alpha = 0f), tween(200), label = "speaker")
-    Box(
-        Modifier.size(48.dp).toggleable(value = on, role = Role.Button, onValueChange = onChange)
-            .semantics {
-                contentDescription = "Read this step aloud"
-                stateDescription = if (on) "Every step is read automatically" else "Tap to hear this step"
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(Modifier.size(38.dp).clip(CircleShape).background(bg), contentAlignment = Alignment.Center) {
-            GlyphIcon(if (on) Glyph.SPEAKER_ON else Glyph.SPEAKER_OFF, if (on) Brand.coral else Film.boneDim, size = 22.dp)
-        }
-    }
-}
-
 @Composable
 fun LanguageToggle(lang: GuideLang, onChange: (GuideLang) -> Unit) {
     val next = if (lang == GuideLang.EN) GuideLang.HI else GuideLang.EN
@@ -181,19 +83,6 @@ fun LanguageToggle(lang: GuideLang, onChange: (GuideLang) -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(if (lang == GuideLang.EN) "हि" else "EN", style = MaterialTheme.typography.labelLarge, color = Film.scan)
-    }
-}
-
-/** Compact outlined action used inside banners and panels; 48dp tall. */
-@Composable
-fun PillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(24.dp)
-    Box(
-        modifier.heightIn(min = 48.dp).clip(shape).border(1.dp, Film.scan.copy(alpha = 0.7f), shape)
-            .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 18.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text, style = MaterialTheme.typography.labelLarge, color = Film.scan)
     }
 }
 

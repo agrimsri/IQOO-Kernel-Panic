@@ -209,7 +209,8 @@ fun FoldText(
     lessLabel: String = "Less",
 ) {
     val lead = remember(text) { leadSentence(text) }
-    val multi = lead.length < text.trim().length
+    // Short text is shown in full; only text longer than FOLD_ABOVE characters folds behind More.
+    val multi = text.trim().length > FOLD_ABOVE && lead.length < text.trim().length
     var clipped by remember(text) { mutableStateOf(false) }
     var open by rememberSaveable(text) { mutableStateOf(false) }
     Column(modifier.fillMaxWidth().animateContentSize(foldSpec())) {
@@ -217,7 +218,7 @@ fun FoldText(
             Text(text, style = style, color = color)
         } else {
             Text(
-                if (multi) lead else text, style = style, color = color, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
+                if (multi) lead else text, style = style, color = color, maxLines = if (multi) maxLines else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis,
                 onTextLayout = { if (it.hasVisualOverflow && !clipped) clipped = true },
             )
         }
@@ -369,7 +370,7 @@ fun Hairline(modifier: Modifier = Modifier) {
 fun SwitchRow(title: String, detail: String?, checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val full = detail?.trim()
     val lead = full?.let { remember(it) { leadSentence(it) } }
-    val multi = full != null && lead != null && lead.length < full.length
+    val multi = full != null && lead != null && full.length > FOLD_ABOVE && lead.length < full.length
     var clipped by remember(full) { mutableStateOf(false) }
     var open by rememberSaveable(title) { mutableStateOf(false) }
     Column(modifier.fillMaxWidth().animateContentSize(foldSpec())) {
@@ -384,7 +385,7 @@ fun SwitchRow(title: String, detail: String?, checked: Boolean, onChange: (Boole
                 if (full != null && lead != null) {
                     if (open) Text(full, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
                     else Text(
-                        lead, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        if (multi) lead else full, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, maxLines = if (multi) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis,
                         onTextLayout = { if (it.hasVisualOverflow && !clipped) clipped = true },
                     )
                 }
@@ -432,3 +433,6 @@ fun EmptyHint(text: String, modifier: Modifier = Modifier, glyph: Glyph = Glyph.
         Text(text, style = MaterialTheme.typography.bodyMedium, color = color)
     }
 }
+
+/** Text up to this many characters is shown in full; longer text shows its first sentence and folds the rest behind More. */
+internal const val FOLD_ABOVE = 220

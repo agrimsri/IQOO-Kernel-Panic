@@ -77,7 +77,6 @@ import com.dpdpxray.app.ui.components.reveal
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.guide.GradientAction
-import com.dpdpxray.app.ui.guide.GuideBanner
 import com.dpdpxray.app.ui.guide.GuideFlow
 import com.dpdpxray.app.ui.guide.SpeakStep
 import com.dpdpxray.app.ui.system.SearchField
@@ -261,7 +260,7 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, preferPreview: 
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CheckSheetTitle("Check ${app.label}")
-        GuideBanner(GuideFlow.pickerSetup(fullAvailable = freshReset), Modifier.reveal(0))
+        SpeakStep(GuideFlow.pickerSetup(fullAvailable = freshReset))
         if (shizukuReady) Toggle("Allow clearing this test app's local data", "Developer testing only. Removes its saved state, accounts and settings before each run. Leave off for personal apps.", allowReset) {
             allowReset = it
             if (!it) full = false

@@ -109,7 +109,6 @@ import com.dpdpxray.app.ui.system.PrimaryButton
 import com.dpdpxray.app.ui.system.StatusDot
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
-import com.dpdpxray.app.ui.guide.GuideBanner
 import com.dpdpxray.app.ui.guide.NextAction
 import com.dpdpxray.app.ui.guide.Panel
 import com.dpdpxray.app.ui.guide.ResultFacts

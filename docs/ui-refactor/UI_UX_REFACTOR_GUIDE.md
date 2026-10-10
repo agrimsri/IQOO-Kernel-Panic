@@ -714,3 +714,26 @@ GuideFlow,ResultGuide,SetupSteps}.kt`, `ui/shell/{AppShell,ScreenMotion}.kt`, `u
 ResultScreens,ToolScreens,AppPickerScreen,LiveAuditScreen}.kt`, `ui/modes/*`, `ui/onboarding/*`,
 `apkguard/ApkGuardScreens.kt`, `autoguard/CheckupScreen.kt`, `quarantine/QuarantineScreen.kt`, `voice/VoiceCopilotScreen.kt`,
 `trust/*`, `MainActivity.kt`.
+
+---
+
+## 14. Implementation status (branch `ui-refactor`)
+
+| Phase | State | Commit |
+|---|---|---|
+| 0 Baseline | Done | `475e7f9` |
+| 1 Tokens and shell | Done: light/dark palettes, Inter, flat components, new tab bar, `ui/system` kit, `PaletteContrastTest` | `f487144` |
+| 2 Home, Setup sheet, onboarding | Done: one Home for both modes, Setup sheet, three-page onboarding, global language and voice menu | `cb586ca` |
+| 3 Result family | Done: score hero, one primary action, findings list, caveats as notices, legal lens moved into Evidence and limits | `c1435a5` |
+| 4 Hubs and lists | Done: four tabs (APK Guard under Check, decision D1), flat picker and APK Guard hub, Reports filter, grouped More | `68f8676` |
+| 5 Flows | Partly done: live audit calmed, guide banners retired everywhere (spoken guidance kept through `SpeakStep`) | see git log |
+| 6 Clean-up | Partly done: dead components removed (`GuideBanner`, `ModePill`, onboarding art), short text now shows in full, only text over 220 characters folds | see git log |
+
+Not done, still to do:
+
+* **Camera check, voice copilot, quarantine run, phone checkup, Trust screen, AI lab, finding detail, Fixes, Report preview** keep their old structure. They pick up the new colours, type, flat cards and buttons through the shared components, but have not been rebuilt to the layouts in section 7 (7.6, 7.7, 7.13, 7.14).
+* **Settings** keeps its card layout (Mode, Display, Checks, Legal lens, Voice, Auto-guard, domains, Advanced, Privacy). Regrouping into the section 7.12 list style is open.
+* **Folding:** `FoldText` call sites are still about 46; the target of 10 needs per-screen copy edits, not a global rule.
+* **Entrance fade** (`reveal`) is still called about 87 times, but it is now one short fade. Remove the calls screen by screen.
+* **Verification not yet done:** TalkBack pass, 200 % font scale, stage mode, Hindi layouts, dark mode on every screen (only Home and onboarding were checked in dark), and the screens that need the VPN and consent watcher (live audit, finding detail, quarantine).
+* **Tests:** two `CliAuditTest` tests fail. They sit in the CLI work that was already uncommitted on this branch and are unrelated to the UI. `BrandPaletteTest` (map palette) still passes unchanged.
