@@ -1,5 +1,7 @@
 package com.dpdpxray.core.report
 
+import com.dpdpxray.core.darkpattern.DarkPatternScanner
+import com.dpdpxray.core.darkpattern.DarkPatternText
 import com.dpdpxray.core.dpdp.CitationService
 import com.dpdpxray.core.fixes.FixTemplate
 import com.dpdpxray.core.law.LegalLens
@@ -10,6 +12,7 @@ import com.dpdpxray.core.law.PassageKind
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.ConsentKind
+import com.dpdpxray.core.model.EvidenceType
 import com.dpdpxray.core.model.ScoreBand
 import kotlinx.serialization.json.Json
 import java.time.Instant
@@ -113,6 +116,8 @@ object MarkdownReport {
             }
         }
 
+        darkPatternSection(sessions)
+
         if (fixes.isNotEmpty()) {
             appendLine()
             appendLine("## How to fix")
@@ -155,6 +160,35 @@ object MarkdownReport {
         appendLine()
         appendLine("---")
         appendLine("*$DISCLAIMER*")
+    }
+
+    /** Dark-pattern signals (India CCPA 2023): their own section, apart from the scored findings. */
+    private fun StringBuilder.darkPatternSection(sessions: List<AuditSession>) {
+        val signals = DarkPatternScanner.scan(sessions)
+        val summary = DarkPatternText.summary(signals, DarkPatternScanner.screensChecked(sessions))
+        appendLine()
+        appendLine("## ${DarkPatternText.CARD_TITLE}")
+        appendLine()
+        appendLine(if (signals.isEmpty()) "$summary." else "$summary. Not counted in the score.")
+        for (s in signals) {
+            appendLine()
+            appendLine("### ${DarkPatternText.rowTitle(s)}")
+            appendLine("*${DarkPatternText.chip(s)} · ${DarkPatternText.plans(s)}*")
+            appendLine()
+            appendLine(DarkPatternText.resembles(s))
+            appendLine()
+            s.evidence.forEach { appendLine("- $it") }
+            appendLine()
+            appendLine("> ${s.pattern.definition}")
+            appendLine(">")
+            appendLine("> — ${DarkPatternText.SOURCE_TITLE} #${s.pattern.number} (${DarkPatternText.SOURCE_URL})")
+        }
+        if (signals.any { it.evidenceType == EvidenceType.INFERRED }) {
+            appendLine()
+            appendLine("*${DarkPatternText.AI_NOTE}*")
+        }
+        appendLine()
+        appendLine("*${DarkPatternText.FOOTER}*")
     }
 
     private fun StringBuilder.quote(c: LensPassage) {

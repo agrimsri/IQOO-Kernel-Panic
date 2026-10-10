@@ -4,6 +4,7 @@ import com.dpdpxray.app.data.AuditBundle
 import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.data.SessionNetworkReadings
 import com.dpdpxray.core.datasafety.PlayLabelExport
+import com.dpdpxray.core.darkpattern.DarkPatternExport
 import com.dpdpxray.core.export.AuditBundleV1
 import com.dpdpxray.core.export.AuditBundles
 import com.dpdpxray.core.export.BundleApp
@@ -28,11 +29,14 @@ object AuditJsonExport {
      * [legalProfile] is the lens selected in Settings (a LegalProfile name); it is recorded, never applied to the evidence.
      * [sdkAttribution] is the optional "Which SDK caused this?" grouping, derived from the same sessions and result.
      * [playLabel] is the attached Play Data safety text; by default the label alone (the Report screen adds its comparison).
+     * [darkPatterns] is the optional dark-pattern signals part (India CCPA 2023), derived from the same sessions; it never
+     * changes the result.
      */
     fun build(
         bundle: AuditBundle, versionName: String, exportedAt: String = AuditBundles.now(), legalProfile: String? = null,
         sdkAttribution: SdkAttributionExport? = null,
         playLabel: PlayLabelExport? = bundle.playLabel?.let { PlayLabelExport.of(it, null) },
+        darkPatterns: DarkPatternExport? = null,
     ): AuditBundleV1 =
         AuditBundles.audit(
             app = BundleApp(bundle.meta.targetPackage, bundle.meta.targetLabel),
@@ -48,6 +52,7 @@ object AuditJsonExport {
             legalProfile = legalProfile,
             sdkAttribution = sdkAttribution,
             playLabel = playLabel,
+            darkPatterns = darkPatterns,
         )
 
     /** Audit ids already say what they are ("audit-<ms>", "sample-<ms>"): TraceVeil-audit-1791595268053.json. */
@@ -56,10 +61,11 @@ object AuditJsonExport {
     fun write(
         bundle: AuditBundle, versionName: String, legalProfile: String? = null, sdkAttribution: SdkAttributionExport? = null,
         playLabel: PlayLabelExport? = bundle.playLabel?.let { PlayLabelExport.of(it, null) },
+        darkPatterns: DarkPatternExport? = null,
     ): File =
         File(bundle.dir, fileName(bundle.meta)).apply {
             writeText(
-                AuditBundles.encode(build(bundle, versionName, legalProfile = legalProfile, sdkAttribution = sdkAttribution, playLabel = playLabel)),
+                AuditBundles.encode(build(bundle, versionName, legalProfile = legalProfile, sdkAttribution = sdkAttribution, playLabel = playLabel, darkPatterns = darkPatterns)),
                 Charsets.UTF_8,
             )
         }

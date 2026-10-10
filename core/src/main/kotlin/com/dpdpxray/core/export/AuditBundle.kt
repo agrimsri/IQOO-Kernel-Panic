@@ -2,6 +2,7 @@ package com.dpdpxray.core.export
 
 import com.dpdpxray.core.attribution.SdkGroup
 import com.dpdpxray.core.datasafety.PlayLabelExport
+import com.dpdpxray.core.darkpattern.DarkPatternExport
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.ScoreBand
@@ -39,6 +40,8 @@ import java.time.temporal.ChronoUnit
  * from "sessions" and "result" with TraceVeil's tracker catalogue and adds no new evidence. "playLabel" (optional, omitted
  * when unset) is the Google Play Data safety text a person attached to the audit and, when computed, its comparison with
  * the bundle's lookups; it is separate from the score and never changes "result".
+ * "darkPatterns" (optional, omitted when unset) lists the dark-pattern signals (India CCPA 2023) read from the same
+ * sessions' consent-screen trees and taps; they are signals for review, never findings, and never change "result".
  */
 
 /** The audited app named at the top of a bundle. */
@@ -69,6 +72,8 @@ data class AuditBundleV1(
     val sdkAttribution: SdkAttributionExport? = null,
     /** "Play label vs what this check saw": the attached Data safety text and its comparison. Not written when null. */
     val playLabel: PlayLabelExport? = null,
+    /** Dark-pattern signals (India CCPA 2023), derived on the phone from [sessions]; never part of [result]. Not written when null. */
+    val darkPatterns: DarkPatternExport? = null,
 )
 
 /**
@@ -150,10 +155,11 @@ object AuditBundles {
         legalProfile: String? = null,
         sdkAttribution: SdkAttributionExport? = null,
         playLabel: PlayLabelExport? = null,
+        darkPatterns: DarkPatternExport? = null,
     ) = AuditBundleV1(
         exportedAt = exportedAt, app = app, meta = meta, sessions = sessions, result = result,
         networkReadings = networkReadings, tool = BundleTool(TOOL_NAME, toolVersion), note = note, legalProfile = legalProfile,
-        sdkAttribution = sdkAttribution, playLabel = playLabel,
+        sdkAttribution = sdkAttribution, playLabel = playLabel, darkPatterns = darkPatterns,
     )
 
     fun quarantine(report: QuarantineReport, exportedAt: String = now(), note: String? = null) =
@@ -203,7 +209,7 @@ object AuditBundles {
         return JsonObject(obj.filterNot { (k, v) -> k in OPTIONAL_TOP_LEVEL && v == JsonNull })
     }
 
-    private val OPTIONAL_TOP_LEVEL = setOf("note", "legalProfile", "sdkAttribution", "playLabel")
+    private val OPTIONAL_TOP_LEVEL = setOf("note", "legalProfile", "sdkAttribution", "playLabel", "darkPatterns")
 
     private fun expectSchema(text: String, expected: String): JsonObject {
         val parsed = try {

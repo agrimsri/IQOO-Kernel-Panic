@@ -183,6 +183,6 @@ class ModelCompatibilityTest {
             CheckId.entries.map { it.name },
         )
         CheckId.entries.forEach { assertEquals(it.name, it.code) }
-        assertEquals(listOf("SCREEN_APPEARED", "ACCEPT", "REJECT", "SETTINGS", "MANUAL_MARK", "PERMISSION_DIALOG"), ConsentKind.entries.map { it.name })
+        assertEquals(listOf("SCREEN_APPEARED", "ACCEPT", "REJECT", "SETTINGS", "MANUAL_MARK", "PERMISSION_DIALOG", "REPROMPT"), ConsentKind.entries.map { it.name })
     }
 }
