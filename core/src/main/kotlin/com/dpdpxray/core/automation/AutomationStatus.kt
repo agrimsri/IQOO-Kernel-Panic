@@ -46,6 +46,8 @@ data class AutomationStatus(
     val score: Int? = null,
     val band: String? = null,
     val findingCount: Int? = null,
+    /** [BundleSignatures] HMAC of bundle.json, set with "done". */
+    val bundleSignature: String? = null,
     val startedAt: String,
     val updatedAt: String,
     val finishedAt: String? = null,
@@ -76,11 +78,15 @@ object AutomationStatuses {
 
     fun step(status: AutomationStatus, step: String, nowMs: Long) = status.copy(step = step, updatedAt = timestamp(nowMs))
 
-    fun done(status: AutomationStatus, auditId: String, score: Int?, band: String, findingCount: Int, nowMs: Long): AutomationStatus {
+    fun done(
+        status: AutomationStatus, auditId: String, score: Int?, band: String, findingCount: Int, nowMs: Long,
+        bundleSignature: String? = null,
+    ): AutomationStatus {
         val at = timestamp(nowMs)
         return status.copy(
             state = RunState.DONE, reason = null, reasonCode = null, fix = null, step = "Finished and saved",
-            auditId = auditId, score = score, band = band, findingCount = findingCount, updatedAt = at, finishedAt = at,
+            auditId = auditId, score = score, band = band, findingCount = findingCount, bundleSignature = bundleSignature,
+            updatedAt = at, finishedAt = at,
         )
     }
 

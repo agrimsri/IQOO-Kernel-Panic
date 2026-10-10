@@ -99,6 +99,25 @@ class AutomationStatusTest {
         assertEquals(120, PairingTokens.ENTROPY_BITS)
     }
 
+    @Test fun `the bundle signature binds bundle json to the pairing token`() {
+        val token = PairingTokens.generate(Random(2))
+        val bundle = "{\"schema\": \"traceveil.audit.v1\"}\n".toByteArray()
+        val sig = BundleSignatures.sign(token, bundle)
+        assertTrue(sig, Regex("[0-9a-f]{64}").matches(sig))
+        assertTrue(BundleSignatures.verify(token, bundle, sig))
+        assertFalse("another token", BundleSignatures.verify(PairingTokens.generate(Random(3)), bundle, sig))
+        assertFalse("a changed byte", BundleSignatures.verify(token, bundle.copyOf().also { it[3] = 'X'.code.toByte() }, sig))
+        assertFalse("no signature", BundleSignatures.verify(token, bundle, null))
+        assertFalse("not hex", BundleSignatures.verify(token, bundle, "zz"))
+        // RFC 4231 test case 2: HMAC-SHA256 with key "Jefe".
+        assertEquals("5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843",
+            BundleSignatures.sign("Jefe", "what do ya want for nothing?".toByteArray()))
+
+        val running = AutomationStatuses.running(request, resetAppData = true, startedMs = started, appVersion = "1.1.0")
+        val done = AutomationStatuses.done(running, "audit-1", 21, "AT_RISK", 5, started, bundleSignature = sig)
+        assertEquals(sig, AutomationStatuses.decode(AutomationStatuses.encode(done)).bundleSignature)
+    }
+
     @Test fun `token comparison needs an exact match`() {
         val t = PairingTokens.generate(Random(1))
         assertTrue(PairingTokens.matches(t, t))

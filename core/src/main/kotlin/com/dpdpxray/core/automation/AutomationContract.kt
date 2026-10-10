@@ -4,6 +4,8 @@ import com.dpdpxray.core.model.AuditPlan
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Random
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 /*
  * TraceVeil Runner: a developer starts a consent audit on a USB-connected test phone from a laptop or CI runner
@@ -85,5 +87,24 @@ object PairingTokens {
     fun matches(expected: String?, presented: String?): Boolean {
         if (expected.isNullOrEmpty() || presented.isNullOrEmpty()) return false
         return MessageDigest.isEqual(expected.toByteArray(Charsets.UTF_8), presented.toByteArray(Charsets.UTF_8))
+    }
+}
+
+/**
+ * HMAC-SHA256 of bundle.json's exact bytes, keyed with the pairing token that started the run. The phone puts it in
+ * the "done" status; the laptop recomputes it, so a bundle.json written by anything that does not know the token (for
+ * example another app with shell rights through Shizuku) is rejected instead of gated.
+ */
+object BundleSignatures {
+    fun sign(token: String, bundle: ByteArray): String {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(token.toByteArray(Charsets.UTF_8), "HmacSHA256"))
+        return mac.doFinal(bundle).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    }
+
+    /** Constant-time comparison; a missing or malformed signature never verifies. */
+    fun verify(token: String, bundle: ByteArray, signature: String?): Boolean {
+        if (signature == null || !Regex("[0-9a-f]{64}").matches(signature)) return false
+        return MessageDigest.isEqual(sign(token, bundle).toByteArray(Charsets.US_ASCII), signature.toByteArray(Charsets.US_ASCII))
     }
 }
