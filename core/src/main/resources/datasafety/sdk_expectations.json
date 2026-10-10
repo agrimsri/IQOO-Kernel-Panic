@@ -1,0 +1,60 @@
+[
+  {"entity": "Google Analytics for Firebase",
+   "sourceTitle": "Google Analytics Help: Prepare for Google Play's data disclosure requirements",
+   "sourceUrl": "https://support.google.com/analytics/answer/11582702",
+   "checked": "2026-10-11",
+   "types": [
+     {"category": "DEVICE_OR_OTHER_IDS", "quote": "Collects the Android Advertising ID"},
+     {"category": "APP_ACTIVITY", "quote": "Collects screen views and sessions for use in Reporting and Analysis."},
+     {"category": "LOCATION", "quote": "Derives coarse location data from the masked IP addresses of the device."}
+   ],
+   "note": "The page also says the developer is \"solely responsible for deciding how to respond to Google Play's Data safety section form\". With consent mode's analytics_storage denied, Google's consent-mode page (updated 2026-07-30) says the SDK \"Won't read or write first-party analytics cookies or app identifiers\" while \"signals (apps) will be sent\", so a lookup after Reject is not by itself an identifier."},
+  {"entity": "Firebase Crashlytics",
+   "sourceTitle": "Firebase: Google Play's data disclosure requirements for Firebase Android SDKs",
+   "sourceUrl": "https://firebase.google.com/docs/android/play-data-disclosure",
+   "checked": "2026-10-11",
+   "types": [
+     {"category": "APP_INFO_AND_PERFORMANCE", "quote": "Collects stack traces when an application crashes."},
+     {"category": "DEVICE_OR_OTHER_IDS", "quote": "Generates and stores the Crashlytics installation UUID to measure the number of users impacted by a crash."}
+   ],
+   "note": "The page says: \"Firebase does not transfer this data to third-parties except:\" to its subprocessors and as the developer instructs. It does not use Play's category names; the mapping is TraceVeil's reading."},
+  {"entity": "Google Ads / AdMob",
+   "sourceTitle": "Google Mobile Ads SDK: Google Play data disclosure",
+   "sourceUrl": "https://developers.google.com/admob/android/privacy/play-data-disclosure",
+   "checked": "2026-10-11",
+   "sharesPerSource": true,
+   "sharesQuote": "collects and shares the following data types automatically for advertising, analytics, and fraud prevention purposes.",
+   "types": [
+     {"category": "DEVICE_OR_OTHER_IDS", "quote": "Collects Android advertising (ad) ID"},
+     {"category": "APP_ACTIVITY", "quote": "Collects user product interactions and interaction information, including app launch, taps, and video views."},
+     {"category": "APP_INFO_AND_PERFORMANCE", "quote": "Diagnostic information ... including app launch time, hang rate, and energy usage"},
+     {"category": "LOCATION", "quote": "Collects device's IP address, which may be used to estimate the general location of a device."}
+   ]},
+  {"entity": "Meta (Facebook SDK)",
+   "sourceTitle": "Meta for Developers: Resources for completing app store data practice questionnaires for apps that include the Facebook or Audience Network SDK (18 Jul 2022)",
+   "sourceUrl": "https://developers.facebook.com/blog/post/2022/07/18/resources-for-completing-app-store-data-practice-questionnaires-apps-facebook-or-audience-network-sdk",
+   "checked": "2026-10-11",
+   "types": [
+     {"category": "DEVICE_OR_OTHER_IDS", "quote": "We may also receive and process the following information if your app is integrated with the Facebook SDK: ... Device identifiers;"},
+     {"category": "APP_ACTIVITY", "quote": "there are app events that are automatically logged (app installs, app launches, and in-app purchases)"}
+   ],
+   "note": "The post does not use Play's category names; the mapping is TraceVeil's reading. Automatic app event logging can be turned off by the developer."},
+  {"entity": "Meta Audience Network",
+   "sourceTitle": "Meta for Developers: Resources for completing app store data practice questionnaires for apps that include the Facebook or Audience Network SDK (18 Jul 2022)",
+   "sourceUrl": "https://developers.facebook.com/blog/post/2022/07/18/resources-for-completing-app-store-data-practice-questionnaires-apps-facebook-or-audience-network-sdk",
+   "checked": "2026-10-11",
+   "types": [
+     {"category": "DEVICE_OR_OTHER_IDS", "quote": "We may receive and process the following information when you use the Audience Network SDK ... Device identifiers;"},
+     {"category": "APP_ACTIVITY", "quote": "Ad performance information, such as impressions, clicks, placement, and viewability."}
+   ],
+   "note": "The post does not use Play's category names; the mapping is TraceVeil's reading."},
+  {"entity": "AppsFlyer",
+   "sourceTitle": "AppsFlyer Android SDK reference (AppsFlyerLib)",
+   "sourceUrl": "https://dev.appsflyer.com/hc/docs/android-sdk-reference-appsflyerlib",
+   "checked": "2026-10-11",
+   "types": [
+     {"category": "DEVICE_OR_OTHER_IDS", "quote": "Disables collection of various Advertising IDs by the SDK. ... This includes Google Advertising ID (GAID), OAID and Amazon Advertising ID (AAID)."},
+     {"category": "APP_ACTIVITY", "quote": "Log an in-app event."}
+   ],
+   "note": "The first quote describes the switch that turns advertising-ID collection off, so it applies unless the app uses that switch; in-app events are sent when the app logs them. AppsFlyer's own Data safety help article (support.appsflyer.com/hc/en-us/articles/4417197430289) could not be read (HTTP 403), so it is not used."}
+]
