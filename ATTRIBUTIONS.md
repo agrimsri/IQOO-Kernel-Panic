@@ -81,3 +81,15 @@ CleverTap is deliberately unresolved (three entities in three countries, no head
 | Tested 10 October 2026 | Two real calls through the app's own `SarvamTts` code, with the real grounded answers: English (497 characters, request `20261010_73884898-bf84-475b-8666-9c7884686da7`, about 32 s of 22,050 Hz mono 16-bit WAV) and Hindi (101 characters, request `20261010_dc25fd6b-1ef9-452f-a25b-60059e3db971`, about 11 s). About 600 characters in total, roughly ₹1.8 at the listed price. Not yet confirmed on the phone: audible playback of the online voice. |
 | Not yet read | Sarvam's terms, data-retention and training policy. **No team sign-off is recorded.** Do not describe the product as "uploads nothing" while this is enabled, and do not enable it for a real-app audit. |
 
+
+## Trained models: datasets and derived weights — 10 October 2026
+
+Raw data is not in Git or the APK; only the trained weights are bundled. Full details, citations and SHA-256 values are in [ml/DATA_SOURCES.md](ml/DATA_SOURCES.md); licences were read on 10 October 2026.
+
+| Material | Source / terms | Handling |
+| --- | --- | --- |
+| NATICUSdroid (training) and TUANDROMD (cross-dataset test) | UCI Machine Learning Repository, DOIs 10.24432/C5FS64 and 10.24432/C5560H; both CC BY 4.0 | Credited in `core/src/main/resources/ml/apk_permission_risk.json` and the model card, with the changes we made (name normalisation, dropped columns). |
+| EasyPrivacy and EasyList | The EasyList authors (https://easylist.to/); dual GPL-3.0-or-later / CC BY-SA 3.0, used under CC BY-SA 3.0 | Attribution "The EasyList authors (https://easylist.to/)". The derived `core/src/main/resources/ml/tracker_hostname.json` is shared under CC BY-SA 3.0, not MIT. |
+| Majestic Million | Majestic (https://majestic.com/); CC BY 3.0 | Attribution to Majestic in the TrackerLens weights file and model card. |
+| AOSP platform manifests; Public Suffix List | Apache-2.0; MPL-2.0 | Training only (permission names and levels; registrable-domain grouping). Nothing from them is shipped. |
+| DuckDuckGo Tracker Radar | CC BY-NC-SA 4.0 | Considered, **not used** (non-commercial only). |
