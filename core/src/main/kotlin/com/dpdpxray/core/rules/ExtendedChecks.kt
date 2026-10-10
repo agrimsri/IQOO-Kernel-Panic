@@ -132,11 +132,12 @@ internal class ExtendedChecks(
         return Finding(
             checkId = CheckId.C13, severity = Severity.LOW, evidenceType = EvidenceType.INFERRED, title = CheckId.C13.title,
             explanation = "The app's installed manifest bundles ${on.joinToString { it.entry.entity }} and leaves their " +
-                "documented data-collection switches at the default, which is on. Per each vendor's documentation the SDK " +
-                "then starts collecting when the app opens, before any consent choice the app later shows; the vendors " +
-                "document a manifest switch to wait for consent. The manifest facts were read on this phone (observed); what " +
-                "the SDK does with them comes from vendor documentation (inferred). A call in the app's own code could change " +
-                "the setting after launch, which TraceVeil cannot see. Payloads were not inspected.",
+                "documented data-collection switches at the default, which is on. Per each vendor's documentation this then " +
+                "runs automatically from app launch instead of waiting for a consent choice (" +
+                on.joinToString("; ") { "${it.entry.entity}: ${it.entry.collection.replaceFirstChar { c -> c.lowercase() }}" } +
+                "), and the vendors document these switches for waiting until the user consents. The manifest facts were " +
+                "read on this phone (observed); what the SDK does with them comes from vendor documentation (inferred). A call " +
+                "in the app's own code could change the setting after launch, which TraceVeil cannot see. Payloads were not inspected.",
             evidence = evidence.take(RulesEngine.MAX_EVIDENCE),
             plans = plans.filter { it.session.manifestFacts != null }.map { it.session.plan }.distinct(),
             dpdpRefs = listOf("s6(1)"),

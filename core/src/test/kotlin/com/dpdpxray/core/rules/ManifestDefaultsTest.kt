@@ -94,6 +94,8 @@ class ManifestDefaultsTest {
         assertEquals(PenaltyBand.NONE, c13.penaltyBand)
         assertEquals(listOf("s6(1)"), c13.dpdpRefs)
         assertEquals(listOf("Google Analytics for Firebase", "Firebase Crashlytics", "Meta (Facebook SDK)"), c13.entities)
+        assertTrue(c13.explanation, c13.explanation.contains("(Google Analytics for Firebase: analytics data collection; Firebase Crashlytics: " +
+            "automatic crash-report collection; Meta (Facebook SDK): automatic SDK start-up and app-event logging)"))
         val fa = c13.evidence.first()
         assertTrue(fa, fa.startsWith("Google Analytics for Firebase: bundled (installed manifest declares com.google.android.gms.measurement.AppMeasurementJobService"))
         assertTrue(fa, fa.contains("firebase_analytics_collection_enabled not declared, so Analytics collection is on from launch"))
