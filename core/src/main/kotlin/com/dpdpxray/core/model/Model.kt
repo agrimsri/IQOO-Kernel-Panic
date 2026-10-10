@@ -2,10 +2,23 @@ package com.dpdpxray.core.model
 
 import kotlinx.serialization.Serializable
 
-/** What a contacted host is used for. TRACKING_CATEGORIES are the ones DPDP consent checks care about. */
+/**
+ * What a contacted host is used for. TRACKING_CATEGORIES are the ones DPDP consent checks care about.
+ * Saved audits store these by name: add new values at the end and never rename one.
+ */
 @Serializable
 enum class Category {
-    ANALYTICS, ADVERTISING, ATTRIBUTION, SOCIAL, CRASH_REPORTING, ENGAGEMENT, FIRST_PARTY, UNKNOWN;
+    ANALYTICS, ADVERTISING, ATTRIBUTION, SOCIAL, CRASH_REPORTING, ENGAGEMENT, FIRST_PARTY, UNKNOWN,
+
+    /** Serves images, video or static files (a content CDN). Not tracking by itself. */
+    CONTENT_DELIVERY,
+
+    /**
+     * A catalogued analytics, advertising or social service run by the same company that publishes the audited app
+     * (for example Meta servers contacted by Instagram). First-party data collection by the app's own company, not a
+     * third-party tracker. Assigned in context by the rules engine, never by the catalogue alone.
+     */
+    FIRST_PARTY_SAME_COMPANY;
 
     val isTracking: Boolean get() = this in TRACKING_CATEGORIES
 
@@ -151,6 +164,11 @@ data class AuditSession(
     val notes: List<String> = emptyList(),
     /** Capture completeness for this session. null = not recorded (audits saved before it existed), not "healthy". */
     val captureHealth: CaptureHealth? = null,
+    /**
+     * true = this plan started right after an approved reset actually cleared the app's data; false = the app kept its
+     * data (reset not approved, not possible, or failed). null = not recorded (audits saved before this field existed).
+     */
+    val freshState: Boolean? = null,
 ) {
     val consentChoice: ConsentEvent?
         get() = consentEvents.firstOrNull { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }
@@ -158,8 +176,22 @@ data class AuditSession(
     val consentScreenSeen: Boolean
         get() = consentEvents.any { it.kind == ConsentKind.SCREEN_APPEARED || it.kind == ConsentKind.MANUAL_MARK } ||
             consentChoice != null
+
+    /**
+     * Whether this plan ran on data the app kept from earlier use. A recorded [freshState] decides. For older audits
+     * (null) the orchestrator's own "not cleared" notes decide; without such a note the answer is false, which keeps
+     * the rules those audits were scored with.
+     */
+    val appDataKept: Boolean
+        get() = freshState?.let { !it } ?: notes.any { n -> KEPT_DATA_NOTES.any { n.contains(it, ignoreCase = true) } }
+
+    companion object {
+        /** Note text the orchestrator writes when a plan did not start from cleared data (same markers the app uses). */
+        val KEPT_DATA_NOTES = listOf("App data was not cleared", "Could not clear app data")
+    }
 }
 
+/** Saved results store these by name: add new checks at the end and never rename one. */
 @Serializable
 enum class CheckId(val code: String, val title: String) {
     C1("C1", "Trackers contacted before consent"),
@@ -174,6 +206,8 @@ enum class CheckId(val code: String, val title: String) {
     C10("C10", "Device identifiers likely shared before consent"),
     NC("NC", "No consent mechanism detected"),
     V0("V0", "Low network visibility — result inconclusive"),
+    U1("U1", "Consent history unknown — app kept its data"),
+    S1("S1", "Same-company servers contacted (first-party data collection)"),
 }
 
 @Serializable

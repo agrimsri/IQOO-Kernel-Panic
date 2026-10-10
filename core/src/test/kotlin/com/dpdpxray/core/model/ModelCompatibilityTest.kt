@@ -98,6 +98,41 @@ class ModelCompatibilityTest {
     }
 
     @Test
+    fun `sessions saved before G1 have no fresh-state record and keep their findings`() {
+        val raw = Json.parseToJsonElement(legacyJson).jsonArray.single().jsonObject
+        assertFalse(raw.containsKey("freshState"))
+        val session = AuditJson.decodeSessions(legacyJson).single()
+        assertNull("not recorded, not 'fresh' and not 'kept'", session.freshState)
+        assertFalse("no 'not cleared' note, so the original rules apply", session.appDataKept)
+    }
+
+    @Test
+    fun `fresh state round-trips with and without a value`() {
+        val base = AuditSession(id = "a", targetPackage = "com.instagram.android", targetLabel = "Instagram", plan = AuditPlan.SILENT)
+        for (fresh in listOf(true, false, null)) {
+            val session = base.copy(freshState = fresh)
+            val json = AuditJson.encodeSessions(listOf(session))
+            assertEquals(listOf(session), AuditJson.decodeSessions(json))
+        }
+        val withoutKey = Json.parseToJsonElement(AuditJson.encodeSessions(listOf(base))).jsonArray.single().jsonObject
+            .let { obj -> kotlinx.serialization.json.JsonObject(obj - "freshState") }.toString()
+        assertNull(AuditJson.decodeSessions("[$withoutKey]").single().freshState)
+    }
+
+    @Test
+    fun `new categories and checks are additive and old names still decode`() {
+        val old = listOf("ANALYTICS", "ADVERTISING", "ATTRIBUTION", "SOCIAL", "CRASH_REPORTING", "ENGAGEMENT", "FIRST_PARTY", "UNKNOWN")
+        old.forEach { assertEquals(it, Category.valueOf(it).name) }
+        assertEquals(old, Category.entries.take(old.size).map { it.name })
+        assertFalse(Category.CONTENT_DELIVERY.isTracking)
+        assertFalse(Category.FIRST_PARTY_SAME_COMPANY.isTracking)
+        val oldChecks = listOf("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "NC", "V0")
+        assertEquals(oldChecks, CheckId.entries.take(oldChecks.size).map { it.name })
+        val e = NetEvent(1, "static.xx.fbcdn.net", category = Category.CONTENT_DELIVERY)
+        assertEquals(e, AuditJson.json.decodeFromString(NetEvent.serializer(), AuditJson.json.encodeToString(NetEvent.serializer(), e)))
+    }
+
+    @Test
     fun `positional NetEvent construction is unchanged`() {
         val e = NetEvent(1, "a.example", 28, "X", Category.ANALYTICS, Phase.AFTER_REJECT, "com.google.android.gms")
         assertEquals(28, e.queryType)

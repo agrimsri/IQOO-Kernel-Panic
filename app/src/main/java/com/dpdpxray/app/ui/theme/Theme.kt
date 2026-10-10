@@ -52,8 +52,8 @@ fun categoryColor(c: Category) = when (c) {
     Category.ADVERTISING, Category.ATTRIBUTION -> Film.leak
     Category.ANALYTICS, Category.SOCIAL, Category.ENGAGEMENT -> Film.high
     Category.CRASH_REPORTING -> Film.warn
-    Category.FIRST_PARTY -> Film.clear
-    Category.UNKNOWN -> Film.boneDim
+    Category.FIRST_PARTY, Category.FIRST_PARTY_SAME_COMPANY -> Film.clear
+    Category.UNKNOWN, Category.CONTENT_DELIVERY -> Film.boneDim
 }
 
 @OptIn(ExperimentalTextApi::class)
