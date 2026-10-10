@@ -85,4 +85,16 @@ class ModelSelectionTest {
         assertFalse(ModelSelection.isNpuCompiled(gpu))
         assertFalse(ModelSelection.isNpuCompiled("smollm2-135m.litertlm"))
     }
+
+    @Test
+    fun `the full Gemma 4 bundle wins over the text-only GPU build, in any listing order`() {
+        val full = "gemma-4-E2B-it.litertlm"
+        val gpuOnly = "gemma-4-E2B-it-gpu.litertlm"
+        assertEquals(full, ModelSelection.mainModel(listOf(gpuOnly, full)))
+        assertEquals(full, ModelSelection.mainModel(listOf(full, gpuOnly)))
+        assertEquals(gpuOnly, ModelSelection.mainModel(listOf(gpuOnly)))
+        assertTrue(ModelSelection.isTextOnlyBuild(gpuOnly))
+        assertTrue(ModelSelection.isTextOnlyBuild("gemma-4-E2B-it-web.litertlm"))
+        assertFalse(ModelSelection.isTextOnlyBuild(full))
+    }
 }

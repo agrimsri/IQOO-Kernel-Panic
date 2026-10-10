@@ -32,6 +32,8 @@ data class ModelCapabilities(val inputs: Set<ModelCapability>, val basis: String
         fun fromFileName(name: String): ModelCapabilities = when {
             ModelSelection.isNpuCompiled(name) ->
                 ModelCapabilities(setOf(ModelCapability.TEXT), "NPU bundle: treated as text-only until image input is verified on this phone")
+            ModelSelection.isTextOnlyBuild(name) ->
+                ModelCapabilities(setOf(ModelCapability.TEXT), "file name: -gpu/-web build, published without image or audio encoders")
             MULTIMODAL_FAMILIES.any { name.contains(it, ignoreCase = true) } ->
                 ModelCapabilities(setOf(ModelCapability.TEXT, ModelCapability.VISION), "file name: Gemma 4 / Gemma 3n family")
             else -> ModelCapabilities(setOf(ModelCapability.TEXT), "file name: unrecognised family, treated as text-only")

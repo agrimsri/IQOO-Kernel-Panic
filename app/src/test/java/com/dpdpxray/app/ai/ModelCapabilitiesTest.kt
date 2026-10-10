@@ -11,9 +11,16 @@ import org.junit.Test
 
 class ModelCapabilitiesTest {
     @Test
-    fun `Gemma 4 and Gemma 3n GPU bundles read text and images, never assumed to take audio`() {
-        assertEquals(setOf(TEXT, VISION), ModelCapabilities.fromFileName("gemma-4-E2B-it-gpu.litertlm").inputs)
+    fun `Gemma 4 and Gemma 3n full bundles read text and images, never assumed to take audio`() {
+        assertEquals(setOf(TEXT, VISION), ModelCapabilities.fromFileName("gemma-4-E2B-it.litertlm").inputs)
         assertEquals(setOf(TEXT, VISION), ModelCapabilities.fromFileName("gemma-3n-E2B-it-int4.litertlm").inputs)
+    }
+
+    @Test
+    fun `the published -gpu and -web Gemma 4 builds are text-only (no image encoder in the file)`() {
+        assertEquals(setOf(TEXT), ModelCapabilities.fromFileName("gemma-4-E2B-it-gpu.litertlm").inputs)
+        assertEquals(setOf(TEXT), ModelCapabilities.fromFileName("gemma-4-E2B-it-web.litertlm").inputs)
+        assertEquals(null, EncoderPlan.of(BackendKind.GPU, ModelCapabilities.fromFileName("gemma-4-E2B-it-gpu.litertlm")).vision)
     }
 
     @Test
@@ -29,7 +36,7 @@ class ModelCapabilitiesTest {
 
     @Test
     fun `vision encoder only for image-capable bundles, on the CPU for the CPU backend`() {
-        val gemma = ModelCapabilities.fromFileName("gemma-4-E2B-it-gpu.litertlm")
+        val gemma = ModelCapabilities.fromFileName("gemma-4-E2B-it.litertlm")
         assertEquals(EncoderTarget.GPU, EncoderPlan.of(BackendKind.GPU, gemma).vision)
         assertEquals(EncoderTarget.CPU, EncoderPlan.of(BackendKind.CPU, gemma).vision)
         assertEquals(null, EncoderPlan.of(BackendKind.NPU, ModelCapabilities.fromFileName("Gemma3-1B-IT_q4_ekv1280_sm8850.litertlm")).vision)
@@ -43,7 +50,7 @@ class ModelCapabilitiesTest {
         assertEquals(VISION, EncoderPlan.missingEncoder("NOT_FOUND: TF_LITE_VISION_ENCODER not found in the model."))
         assertEquals(null, EncoderPlan.missingEncoder("out of memory"))
         assertEquals(null, EncoderPlan.missingEncoder(null))
-        val reopened = ModelCapabilities.fromFileName("gemma-4-E2B-it-gpu.litertlm").without(VISION, "bundle has no image encoder")
+        val reopened = ModelCapabilities.fromFileName("gemma-4-E2B-it.litertlm").without(VISION, "bundle has no image encoder")
         assertEquals(setOf(TEXT), reopened.inputs)
         assertFalse(reopened.canReadImages)
     }
@@ -67,7 +74,7 @@ class ModelCapabilitiesTest {
 
     @Test
     fun `bundle metadata can only narrow what the file name suggested`() {
-        val named = ModelCapabilities.fromFileName("gemma-4-E2B-it-gpu.litertlm")
+        val named = ModelCapabilities.fromFileName("gemma-4-E2B-it.litertlm")
         assertEquals(setOf(TEXT), named.narrowTo(ModelCapabilities.fromBundle(text = true, vision = false, audio = false)).inputs)
         val textOnly = ModelCapabilities.fromFileName("qwen3-0.6b.litertlm")
         assertEquals(setOf(TEXT), textOnly.narrowTo(ModelCapabilities.fromBundle(text = true, vision = true, audio = true)).inputs)
@@ -84,7 +91,7 @@ class ModelCapabilitiesTest {
 
     @Test
     fun `vision model gets the screenshot when there is one`() {
-        val caps = ModelCapabilities.fromFileName("gemma-4-E2B-it-gpu.litertlm")
+        val caps = ModelCapabilities.fromFileName("gemma-4-E2B-it.litertlm")
         assertEquals(CapabilityRouting.ScreenReviewPlan(callModel = true, attachImage = true, reason = null), CapabilityRouting.screenReview(caps, true))
         assertEquals(CapabilityRouting.ScreenReviewPlan(callModel = true, attachImage = false, reason = null), CapabilityRouting.screenReview(caps, false))
     }

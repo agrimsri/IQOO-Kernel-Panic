@@ -20,12 +20,22 @@ object ModelSelection {
     /** True for any file that looks compiled for an NPU; such files are never used as the GPU/CPU model. */
     fun isNpuCompiled(name: String): Boolean = NPU_MARKERS.any { name.contains(it, ignoreCase = true) } || socTokens(name).isNotEmpty()
 
+    /** Published "-gpu" and "-web" LiteRT-LM builds are text-only (no vision or audio encoder sections). */
+    fun isTextOnlyBuild(name: String): Boolean = TEXT_ONLY_SUFFIXES.any { name.endsWith(it, ignoreCase = true) }
+
+    private val TEXT_ONLY_SUFFIXES = listOf("-gpu.litertlm", "-web.litertlm")
+
     /** `Build.SOC_MODEL` ("SM8850", "SM8850-AC") to "sm8850"; null, blank, "unknown" or unrecognised values give null. */
     fun normaliseSoc(raw: String?): String? = raw?.let { SOC_TOKEN.find(it)?.value?.lowercase() }
 
-    /** The main multimodal LLM: Gemma 4 E2B first, then any Gemma 4, then Gemma 3n, then any other non-NPU, non-embedder bundle. */
+    /**
+     * The main LLM: Gemma 4 E2B first, then any Gemma 4, then Gemma 3n, then any other non-NPU, non-embedder bundle. Within
+     * a family the full bundle wins over the "-gpu"/"-web" builds, which ship without image and audio encoders (the
+     * 2,008,432,640-byte gemma-4-E2B-it-gpu.litertlm is text-only), so consent screenshots can be read when it is present.
+     */
     fun mainModel(names: List<String>): String? {
         val llms = names.filter { it.endsWith(".litertlm") && !it.contains("embed", ignoreCase = true) && !isNpuCompiled(it) }
+            .sortedWith(compareBy<String> { isTextOnlyBuild(it) }.thenBy { it })
         return llms.firstOrNull { it.contains("gemma-4", true) && it.contains("e2b", true) }
             ?: llms.firstOrNull { it.contains("gemma-4", true) }
             ?: llms.firstOrNull { it.contains("3n", true) }
