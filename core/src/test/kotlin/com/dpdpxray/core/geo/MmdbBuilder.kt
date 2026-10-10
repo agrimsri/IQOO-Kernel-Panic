@@ -83,6 +83,21 @@ internal class MmdbBuilder(private val ipVersion: Int, private val recordSize: I
         fun array(vararg items: ByteArray): ByteArray = items.fold(ctrl(11, items.size)) { a, b -> a + b }
         fun pointer(offset: Int): ByteArray = byteArrayOf((0x20 or (offset shr 8 and 7)).toByte(), offset.toByte())
 
+        fun bool(v: Boolean): ByteArray = ctrl(14, if (v) 1 else 0)
+
+        /**
+         * The data-section shape DB-IP "IP to Country Lite" uses (read from the real file's records on 10 October 2026):
+         * continent and country only, with a geoname id, an EU flag and names in several languages. There is no
+         * registered_country.
+         */
+        fun dbipCountry(iso: String, continent: String, geonameId: Long, inEu: Boolean = false): ByteArray = map(
+            "continent" to map("code" to str(continent), "geoname_id" to uint(6, geonameId + 1), "names" to map("en" to str(continent))),
+            "country" to map(
+                "geoname_id" to uint(6, geonameId), "is_in_european_union" to bool(inEu), "iso_code" to str(iso),
+                "names" to map("en" to str(iso), "zh-CN" to str("国家"), "ja" to str("国")),
+            ),
+        )
+
         /** The data-section shape GeoLite2-Country uses: country, registered_country (and optionally represented). */
         fun country(located: String?, registered: String?): ByteArray = map(
             *listOfNotNull(

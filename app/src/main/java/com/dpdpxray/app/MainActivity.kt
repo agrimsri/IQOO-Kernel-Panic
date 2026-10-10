@@ -42,6 +42,8 @@ import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.quarantine.QuarantineRoutes
 import com.dpdpxray.app.quarantine.QuarantineScreen
 import com.dpdpxray.app.quarantine.navigateToQuarantine
+import com.dpdpxray.app.trust.TrustRoutes
+import com.dpdpxray.app.trust.trustDestination
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.AuditRoutes
 import com.dpdpxray.app.ui.guide.GuideLang
@@ -214,8 +216,10 @@ class MainActivity : ComponentActivity() {
                                 onVoice = { nav.navigate(AuditRoutes.voice(it)) },
                                 onHowItWorks = { nav.navigate(OnboardingGate.ONBOARDING) },
                                 onOpen = { nav.navigate("results/$it") },
+                                onTrust = { nav.navigate(TrustRoutes.ROUTE) },
                             )
                         }
+                        trustDestination(nav)
                         composable("pick?q={q}", arguments = listOf(navArgument("q") { type = NavType.StringType; defaultValue = "" })) { e ->
                             AppPickerScreen(
                                 vm, onBack = { nav.popBackStack() }, onStarted = { nav.navigate("live") { popUpTo("home") } },

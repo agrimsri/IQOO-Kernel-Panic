@@ -105,6 +105,7 @@ fun MoreScreen(
     onVoice: (String) -> Unit,
     onHowItWorks: () -> Unit,
     onOpen: (String) -> Unit,
+    onTrust: (() -> Unit)? = null,
 ) {
     val audits by vm.audits.collectAsState()
     val llm by vm.llmStatus.collectAsState()
@@ -138,6 +139,10 @@ fun MoreScreen(
             SectionCard(title = "About TraceVeil", glyph = Glyph.INFO) {
                 Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium, color = Film.bone)
                 Note("Checks run on this phone. Results are an automated technical assessment, not legal advice.")
+                if (onTrust != null) {
+                    Hairline(Modifier.padding(vertical = 8.dp))
+                    NavRow("Why you can trust TraceVeil", "What stays on the phone, its permissions, network use and identity", onTrust, glyph = Glyph.LOCK, accent = Film.clear)
+                }
             }
         }
     }

@@ -3,13 +3,16 @@ package com.dpdpxray.core.geo
 import java.util.Locale
 
 /**
- * What a GeoLite2-Country record says about one address. [located] is where the database places the address;
- * [registered] is the country the address block is registered in. They can differ, and neither says where traffic went.
+ * What a country record (GeoLite2-Country or DB-IP Lite) says about one address. [located] is where the database places
+ * the address; [registered] is the country the address block is registered in, which DB-IP Lite records do not carry
+ * (null). They can differ, and neither says where traffic went.
  */
 data class IpCountry(val located: String?, val registered: String?)
 
 class IpCountryLookup(private val reader: MmdbReader) {
     val buildEpochSeconds: Long? get() = reader.buildEpochSeconds
+    /** The file's own `database_type`, e.g. "GeoLite2-Country" or "DBIP-Country-Lite". */
+    val databaseType: String? get() = reader.databaseType
 
     /**
      * Null when [ip] is not a literal address, is a private or reserved address, is not in the database, or the record
