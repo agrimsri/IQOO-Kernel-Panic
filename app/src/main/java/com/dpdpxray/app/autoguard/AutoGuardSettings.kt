@@ -51,13 +51,14 @@ fun AutoGuardSettingsCard(onCheckup: (() -> Unit)?) {
     SectionCard(title = "Auto-guard", glyph = Glyph.BELL) {
         SwitchRow(
             "Check new apps automatically, even when TraceVeil is closed",
-            "Android lets TraceVeil look for newly installed apps about every 15 minutes and show a notification for each one. " +
-                "Android decides the exact time; battery saving can delay it. When you open TraceVeil, and while it is open, alerts appear at once.",
+            "Android lets TraceVeil look for newly installed apps about every 15 minutes and show a notification for each new app " +
+                "(several at once share one). Android decides the exact time; battery saving can delay it. When you open TraceVeil, " +
+                "and while it is open, alerts appear at once. Switching this off stops new-install alerts while TraceVeil is open too.",
             s.autoCheckNewApps,
             { v -> store.update { it.copy(autoCheckNewApps = v) } },
         )
         if (s.autoCheckNewApps) {
-            Note(lastNewAppCheck?.let { "Last background check: ${time(it)}" } ?: "The first background check runs within a few minutes.")
+            Note(lastNewAppCheck?.let { "Last background check: ${time(it)}" } ?: "No background check has finished yet. Android usually runs the first one within a few minutes.")
             Spacer(Modifier.height(8.dp))
         }
         Hairline()
