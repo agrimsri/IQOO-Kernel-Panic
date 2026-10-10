@@ -92,12 +92,16 @@ object ApkInstallWatcher {
         post(context, NOTIFICATION_BASE + (pkg.hashCode() and 0xFFFF), pkg.hashCode(), open, alert)
     }
 
-    /** One alert for several new apps; tapping it opens APK Guard, which lists the newest installs first. */
-    fun postCombinedAlert(context: Context, alert: InstallAlert) {
+    /**
+     * One alert for several new apps; tapping it opens APK Guard, which lists the newest installs first. Each batch
+     * gets its own notification id, so a later batch does not replace an unread earlier one.
+     */
+    fun postCombinedAlert(context: Context, packages: List<String>, alert: InstallAlert) {
         val open = Intent(context, MainActivity::class.java)
             .setAction(AutoGuardRoutes.ACTION_OPEN_APK_GUARD)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        post(context, COMBINED_NOTIFICATION, COMBINED_NOTIFICATION, open, alert)
+        val id = COMBINED_BASE + (packages.sorted().joinToString(",").hashCode() and 0xFFFF)
+        post(context, id, COMBINED_BASE, open, alert)
     }
 
     /** False when Android will not show TraceVeil's notifications (permission refused or notifications switched off). */
@@ -124,6 +128,7 @@ object ApkInstallWatcher {
         runCatching { nm.notify(id, n) }
     }
 
+    /** Notification ids: one app's alert 0x4A0000..0x4AFFFF, combined alerts 0x4B0000..0x4BFFFF. */
     private const val NOTIFICATION_BASE = 0x4A0000
-    private const val COMBINED_NOTIFICATION = 0x4A0000 - 1
+    private const val COMBINED_BASE = 0x4B0000
 }

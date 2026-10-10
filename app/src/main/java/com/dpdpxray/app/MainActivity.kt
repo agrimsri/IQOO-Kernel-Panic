@@ -98,8 +98,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         graph.warmUpSemanticSearch()
-        // Auto-guard: alert at once for apps installed while TraceVeil was closed (not again on rotation).
-        if (savedInstanceState == null) com.dpdpxray.app.autoguard.AutoGuard.onAppOpened(this)
+        // Auto-guard: alert at once for apps installed while TraceVeil was closed (once per process).
+        com.dpdpxray.app.autoguard.AutoGuard.onAppOpened(this)
         if (savedInstanceState == null) apkGuardRoute.value = ApkGuardIntents.route(this, intent)
         if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)

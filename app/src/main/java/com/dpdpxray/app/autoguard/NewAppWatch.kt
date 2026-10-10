@@ -6,27 +6,24 @@ data class WatchState(
     val sequence: Int,
     /** Settings.Global.BOOT_COUNT when [sequence] was read; null when Android did not report it. */
     val bootCount: Int?,
-    /** Wall-clock time the last check started. Apps first installed before it (minus [NewAppWatch.MARGIN_MS]) are not new. */
-    val checkedAtMs: Long,
+    /** Apps (not from the phone's system image) that were installed at the last check: package to first-install time. */
+    val known: Map<String, Long>,
 )
 
 /** One installed package the check is looking at, copied out of PackageInfo so the decision is testable. */
 data class ChangedApp(val packageName: String, val firstInstallTime: Long, val isSystem: Boolean)
 
 /**
- * Pure rules for the background new-app check (no Android types). The check asks Android which packages changed since
- * the last check (PackageManager.getChangedPackages) and alerts only for apps that were newly installed since then:
- * never for updates, apps that came with the phone, TraceVeil itself, or an install that was already alerted (by this
- * check or by the live install receiver). The very first check only records a baseline, so apps that were already on
- * the phone never produce an alert.
+ * Pure rules for the background new-app check (no Android types). TraceVeil remembers which apps were installed at the
+ * last check; an app that is not on that list (or is on it with a different first-install time, i.e. it was
+ * reinstalled) is a new install. Updates keep their first-install time, so they are never new. Nothing depends on the
+ * phone's clock, so a clock that is wrong or changed cannot make an old app look new.
+ *
+ * Within one boot, only the packages Android reports as changed since the saved sequence number
+ * (PackageManager.getChangedPackages) are looked at. The very first check, and the first check after the check is
+ * switched on, only records the list, so apps already on the phone never produce an alert.
  */
 object NewAppWatch {
-    /**
-     * Android records an app's first-install time slightly before it bumps the change counter. This margin keeps an app
-     * that was installed during the previous check from being mistaken for an old one.
-     */
-    const val MARGIN_MS = 2 * 60_000L
-
     /** Up to this many new apps get one notification each; more than that share one notification. */
     const val MAX_SEPARATE_ALERTS = 3
 
@@ -34,7 +31,7 @@ object NewAppWatch {
     const val LEDGER_LIMIT = 300
 
     sealed interface Read {
-        /** Nothing saved yet (first run, or the check was just switched on): record a baseline and alert nothing. */
+        /** Nothing saved yet (first run, or the check was just switched on): record the installed apps, alert nothing. */
         data object Baseline : Read
 
         /** Same boot as last time: ask Android for packages changed since [sequence]. */
@@ -42,7 +39,7 @@ object NewAppWatch {
 
         /**
          * The phone restarted (Android's change counter started again at 0) or the boot count is unreadable, so the saved
-         * sequence cannot be trusted. Look at every installed app; the time rule below still skips every old app.
+         * sequence cannot be trusted. Compare every installed app with the remembered list.
          */
         data object AllInstalled : Read
     }
@@ -54,26 +51,37 @@ object NewAppWatch {
     }
 
     /**
-     * The apps to alert about, oldest install first. [alerted] maps a package to the first-install time that was already
-     * alerted; a reinstall has a new first-install time and is alerted again, an update keeps it and is not.
+     * The apps to alert about, oldest install first: not from the system image, not TraceVeil, not on the [known] list
+     * with the same first-install time, and not already alerted ([alerted] maps a package to the first-install time
+     * that was alerted, by this check or by the live receiver).
      */
-    fun newInstalls(candidates: List<ChangedApp>, ownPackage: String, saved: WatchState, alerted: Map<String, Long>): List<ChangedApp> =
-        candidates.asSequence()
+    fun newInstalls(present: List<ChangedApp>, ownPackage: String, known: Map<String, Long>, alerted: Map<String, Long>): List<ChangedApp> =
+        present.asSequence()
             .filter { !it.isSystem && it.packageName != ownPackage && it.packageName.isNotBlank() }
-            .filter { it.firstInstallTime >= saved.checkedAtMs - MARGIN_MS }
+            .filter { known[it.packageName] != it.firstInstallTime }
             .filter { alerted[it.packageName] != it.firstInstallTime }
             .distinctBy { it.packageName }
             .sortedBy { it.firstInstallTime }
             .toList()
 
     /**
-     * The state to save after a check that started at [startedAt]. [reportedSequence] is the sequence number Android
-     * returned, or null when it returned no changes: then the same-boot sequence is kept, and after a restart the
-     * counter is still at 0.
+     * The remembered list after a check. After a full read ([Read.Baseline] or [Read.AllInstalled]) it is exactly the
+     * installed apps in [present]. After a [Read.Since] read, packages in [changedNames] are updated from [present],
+     * and a changed package that is no longer installed is dropped.
      */
-    fun next(read: Read, reportedSequence: Int?, bootCount: Int?, startedAt: Long): WatchState {
+    fun nextKnown(known: Map<String, Long>?, read: Read, present: List<ChangedApp>, changedNames: Collection<String>): Map<String, Long> {
+        val installed = present.filter { !it.isSystem }.associate { it.packageName to it.firstInstallTime }
+        if (read !is Read.Since || known == null) return installed
+        return known - changedNames.toSet() + installed
+    }
+
+    /**
+     * The state to save after a check. [reportedSequence] is the sequence number Android returned, or null when it
+     * returned no changes: then the same-boot sequence is kept, and after a restart the counter is still at 0.
+     */
+    fun next(read: Read, reportedSequence: Int?, bootCount: Int?, known: Map<String, Long>): WatchState {
         val sequence = reportedSequence ?: if (read is Read.Since) read.sequence else 0
-        return WatchState(sequence, bootCount, startedAt)
+        return WatchState(sequence, bootCount, known)
     }
 
     /** True when this install (package + first-install time) has not been alerted yet. */
@@ -88,10 +96,10 @@ object NewAppWatch {
 
     // --- storage format ---------------------------------------------------------------------------------------------
 
-    /** One ledger entry as stored text: "package<TAB>firstInstallTime". */
-    fun encodeLedger(alerted: Map<String, Long>): Set<String> = alerted.map { (pkg, time) -> "$pkg\t$time" }.toSet()
+    /** Package to first-install time as stored text: "package<TAB>firstInstallTime" (the ledger and the known list). */
+    fun encodeLedger(entries: Map<String, Long>): Set<String> = entries.map { (pkg, time) -> "$pkg\t$time" }.toSet()
 
-    /** Reads stored ledger entries; malformed entries are dropped, never guessed. */
+    /** Reads stored entries; malformed entries are dropped, never guessed. */
     fun decodeLedger(stored: Set<String>?): Map<String, Long> = stored.orEmpty().mapNotNull { line ->
         val pkg = line.substringBefore('\t', "")
         val time = line.substringAfter('\t', "").toLongOrNull()

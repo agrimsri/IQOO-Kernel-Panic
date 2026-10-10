@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
  */
 object AutoGuard {
     @Volatile private var started = false
+    private val openedCheck = java.util.concurrent.atomic.AtomicBoolean(false)
 
     /**
      * Called once per process from the Application. Follows the two settings: switching one off cancels its job at
@@ -42,12 +43,15 @@ object AutoGuard {
 
     /**
      * TraceVeil's screen opened: look for apps installed while it was closed now, instead of waiting for the next
-     * periodic run. Cheap when nothing changed (one call to Android). Does nothing when the check is switched off.
+     * periodic run. Once per process: while the process lives, the live receiver alerts new installs at once (this
+     * also covers a screen Android restores after killing the process). Cheap when nothing changed (one call to
+     * Android). Does nothing when the check is switched off.
      */
     fun onAppOpened(context: Context) {
+        if (!openedCheck.compareAndSet(false, true)) return
         val app = context.applicationContext
         app.graph.scope.launch(Dispatchers.IO) {
-            val outcome = runCatching { NewAppCheck.run(app) }.getOrNull()
+            val outcome = runCatching { NewAppCheck.run(app, fromJob = false) }.getOrNull()
             outcome?.speak?.let { ApkAlertSpeaker.speak(app, it.spokenEn, it.spokenHi) }
         }
     }

@@ -6,12 +6,14 @@ import android.content.Context
 import android.util.Log
 import com.dpdpxray.app.apkguard.ApkAlertSpeaker
 import com.dpdpxray.app.apkguard.InstallAlert
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
@@ -27,7 +29,7 @@ internal const val AUTOGUARD_LOG = "TraceVeilAutoGuard"
  */
 class NewAppCheckJobService : AutoGuardJobService() {
     override suspend fun work(jobId: Int) {
-        val outcome = NewAppCheck.run(applicationContext)
+        val outcome = NewAppCheck.run(applicationContext, fromJob = true)
         Log.i(AUTOGUARD_LOG, "new-app check job=$jobId read=${outcome?.read ?: "switched off"} alerted=${outcome?.alerted?.size ?: 0}")
         outcome?.speak?.let { speakAndWait(applicationContext, it) }
     }
@@ -57,8 +59,13 @@ abstract class AutoGuardJobService : JobService() {
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 work(params.jobId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A failed check must not crash TraceVeil in the background; the next run reads the same window again.
+                Log.w(AUTOGUARD_LOG, "job ${params.jobId} failed: ${e.javaClass.simpleName}")
             } finally {
-                running.remove(params.jobId)
+                running.remove(params.jobId, coroutineContext.job)
                 jobFinished(params, false)
             }
         }
