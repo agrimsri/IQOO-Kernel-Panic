@@ -139,7 +139,7 @@ fun HomeScreen(
     val aiLine = aiStatusLine(llm)
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-        HomeHeader(onSettings)
+        HomeHeader(onSettings, mark = { com.dpdpxray.app.ui.components.BrandMark(size = 40.dp) })
         val modeSettings by vm.settings.collectAsState()
         com.dpdpxray.app.ui.modes.ModePill(
             modeSettings.audience, { a -> vm.updateSettings { it.copy(audience = a) } },

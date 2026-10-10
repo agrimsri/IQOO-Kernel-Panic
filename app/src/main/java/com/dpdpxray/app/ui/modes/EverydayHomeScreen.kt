@@ -176,6 +176,8 @@ fun EverydayHomeScreen(
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            com.dpdpxray.app.ui.components.BrandMark(size = 40.dp)
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("TraceVeil", style = MaterialTheme.typography.headlineMedium, maxLines = 1, modifier = Modifier.semantics { heading() })
                 Box(Modifier.padding(top = 4.dp).size(width = 44.dp, height = 3.dp).clip(CircleShape).background(Brand.horizontal))
