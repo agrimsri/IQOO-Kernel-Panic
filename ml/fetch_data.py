@@ -35,8 +35,10 @@ SOURCES = {
 for _tag in AOSP_TAGS:
     SOURCES[f"aosp-{_tag}"] = ("apk", AOSP.format(tag=_tag), f"aosp/AndroidManifest_{_tag}.xml", None, "b64")
 
+# Filter lists and the Majestic list update daily; the SHA-256 we trained on is in ml/DATA_SOURCES.md.
 TRACKER_SOURCES = {
     "easyprivacy": ("tracker", "https://easylist.to/easylist/easyprivacy.txt", "easyprivacy/easyprivacy.txt", None, "plain"),
+    "easylist": ("tracker", "https://easylist.to/easylist/easylist.txt", "easylist/easylist.txt", None, "plain"),
     "majestic": ("tracker", "https://downloads.majestic.com/majestic_million.csv", "majestic/majestic_million.csv", None, "plain"),
     "psl": ("tracker", "https://publicsuffix.org/list/public_suffix_list.dat", "psl/public_suffix_list.dat", None, "plain"),
 }
