@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.dpdpxray.app.audit.AuditConfig
 import com.dpdpxray.app.control.AuditableApp
+import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.Callout
 import com.dpdpxray.app.ui.components.HostText
@@ -67,10 +68,12 @@ import com.dpdpxray.app.ui.guide.GradientAction
 import com.dpdpxray.app.ui.guide.GuideBanner
 import com.dpdpxray.app.ui.guide.GuideFlow
 import com.dpdpxray.app.ui.guide.OutlineAction
+import com.dpdpxray.app.ui.modes.CheckChoice
+import com.dpdpxray.app.ui.modes.CheckSheet
+import com.dpdpxray.app.ui.modes.EverydayCheckSetup
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
-import com.dpdpxray.core.model.AuditPlan
 
 private val demoPackages = setOf("com.leakyshop.demo", "com.leakyshop.demo.fixed")
 
@@ -132,9 +135,16 @@ fun AppPickerScreen(
 
     selected?.let { app ->
         ModalBottomSheet(onDismissRequest = { selected = null }, containerColor = Film.raised) {
-            AuditSetup(app, shizukuReady = pf.shizukuGranted, preferPreview = settings.fastDemo, onQuarantine = { selected = null; onQuarantine(app.packageName) }) { config ->
+            val quarantine = { selected = null; onQuarantine(app.packageName) }
+            val start: (AuditConfig) -> Unit = { config ->
                 selected = null
                 if (vm.startAudit(config)) onStarted()
+            }
+            // Everyday mode: one Quick check that says No; Full and clearing data fold under Advanced.
+            if (settings.audience == Audience.USER) {
+                EverydayCheckSetup(app, controlledDemo = app.packageName in demoPackages, shizukuReady = pf.shizukuGranted, onQuarantine = quarantine, onStart = start)
+            } else {
+                AuditSetup(app, shizukuReady = pf.shizukuGranted, preferPreview = settings.fastDemo, onQuarantine = quarantine, onStart = start)
             }
         }
     }
@@ -166,11 +176,12 @@ private fun AppRow(app: AuditableApp, demo: Boolean, onClick: () -> Unit) {
 @Composable
 private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, preferPreview: Boolean, onQuarantine: () -> Unit = {}, onStart: (AuditConfig) -> Unit) {
     val controlledDemo = app.packageName == "com.leakyshop.demo" || app.packageName == "com.leakyshop.demo.fixed"
-    var allowReset by remember { mutableStateOf(controlledDemo) }
+    val initial = remember { CheckSheet.defaults(Audience.DEVELOPER, controlledDemo, shizukuReady, preferPreview) }
+    var allowReset by remember { mutableStateOf(initial.allowReset) }
     val freshReset = allowReset && shizukuReady
-    var full by remember { mutableStateOf(shizukuReady && controlledDemo) }
-    var preview by remember { mutableStateOf(preferPreview && !(shizukuReady && controlledDemo)) }
-    var agent by remember { mutableStateOf(controlledDemo) }
+    var full by remember { mutableStateOf(initial.choice == CheckChoice.FULL) }
+    var preview by remember { mutableStateOf(initial.choice == CheckChoice.PREVIEW) }
+    var agent by remember { mutableStateOf(initial.agentTaps) }
     var child by remember { mutableStateOf(false) }
     var gms by remember { mutableStateOf(false) }
 
@@ -200,13 +211,8 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, preferPreview: 
 
         Spacer(Modifier.height(12.dp))
         GradientAction("Start check", {
-            onStart(
-                AuditConfig(
-                    targetPackage = app.packageName, targetLabel = app.label,
-                    plans = if (full && freshReset) listOf(AuditPlan.SILENT, AuditPlan.REJECT, AuditPlan.ACCEPT) else listOf(AuditPlan.ACCEPT),
-                    childFacing = child, includeGms = gms, autoDrive = agent, resetAppData = freshReset, fastPreview = preview,
-                ),
-            )
+            val choice = when { full -> CheckChoice.FULL; preview -> CheckChoice.PREVIEW; else -> CheckChoice.QUICK }
+            onStart(CheckSheet.config(Audience.DEVELOPER, app.packageName, app.label, choice, allowReset, shizukuReady, agent, child, gms))
         })
         // Quarantine run (separate feature): opens its own explainer; nothing starts until Start is tapped there.
         Spacer(Modifier.height(4.dp))
@@ -217,7 +223,7 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, preferPreview: 
 
 /** A plan as a selectable card: the chosen one gets a scan-coloured outline and a light wash. */
 @Composable
-private fun PlanOption(title: String, detail: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
+internal fun PlanOption(title: String, detail: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(14.dp)
     Row(
         Modifier.fillMaxWidth().clip(shape)

@@ -1,5 +1,6 @@
 package com.dpdpxray.app.ui.onboarding
 
+import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.ui.guide.Bi
 
 data class OnboardingPage(val key: String, val title: Bi, val body: Bi, val spoken: Bi)
@@ -9,8 +10,12 @@ data class OnboardingNeed(val key: String, val title: Bi, val required: Boolean,
 
 data class OnboardingChoice(val key: String, val title: Bi, val detail: Bi)
 
+/** One of the two front doors offered on the "How will you use TraceVeil?" page. */
+data class AudienceOption(val audience: Audience, val title: Bi, val tagline: Bi, val detail: Bi)
+
 /** Every word of first-run onboarding, in English and Hindi. Pure so it can be checked by unit tests. */
 object OnboardingCopy {
+    /** The developer wording of every page; [pagesFor] swaps in the everyday wording where it differs. */
     val pages = listOf(
         OnboardingPage(
             "promise",
@@ -19,6 +24,14 @@ object OnboardingCopy {
                 "जब कोई ऐप सहमति माँगता है, TraceVeil देखता है कि आपके चुनने से पहले और बाद में वह किन पतों तक पहुँचने की कोशिश करता है, यहीं आपके फ़ोन पर।"),
             Bi("Apps promise. TraceVeil checks. It watches which addresses an app tries to reach before and after you choose.",
                 "ऐप वादा करते हैं। TraceVeil जाँचता है। यह देखता है कि आपके चुनने से पहले और बाद में ऐप किन पतों तक पहुँचने की कोशिश करता है।"),
+        ),
+        OnboardingPage(
+            "audience",
+            Bi("How will you use TraceVeil?", "आप TraceVeil का इस्तेमाल कैसे करेंगे?"),
+            Bi("Pick one and Home is set up for it. You can switch any time in More.",
+                "एक चुनें, होम उसी के हिसाब से तैयार होगा। आप More में कभी भी बदल सकते हैं।"),
+            Bi("How will you use TraceVeil? Pick one. You can switch later in More.",
+                "आप TraceVeil का इस्तेमाल कैसे करेंगे? एक चुनें। बाद में More में बदल सकते हैं।"),
         ),
         OnboardingPage(
             "how",
@@ -71,6 +84,53 @@ object OnboardingCopy {
             "हमारा डेमो ऐप, जो जानबूझकर कंसेंट नियम तोड़ता है। VPN और कंसेंट वॉचर चाहिए।"))
     val apk = OnboardingChoice("apk", Bi("Check an APK file", "APK फ़ाइल जाँचें"),
         Bi("Pick an app file on this phone to inspect.", "जाँचने के लिए इस फ़ोन पर कोई ऐप फ़ाइल चुनें।"))
+
+    val audiences = listOf(
+        AudienceOption(
+            Audience.USER, Bi("I use apps", "मैं ऐप यूज़र हूँ"), Bi("Protect my phone", "मेरे फ़ोन की सुरक्षा"),
+            Bi("Check files and new apps, and see which apps ignore your 'No'.",
+                "फ़ाइलें और नए ऐप जाँचें, और देखें कि कौन-से ऐप आपकी 'ना' नहीं मानते।"),
+        ),
+        AudienceOption(
+            Audience.DEVELOPER, Bi("I build apps", "मैं ऐप डेवलपर हूँ"), Bi("Test my app", "मेरे ऐप की टेस्टिंग"),
+            Bi("Consent audits, fixes, CI and automation.", "कंसेंट ऑडिट, सुधार, CI और ऑटोमेशन।"),
+        ),
+    )
+    /** The Next button on the mode page until one is picked (Skip still works and keeps developer mode). */
+    val pickOne = Bi("Pick one above", "ऊपर एक चुनें")
+
+    private val everydayNeeds = OnboardingPage(
+        "needs",
+        Bi("What we need and why", "हमें क्या चाहिए और क्यों"),
+        Bi("Two switches, each for one reason. Checking an app file needs neither.",
+            "दो स्विच, हर एक की एक वजह। ऐप फ़ाइल जाँचने के लिए इनमें से कोई नहीं चाहिए।"),
+        Bi("TraceVeil needs a VPN to see one app's lookups, and the consent watcher to see its popup. Results stay on this phone.",
+            "TraceVeil को एक ऐप के लुकअप देखने के लिए VPN, और उसका पॉपअप देखने के लिए कंसेंट वॉचर चाहिए। नतीजे इसी फ़ोन पर रहते हैं।"),
+    )
+    private val everydayTry = OnboardingPage(
+        "try",
+        Bi("Try it first", "पहले आज़माएँ"),
+        Bi("Check an app file, or see a sample result. For the 'No' check, avoid banking, payment and chat apps.",
+            "कोई ऐप फ़ाइल जाँचें, या नमूना नतीजा देखें। 'ना' वाली जाँच में बैंकिंग, पेमेंट और चैट ऐप से बचें।"),
+        Bi("Try it first. Check an app file, or see a sample.", "पहले आज़माएँ। कोई ऐप फ़ाइल जाँचें, या नमूना देखें।"),
+    )
+
+    /** Same five pages for both modes; everyday wording leaves out the developer-only reset helper. */
+    fun pagesFor(audience: Audience): List<OnboardingPage> = when (audience) {
+        Audience.DEVELOPER -> pages
+        Audience.USER -> pages.map { p -> when (p.key) { "needs" -> everydayNeeds; "try" -> everydayTry; else -> p } }
+    }
+
+    fun needsFor(audience: Audience): List<OnboardingNeed> = when (audience) {
+        Audience.DEVELOPER -> needs
+        Audience.USER -> needs.filter { it.required }
+    }
+
+    /** First steps on the last page; the first one is highlighted. Everyday leads with the file check. */
+    fun choicesFor(audience: Audience): List<OnboardingChoice> = when (audience) {
+        Audience.DEVELOPER -> listOf(sample, demo, apk)
+        Audience.USER -> listOf(apk, sample, demo)
+    }
 
     val skip = Bi("Skip", "छोड़ें")
     val next = Bi("Next", "आगे")

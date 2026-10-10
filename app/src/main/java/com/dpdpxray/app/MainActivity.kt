@@ -38,6 +38,7 @@ import com.dpdpxray.app.apkguard.ApkGuardRoutes
 import com.dpdpxray.app.apkguard.ApkGuardSubject
 import androidx.navigation.navArgument
 import com.dpdpxray.app.audit.AuditProgress
+import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.quarantine.QuarantineRoutes
 import com.dpdpxray.app.quarantine.QuarantineScreen
 import com.dpdpxray.app.quarantine.navigateToQuarantine
@@ -49,6 +50,8 @@ import com.dpdpxray.app.ui.guide.GuideViewModel
 import com.dpdpxray.app.ui.guide.LocalGuide
 import com.dpdpxray.app.ui.guide.OnboardingGate
 import com.dpdpxray.app.ui.onboarding.OnboardingScreen
+import com.dpdpxray.app.ui.modes.EverydayHomeScreen
+import com.dpdpxray.app.ui.modes.ModeRoutes
 import com.dpdpxray.app.voice.VoiceCopilotScreen
 import com.dpdpxray.app.voice.wake.AssistantEntry
 import com.dpdpxray.app.voice.wake.AssistantFeature
@@ -163,10 +166,28 @@ class MainActivity : ComponentActivity() {
                                 onSample = { leaveOnboarding(); vm.openSample { nav.navigate("results/$it") } },
                                 onDemo = { leaveOnboarding(); if (vm.prepareAudit()) nav.navigate("pick?q=LeakyShop") },
                                 onApk = apkCheck()?.let { open -> { leaveOnboarding(); open() } },
+                                // Mode choice: nothing pre-picked on first run; a replay shows the current mode.
+                                audience = settings.audience.takeIf { settings.onboardingDone },
+                                onAudience = { a -> vm.updateSettings { it.copy(audience = a) } },
                             )
                         }
                         composable("home") {
-                            HomeScreen(
+                            // Everyday mode gets its own front door; both doors open the same screens and engine.
+                            if (settings.audience == Audience.USER) {
+                                val routeIfPresent: (String) -> (() -> Unit)? = { r -> if (nav.graph.findNode(r) != null) { { nav.navigate(r) } } else null }
+                                EverydayHomeScreen(
+                                    vm,
+                                    onCheckApp = { nav.navigate("pick") },
+                                    onApkFile = { nav.navigate(ApkGuardRoutes.file(it)) },
+                                    onAlerts = { nav.openTab(AppTab.APK) },
+                                    onOpen = { nav.navigate("results/$it") },
+                                    onAllReports = { nav.openTab(AppTab.REPORTS) },
+                                    onLive = { nav.navigate("live") },
+                                    onSettings = { nav.navigate("settings") },
+                                    onCheckup = routeIfPresent(ModeRoutes.CHECKUP),
+                                    onTrust = routeIfPresent(ModeRoutes.TRUST),
+                                )
+                            } else HomeScreen(
                                 vm,
                                 onAudit = { nav.navigate("pick") },
                                 onOpen = { nav.navigate("results/$it") },
@@ -178,6 +199,7 @@ class MainActivity : ComponentActivity() {
                                 onHowItWorks = { nav.navigate(OnboardingGate.ONBOARDING) },
                                 onLive = { nav.navigate("live") },
                                 onAllReports = { nav.openTab(AppTab.REPORTS) },
+                                onAutomation = { nav.navigate("settings") },
                             )
                         }
                         composable(AppTabs.REPORTS) {
