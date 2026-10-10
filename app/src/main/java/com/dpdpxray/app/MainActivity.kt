@@ -222,6 +222,8 @@ class MainActivity : ComponentActivity() {
                                     onSettings = { nav.navigate("settings") },
                                     onCheckup = routeIfPresent(ModeRoutes.CHECKUP),
                                     onTrust = routeIfPresent(ModeRoutes.TRUST),
+                                    // Same Update Watch re-check route as Developer Home and Reports.
+                                    onRecheck = { nav.navigate(ApkGuardRoutes.recheckPicker(it)) },
                                 )
                             } else HomeScreen(
                                 vm,

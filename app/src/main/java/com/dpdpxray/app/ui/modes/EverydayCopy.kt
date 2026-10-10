@@ -7,6 +7,9 @@ import com.dpdpxray.app.ui.guide.GuideStep
 import com.dpdpxray.app.ui.guide.GuideTone
 import com.dpdpxray.app.ui.guide.SetupKind
 import com.dpdpxray.core.model.ScoreBand
+import com.dpdpxray.core.update.AppVersion
+import com.dpdpxray.core.update.UpdateKind
+import com.dpdpxray.core.update.UpdatedApp
 
 /** Names of the two modes, shown in More, Settings and on the everyday Home. */
 object ModeCopy {
@@ -132,6 +135,24 @@ object EverydayCopy {
     val sample = Bi("Sample", "नमूना")
     val partial = Bi("Partial check", "अधूरी जाँच")
 
+    // Update Watch on the everyday Home: an app the person checked now has a different version installed.
+    fun updatedTitle(n: Int) = if (n == 1) Bi("An app you checked has updated", "आपका जाँचा हुआ एक ऐप अपडेट हुआ है")
+    else Bi("$n apps you checked have updated", "आपके जाँचे हुए $n ऐप अपडेट हुए हैं")
+    val updatedNote = Bi(
+        "Your last result is about the old version. Check again to see what changed.",
+        "आपका पिछला नतीजा पुराने वर्ज़न का है। क्या बदला, यह देखने के लिए फिर से जाँचें।",
+    )
+    val checkAgain = Bi("Check again", "फिर से जाँचें")
+
+    /** "LeakyShop 1.0 → 1.1": the app and the versions Android reports, nothing about what changed inside it. */
+    fun updatedLine(item: UpdatedApp): Bi = when (item.kind) {
+        UpdateKind.UPDATED -> Bi("${item.label} ${item.versionChange}", "${item.label} ${item.versionChange}")
+        UpdateKind.DOWNGRADED -> Bi("${item.label} ${item.versionChange} (older version)", "${item.label} ${item.versionChange} (पुराना वर्ज़न)")
+        UpdateKind.VERSION_NOT_RECORDED -> AppVersion.label(item.newVersion).let { now ->
+            Bi("${item.label} · now $now", "${item.label} · अब $now")
+        }
+    }
+
     /** Plain names for a result's band: what was seen, never a verdict on the app. */
     fun band(b: ScoreBand) = when (b) {
         ScoreBand.READY -> Bi("Nothing flagged in this check", "इस जाँच में कुछ नहीं मिला")
@@ -144,12 +165,33 @@ object EverydayCopy {
     fun all(): List<Bi> = listOf(eyebrow, heroTitle, heroBody, onPhone, readsOnly) +
         listOf(file, apps, alerts, sayNo, trust).flatMap { listOf(it.title, it.body) } +
         listOf(ready, stepsFirst(1), stepsFirst(2), readiness, running, recentTitle, seeAll, emptyTitle, emptyBody, seeSample, sample, partial) +
+        listOf(updatedTitle(1), updatedTitle(2), updatedNote, checkAgain) +
         listOf(SetupKind.VPN, SetupKind.WATCHER, SetupKind.PRIVATE_DNS).flatMap { listOf(setupTitle(it), setupDetail(it)) } +
         listOf(otherVpnTitle, otherVpnDetail) +
         AlertStatus.entries.flatMap { listOf(alertLabel(it, false), alertLabel(it, true)) } +
         ScoreBand.entries.map { band(it) } +
         Audience.entries.flatMap { listOf(ModeCopy.name(it), ModeCopy.tagline(it), ModeCopy.title(it)) } +
         listOf(ModeCopy.note, ModeCopy.switchToDeveloper)
+}
+
+/** What the everyday Home's Update Watch card shows: a title, up to [EverydayUpdates.MAX_ROWS] apps, and how many more. */
+data class EverydayUpdateCard(val title: Bi, val rows: List<Row>, val more: Int) {
+    /** One updated app: its line and the package "Check again" opens the check for. */
+    data class Row(val packageName: String, val line: Bi)
+}
+
+/**
+ * The everyday Update Watch card, from the same list Developer Home and Reports use (XrayViewModel.updatedApps, in
+ * its order). Null, so nothing is shown, until at least one checked app has a different version installed.
+ */
+object EverydayUpdates {
+    const val MAX_ROWS = 3
+
+    fun card(items: List<UpdatedApp>): EverydayUpdateCard? = if (items.isEmpty()) null else EverydayUpdateCard(
+        title = EverydayCopy.updatedTitle(items.size),
+        rows = items.take(MAX_ROWS).map { EverydayUpdateCard.Row(it.packageName, EverydayCopy.updatedLine(it)) },
+        more = (items.size - MAX_ROWS).coerceAtLeast(0),
+    )
 }
 
 /** The everyday check sheet: one Quick check that says No, with Full and clearing folded under Advanced. */
