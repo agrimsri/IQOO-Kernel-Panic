@@ -91,6 +91,7 @@ class SdkAttributionTest {
         val meta = groups(leaky).first { it.name == "Meta (Facebook SDK)" }
         assertEquals("Meta", meta.company)
         assertEquals(Category.ADVERTISING, meta.category)
+        assertFalse(meta.sameCompanyAsApp)
         val host = meta.hosts.single()
         assertEquals("graph.facebook.com", host.host)
         assertEquals(4, host.lookups)
@@ -224,6 +225,25 @@ class SdkAttributionTest {
         assertEquals("metrics.leakyshop.example", sighting.host)
         assertEquals("launches.appsflyersdk.com", sighting.viaAlias)
         assertTrue(af.checks.containsAll(listOf(CheckId.C1, CheckId.C11)))
+    }
+
+    @Test
+    fun `recorded Facebook capture - Meta's own service hosts are listed, linked to no finding and offered no fix`() {
+        // Saved sessions of the Facebook Quick check recorded on the iQOO 15 (audit-1791603680860): kept data, no consent screen.
+        val replay = com.dpdpxray.core.report.AuditJson.decodeSessions(
+            javaClass.getResource("/replays/facebook-audit-1791603680860.sessions.json")!!.readText(),
+        )
+        val g = groups(replay)
+        val meta = g.single { it.known }
+        assertEquals("Meta", meta.name)
+        assertEquals(Category.COMPANY_SERVICE, meta.category)
+        // Facebook's cited publisher is Meta, so the card can say "same company as the app".
+        assertTrue(meta.sameCompanyAsApp)
+        assertEquals(listOf("gateway.facebook.com", "b-graph.facebook.com"), meta.hosts.map { it.host })
+        assertTrue(meta.hosts.all { it.firstRelation == SdkAttribution.HISTORY_UNKNOWN })
+        assertTrue(meta.checks.isEmpty() && meta.fixIds.isEmpty() && meta.impact == 0.0)
+        assertEquals("These hostnames belong to Meta in TraceVeil's catalogue.", meta.catalogueMatch)
+        assertNull(SdkAttribution.headline(g, byCompany = true))
     }
 
     @Test

@@ -50,7 +50,7 @@ data class SdkGroup(
     val category: Category,
     /** false only for the unknown-hosts group. */
     val known: Boolean = true,
-    /** The audited app's own publisher runs this service (first-party data collection, finding S1). */
+    /** A cited record names the audited app's publisher as this service's company (see AppOwners). */
     val sameCompanyAsApp: Boolean = false,
     /** OBSERVED when DNS lookups to its hosts were captured; INFERRED when only a documentation-based check names it. */
     val evidence: EvidenceType,
@@ -89,9 +89,12 @@ class SdkAttribution(
             classifier.classify(s).map { e -> Seen(s, e, seconds(s, e), relation(e.phase, historyUnknown)) }
         }
         val linked = linkedChecks(result.findings, sessions)
+        // The audited app's publisher, from a cited record only (AppOwners); null when not recorded, never guessed.
+        val ownerCompany = sessions.firstNotNullOfOrNull { classifier.ownerOf(it)?.company }
 
         val byEntity = seen.filter { it.event.entity != null }.groupBy { it.event.entity!! }
-        val named = (byEntity.keys + linked.keys).distinct().map { entity -> known(entity, byEntity[entity].orEmpty(), linked[entity].orEmpty()) }
+        val named = (byEntity.keys + linked.keys).distinct()
+            .map { entity -> known(entity, byEntity[entity].orEmpty(), linked[entity].orEmpty(), ownerCompany) }
         val unknownSeen = seen.filter { it.event.entity == null && it.event.category == Category.UNKNOWN }
         val unknown = if (unknownSeen.isEmpty()) null else SdkGroup(
             name = UNKNOWN_GROUP, company = null, category = Category.UNKNOWN, known = false,
@@ -106,7 +109,7 @@ class SdkAttribution(
         ) + listOfNotNull(unknown)
     }
 
-    private fun known(entity: String, seen: List<Seen>, findings: List<Finding>): SdkGroup {
+    private fun known(entity: String, seen: List<Seen>, findings: List<Finding>, ownerCompany: String?): SdkGroup {
         val entry = catalog.entryFor(entity)
         val checks = findings.map { it.checkId }.distinct().sortedBy { it.ordinal }
         val sdkKey = entry?.sdkKey
@@ -116,7 +119,8 @@ class SdkAttribution(
             name = entity,
             company = entry?.company,
             category = entry?.category ?: seen.firstOrNull()?.event?.category ?: Category.UNKNOWN,
-            sameCompanyAsApp = seen.any { it.event.category == Category.FIRST_PARTY_SAME_COMPANY },
+            sameCompanyAsApp = seen.any { it.event.category == Category.FIRST_PARTY_SAME_COMPANY } ||
+                (ownerCompany != null && entry?.company == ownerCompany),
             evidence = if (hosts.isNotEmpty()) EvidenceType.OBSERVED else EvidenceType.INFERRED,
             catalogueMatch = catalogueWording(entity, entry?.company, hosts.size, checks),
             hosts = hosts,
