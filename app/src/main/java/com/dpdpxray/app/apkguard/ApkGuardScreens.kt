@@ -172,7 +172,7 @@ fun ApkGuardHubScreen(onBack: (() -> Unit)?, onOpenApp: (String) -> Unit, onOpen
                         Callout("Automatic new-app checks are off. Switch them on in Settings › Auto-guard.", Modifier.padding(bottom = 8.dp))
                     }
                     LearnMore {
-                        Note("While TraceVeil is open, Android tells it at once when a new app is installed. When TraceVeil is closed, Android runs its background check about every 15 minutes; Android decides the exact time, and battery saving can delay it. Each install is alerted once, never for updates or apps that came with the phone. The check reads only what Android shows about the app, on this phone. TraceVeil never starts an audit, a VPN or anything else by itself.")
+                        Note("While TraceVeil is open, Android tells it at once when a new app is installed. When TraceVeil is closed, Android runs its background check about every 15 minutes; Android decides the exact time, and battery saving can delay it, more so if TraceVeil has not been opened for a while. If TraceVeil is force-stopped (by you or by the phone's battery manager), Android pauses the check until TraceVeil is opened again. Each install is alerted once, never for updates or apps that came with the phone. The check reads only what Android shows about the app, on this phone. TraceVeil never starts an audit, a VPN or anything else by itself.")
                     }
                     if (!notificationsAllowed) {
                         Callout("Notifications are off for TraceVeil, so new-install alerts cannot appear.", Modifier.padding(bottom = 8.dp))

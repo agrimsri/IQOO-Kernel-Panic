@@ -67,7 +67,8 @@ fun AutoGuardSettingsCard(onCheckup: (() -> Unit)?) {
             s.weeklyCheckup,
             { v -> store.update { it.copy(weeklyCheckup = v) } },
         )
-        Row(Modifier.padding(top = 4.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Note("If TraceVeil is force-stopped (by you or by the phone's battery manager), Android pauses both checks until you open TraceVeil again.")
+        Row(Modifier.padding(top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             GlyphIcon(Glyph.LOCK, Film.clear, size = 18.dp)
             Spacer(Modifier.width(8.dp))
             Note("Runs on this phone only. Nothing is sent anywhere.", Film.clear)
