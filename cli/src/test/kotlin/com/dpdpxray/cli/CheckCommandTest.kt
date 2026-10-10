@@ -214,6 +214,16 @@ class CheckCommandTest {
     }
 
     @Test
+    fun `an internal error exits 2, never 1 like a policy violation`() {
+        val out = java.io.ByteArrayOutputStream()
+        val err = java.io.ByteArrayOutputStream()
+        val broken = lazy<Gate> { throw IllegalStateException("catalogue missing") }
+        val code = TraceVeilCi(java.io.PrintStream(out, true, "UTF-8"), java.io.PrintStream(err, true, "UTF-8"), dir, broken).run(arrayOf("check", leaky))
+        assertEquals(Exit.USAGE, code)
+        assertTrue(err.toString("UTF-8"), err.toString("UTF-8").contains("internal error: catalogue missing"))
+    }
+
+    @Test
     fun `help and version exit 0`() {
         val help = run(dir, "--help")
         assertEquals(Exit.PASS, help.exit)

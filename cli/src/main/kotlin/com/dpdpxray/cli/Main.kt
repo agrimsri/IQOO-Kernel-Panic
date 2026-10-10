@@ -55,6 +55,10 @@ class TraceVeilCi(
         err.println("traceveil-ci: ${e.message}")
         err.println("Run \"traceveil-ci --help\" for usage.")
         Exit.USAGE
+    } catch (e: Exception) {
+        // Never let a crash look like a policy result: the JVM would exit 1, the code for a violation.
+        err.println("traceveil-ci: internal error: ${e.message ?: e.javaClass.name}")
+        Exit.USAGE
     }
 
     private fun check(a: Args): Int {

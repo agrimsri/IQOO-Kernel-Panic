@@ -100,6 +100,15 @@ class SarifTest {
     }
 
     @Test
+    fun `a bundle outside the working directory gets a file URI`() {
+        val elsewhere = temp.newFolder("elsewhere")
+        val r = run(elsewhere, "check", File(dir, SampleBundles.LEAKY).absolutePath, "--format", "sarif")
+        val uri = Json.parseToJsonElement(r.out).jsonObject["runs"]!!.jsonArray.single().jsonObject["results"]!!.jsonArray.first().jsonObject
+            .get("locations")!!.jsonArray.single().jsonObject.obj("physicalLocation").obj("artifactLocation").str("uri")
+        assertTrue(uri, uri.startsWith("file:/") && uri.endsWith("/bundles/${SampleBundles.LEAKY}"))
+    }
+
+    @Test
     fun `line lookup falls back to the first line`() {
         assertEquals(3, CheckSarif.lineOf("{\n  \"x\": 1,\n  \"checkId\": \"C2\"\n}", "C2"))
         assertEquals(1, CheckSarif.lineOf("{\"checkId\": \"C1\"}", "C9"))

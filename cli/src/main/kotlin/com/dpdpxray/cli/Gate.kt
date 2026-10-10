@@ -17,7 +17,7 @@ import com.dpdpxray.core.trackers.TrackerCatalog
 import java.io.File
 
 /** A bundle file read from disk. [displayPath] is relative to the working directory when the file is inside it. */
-class LoadedBundle(val displayPath: String, val text: String, val bundle: AuditBundleV1) {
+class LoadedBundle(val displayPath: String, val text: String, val bundle: AuditBundleV1, val uri: String = displayPath) {
     val meta: BundleMeta = AuditBundles.metaOf(bundle)
 
     /** Synthetic data: the app's sample flag, or a fixture note. */
@@ -35,7 +35,13 @@ class LoadedBundle(val displayPath: String, val text: String, val bundle: AuditB
             } catch (e: BundleFormatException) {
                 throw UsageException("$shown: ${e.message}")
             }
-            return LoadedBundle(shown, text, bundle)
+            return LoadedBundle(shown, text, bundle, artifactUri(file, cwd))
+        }
+
+        /** SARIF artifact location: relative to the working directory (the repository root in CI), else a file URI. */
+        fun artifactUri(file: File, cwd: File): String {
+            val shown = displayPath(file, cwd)
+            return if (File(shown).isAbsolute || shown.startsWith("/")) file.absoluteFile.toPath().normalize().toUri().toString() else shown
         }
 
         fun displayPath(file: File, cwd: File): String {

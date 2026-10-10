@@ -77,7 +77,7 @@ object CheckSarif {
         put("locations", buildJsonArray {
             add(buildJsonObject {
                 put("physicalLocation", buildJsonObject {
-                    put("artifactLocation", buildJsonObject { put("uri", c.source.displayPath) })
+                    put("artifactLocation", buildJsonObject { put("uri", c.source.uri) })
                     put("region", buildJsonObject { put("startLine", lineOf(c.source.text, f.checkId.code)) })
                 })
             })
