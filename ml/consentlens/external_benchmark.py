@@ -65,6 +65,30 @@ def probs_of(path, X):
     return scale * (it.get_tensor(out["index"]).astype(np.float32) - zp)
 
 
+# Hand-written spot-check strings (common banner wording; our own expected role). Not a benchmark: a sanity probe.
+PROBE = [("Cookie settings", "MANAGE"), ("Cookie preferences", "MANAGE"), ("Manage cookies", "MANAGE"), ("Customise cookies", "MANAGE"),
+         ("Configurar cookies", "MANAGE"), ("Paramètres des cookies", "MANAGE"), ("Einstellungen", "MANAGE"), ("More options", "MANAGE"),
+         ("About cookies", "OTHER"), ("Cookie details", "OTHER"), ("Cookie policy", "PRIVACY_LINK"), ("Your privacy choices", "PRIVACY_LINK"),
+         ("Essential cookies only", "REJECT"), ("Use necessary cookies only", "REJECT"), ("Reject non-essential cookies", "REJECT"),
+         ("Tout refuser", "REJECT"), ("Rechazar todo", "REJECT"), ("Alle ablehnen", "REJECT"),
+         ("Accept all cookies", "ACCEPT"), ("Allow all cookies", "ACCEPT")]
+
+
+def probe(models, thr):
+    X = np.array([encode(t) for t, _ in PROBE], dtype=np.int32)
+    button, _ = A.lexicon_layers()
+    out = []
+    P = {name: probs_of(path, X) for name, path in models}
+    for i, (t, exp) in enumerate(PROBE):
+        r = {"text": t, "expected": exp, "lexicon": button(t)}
+        for name, _ in models:
+            p = P[name][i]
+            r[name] = {"role": ROLES[int(p.argmax())], "confidence": round(float(p.max()), 2),
+                       "used_by_app": r["lexicon"] is None and ROLES[int(p.argmax())] != "OTHER" and float(p.max()) >= thr.get(name, 0.9)}
+        out.append(r)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", required=True)
@@ -116,6 +140,10 @@ def main():
     os.makedirs(A.OUT, exist_ok=True)
     with open(os.path.join(A.OUT, "external_bouhoula2024.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(res, f, indent=1)
+    pr = probe([spec.split("=", 1) for spec in a.tflite], thr)
+    with open(os.path.join(A.OUT, "probe_banner_strings.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump({"note": "hand-written spot check of common banner wording; expected roles are ours; not a benchmark",
+                   "thresholds": thr, "rows": pr}, f, ensure_ascii=False, indent=1)
 
 
 if __name__ == "__main__":

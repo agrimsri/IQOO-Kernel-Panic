@@ -42,13 +42,14 @@ def main():
                                               "pass": lo >= 0.98}
     size = max(S["lolo"][a.cand]["tflite_bytes"] + ([exp["bytes"]] if exp else []))
     crit["Size <= 400 KB"] = {"value": f"{size:,} bytes", "pass": size <= 400 * 1024}
-    shipped = all(v["pass"] for v in crit.values())
-    out = {"cand": a.cand, "shipped": shipped, "criteria": crit, "worst_role_drop": worst[0]}
+    all_pass = all(v["pass"] for v in crit.values())
+    out = {"cand": a.cand, "criteria_all_pass": all_pass, "criteria": crit, "worst_role_drop": worst[0],
+           "note": "the ship decision itself is recorded in decision.json (write_v2_report.py); see v2_report.md"}
     with open(os.path.join(V2, "decision_criteria.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(out, f, indent=1)
     for k, v in crit.items():
         print(("PASS " if v["pass"] else "FAIL ") + k + ": " + v["value"])
-    print("SHIP" if shipped else "KEEP v1")
+    print("ALL CRITERIA PASS" if all_pass else "AT LEAST ONE CRITERION FAILS")
 
 
 if __name__ == "__main__":

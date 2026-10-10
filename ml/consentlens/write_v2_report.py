@@ -40,6 +40,7 @@ def main():
     ap.add_argument("--cand", required=True)
     ap.add_argument("--shipped", choices=["yes", "no"], required=True)
     ap.add_argument("--thr-app", type=float, required=True)
+    ap.add_argument("--hold-reason", default=None, help="plain-text verdict when the candidate is not shipped for a reason beyond the criteria table")
     a = ap.parse_args()
     cand, shipped = a.cand, a.shipped == "yes"
     S = J(V2, f"outer_v1_vs_{cand}.json")
@@ -71,14 +72,31 @@ def main():
           f"under the same folds and protocol: macro-F1 {d_seen:+.3f} on seen languages and {d_lolo:+.3f} on held-out languages "
           "(mean of 3 training seeds each, INT8 files), no role down by more than 0.05, no new TFLite op type, INT8/float agreement ≥ 98%, file ≤ 400 KB.")
     else:
-        w(f"**ConsentLens-1 stays in the app.** The best candidate, `{cand}` ({RECIPE_NOTES.get(cand, '')}), did not meet every ship criterion "
-          f"(macro-F1 {d_seen:+.3f} seen / {d_lolo:+.3f} held-out). The app assets are unchanged; only the experiment code and this report are committed.")
+        if a.hold_reason:
+            w(f"**ConsentLens-1 stays in the app.** {a.hold_reason} The app assets are unchanged; only the experiment code and this report are committed.")
+        else:
+            w(f"**ConsentLens-1 stays in the app.** The best candidate, `{cand}` ({RECIPE_NOTES.get(cand, '')}), did not meet every ship criterion "
+              f"(macro-F1 {d_seen:+.3f} seen / {d_lolo:+.3f} held-out). The app assets are unchanged; only the experiment code and this report are committed.")
+    w("")
+    w("The lead's ship criteria, measured on the internal test folds:")
     w("")
     w("| Criterion | Measured | Result |")
     w("| --- | --- | --- |")
     for k, v in C["criteria"].items():
         w(f"| {k} | {v['value']} | {'PASS' if v['pass'] else 'FAIL'} |")
     w("")
+    if not shipped and a.hold_reason:
+        w("The external check (section 8) is not one of those criteria; it is the reason the candidate is held back. "
+          "If the team accepts that risk, v2 can be installed in a few minutes:")
+        w("")
+        w("```sh")
+        w("# the exported candidate (all rows, seed 42) is kept outside Git: D:/DevTools/tmp/consentlens-v2-work/consentlens2_candidate_int8.tflite (+ .json)")
+        w(f"python -I ml/consentlens/experiments_v2.py ship --recipe {cand} --out <that .tflite> --threshold {cthr if cthr else 0.68} \\")
+        w(f"    --summary ml/consentlens/reports/v2/outer_v1_vs_{cand}.json --model-id ConsentLens-2   # rewrites the asset, meta and golden decode cases")
+        w("# then set ConsentLensText.MODEL_ID = \"ConsentLens-2\", update the ConsentLensEngine KDoc size line, run :core:test :app:testDebugUnitTest :app:assembleDebug,")
+        w("# and on the phone: AI lab -> ConsentLens -> Load (planNodes=1/11, fullyDelegated=true), Benchmark, Try samples")
+        w("```")
+        w("")
     w("## 1. v1 reproduced exactly")
     w("")
     w("`experiments_v2.py run --recipe v1 --seed 42` calls ConsentLens-1's own `train_consentlens.train` / `to_int8` on the same folds. "
@@ -128,9 +146,9 @@ def main():
     w("- **Logit adjustment** (subtracting τ·log prior from the logits, foldable into the last bias) did not help v1 on dev (τ = 0.1: +0.002 / −0.000; larger τ hurt): the square-root class weights already balance the roles.")
     w("- **Dilation:** Keras `Conv1D(dilation_rate>1)` converts to SPACE_TO_BATCH_ND + CONV_2D + BATCH_TO_SPACE_ND + RELU (3 new op types). A direct `tf.nn.conv2d(..., dilations=…)` "
       "converts to a single CONV_2D with a dilation factor; `experiments_v2.DilatedConv1D` does that. Three-layer, dilated and strided variants (`s2_d3`, `s2_s3`, `deep*`) were "
-      "built and op-checked (only v1's op types, 292–350 KB) but **not screened**: there was not enough laptop time.")
-    w("- **Not tried for lack of time:** label smoothing (`s3`), focal loss, full inverse-frequency weights (`s2_inv`), language-balanced sampling and knowledge distillation are "
-      "implemented as recipe switches but have no dev result; nothing is claimed about them.")
+      "built and op-checked (they convert to v1's op types only) but **not screened**: there was not enough laptop time.")
+    w("- **Not run for lack of time:** label smoothing (`s3`), focal loss, full inverse-frequency weights (`s2_inv`) and language-balanced sampling exist as recipe switches; "
+      "knowledge distillation has only a soft-target hook (no teacher was trained). None has a dev result, so nothing is claimed about them.")
     ens = J(V2, "dev_ensembles.json") if os.path.exists(os.path.join(V2, "dev_ensembles.json")) else None
     if ens:
         gains = [v["gain"] for p in ens.values() for v in p["pairs"].values()]
@@ -165,6 +183,11 @@ def main():
         w(f"- {PROT[p]}: v1 " + ", ".join(f"seed {k} {v['int8_macro_f1']:.4f}" for k, v in b[p]["per_seed"].items())
           + "; candidate " + ", ".join(f"seed {k} {v['int8_macro_f1']:.4f}" for k, v in c[p]["per_seed"].items()))
     w("")
+    worst_beats = all(min(v["int8_macro_f1"] for v in c[p]["per_seed"].values()) > max(v["int8_macro_f1"] for v in b[p]["per_seed"].values())
+                      for p in ("seen", "lolo"))
+    w("The published v1 (seed 42) was v1's best seed on seen languages, so v1's 3-seed mean is below its published 0.671. "
+      + ("The worst candidate seed beats the best v1 seed on both protocols." if worst_beats else "The seed ranges of v1 and the candidate overlap on at least one protocol."))
+    w("")
     w("Figures: `reports/v2/fig_macro_f1.png`, `fig_per_class_f1.png`, `fig_confusion.png`, `fig_layered.png`.")
     w("")
     w("## 5. Size, ops, quantisation, latency")
@@ -188,6 +211,11 @@ def main():
         w(f"| {n} | {t.replace('threads=', '')} | {v['median_ms']:.3f} | {v['p95_ms']:.3f} |")
     w("")
     w("These are laptop numbers, not phone numbers.")
+    if os.path.exists(os.path.join(V2, "demo_phrases_v1_v2.json")):
+        dp = J(V2, "demo_phrases_v1_v2.json")
+        w("")
+        w(f"AI-lab demo phrases (24 hand-written strings in 15 languages, some in the training data): ConsentLens-1 matches our expected role on {dp['v1_matches']}/24, "
+          f"the v2 candidate on {dp['v2_matches']}/24 (`reports/v2/demo_phrases_v1_v2.json`).")
     w("")
     w("## 6. Threshold")
     w("")
@@ -227,9 +255,25 @@ def main():
         w(f"| {name} | {m['macro_f1_4']:.3f} | {m['accuracy']:.3f} | {pc['ACCEPT']['f1']:.3f} | {pc['REJECT']['f1']:.3f} | {pc['MANAGE']['f1']:.3f} | {pc['NOT_A_CHOICE']['f1']:.3f} |")
     row("Lexicon only", ext["lexicon_only"])
     for name, m in ext["models"].items():
-        row(f"{name} alone (argmax)", m["argmax"])
-        row(f"Lexicon + {name} (≥ {m['layered_lexicon_then_model']['threshold']:.2f})", m["layered_lexicon_then_model"])
+        base = name.split("_at_")[0]
+        if "_at_" not in name:
+            row(f"{name} alone (argmax)", m["argmax"])
+        row(f"Lexicon + {base} (≥ {m['layered_lexicon_then_model']['threshold']:.2f})", m["layered_lexicon_then_model"])
+        if "_at_" not in name:
+            nv = m["argmax_novel_strings_only"]
+            row(f"{name} alone, novel strings only (n={nv['n']:,})", nv)
     w("")
+    M2 = ext["models"]
+    if "v1" in M2 and "v2" in M2:
+        a1, a2 = M2["v1"]["argmax"]["per_class"], M2["v2"]["argmax"]["per_class"]
+        frs = "; ".join(f"{k.split('_at_')[0]} at {v['layered_lexicon_then_model']['threshold']:.2f}: {v['layered_model_decided_false_reject']['count']}"
+                        for k, v in M2.items() if "layered_model_decided_false_reject" in v)
+        exs = ", ".join(f"\"{x[0]}\"" for x in M2["v2"]["layered_model_decided_false_reject"]["examples"][:6])
+        w(f"**Per role the two models move in opposite directions on this English set.** Model alone: Accept F1 {a1['ACCEPT']['f1']:.3f} → {a2['ACCEPT']['f1']:.3f}, "
+          f"Manage {a1['MANAGE']['f1']:.3f} → {a2['MANAGE']['f1']:.3f}, but **Reject {a1['REJECT']['f1']:.3f} → {a2['REJECT']['f1']:.3f}** "
+          f"(precision {a1['REJECT']['precision']:.2f} → {a2['REJECT']['precision']:.2f}). Strings that the layered decision labels Reject on the model's word although "
+          f"they are not Reject: {frs}. Typical v2 errors: {exs}. A wrong Reject on a button can make an audit infer \"reject option visible\", so this is the error that matters most.")
+        w("")
     w("The paper's own BERT reports \"an accuracy of 95.1% and an F1 score of 90.9%\" with 5-fold cross-validation trained on this same data "
       "(in-distribution, 6 labels, server-side, text machine-translated to English). Our numbers are zero-shot with a different label set; they are not comparable and we do not claim to beat it.")
     w("")
@@ -251,7 +295,10 @@ def main():
     w("")
     w("## 10. Limits, and what the lead must verify on the phone")
     w("")
-    w("- Unseen languages remain hard: Accept vs Reject on never-seen languages is the weakest cell for both models.")
+    w("- Unseen languages remain hard: the choice buttons (Accept, Reject, Manage) on never-seen languages are the weakest roles for both models.")
+    if not shipped and a.hold_reason:
+        w("- The candidate says \"Reject\" too often for English cookie-settings and info links (section 8). Fix first: add such strings as MANAGE/OTHER training rows from an "
+          "openly licensed source (not the GPLv3 benchmark itself, which must stay a test set), then re-run this exact protocol and the external check.")
     w("- Labels are per string key (AOSP, Klaro!, tarteaucitron.js), not per screen; most rows are Android permission/system strings.")
     w("- The external benchmark is English web buttons only; it does not test the multilingual claim.")
     w("- Folds 1–4 carry a small selection effect from the dev split; fold 0 is clean.")
@@ -282,7 +329,9 @@ def main():
                    f"no new op type, INT8/float agreement of at least 98% and a {exp['bytes']:,}-byte file. It replaces <code>consentlens_int8.tflite</code> as "
                    f"<b>ConsentLens-2</b> with threshold {a.thr_app:.2f} (chosen on the dev split). NPU delegation must still be confirmed on the phone.</p>")
     else:
-        summary = (f"<p>The best candidate <code>{cand}</code> did not pass every ship criterion (macro-F1 {d_seen:+.3f} seen, {d_lolo:+.3f} held-out). "
+        import html as _html
+        summary = (f"<p>{_html.escape(a.hold_reason)} The app keeps ConsentLens-1.</p>" if a.hold_reason else
+                   f"<p>The best candidate <code>{cand}</code> did not pass every ship criterion (macro-F1 {d_seen:+.3f} seen, {d_lolo:+.3f} held-out). "
                    "The app keeps ConsentLens-1; this report documents the experiments.</p>")
     ens = J(V2, "dev_ensembles.json") if os.path.exists(os.path.join(V2, "dev_ensembles.json")) else None
     gains = [v["gain"] for p in ens.values() for v in p["pairs"].values()] if ens else [0.0]
@@ -302,7 +351,8 @@ def main():
              "the best single model's on both dev splits; otherwise the best single model is. <b>Outcome:</b> the packed ensemble lost on the seen-language dev split "
              "(see table), so the wider single network <code>s2_w160</code> is the candidate. The ensemble's outer run, started early to save time, was stopped; its two "
              "finished folds (0.646 and 0.557 vs v1's 0.574 and 0.500, seed 1, held-out languages) are incomplete and were not used for any decision.</p>")
-    dec = {"shipped": shipped, "summary_html": summary, "threshold_in_app": f"{a.thr_app:.2f}",
+    dec = {"shipped": shipped, "hold_basis": None if shipped else ("external" if a.hold_reason else "criteria"),
+           "summary_html": summary, "threshold_in_app": f"{a.thr_app:.2f}",
            "reproduction": {"lolo_int8_macro_f1": s42l["int8_macro_f1"], "lolo_float_macro_f1": s42l["float_macro_f1"],
                             "lolo_agreement": s42l["int8_float_agreement"], "seen_int8_macro_f1": s42s["int8_macro_f1"],
                             "statement": "Seed 42 through ConsentLens-1's own training and conversion code reproduces every fold of the published "
@@ -355,7 +405,7 @@ def main():
     m("- **How it was chosen:** every choice was made on an inner validation split inside the training rows of outer fold 0, never on test rows, with a rule fixed "
       "before any candidate's test numbers existed. Full method, dev table, per-seed numbers, confusion matrices, the layered-system measurement, the external benchmark "
       "and related work: [reports/v2_report.md](reports/v2_report.md).")
-    m("- **Still true from ConsentLens-1:** labels are per string key; unseen languages remain hard (Accept vs Reject is the weakest cell); NPU delegation and latency "
+    m("- **Still true from ConsentLens-1:** labels are per string key; unseen languages remain hard (Accept, Reject and Manage are the weakest roles there); NPU delegation and latency "
       f"must be confirmed on the phone (AI lab → Load must show `planNodes=1/{len(exp['ops'])}`, `fullyDelegated=true`).")
     m("")
     with open(os.path.join(V2, "model_card_v2_section.md"), "w", encoding="utf-8", newline="\n") as f:
