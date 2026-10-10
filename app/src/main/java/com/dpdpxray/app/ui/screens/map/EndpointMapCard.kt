@@ -5,14 +5,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -28,12 +25,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.capture.DnsForwarder
+import com.dpdpxray.app.ui.components.FoldText
+import com.dpdpxray.app.ui.components.KeyCaveat
 import com.dpdpxray.app.ui.components.LearnMore
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.Mono
@@ -111,7 +112,7 @@ fun EndpointMapCardContent(
                 return@Column
             }
             val view = remember(model, owners, mode, legal) { MapPresenter.view(model, owners, mode, legal) }
-            Text(view.explanation, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+            FoldText(view.explanation)
 
             val highlighted = remember(model, owners, mode) { MapPresenter.highlight(model, owners, mode) }
             val uncertain = remember(model, mode) {
@@ -139,20 +140,32 @@ fun EndpointMapCardContent(
                 }
             }
 
-            view.footer.forEach { Text(it, style = MaterialTheme.typography.labelMedium, color = Film.boneDim) }
-            if (view.rows.isNotEmpty()) Text(
-                "Observed: seen in this audit's DNS. Inferred: derived from it. Sourced: from a cited document. Unknown: no evidence.",
-                style = MaterialTheme.typography.labelMedium, color = Film.boneDim,
+            // Text diet: the one caveat that must stay in view, then the table's own notes and licence credit as before.
+            // The long explanation of each mode and the evidence legend fold into "What this map shows, and what it doesn't".
+            KeyCaveat(
+                if (mode == MapMode.SOURCE_DNS) "A country shows where an address is placed, not where data went."
+                else "Nothing here says a vendor or app broke a law.",
+                color = Brand.CoralGlow.color,
             )
-            MapLimitsFold(network, (model.source as? GeoSource.Loaded)?.origin == TableOrigin.BUNDLED, pushCommand)
+            val folded = if (mode == MapMode.SOURCE_DNS) view.footer.take(1) else view.footer
+            view.footer.drop(folded.size).forEach { Text(it, style = MaterialTheme.typography.labelMedium, color = Film.boneDim) }
+            val legend = if (view.rows.isNotEmpty()) {
+                "Observed: seen in this audit's DNS. Inferred: derived from it. Sourced: from a cited document. Unknown: no evidence."
+            } else null
+            MapLimitsFold(network, (model.source as? GeoSource.Loaded)?.origin == TableOrigin.BUNDLED, pushCommand, folded, legend)
         }
     }
 }
 
-/** "What this map shows, and what it doesn't": short lines first, the capture's network, then why a country can matter. */
+/**
+ * "What this map shows, and what it doesn't": this view's own notes ([footer]) and the evidence [legend] first, then short
+ * lines, the capture's network, and why a country can matter.
+ */
 @Composable
-private fun MapLimitsFold(network: List<Fact>, bundledTable: Boolean, pushCommand: String) {
+private fun MapLimitsFold(network: List<Fact>, bundledTable: Boolean, pushCommand: String, footer: List<String>, legend: String?) {
     LearnMore(label = MapGuide.TITLE, openLabel = "Hide: ${MapGuide.TITLE.replaceFirstChar { it.lowercase() }}") {
+        footer.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = Film.bone) }
+        legend?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Film.boneDim) }
         MapGuide.points(DnsForwarder.FALLBACKS).forEach { p ->
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(p.title, style = MaterialTheme.typography.titleSmall, color = Film.bone)
@@ -205,9 +218,8 @@ private fun ModeSwitch(mode: MapMode, onMode: (MapMode) -> Unit) {
 
 @Composable
 private fun RowBlock(row: MapRow, rule: Color, isRepeat: (Int) -> Boolean) {
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-        Box(Modifier.width(2.dp).fillMaxHeight().background(rule))
-        Column(Modifier.padding(start = 12.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxWidth().drawBehind { drawRect(rule, size = Size(2.dp.toPx(), size.height)) }) {
+        Column(Modifier.padding(start = 14.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(row.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 EvidenceChip(row.evidence)
