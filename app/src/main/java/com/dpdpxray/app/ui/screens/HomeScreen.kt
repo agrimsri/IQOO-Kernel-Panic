@@ -34,10 +34,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -55,17 +54,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.control.DeviceChecks
-import com.dpdpxray.app.data.AuditMeta
-import com.dpdpxray.app.data.SampleAudit
 import com.dpdpxray.app.ui.XrayViewModel
-import com.dpdpxray.app.ui.components.Tag
+import com.dpdpxray.app.ui.components.GroupHeader
 import com.dpdpxray.app.ui.guide.ActionTile
 import com.dpdpxray.app.ui.guide.EmptyState
 import com.dpdpxray.app.ui.guide.Glyph
@@ -74,10 +70,9 @@ import com.dpdpxray.app.ui.guide.GradientAction
 import com.dpdpxray.app.ui.guide.GuideBanner
 import com.dpdpxray.app.ui.guide.GuideFlow
 import com.dpdpxray.app.ui.guide.LinkAction
+import com.dpdpxray.app.ui.guide.OutlineAction
 import com.dpdpxray.app.ui.guide.Panel
 import com.dpdpxray.app.ui.guide.PillButton
-import com.dpdpxray.app.ui.guide.RecentChecks
-import com.dpdpxray.app.ui.guide.ScoreChip
 import com.dpdpxray.app.ui.guide.SetupItem
 import com.dpdpxray.app.ui.guide.SetupKind
 import com.dpdpxray.app.ui.guide.SetupNeed
@@ -85,10 +80,6 @@ import com.dpdpxray.app.ui.guide.SetupSteps
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
-import com.dpdpxray.app.ui.theme.bandColor
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun HomeScreen(
@@ -103,6 +94,8 @@ fun HomeScreen(
     onApk: (() -> Unit)? = null,
     onHowItWorks: () -> Unit = {},
     onLive: () -> Unit = {},
+    /** Opens the Reports tab with every saved check. */
+    onAllReports: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val pf by vm.preflight.collectAsState()
@@ -131,26 +124,21 @@ fun HomeScreen(
             SetupKind.SHIZUKU -> vm.requestShizuku()
         }
     }
-    val aiLine = when (val s = llm) {
-        is LlmStatus.Ready -> "${s.model} on ${s.backend.label}"
-        is LlmStatus.Loading -> "Loading on ${s.backend.label}…"
-        LlmStatus.NotLoaded -> "Model found; it loads when an audit starts"
-        LlmStatus.NoModel -> "No model yet. Screen checks use the accessibility tree only"
-        is LlmStatus.Failed -> s.message
-    }
+    val aiLine = aiStatusLine(llm)
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-        Row(Modifier.fillMaxWidth().padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("TraceVeil", style = MaterialTheme.typography.headlineMedium, maxLines = 1, modifier = Modifier.semantics { heading() })
                 Box(Modifier.padding(top = 4.dp).size(width = 44.dp, height = 3.dp).clip(CircleShape).background(Brand.horizontal))
             }
-            LinkAction("AI lab", onLab)
-            LinkAction("Settings", onSettings, color = Film.boneDim)
+            IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).semantics { contentDescription = "Settings" }) {
+                GlyphIcon(Glyph.SETTINGS, Film.boneDim, size = 24.dp)
+            }
         }
-        Text("Apps promise. TraceVeil checks.", style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 10.dp))
+        Text("Apps promise. TraceVeil checks.", style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 8.dp))
 
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(16.dp))
         GuideBanner(
             running?.let { GuideFlow.homeRunning(it.config.targetLabel) } ?: GuideFlow.home(pf),
             speak = running == null,
@@ -163,7 +151,12 @@ fun HomeScreen(
         }
 
         Spacer(Modifier.height(16.dp))
-        Hero(canAudit = pf.canAudit) { if (vm.prepareAudit()) onAudit() }
+        Hero(canAudit = pf.canAudit, stepsLeft = todo.size) { if (vm.prepareAudit()) onAudit() }
+
+        if (todo.isEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            ReadyPanel(items, aiLine, fix, onLab)
+        }
 
         val latest = audits.firstOrNull()
         val tiles = buildList {
@@ -172,7 +165,8 @@ fun HomeScreen(
             add(Tile("See a sample", "A labelled example result; no setup", Glyph.SAMPLE) { vm.openSample(onOpen) })
             add(Tile("Camera check", "Review a photo of a consent screen", Glyph.CAMERA, onCamera))
         }
-        Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        GroupHeader("Quick actions")
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             tiles.chunked(2).forEach { row ->
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     row.forEach { t -> ActionTile(t.title, t.detail, t.glyph, t.onClick, Modifier.weight(1f).fillMaxHeight()) }
@@ -182,17 +176,12 @@ fun HomeScreen(
         }
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             LinkAction("How it works", onHowItWorks, glyph = Glyph.BOOK)
-            LinkAction("More samples", { showSampleFixtures = true }, color = Film.boneDim)
+            LinkAction("More samples", { showSampleFixtures = true }, color = Film.boneDim, glyph = Glyph.REPORTS)
         }
 
-        if (todo.isEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            ReadyPanel(items, aiLine, fix, onLab)
-        }
-
-        Row(Modifier.fillMaxWidth().padding(top = 26.dp, bottom = 10.dp), verticalAlignment = Alignment.Bottom) {
-            Text("Recent checks", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
-            if (audits.isNotEmpty()) Text("${audits.size}", style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
+        GroupHeader("Recent checks") {
+            if (audits.size > RECENT_ON_HOME) LinkAction("See all ${audits.size}", onAllReports)
+            else if (audits.isNotEmpty()) Text("${audits.size}", style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
         }
         if (audits.isEmpty()) {
             EmptyState(
@@ -202,36 +191,27 @@ fun HomeScreen(
             )
         }
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            audits.forEach { RecentCard(it) { onOpen(it.id) } }
+            audits.take(RECENT_ON_HOME).forEach { RecentCheckCard(it) { onOpen(it.id) } }
         }
-        Spacer(Modifier.height(32.dp))
+        if (audits.size > RECENT_ON_HOME) {
+            OutlineAction("See all ${audits.size} checks in Reports", onAllReports, Modifier.padding(top = 12.dp), glyph = Glyph.REPORTS)
+        }
+        Spacer(Modifier.height(24.dp))
     }
-    if (showSampleFixtures) {
-        AlertDialog(
-            onDismissRequest = { showSampleFixtures = false },
-            title = { Text("Sample evidence") },
-            text = {
-                Column {
-                    Text("Synthetic examples, not a live audit. Example IPs do not identify real server locations.")
-                    SampleAudit.Variant.entries.filter { it != SampleAudit.Variant.BASELINE }.forEach { variant ->
-                        TextButton(onClick = {
-                            showSampleFixtures = false
-                            vm.openSample(variant, onOpen)
-                        }, modifier = Modifier.heightIn(min = 48.dp)) { Text(variant.label) }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showSampleFixtures = false }) { Text("Cancel") } },
-            containerColor = Film.raised,
-        )
-    }
+    if (showSampleFixtures) SampleFixturesDialog(vm, onOpen) { showSampleFixtures = false }
 }
+
+/** Home shows the newest few; the Reports tab lists them all. */
+private const val RECENT_ON_HOME = 3
 
 private data class Tile(val title: String, val detail: String, val glyph: Glyph, val onClick: () -> Unit)
 
-/** The lightbox: one question, one sentence, one action. A faint film grid and a consent line sit behind it. */
+/**
+ * The lightbox: a readiness chip, one question, one sentence, one action. A faint film grid and a consent line sit
+ * behind it.
+ */
 @Composable
-private fun Hero(canAudit: Boolean, onCheck: () -> Unit) {
+private fun Hero(canAudit: Boolean, stepsLeft: Int, onCheck: () -> Unit) {
     val shape = RoundedCornerShape(22.dp)
     Box(Modifier.fillMaxWidth().clip(shape).background(Film.raised).border(1.dp, FilmExtra.hairline, shape)) {
         Canvas(Modifier.matchParentSize()) {
@@ -240,14 +220,18 @@ private fun Hero(canAudit: Boolean, onCheck: () -> Unit) {
             while (x < size.width) { drawLine(FilmExtra.hairline, Offset(x, 0f), Offset(x, size.height), 1f); x += step }
             var y = step
             while (y < size.height) { drawLine(FilmExtra.hairline, Offset(0f, y), Offset(size.width, y), 1f); y += step }
-            val line = size.height * 0.30f
+            val line = size.height * 0.36f
             drawLine(
                 Brush.horizontalGradient(listOf(Color.Transparent, Film.scan.copy(alpha = 0.55f), Color.Transparent)),
                 Offset(0f, line), Offset(size.width, line), 2.dp.toPx(),
             )
         }
         Column(Modifier.padding(20.dp)) {
-            Text("Does an app respect your choice?", style = MaterialTheme.typography.headlineMedium, color = Film.bone)
+            ReadinessChip(canAudit, stepsLeft)
+            Text(
+                "Does an app respect your choice?", style = MaterialTheme.typography.headlineMedium, color = Film.bone,
+                modifier = Modifier.padding(top = 14.dp).semantics { heading() },
+            )
             Text(
                 "TraceVeil watches one app's lookups while you accept or refuse its consent popup, then explains what it saw.",
                 style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 8.dp, bottom = 18.dp),
@@ -258,6 +242,27 @@ private fun Hero(canAudit: Boolean, onCheck: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium, color = Film.warn, modifier = Modifier.padding(top = 10.dp),
             )
         }
+    }
+}
+
+/** "Ready to check" in green once nothing is left to do; otherwise what is left, in amber. Same checks as Getting ready. */
+@Composable
+private fun ReadinessChip(canAudit: Boolean, stepsLeft: Int) {
+    val color = if (canAudit && stepsLeft == 0) Film.clear else Film.warn
+    val text = when {
+        canAudit && stepsLeft == 0 -> "Ready to check"
+        canAudit -> "Ready · see the tip above"
+        stepsLeft == 1 -> "1 setup step left"
+        else -> "$stepsLeft setup steps left"
+    }
+    Row(
+        Modifier.clip(CircleShape).background(color.copy(alpha = 0.12f)).border(1.dp, color.copy(alpha = 0.4f), CircleShape)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(8.dp))
+        Text(text, style = MaterialTheme.typography.labelMedium, color = color)
     }
 }
 
@@ -301,7 +306,7 @@ private fun ReadyPanel(items: List<SetupItem>, aiLine: String, fix: (SetupKind) 
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Ready to check", style = MaterialTheme.typography.titleMedium)
+                Text("Setup", style = MaterialTheme.typography.titleMedium)
                 Text("VPN allowed and consent watcher on", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
             }
             Text(if (open) "Hide" else "Details", style = MaterialTheme.typography.labelLarge, color = Film.scan)
@@ -355,40 +360,5 @@ private fun AiRow(line: String, onLab: () -> Unit) {
             Text(line, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
         }
         LinkAction("AI lab", onLab)
-    }
-}
-
-@Composable
-private fun RecentCard(meta: AuditMeta, onClick: () -> Unit) {
-    val color = bandColor(meta.band)
-    val shape = RoundedCornerShape(16.dp)
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 76.dp).clip(shape).background(Film.raised)
-            .clickable(role = Role.Button, onClick = onClick).padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ScoreChip(RecentChecks.scoreText(meta), color)
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(meta.targetLabel, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                if (meta.sample) {
-                    Spacer(Modifier.width(8.dp))
-                    Tag("Sample", Film.boneDim)
-                }
-            }
-            Text(
-                "${meta.band.label}, ${if (meta.findingCount == 1) "1 finding" else "${meta.findingCount} findings"}, " +
-                    SimpleDateFormat("d MMM, HH:mm", Locale.US).format(Date(meta.createdAtMs)),
-                style = MaterialTheme.typography.bodyMedium, color = Film.boneDim,
-            )
-            RecentChecks.coverageWarning(meta)?.let { warning ->
-                Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(6.dp).clip(CircleShape).background(Film.warn))
-                    Spacer(Modifier.width(6.dp))
-                    Text(warning, style = MaterialTheme.typography.labelMedium, color = Film.warn)
-                }
-            }
-        }
     }
 }
