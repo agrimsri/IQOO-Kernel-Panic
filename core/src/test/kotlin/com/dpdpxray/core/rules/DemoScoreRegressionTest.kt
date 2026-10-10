@@ -128,13 +128,13 @@ class DemoScoreRegressionTest {
     }
 
     /**
-     * What the next phone run records on top of the device-shaped sessions: the consent-screen tree (neither LeakyShop
-     * build links a privacy policy, see leakyshop/Shop.kt), permission dialogs watched (LeakyShop asks for none), the
-     * installed manifest (no SDK is bundled: LeakyShop only resolves the SDK hosts) and a background window with no
-     * lookups. Only C15 (info) is added; the scores stay 21 and 100.
+     * What the next phone run records on top of the device-shaped sessions: the consent-screen tree (only the fixed
+     * LeakyShop build links a privacy policy, see leakyshop/Shop.kt), permission dialogs watched (LeakyShop asks for
+     * none), the installed manifest (no SDK is bundled: LeakyShop only resolves the SDK hosts) and a background window
+     * with no lookups. The leaky build adds only C15 (info); the scores stay 21 and 100.
      */
     @Test
-    fun `new evidence on the phone adds only C15 info and keeps 21 and 100`() {
+    fun `new evidence adds only C15 info to the leaky build and keeps 21 and 100`() {
         val noSdk = AppManifestFacts(versionName = "1.0", versionCode = 1, partsRead = listOf("meta-data", "services", "receivers", "providers"))
         fun phone(sessions: List<AuditSession>, tree: UiNode) = sessions.map { s ->
             s.copy(
@@ -147,7 +147,8 @@ class DemoScoreRegressionTest {
             Triple(21, ScoreBand.AT_RISK, setOf(CheckId.C1, CheckId.C2, CheckId.C3, CheckId.C4, CheckId.C10, CheckId.C15)),
             summary(engine.evaluate(phone(deviceLeaky, Fixtures.leakyDialog))),
         )
-        assertEquals(Triple(100, ScoreBand.READY, setOf(CheckId.C15)), summary(engine.evaluate(phone(deviceFixed, Fixtures.fixedDialog))))
+        // The fixed build links its privacy policy from the dialog (leakyshop Shop.kt), so C15 does not appear.
+        assertEquals(Triple(100, ScoreBand.READY, emptySet<CheckId>()), summary(engine.evaluate(phone(deviceFixed, Fixtures.fixedDialog))))
     }
 
     @Test
