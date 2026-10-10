@@ -12,7 +12,9 @@ import com.dpdpxray.app.control.DeviceChecks
 import com.dpdpxray.app.graph
 import com.dpdpxray.app.quarantine.QuarantineController
 import com.dpdpxray.app.voice.copilotEvidence
+import com.dpdpxray.app.voice.wake.WakeController
 import com.dpdpxray.app.voice.wake.WakeRuntime
+import com.dpdpxray.app.voice.wake.WakeStopReason
 import com.dpdpxray.core.assistant.AppCandidate
 import com.dpdpxray.core.assistant.AuditSpokenSummary
 import com.dpdpxray.core.assistant.ChoiceReply
@@ -95,9 +97,15 @@ class VoiceAssistant private constructor(private val app: Application) {
             choices = step.choices
             choicesAtMs = SystemClock.elapsedRealtime()
         }
-        step.question?.let { q -> return answer(q, ctx, hindi, kind) }
+        step.question?.let { q ->
+            Log.i(TAG, "command $kind outcome=answered")
+            return answer(q, ctx, hindi, kind)
+        }
 
-        val action = step.action ?: return Turn(step.reply, hindi, kind, step.choices, step.stopListening)
+        val action = step.action ?: run {
+            Log.i(TAG, "command $kind outcome=none")
+            return Turn(step.reply, hindi, kind, step.choices, step.stopListening)
+        }
         val outcome = perform(action, source, hindi)
         val reply = when (outcome) {
             UiOutcome.Done, UiOutcome.Skipped -> step.reply
@@ -116,6 +124,8 @@ class VoiceAssistant private constructor(private val app: Application) {
     fun submit(text: String, preferHindi: Boolean, focusAuditId: String?, speak: Boolean, onTurn: (Turn) -> Unit): Job = scope.launch {
         voice.stop()
         val turn = handle(text, AssistantSource.COPILOT, preferHindi, focusAuditId)
+        // The wake-word service stops itself after its own reply; from the copilot it is stopped here.
+        if (turn.stopListening) WakeController.stop(WakeStopReason.USER)
         onTurn(turn)
         if (speak) say(turn.reply, turn.hindi)
     }
