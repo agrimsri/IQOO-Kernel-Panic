@@ -1,5 +1,6 @@
 package com.dpdpxray.core.rules
 
+import com.dpdpxray.core.manifest.SdkManifestCatalog
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
@@ -29,9 +30,14 @@ import kotlin.math.roundToInt
  * whether consent was given earlier, so its tracker lookups are reported under [CheckId.U1] instead of as "before
  * consent". Plans that started from an approved fresh reset are judged exactly as before.
  */
-class RulesEngine(private val catalog: TrackerCatalog, owners: AppOwners = AppOwners.default) {
+class RulesEngine(
+    private val catalog: TrackerCatalog,
+    owners: AppOwners = AppOwners.default,
+    sdkCatalog: SdkManifestCatalog = SdkManifestCatalog.default,
+) {
 
     private val classifier = SessionClassifier(catalog, owners)
+    private val extended = ExtendedChecks(catalog, sdkCatalog) { s, e, relation -> describe(Ctx(s, emptyList(), null), e, relation) }
 
     private data class Ctx(val session: AuditSession, val events: List<NetEvent>, val owner: AppOwner?) {
         /** Kept data and no consent screen in this plan: consent may have been given before the audit (e.g. at sign-up). */
@@ -56,6 +62,8 @@ class RulesEngine(private val catalog: TrackerCatalog, owners: AppOwners = AppOw
         c10AdIds(ctx)?.let { findings += it }
         consentHistoryUnknown(ctx)?.let { findings += it }
         sameCompany(ctx)?.let { findings += it }
+        // C11–C15 and V1 (ExtendedChecks): only from evidence the session recorded; silent when it was not recorded.
+        findings += extended.evaluate(ctx.map { PlanEvidence(it.session, it.events, it.owner, it.historyUnknown) })
 
         val (score, band) = ScoreCalculator.compute(findings)
         return AuditResult(findings.sortedWith(compareBy({ it.severity.ordinal }, { it.checkId.ordinal })), score, band)

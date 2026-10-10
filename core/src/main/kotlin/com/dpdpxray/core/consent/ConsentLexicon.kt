@@ -54,6 +54,30 @@ object ConsentLexicon {
         return cueHits >= 1 && hasChoice
     }
 
+    /**
+     * Wording that names a privacy policy or notice document, or a link to one: English (privacy policy / notice /
+     * statement / centre, data policy, cookie policy, "privacy & terms"), Hindi and Kannada. "Privacy" alone ("We value
+     * your privacy", "Settings › Privacy") does not count.
+     */
+    private val POLICY_PATTERNS = listOf(
+        Regex("\\bprivacy (policy|policies|notice|statement|center|centre|terms)\\b"),
+        Regex("\\b(data|cookie|cookies) (policy|notice)\\b"),
+        Regex("\\bdata protection (policy|notice)\\b"),
+        Regex("\\b(terms|terms of (use|service)) (and )?privacy\\b"),
+        Regex("\\bprivacypolicy\\b"),
+        Regex("https?\\S*privacy"),
+        Regex("(गोपनीयता|निजता|प्राइवेसी) (नीति|सूचना|पॉलिसी|पालिसी)"),
+        Regex("(ಗೌಪ್ಯತಾ|ಗೌಪ್ಯತೆ|ಖಾಸಗಿತನ) (ನೀತಿ|ಸೂಚನೆ)"),
+    )
+
+    /** True when any label names a privacy policy or notice document (see [POLICY_PATTERNS]). */
+    fun mentionsPrivacyPolicy(labels: List<String?>): Boolean =
+        labels.filterNotNull().any { raw ->
+            val lower = raw.lowercase()
+            val text = normalize(raw)
+            POLICY_PATTERNS.any { it.containsMatchIn(text) || it.containsMatchIn(lower) }
+        }
+
     private fun matches(text: String, phrases: List<String>): Boolean =
         phrases.any { p -> text == p || text.startsWith("$p ") }
 
