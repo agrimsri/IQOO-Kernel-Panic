@@ -254,13 +254,13 @@ private fun headline(findings: List<Finding>): String {
     val v0 = findings.any { it.checkId == CheckId.V0 }
     return when {
         v0 -> "Too few lookups were captured to judge this app. See the first finding for how to re-run."
-        c2 != null -> "Tracking continued after the user refused consent: ${c2.entities.joinToString()}."
-        c1 != null -> "${c1.entities.size} tracker${if (c1.entities.size == 1) "" else "s"} contacted before any consent choice: ${c1.entities.joinToString()}."
-        findings.isEmpty() -> "No trackers before consent and no consent-screen problems found."
+        c2 != null -> "Tracker hosts were looked up after the user refused consent: ${c2.entities.joinToString()}."
+        c1 != null -> "Hosts of ${c1.entities.size} tracker${if (c1.entities.size == 1) "" else "s"} looked up before any consent choice: ${c1.entities.joinToString()}."
+        findings.isEmpty() -> "No tracker lookups before consent and no consent-screen problems in this capture."
         findings.all { it.severity == Severity.INFO } && findings.any { it.checkId == CheckId.U1 } ->
             "Consent history unknown: this app kept its data, so consent given earlier could not be checked."
-        findings.all { it.severity == Severity.INFO } -> "No third-party trackers before consent and no consent-screen problems found. See the information notes."
-        else -> "No tracking before consent, but the consent screen needs work."
+        findings.all { it.severity == Severity.INFO } -> "No third-party tracker lookups before consent and no consent-screen problems in this capture. See the information notes."
+        else -> "No tracker lookups before consent, but the consent screen needs work."
     }
 }
 
