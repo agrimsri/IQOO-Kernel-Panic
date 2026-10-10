@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Opt-in "Hey TraceVeil" (off by default): only while the user has started it, with a visible notification. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Needed to list installed apps that can be audited. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
@@ -42,6 +44,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Started only from the Settings button while TraceVeil is on screen; never exported, never on boot. -->
+        <service
+            android:name=".voice.wake.HeyTraceVeilService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <service
             android:name=".capture.XrayVpnService"
