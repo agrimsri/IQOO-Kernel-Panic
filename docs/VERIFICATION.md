@@ -1,6 +1,36 @@
 # TraceVeil baseline verification
 
-## Latest local integration checkpoint — 10 October 2026
+## Latest Fast Preview checkpoint — 10 October 2026
+
+Product source: `619a0d5a386de689cd4a96bdcd8e0fafec528346` on `nitya/evidence-integration`. Normal Full remains the controlled-demo default. Fast Preview is optional and limited to one Accept plan; Full is not shortened by the old Fast preference. New metadata/report/UI timing provenance and comparison guards distinguish Preview, normal and historical unknown timing.
+
+Fresh full command, after all review corrections:
+
+```text
+gradlew.bat --offline :core:test :app:testDebugUnitTest :app:assembleDebug :leakyshop:assembleLeakyDebug :leakyshop:assembleFixedDebug --rerun-tasks --console=plain
+BUILD SUCCESSFUL in 43s — 128 tasks executed
+303 core + 168 app = 471 tests; zero failures/errors/skips
+Repository checker tests: 15/15 in 17.334s
+```
+
+Final APK SHA-256: `6e1c8ddca15c04fc360bc50e30e2316de3d0ae6691e0bc3da49dfd69acd6b9db`. Data-preserving installation succeeded; the installed base APK hash matches. No personal data reset, permission grant, assistant change or cloud fallback was performed. The two controlled demo reset/agent settings were explicitly verified before each Full run. UI XML was inspected before/after capture, not during the accepted reruns.
+
+| Actual phone audit | Observed result on Nitya's iQOO 15 |
+| --- | --- |
+| Preview `audit-1791594732012`, fixed demo, prior runtime-equivalent `f55de2af…` APK | Real Accept, one DNS lookup,10.373s capture/14.376s overall, stored `fast_preview`, visibly Inconclusive with delayed-traffic/Silent/Reject caveats. Insufficient evidence was not replaced with100. |
+| Full `audit-1791595035479`, final APK |21/100,5/8/5lookups, real Reject but Accept missed while the service was disconnected. Kept as failed/incomplete acceptance; Results visibly warns. |
+| Undisturbed Full `audit-1791595268053`, final APK |21/100,C1/C2/C3/C4/C10,5/8/7lookups, real Reject all and Accept & Continue. Plan windows25.835/19.887/18.359s;64.484s overall. Health and UID readings have matching unique sessions and bracketed samples;20DNSdatagrams/1,379estimatedbytes. Medium confidence, not a safety certificate. |
+| Undisturbed Full `audit-1791595440002`, fixed demo, final APK |100/100,zero findings,one lookup per plan, real Reject and Accept. Plan windows25.838/18.369/18.361s;62.907s overall. Low confidence remains visible with the201byte/3packet estimate and zero-upload caveat. Results screenshot saved locally and inspected. |
+
+An in-run shell `uiautomator dump` coincided with the failed run's accessibility rebind. Android [documents default UiAutomation suppression of accessibility services](https://developer.android.com/reference/android/app/UiAutomation#FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES); the undisturbed rerun passed without a product change. Avoid that inspection method during capture. The failed evidence remains saved. This does not establish ten consecutive successful runs, a universally fixed OEM lifecycle, recognised human speech or audible TTS quality.
+
+One scoped review found/fixed legacy live report exports missing unknown-timing provenance and obsolete Settings copy; consent-wait/dwell tests also added. Initial Preview tests observed six real failures before implementation. Added legacy-export tests observed two failures before their correction, then passed. No further reviewer was dispatched for unchanged old integration work.
+
+Current main advanced separately to `dac54e5` (Yashvi PR#7, includes optional online voice/keep-Camera commits). It is **not** part of this tested APK. Read-only merge diagnosis reports `ToolScreens.kt`, `ui/screens/map/EndpointMapCard.kt` and `voice/VoiceViewModel.kt` conflicts; no merge was performed. Reconcile owner changes and repeat build/device acceptance on the combined tree before main acceptance. [Next work](NEXT_WORK.md) and the updated handoff preserve those boundaries.
+
+Actual SoCSM8850 verified; only GPU Gemma4 model installed. Inspected APK has no Qualcomm dispatch/QNN assets. [NPU recommendation](NPU_RECOMMENDATION.md) is an unvalidated text-only candidate and licence/runtime checklist, not NPU success or an authorised download.
+
+## Earlier local integration checkpoint — 10 October 2026
 
 The sections below retain their historical test results. Current local work additionally includes voice-pack recovery, alias/notice UI, same-package comparison, Agrim-report reliability fixes and the published Y3/A5 components. `origin/main` at `ebdafae` and `origin/yashvi/phone-experience` at `5679a5a` merged cleanly into `nitya/evidence-integration` as `83db945` and `55cac49`. Bug fixes are saved at `14a0d2a`; the subsequent map mount is separately identifiable.
 
