@@ -21,7 +21,9 @@ import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.data.AuditComparison
 import com.dpdpxray.app.data.AuditComparisonResult
 import com.dpdpxray.app.data.SampleAudit
+import com.dpdpxray.app.BuildConfig
 import com.dpdpxray.app.graph
+import com.dpdpxray.app.report.AuditJsonExport
 import com.dpdpxray.app.report.ExportManager
 import com.dpdpxray.app.report.EvidenceReport
 import com.dpdpxray.app.report.HtmlExporter
@@ -275,6 +277,17 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         else {
             val ok = withContext(Dispatchers.IO) { ExportManager.saveToDownloads(ctx, file, file.name, HtmlExporter.MIME) }
             _toast.value = if (ok) "Interactive report saved to Downloads/TraceVeil" else "Could not save the HTML report"
+        }
+    }
+
+    /** Audit data as a traceveil.audit.v1 JSON bundle for TraceVeil CI; it leaves the phone only when saved or shared. */
+    fun exportAuditJson(bundle: AuditBundle, share: Boolean) = viewModelScope.launch {
+        val file = runCatching { withContext(Dispatchers.IO) { AuditJsonExport.write(bundle, BuildConfig.VERSION_NAME) } }
+            .getOrElse { _toast.value = "Could not build the audit data export"; return@launch }
+        if (share) ExportManager.share(ctx, file, AuditJsonExport.MIME)
+        else {
+            val ok = withContext(Dispatchers.IO) { ExportManager.saveToDownloads(ctx, file, file.name, AuditJsonExport.MIME) }
+            _toast.value = if (ok) "Audit data (JSON) saved to Downloads/TraceVeil" else "Could not save the audit data"
         }
     }
 
