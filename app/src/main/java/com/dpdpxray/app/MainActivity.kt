@@ -199,6 +199,7 @@ class MainActivity : ComponentActivity() {
                                 onHowItWorks = { nav.navigate(OnboardingGate.ONBOARDING) },
                                 onLive = { nav.navigate("live") },
                                 onAllReports = { nav.openTab(AppTab.REPORTS) },
+                                onAutomation = { nav.navigate("settings") },
                             )
                         }
                         composable(AppTabs.REPORTS) {

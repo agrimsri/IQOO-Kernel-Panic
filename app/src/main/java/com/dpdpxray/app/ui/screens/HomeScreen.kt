@@ -77,6 +77,8 @@ import com.dpdpxray.app.ui.guide.SetupItem
 import com.dpdpxray.app.ui.guide.SetupKind
 import com.dpdpxray.app.ui.guide.SetupNeed
 import com.dpdpxray.app.ui.guide.SetupSteps
+import com.dpdpxray.app.ui.modes.ModeGlyph
+import com.dpdpxray.app.ui.modes.ModeGlyphIcon
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
@@ -96,6 +98,8 @@ fun HomeScreen(
     onLive: () -> Unit = {},
     /** Opens the Reports tab with every saved check. */
     onAllReports: () -> Unit = {},
+    /** Opens Settings, where developer automation (laptop and CI runs) lives; null hides the card. */
+    onAutomation: (() -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
     val pf by vm.preflight.collectAsState()
@@ -177,6 +181,10 @@ fun HomeScreen(
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             LinkAction("How it works", onHowItWorks, glyph = Glyph.BOOK)
             LinkAction("More samples", { showSampleFixtures = true }, color = Film.boneDim, glyph = Glyph.REPORTS)
+        }
+        if (onAutomation != null) {
+            Spacer(Modifier.height(8.dp))
+            AutomateCard(onAutomation)
         }
 
         GroupHeader("Recent checks") {
@@ -263,6 +271,28 @@ private fun ReadinessChip(canAudit: Boolean, stepsLeft: Int) {
         Box(Modifier.size(8.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(8.dp))
         Text(text, style = MaterialTheme.typography.labelMedium, color = color)
+    }
+}
+
+/** Developer mode only: the same audits, run from a laptop or CI. Opens Settings › Developer automation. */
+@Composable
+private fun AutomateCard(onClick: () -> Unit) {
+    val shape = RoundedCornerShape(18.dp)
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 84.dp).clip(shape).background(Film.raised).border(1.dp, FilmExtra.hairline, shape)
+            .clickable(role = Role.Button, onClick = onClick).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(44.dp).clip(CircleShape).background(Film.scan.copy(alpha = 0.13f)), contentAlignment = Alignment.Center) {
+            ModeGlyphIcon(ModeGlyph.CODE, Film.scan, size = 24.dp)
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Automate it", style = MaterialTheme.typography.titleMedium, color = Film.bone)
+            Text("Run audits from your laptop or CI on every alpha/beta build.", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+        }
+        Spacer(Modifier.width(8.dp))
+        GlyphIcon(Glyph.CHEVRON_RIGHT, Film.boneDim, size = 18.dp)
     }
 }
 
