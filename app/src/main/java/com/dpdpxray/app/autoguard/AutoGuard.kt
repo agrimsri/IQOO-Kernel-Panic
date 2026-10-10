@@ -3,7 +3,9 @@ package com.dpdpxray.app.autoguard
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.dpdpxray.app.apkguard.ApkAlertSpeaker
 import com.dpdpxray.app.graph
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -35,6 +37,18 @@ object AutoGuard {
                 runCatching { AutoGuardJobs.sync(app, newApps, weekly, runNewAppCheckNow = runNow) }
                 previous = newApps
             }
+        }
+    }
+
+    /**
+     * TraceVeil's screen opened: look for apps installed while it was closed now, instead of waiting for the next
+     * periodic run. Cheap when nothing changed (one call to Android). Does nothing when the check is switched off.
+     */
+    fun onAppOpened(context: Context) {
+        val app = context.applicationContext
+        app.graph.scope.launch(Dispatchers.IO) {
+            val outcome = runCatching { NewAppCheck.run(app) }.getOrNull()
+            outcome?.speak?.let { ApkAlertSpeaker.speak(app, it.spokenEn, it.spokenHi) }
         }
     }
 }
