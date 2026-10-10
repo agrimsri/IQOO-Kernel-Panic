@@ -106,6 +106,7 @@ class RealAttestationChainTest {
         val mixed = listOf(chain("tegu_sdk36_TEE_EC_2026_ROOT").first()) + chain("caiman_sdk36_SB_EC_RKP").drop(1)
         val v = AttestationChains.verify(mixed, googleRoots)
         assertEquals(CheckStatus.FAIL, statusOf(v, "chain"))
+        assertEquals(CheckStatus.WARN, statusOf(v, "hardware"))
         assertFalse(v.ok)
     }
 
@@ -114,7 +115,9 @@ class RealAttestationChainTest {
         val v = AttestationChains.verify(chain("caiman_sdk36_SB_EC_RKP"), listOf(TestPki.chain().trustedRoot))
         assertEquals(CheckStatus.PASS, statusOf(v, "chain"))
         assertEquals(CheckStatus.FAIL, statusOf(v, "root"))
+        assertEquals(CheckStatus.WARN, statusOf(v, "hardware"))
         assertNull(v.root)
+        assertFalse(v.trusted)
         assertFalse(v.ok)
     }
 

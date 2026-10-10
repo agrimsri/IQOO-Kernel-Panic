@@ -9,10 +9,16 @@ data class EvidenceCheck(val id: String, val status: CheckStatus, val title: Str
     override fun toString() = "$status $id: $title - $detail"
 }
 
-/** The chain part of a verification. [keyDescription] describes the leaf (signing) key, and is null unless it does. */
-class ChainVerification(val checks: List<EvidenceCheck>, val keyDescription: KeyDescription?, val root: TrustedRoot?) {
+/**
+ * The chain part of a verification. [keyDescription] describes the leaf (signing) key, and is null unless it does.
+ * [trusted]: every link verified and the root is a trusted key; only then do the attestation's claims count.
+ */
+class ChainVerification(val checks: List<EvidenceCheck>, val keyDescription: KeyDescription?, val root: TrustedRoot?, val trusted: Boolean = false) {
     val ok: Boolean get() = checks.isNotEmpty() && checks.none { it.status == CheckStatus.FAIL }
 }
+
+/** What an untrusted chain says about itself: shown as a warning, never as a pass. */
+internal const val NOT_ESTABLISHED = "Not established (the chain is not trusted, so this is only what the certificate claims): "
 
 /**
  * Checks an Android Key Attestation chain (leaf first) the way Google's key attestation page describes: each
@@ -44,6 +50,9 @@ object AttestationChains {
 
         val last = chain.last()
         val root = roots.firstOrNull { it.matches(last) }
+        val trusted = broken == null && root != null
+        fun claim(check: EvidenceCheck) =
+            if (trusted || check.status != CheckStatus.PASS) check else check.copy(status = CheckStatus.WARN, detail = "$NOT_ESTABLISHED${check.detail}")
         checks += if (root != null) {
             EvidenceCheck("root", CheckStatus.PASS, "Root", "Ends at ${root.name}, public key SHA-256 ${root.publicKeySha256}.")
         } else {
@@ -82,10 +91,10 @@ object AttestationChains {
         )
 
         val level = kd.attestationSecurityLevel
-        checks += when {
+        checks += claim(when {
             level.isHardware && kd.keyMintSecurityLevel == level -> EvidenceCheck(
                 "hardware", CheckStatus.PASS, "Secure hardware",
-                "The key is in this phone's ${level.label} (attestation and KeyMint security level ${level.wire}).",
+                "The key is in the phone's ${level.label} (attestation and KeyMint security level ${level.wire}).",
             )
             level.isHardware -> EvidenceCheck(
                 "hardware", CheckStatus.FAIL, "Secure hardware",
@@ -95,10 +104,10 @@ object AttestationChains {
                 "hardware", CheckStatus.FAIL, "Secure hardware",
                 "The attestation says security level ${level.wire}: the key is not in secure hardware.",
             )
-        }
+        })
 
         val origin = kd.hardwareEnforced.origin
-        checks += if (origin == KeyOrigin.GENERATED) {
+        checks += claim(if (origin == KeyOrigin.GENERATED) {
             EvidenceCheck("origin", CheckStatus.PASS, "Key origin", "The key was ${origin.label} (origin GENERATED, in the hardware-enforced list).")
         } else {
             EvidenceCheck(
@@ -106,8 +115,8 @@ object AttestationChains {
                 if (origin == null) "The hardware-enforced list does not say the key was generated inside the secure hardware."
                 else "The key was ${origin.label} (origin ${origin.name}), not generated inside the secure hardware.",
             )
-        }
-        return ChainVerification(checks, kd, root)
+        })
+        return ChainVerification(checks, kd, root, trusted)
     }
 
     private fun signedBy(cert: X509Certificate, issuer: X509Certificate): Boolean =

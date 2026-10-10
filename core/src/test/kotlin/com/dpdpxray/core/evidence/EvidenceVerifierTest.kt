@@ -75,6 +75,13 @@ class EvidenceVerifierTest {
         assertEquals(CheckStatus.PASS, r.status("chain"))
         assertEquals(CheckStatus.FAIL, r.status("root"))
         assertTrue(r.checks.first { it.id == "root" }.detail.contains("not a Google hardware attestation root"))
+        // What an untrusted chain says about itself is never shown as a pass.
+        for (id in listOf("hardware", "origin", "app")) {
+            val c = r.checks.first { it.id == id }
+            assertEquals(id, CheckStatus.WARN, c.status)
+            assertTrue(c.detail, c.detail.startsWith("Not established"))
+        }
+        assertTrue(r.checks.first { it.id == "boot" }.detail.startsWith("Not established"))
     }
 
     @Test

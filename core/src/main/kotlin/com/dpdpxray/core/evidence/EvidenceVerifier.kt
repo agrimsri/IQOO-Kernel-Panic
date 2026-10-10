@@ -102,7 +102,14 @@ object EvidenceVerifier {
         val kd = chain.keyDescription ?: return EvidenceReport(checks, null, chain.root, sig)
 
         // ---- (c) the app that asked for the key ---------------------------------------------------------------------
-        checks += appCheck(kd, expectedPackage, expectedSignerSha256)
+        // Without a trusted chain, the app, challenge and boot lines are only what the certificate claims.
+        fun claim(c: EvidenceCheck) = when {
+            chain.trusted -> c
+            c.status == CheckStatus.PASS -> c.copy(status = CheckStatus.WARN, detail = "$NOT_ESTABLISHED${c.detail}")
+            c.status == CheckStatus.INFO -> c.copy(detail = "$NOT_ESTABLISHED${c.detail}")
+            else -> c
+        }
+        checks += claim(appCheck(kd, expectedPackage, expectedSignerSha256))
 
         val claimed = SecurityLevel.parse(sig.securityLevel)
         val agrees = claimed == kd.attestationSecurityLevel || (claimed == SecurityLevel.UNKNOWN_SECURE && kd.attestationSecurityLevel.isHardware)
@@ -113,8 +120,8 @@ object EvidenceVerifier {
             )
         }
         checks += datesCheck(certs, sig.createdAt)
-        checks += EvidenceCheck("challenge", CheckStatus.INFO, "Attestation challenge", "${printable(kd.challenge)} (identifies this install's key; not a freshness check).")
-        checks += bootCheck(kd)
+        checks += claim(EvidenceCheck("challenge", CheckStatus.INFO, "Attestation challenge", "${printable(kd.challenge)} (identifies this install's key; not a freshness check)."))
+        checks += claim(bootCheck(kd))
         return EvidenceReport(checks, kd, chain.root, sig)
     }
 
