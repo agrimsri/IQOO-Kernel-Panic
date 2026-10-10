@@ -24,9 +24,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -41,6 +43,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.dpdpxray.app.ui.components.IconBadge
+import com.dpdpxray.app.ui.components.cardSurface
+import com.dpdpxray.app.ui.components.gradientSweep
+import com.dpdpxray.app.ui.components.pressClickable
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
@@ -191,20 +197,25 @@ fun DrawScope.drawGlyph(g: Glyph, tint: Color) {
     }
 }
 
-/** The one action that matters most on a screen. Brand gradient, dark text, 58dp tall. */
+/**
+ * The one action that matters most on a screen. Brand gradient, dark text, 58dp tall, a soft brand glow beneath it,
+ * and (when [sweep] is on) a very slow, faint light band drifting across. Shrinks slightly while pressed.
+ */
 @Composable
-fun GradientAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, glyph: Glyph? = null) {
+fun GradientAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, glyph: Glyph? = null, sweep: Boolean = false) {
     val shape = RoundedCornerShape(16.dp)
     Row(
-        modifier.fillMaxWidth().heightIn(min = 58.dp).clip(shape)
+        modifier.fillMaxWidth().heightIn(min = 58.dp)
+            .then(if (enabled) Modifier.shadow(10.dp, shape, ambientColor = Brand.coral.copy(alpha = 0.4f), spotColor = Brand.coral.copy(alpha = 0.6f)) else Modifier)
+            .pressClickable(enabled = enabled, shape = shape, onClick = onClick)
             .background(if (enabled) Brand.horizontal else SolidColor(Film.line), shape)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .then(if (enabled && sweep) Modifier.gradientSweep(alpha = 0.22f) else Modifier)
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         if (glyph != null) {
-            GlyphIcon(glyph, Film.base, size = 20.dp)
+            GlyphIcon(glyph, if (enabled) Film.base else Film.boneDim, size = 20.dp)
             Spacer(Modifier.width(10.dp))
         }
         Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = if (enabled) Film.base else Film.boneDim)
@@ -217,9 +228,10 @@ fun OutlineAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
     val shape = RoundedCornerShape(16.dp)
     val tint = if (enabled) Film.bone else Film.boneDim
     Row(
-        modifier.fillMaxWidth().heightIn(min = 52.dp).clip(shape)
+        modifier.fillMaxWidth().heightIn(min = 52.dp)
+            .pressClickable(enabled = enabled, shape = shape, onClick = onClick)
+            .background(Film.bone.copy(alpha = 0.04f))
             .border(1.dp, Film.boneDim.copy(alpha = 0.55f), shape)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -237,12 +249,12 @@ fun OutlineAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
 fun ActionTile(title: String, detail: String, glyph: Glyph, onClick: () -> Unit, modifier: Modifier = Modifier, accent: Color = Film.scan) {
     val shape = RoundedCornerShape(16.dp)
     Column(
-        modifier.heightIn(min = 104.dp).clip(shape).background(Film.raised).border(1.dp, FilmExtra.hairline, shape)
-            .clickable(role = Role.Button, onClick = onClick).padding(14.dp),
+        modifier.heightIn(min = 104.dp)
+            .pressClickable(shape = shape, onClick = onClick)
+            .cardSurface(16.dp)
+            .padding(14.dp),
     ) {
-        Box(Modifier.size(36.dp).clip(CircleShape).background(accent.copy(alpha = 0.13f)), contentAlignment = Alignment.Center) {
-            GlyphIcon(glyph, accent, size = 20.dp)
-        }
+        IconBadge(glyph, accent, size = 36.dp)
         Spacer(Modifier.size(10.dp))
         Text(title, style = MaterialTheme.typography.titleMedium, color = Film.bone)
         Text(detail, style = MaterialTheme.typography.labelMedium, color = Film.boneDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -266,7 +278,9 @@ fun LinkAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
 fun ScoreChip(text: String, color: Color, modifier: Modifier = Modifier, size: Dp = 56.dp) {
     val shape = RoundedCornerShape(14.dp)
     Box(
-        modifier.size(size).clip(shape).background(color.copy(alpha = 0.12f)).border(1.5.dp, color.copy(alpha = 0.7f), shape),
+        modifier.size(size).clip(shape)
+            .background(Brush.linearGradient(listOf(color.copy(alpha = 0.26f), color.copy(alpha = 0.07f))))
+            .border(1.5.dp, color.copy(alpha = 0.7f), shape),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, style = MaterialTheme.typography.titleLarge, color = color, maxLines = 1)
@@ -275,17 +289,17 @@ fun ScoreChip(text: String, color: Color, modifier: Modifier = Modifier, size: D
 
 /** A raised panel that groups one idea. */
 @Composable
-fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    val shape = RoundedCornerShape(18.dp)
-    Column(modifier.fillMaxWidth().clip(shape).background(Film.raised).border(1.dp, FilmExtra.hairline, shape).padding(16.dp), content = content)
+fun Panel(modifier: Modifier = Modifier, glow: Color? = null, content: @Composable ColumnScope.() -> Unit) {
+    Column(modifier.fillMaxWidth().cardSurface(glow = glow).padding(16.dp), content = content)
 }
 
-/** Empty states point to the next action: a film frame with a dashed consent line, a title, a sentence, a button. */
+/** Empty states point to the next action: a film frame with a dashed consent line, a title, one line, a button. */
 @Composable
 fun EmptyState(title: String, body: String, modifier: Modifier = Modifier, action: Pair<String, () -> Unit>? = null) {
     Column(modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Canvas(Modifier.size(width = 132.dp, height = 76.dp)) {
             val r = 10.dp.toPx()
+            drawRoundRect(Brush.verticalGradient(listOf(Film.scan.copy(alpha = 0.10f), Color.Transparent)), cornerRadius = CornerRadius(r))
             drawRoundRect(Film.line, cornerRadius = CornerRadius(r), style = Stroke(1.5.dp.toPx()))
             val step = size.width / 7f
             (1..6).forEach { i -> drawCircle(Film.line, 2.dp.toPx(), Offset(step * i, 9.dp.toPx())); drawCircle(Film.line, 2.dp.toPx(), Offset(step * i, size.height - 9.dp.toPx())) }
@@ -295,7 +309,7 @@ fun EmptyState(title: String, body: String, modifier: Modifier = Modifier, actio
             )
         }
         Text(title, style = MaterialTheme.typography.titleMedium, color = Film.bone, modifier = Modifier.padding(top = 12.dp))
-        Text(body, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp, start = 12.dp, end = 12.dp))
+        Text(body, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp, start = 12.dp, end = 12.dp))
         if (action != null) LinkAction(action.first, action.second, Modifier.padding(top = 4.dp))
     }
 }

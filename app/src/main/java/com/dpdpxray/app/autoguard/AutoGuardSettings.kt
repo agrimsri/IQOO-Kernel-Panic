@@ -3,7 +3,6 @@ package com.dpdpxray.app.autoguard
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -21,13 +20,16 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import com.dpdpxray.app.apkguard.ApkInstallWatcher
 import com.dpdpxray.app.graph
 import com.dpdpxray.app.ui.components.Callout
+import com.dpdpxray.app.ui.components.FoldText
 import com.dpdpxray.app.ui.components.Hairline
+import com.dpdpxray.app.ui.components.LearnMore
 import com.dpdpxray.app.ui.components.Note
 import com.dpdpxray.app.ui.components.SecondaryAction
 import com.dpdpxray.app.ui.components.SectionCard
-import com.dpdpxray.app.ui.components.SwitchRow
+import com.dpdpxray.app.ui.components.Tag
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
+import com.dpdpxray.app.ui.components.SwitchRow
 import com.dpdpxray.app.ui.theme.Film
 import java.time.Instant
 import java.time.ZoneId
@@ -39,7 +41,7 @@ import java.util.Locale
  * nothing else changes.
  */
 @Composable
-fun AutoGuardSettingsCard(onCheckup: (() -> Unit)?) {
+fun AutoGuardSettingsCard(onCheckup: (() -> Unit)?, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     val store = remember(ctx) { ctx.graph.settings }
     val s by store.settings.collectAsState()
@@ -47,8 +49,12 @@ fun AutoGuardSettingsCard(onCheckup: (() -> Unit)?) {
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { resumes++ }
     val lastNewAppCheck = remember(resumes, s.autoCheckNewApps) { AutoGuardStore(ctx).newAppsLastRunAt }
     val notificationsOn = remember(resumes) { ApkInstallWatcher.notificationsAllowed(ctx) }
+    val on = listOf(s.autoCheckNewApps, s.weeklyCheckup).count { it }
 
-    SectionCard(title = "Auto-guard", glyph = Glyph.BELL) {
+    SectionCard(
+        modifier, title = "Auto-guard", glyph = Glyph.BELL,
+        trailing = { Tag(if (on == 0) "Off" else "$on of 2 on", if (on == 0) Film.boneDim else Film.clear) },
+    ) {
         SwitchRow(
             "Check new apps automatically, even when TraceVeil is closed",
             "Android lets TraceVeil look for newly installed apps about every 15 minutes and show a notification for each new app " +
@@ -58,8 +64,15 @@ fun AutoGuardSettingsCard(onCheckup: (() -> Unit)?) {
             { v -> store.update { it.copy(autoCheckNewApps = v) } },
         )
         if (s.autoCheckNewApps) {
-            Note(lastNewAppCheck?.let { "Last background check: ${time(it)}" } ?: "No background check has finished yet. Android usually runs the first one within a few minutes.")
-            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.Top) {
+                GlyphIcon(Glyph.CLOCK, Film.scan, Modifier.padding(top = 3.dp), size = 16.dp)
+                Spacer(Modifier.width(8.dp))
+                FoldText(
+                    lastNewAppCheck?.let { "Last background check: ${time(it)}" }
+                        ?: "No background check has finished yet. Android usually runs the first one within a few minutes.",
+                    Modifier.weight(1f),
+                )
+            }
         }
         Hairline()
         SwitchRow(
@@ -68,16 +81,18 @@ fun AutoGuardSettingsCard(onCheckup: (() -> Unit)?) {
             s.weeklyCheckup,
             { v -> store.update { it.copy(weeklyCheckup = v) } },
         )
-        Note("If TraceVeil is force-stopped (by you or by the phone's battery manager), Android pauses both checks until you open TraceVeil again.")
-        Row(Modifier.padding(top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             GlyphIcon(Glyph.LOCK, Film.clear, size = 18.dp)
             Spacer(Modifier.width(8.dp))
             Note("Runs on this phone only. Nothing is sent anywhere.", Film.clear)
         }
-        if (!notificationsOn && (s.autoCheckNewApps || s.weeklyCheckup)) {
-            Callout("Notifications are off for TraceVeil, so Auto-guard cannot show its alerts.", Modifier.padding(bottom = 8.dp))
+        LearnMore(label = "If the checks pause") {
+            Note("If TraceVeil is force-stopped (by you or by the phone's battery manager), Android pauses both checks until you open TraceVeil again.")
         }
-        if (onCheckup != null) SecondaryAction("Open my phone checkup", onCheckup, Modifier.fillMaxWidth())
+        if (!notificationsOn && (s.autoCheckNewApps || s.weeklyCheckup)) {
+            Callout("Notifications are off for TraceVeil, so Auto-guard cannot show its alerts.", Modifier.padding(top = 4.dp, bottom = 8.dp))
+        }
+        if (onCheckup != null) SecondaryAction("Open my phone checkup", onCheckup, Modifier.fillMaxWidth().padding(top = 4.dp))
     }
 }
 

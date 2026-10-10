@@ -1,11 +1,18 @@
 package com.dpdpxray.app.ui.modes
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -13,29 +20,48 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.audit.AuditConfig
 import com.dpdpxray.app.control.AuditableApp
 import com.dpdpxray.app.data.Audience
-import com.dpdpxray.app.ui.components.Callout
 import com.dpdpxray.app.ui.components.CollapsibleCard
+import com.dpdpxray.app.ui.components.DisclosureRow
+import com.dpdpxray.app.ui.components.FoldText
 import com.dpdpxray.app.ui.components.Hairline
-import com.dpdpxray.app.ui.components.Note
 import com.dpdpxray.app.ui.components.SwitchRow
+import com.dpdpxray.app.ui.components.foldSpec
+import com.dpdpxray.app.ui.components.leadSentence
+import com.dpdpxray.app.ui.components.reveal
 import com.dpdpxray.app.ui.guide.Glyph
+import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.guide.GradientAction
 import com.dpdpxray.app.ui.guide.GuideBanner
+import com.dpdpxray.app.ui.guide.GuideLang
 import com.dpdpxray.app.ui.guide.OutlineAction
 import com.dpdpxray.app.ui.guide.guideLang
+import com.dpdpxray.app.ui.guide.lessLabel
+import com.dpdpxray.app.ui.guide.moreLabel
+import com.dpdpxray.app.ui.screens.CheckSheetTitle
 import com.dpdpxray.app.ui.screens.PlanOption
+import com.dpdpxray.app.ui.theme.Film
+import com.dpdpxray.app.ui.theme.Radii
 
 /**
  * Everyday check sheet. Opens on one Quick check that says No (a single Reject run that keeps the app's data), with
  * the agent-tap switch beside it. Full, clearing app data, the children and Play-services options and the
  * internet-cut-off run fold under Advanced. Same engine and safeguards as the developer sheet: data is cleared only
  * with explicit approval and Shizuku, and a quiet result is never called a pass.
+ *
+ * Text diet: each explanation shows its first sentence; the rest folds behind More (in the guide language).
  */
 @Composable
 internal fun EverydayCheckSetup(
@@ -55,20 +81,24 @@ internal fun EverydayCheckSetup(
     var gms by remember { mutableStateOf(false) }
     val freshReset = allowReset && shizukuReady
 
-    Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(c.title(app.label).pick(lang), style = MaterialTheme.typography.headlineMedium)
-        GuideBanner(c.guide(app.label), Modifier.padding(vertical = 6.dp))
-        PlanOption(
-            c.quickTitle.pick(lang), (if (freshReset) c.quickDetailFresh else c.quickDetail).pick(lang),
-            selected = choice == CheckChoice.QUICK, enabled = true,
-        ) { choice = CheckChoice.QUICK }
-        SwitchRow(c.agentTitle.pick(lang), c.agentDetail.pick(lang), agent, { agent = it })
-        if (freshReset) Callout(c.resetCaveat.pick(lang)) else Callout(c.quickCaveat.pick(lang))
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        CheckSheetTitle(c.title(app.label).pick(lang))
+        GuideBanner(c.guide(app.label), Modifier.reveal(0))
+        Column(Modifier.padding(top = 4.dp).reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            PlanOption(
+                c.quickTitle.pick(lang), (if (freshReset) c.quickDetailFresh else c.quickDetail).pick(lang),
+                selected = choice == CheckChoice.QUICK, enabled = true, lang = lang,
+            ) { choice = CheckChoice.QUICK }
+            SwitchRow(c.agentTitle.pick(lang), c.agentDetail.pick(lang), agent, { agent = it })
+            SheetCaveat((if (freshReset) c.resetCaveat else c.quickCaveat).pick(lang), lang)
+        }
 
-        Spacer(Modifier.height(6.dp))
-        CollapsibleCard(c.advanced.pick(lang), summary = c.advancedSummary.pick(lang), glyph = Glyph.SETTINGS, initiallyOpen = choice == CheckChoice.FULL) {
-            PlanOption(c.fullTitle.pick(lang), c.fullDetail.pick(lang), selected = choice == CheckChoice.FULL, enabled = freshReset) { choice = CheckChoice.FULL }
-            if (!freshReset) Note(c.fullNeeds.pick(lang))
+        CollapsibleCard(
+            c.advanced.pick(lang), Modifier.padding(top = 8.dp).reveal(2),
+            summary = c.advancedSummary.pick(lang), glyph = Glyph.SETTINGS, initiallyOpen = choice == CheckChoice.FULL,
+        ) {
+            PlanOption(c.fullTitle.pick(lang), c.fullDetail.pick(lang), selected = choice == CheckChoice.FULL, enabled = freshReset, lang = lang) { choice = CheckChoice.FULL }
+            if (!freshReset) FoldText(c.fullNeeds.pick(lang), moreLabel = lang.moreLabel, lessLabel = lang.lessLabel)
             if (shizukuReady) SwitchRow(c.resetTitle.pick(lang), c.resetDetail.pick(lang), allowReset, { on ->
                 allowReset = on
                 if (!on && choice == CheckChoice.FULL) choice = CheckChoice.QUICK
@@ -79,12 +109,41 @@ internal fun EverydayCheckSetup(
             Hairline()
             Spacer(Modifier.height(4.dp))
             OutlineAction(c.quarantine.pick(lang), onQuarantine, glyph = Glyph.LOCK)
-            Note(c.quarantineNote.pick(lang))
+            FoldText(c.quarantineNote.pick(lang), moreLabel = lang.moreLabel, lessLabel = lang.lessLabel)
         }
 
-        Spacer(Modifier.height(12.dp))
         GradientAction(c.start.pick(lang), {
             onStart(CheckSheet.config(Audience.USER, app.packageName, app.label, choice, allowReset, shizukuReady, agent, child, gms))
-        })
+        }, Modifier.padding(top = 12.dp).reveal(3), glyph = Glyph.PLAY, sweep = true)
+    }
+}
+
+/**
+ * The sheet's caveat: tinted wash, drawn amber rule, the first sentence always in view and the rest behind More.
+ * Like the shared Callout, but its More/Less follow the guide language so the Hindi sheet reads in Hindi.
+ */
+@Composable
+private fun SheetCaveat(text: String, lang: GuideLang, color: Color = Film.warn) {
+    val lead = remember(text) { leadSentence(text) }
+    val rest = remember(text) { text.trim().substring(lead.length).trim().ifBlank { null } }
+    val shape = RoundedCornerShape(Radii.row)
+    Row(
+        Modifier.fillMaxWidth().clip(shape)
+            .background(Brush.horizontalGradient(listOf(color.copy(alpha = 0.16f), color.copy(alpha = 0.06f))))
+            .drawBehind { drawRect(color, size = Size(4.dp.toPx(), size.height)) }
+            .border(1.dp, color.copy(alpha = 0.32f), shape)
+            .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = if (rest != null) 0.dp else 12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        GlyphIcon(Glyph.WARN, color, Modifier.padding(top = 2.dp), size = 18.dp)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f).animateContentSize(foldSpec())) {
+            Text(lead, style = MaterialTheme.typography.bodyMedium, color = Film.bone)
+            if (rest != null) {
+                var open by rememberSaveable(text) { mutableStateOf(false) }
+                if (open) Text(rest, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 6.dp))
+                DisclosureRow(open, lang.moreLabel, lang.lessLabel, { open = !open }, color = color, glyph = null)
+            }
+        }
     }
 }

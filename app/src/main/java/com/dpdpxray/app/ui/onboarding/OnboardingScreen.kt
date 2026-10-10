@@ -3,10 +3,10 @@ package com.dpdpxray.app.ui.onboarding
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,12 +35,14 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -53,25 +55,40 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.data.Audience
+import com.dpdpxray.app.ui.components.FoldText
+import com.dpdpxray.app.ui.components.IconBadge
+import com.dpdpxray.app.ui.components.KeyCaveat
+import com.dpdpxray.app.ui.components.Tag
+import com.dpdpxray.app.ui.components.cardSurface
+import com.dpdpxray.app.ui.components.leadSentence
+import com.dpdpxray.app.ui.components.pressClickable
+import com.dpdpxray.app.ui.components.reveal
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.guide.GradientAction
 import com.dpdpxray.app.ui.guide.GuideLang
 import com.dpdpxray.app.ui.guide.LinkAction
 import com.dpdpxray.app.ui.guide.LocalGuide
+import com.dpdpxray.app.ui.guide.lessLabel
+import com.dpdpxray.app.ui.guide.moreLabel
 import com.dpdpxray.app.ui.modes.ModeGlyph
 import com.dpdpxray.app.ui.modes.ModeGlyphIcon
 import com.dpdpxray.app.ui.theme.ArchivoDisplay
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
+import com.dpdpxray.app.ui.theme.LocalReduceMotion
 import com.dpdpxray.app.ui.theme.LocalScale
+import com.dpdpxray.app.ui.theme.Motion
 import kotlinx.coroutines.launch
 
 /**
  * First-run onboarding: five short pages drawn in code (no image files). Skip is always visible; page two asks how the
  * person will use TraceVeil (everyday or developer), and the last page offers three safe first steps. Spoken guidance
  * and its language can be switched on here, before anything else.
+ *
+ * Text diet: each page shows its title and about two lines; the rest of the page text folds behind More (in the guide
+ * language). Permission reasons and the lookup caveat stay on the page, folded or in view, never removed.
  *
  * [audience] is the mode to show as chosen (null on first run, so neither door is pre-picked); [onAudience] saves a
  * pick at once. Skipping without a pick keeps the stored default, developer mode.
@@ -105,7 +122,7 @@ fun OnboardingScreen(
         DisposableEffect(key, speaker) { onDispose { speaker.stop(key) } }
     }
 
-    Column(Modifier.fillMaxSize().background(Film.base)) {
+    Column(Modifier.fillMaxSize().background(FilmExtra.backdrop)) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             ProgressSegments(page, pages.size, Modifier.weight(1f))
             Spacer(Modifier.width(12.dp))
@@ -128,20 +145,21 @@ fun OnboardingScreen(
         val waitingForPick = pages[page].key == "audience" && picked == null
         HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth(), userScrollEnabled = !waitingForPick) { i ->
             val p = pages[i]
+            // Each page fades up in order the first time it comes into view: art, title, text, then its cards.
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
                 Spacer(Modifier.height(12.dp))
                 when (p.key) {
-                    "promise" -> PromiseArt()
-                    "how" -> HowItWorksArt(lang)
+                    "promise" -> PromiseArt(Modifier.reveal(0))
+                    "how" -> HowItWorksArt(lang, Modifier.reveal(0))
                     else -> {}
                 }
                 Text(
                     p.title.pick(lang),
                     style = TextStyle(fontFamily = ArchivoDisplay, fontWeight = FontWeight(700), fontSize = LocalScale.current.sp(34), lineHeight = LocalScale.current.sp(38)),
                     color = Film.bone,
-                    modifier = Modifier.padding(top = 20.dp).semantics { heading() },
+                    modifier = Modifier.padding(top = 20.dp).reveal(1).semantics { heading() },
                 )
-                Text(p.body.pick(lang), style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 10.dp))
+                PageBody(p, lang, Modifier.padding(top = 10.dp).reveal(2))
                 when (p.key) {
                     "audience" -> AudienceChoices(lang, picked) { a -> picked = a; onAudience(a) }
                     "needs" -> Needs(lang, OnboardingCopy.needsFor(picked ?: Audience.DEFAULT))
@@ -152,7 +170,7 @@ fun OnboardingScreen(
             }
         }
 
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             if (page > 0) LinkAction(OnboardingCopy.back.pick(lang), { scope.launch { pager.animateScrollToPage(page - 1) } }, color = Film.boneDim)
             Spacer(Modifier.weight(1f))
             GradientAction(
@@ -160,17 +178,43 @@ fun OnboardingScreen(
                 { if (last) onDone() else scope.launch { pager.animateScrollToPage(page + 1) } },
                 Modifier.width(184.dp),
                 enabled = !waitingForPick,
+                // The light sweep marks the finish line only, so it stays the one moving action on screen.
+                sweep = last,
             )
         }
+    }
+}
+
+/**
+ * A page's text, on a diet: the first sentence (at most two lines) shows and the rest folds behind More. On the last
+ * page the safety advice (which apps to avoid) is the key caveat, so it stays in view under the first sentence.
+ */
+@Composable
+private fun PageBody(p: OnboardingPage, lang: GuideLang, modifier: Modifier) {
+    val body = p.body.pick(lang)
+    val style = MaterialTheme.typography.bodyLarge
+    if (p.key == "try") {
+        val lead = remember(body) { leadSentence(body) }
+        val rest = remember(body) { body.trim().substring(lead.length).trim().ifBlank { null } }
+        Column(modifier.fillMaxWidth()) {
+            Text(lead, style = style, color = Film.boneDim)
+            if (rest != null) KeyCaveat(rest, Modifier.padding(top = 6.dp))
+        }
+    } else {
+        FoldText(body, modifier, style = style, maxLines = 2, moreLabel = lang.moreLabel, lessLabel = lang.lessLabel)
     }
 }
 
 /** One segment per page; the current one stretches and takes the brand gradient. */
 @Composable
 private fun ProgressSegments(current: Int, total: Int, modifier: Modifier = Modifier) {
+    val reduce = LocalReduceMotion.current
     Row(modifier.semantics { contentDescription = "Page ${current + 1} of $total" }, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         (0 until total).forEach { i ->
-            val w by animateDpAsState(if (i == current) 34.dp else 10.dp, tween(260), label = "seg")
+            val w by animateDpAsState(
+                if (i == current) 34.dp else 10.dp,
+                if (reduce) snap() else tween(Motion.MEDIUM, easing = Motion.emphasized), label = "seg",
+            )
             val brush: Brush = when {
                 i == current -> Brand.horizontal
                 i < current -> SolidColor(Film.boneDim.copy(alpha = 0.6f))
@@ -184,10 +228,12 @@ private fun ProgressSegments(current: Int, total: Int, modifier: Modifier = Modi
 @Composable
 private fun Pill(text: String, glyph: Glyph?, on: Boolean, onToggle: (Boolean) -> Unit, description: String) {
     val shape = RoundedCornerShape(24.dp)
-    val border by animateColorAsState(if (on) Brand.coral else Film.line, tween(200), label = "pill")
+    val reduce = LocalReduceMotion.current
+    val border by animateColorAsState(if (on) Brand.coral else Film.line, if (reduce) snap() else tween(Motion.MEDIUM), label = "pill")
+    val fill by animateColorAsState(if (on) Brand.coral.copy(alpha = 0.12f) else Color.Transparent, if (reduce) snap() else tween(Motion.MEDIUM), label = "pill-fill")
     Row(
         Modifier.heightIn(min = 48.dp).clip(shape).border(1.dp, border, shape)
-            .background(if (on) Brand.coral.copy(alpha = 0.12f) else Color.Transparent)
+            .background(fill)
             .toggleable(value = on, role = Role.Switch, onValueChange = onToggle)
             .semantics { contentDescription = description; stateDescription = if (on) "On" else "Off" }
             .padding(horizontal = 14.dp),
@@ -202,25 +248,36 @@ private fun Pill(text: String, glyph: Glyph?, on: Boolean, onToggle: (Boolean) -
 }
 
 /**
- * The two front doors as big radio cards. The picked one takes the brand outline and a check; nothing is pre-picked
- * on first run.
+ * The two front doors as big radio cards. The picked one takes the brand outline, a warm wash, a soft glow and a
+ * check; nothing is pre-picked on first run.
  */
 @Composable
 private fun AudienceChoices(lang: GuideLang, picked: Audience?, onPick: (Audience) -> Unit) {
-    Column(Modifier.padding(top = 20.dp).selectableGroup(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        OnboardingCopy.audiences.forEach { option ->
+    val reduce = LocalReduceMotion.current
+    Column(Modifier.padding(top = 20.dp).selectableGroup(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        OnboardingCopy.audiences.forEachIndexed { i, option ->
             val selected = option.audience == picked
             val shape = RoundedCornerShape(20.dp)
             val accent = if (option.audience == Audience.USER) Brand.coral else Film.scan
+            val wash by animateColorAsState(
+                if (selected) accent.copy(alpha = 0.12f) else Color.Transparent,
+                if (reduce) snap() else tween(Motion.MEDIUM, easing = Motion.emphasized), label = "door-wash",
+            )
             Row(
-                Modifier.fillMaxWidth().heightIn(min = 120.dp).clip(shape)
-                    .background(if (selected) accent.copy(alpha = 0.10f) else Film.raised)
-                    .border(if (selected) 2.dp else 1.dp, if (selected) Brand.horizontal else SolidColor(FilmExtra.hairline), shape)
+                Modifier.fillMaxWidth().heightIn(min = 120.dp).reveal(3 + i)
+                    .then(if (selected) Modifier.shadow(12.dp, shape, ambientColor = Brand.coral.copy(alpha = 0.35f), spotColor = Brand.coral.copy(alpha = 0.5f)) else Modifier)
+                    .clip(shape).background(FilmExtra.card).background(wash)
+                    .border(if (selected) 2.dp else 1.dp, if (selected) Brand.horizontal else FilmExtra.cardEdge, shape)
                     .selectable(selected = selected, role = Role.RadioButton) { onPick(option.audience) }
                     .padding(18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.size(56.dp).clip(CircleShape).background(accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.size(56.dp).clip(CircleShape)
+                        .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.26f), accent.copy(alpha = 0.08f))))
+                        .border(1.dp, accent.copy(alpha = 0.25f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
                     ModeGlyphIcon(if (option.audience == Audience.USER) ModeGlyph.PHONE else ModeGlyph.CODE, accent, size = 30.dp)
                 }
                 Spacer(Modifier.width(16.dp))
@@ -230,9 +287,9 @@ private fun AudienceChoices(lang: GuideLang, picked: Audience?, onPick: (Audienc
                     Text(option.detail.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 4.dp))
                 }
                 Spacer(Modifier.width(10.dp))
-                val ring by animateColorAsState(if (selected) Brand.coral else Film.line, tween(200), label = "pick")
+                val ring by animateColorAsState(if (selected) Brand.coral else Film.line, if (reduce) snap() else tween(Motion.MEDIUM), label = "pick")
                 Box(
-                    Modifier.size(26.dp).clip(CircleShape).background(if (selected) Brand.coral else Color.Transparent).border(1.5.dp, ring, CircleShape),
+                    Modifier.size(26.dp).clip(CircleShape).background(if (selected) Brand.horizontal else SolidColor(Color.Transparent)).border(1.5.dp, ring, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (selected) GlyphIcon(Glyph.CHECK, Film.base, size = 16.dp)
@@ -242,36 +299,40 @@ private fun AudienceChoices(lang: GuideLang, picked: Audience?, onPick: (Audienc
     }
 }
 
+/**
+ * What we need and why: one raised card per permission with a Required/Optional chip. Each reason shows its first
+ * sentence; the rest (for example "it doesn't decrypt what the app sends") folds behind More. The privacy line stays
+ * in view.
+ */
 @Composable
 private fun Needs(lang: GuideLang, needs: List<OnboardingNeed>) {
     val glyphs = mapOf("vpn" to Glyph.VPN, "watcher" to Glyph.WATCHER, "shizuku" to Glyph.RESET)
-    Column(Modifier.padding(top = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        needs.forEach { need ->
+    Column(Modifier.padding(top = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        needs.forEachIndexed { i, need ->
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Film.raised).padding(14.dp),
+                Modifier.fillMaxWidth().reveal(3 + i).cardSurface(16.dp)
+                    .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = if (folds(need.body.pick(lang))) 6.dp else 14.dp),
                 verticalAlignment = Alignment.Top,
             ) {
                 val accent = if (need.required) Film.scan else Film.boneDim
-                Box(Modifier.size(44.dp).clip(CircleShape).background(accent.copy(alpha = 0.13f)), contentAlignment = Alignment.Center) {
-                    GlyphIcon(glyphs.getValue(need.key), accent, size = 24.dp)
-                }
+                IconBadge(glyphs.getValue(need.key), accent, size = 44.dp)
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(need.title.pick(lang), style = MaterialTheme.typography.titleMedium, color = Film.bone)
+                        Text(need.title.pick(lang), style = MaterialTheme.typography.titleMedium, color = Film.bone, modifier = Modifier.weight(1f, fill = false))
                         Spacer(Modifier.width(8.dp))
-                        Text(
+                        Tag(
                             (if (need.required) OnboardingCopy.required else OnboardingCopy.optional).pick(lang),
-                            style = MaterialTheme.typography.labelMedium, color = if (need.required) Brand.peach else Film.boneDim,
+                            if (need.required) Brand.peach else Film.boneDim,
                         )
                     }
-                    Text(need.body.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 2.dp))
+                    FoldText(need.body.pick(lang), Modifier.padding(top = 4.dp), moreLabel = lang.moreLabel, lessLabel = lang.lessLabel)
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = 4.dp, start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            GlyphIcon(Glyph.LOCK, Film.clear, size = 20.dp)
-            Spacer(Modifier.width(10.dp))
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp).reveal(3 + needs.size), verticalAlignment = Alignment.CenterVertically) {
+            IconBadge(Glyph.LOCK, Film.clear, size = 32.dp)
+            Spacer(Modifier.width(12.dp))
             Text(OnboardingCopy.privacy.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.clear)
         }
     }
@@ -286,28 +347,34 @@ private fun TryChoices(lang: GuideLang, audience: Audience, onSample: () -> Unit
             else -> onApk?.let { Triple(c, Glyph.APK, it) }
         }
     }
-    Column(Modifier.padding(top = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        shown.forEachIndexed { i, (choice, glyph, onClick) -> Choice(choice, glyph, lang, highlight = i == 0, onClick = onClick) }
+    Column(Modifier.padding(top = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        shown.forEachIndexed { i, (choice, glyph, onClick) -> Choice(choice, glyph, lang, highlight = i == 0, Modifier.reveal(3 + i), onClick = onClick) }
     }
 }
 
+/** A first step as a raised card; the first one wears the brand outline. Shrinks slightly while pressed. */
 @Composable
-private fun Choice(c: OnboardingChoice, glyph: Glyph, lang: GuideLang, highlight: Boolean, onClick: () -> Unit) {
+private fun Choice(c: OnboardingChoice, glyph: Glyph, lang: GuideLang, highlight: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(18.dp)
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 76.dp).clip(shape).background(Film.raised)
-            .border(if (highlight) 1.5.dp else 1.dp, if (highlight) Brand.horizontal else SolidColor(FilmExtra.hairline), shape)
-            .clickable(role = Role.Button, onClick = onClick).padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier.fillMaxWidth().heightIn(min = 76.dp)
+            .pressClickable(shape = shape, onClick = onClick)
+            .cardSurface(18.dp)
+            .then(if (highlight) Modifier.border(1.5.dp, Brand.horizontal, shape).background(Brand.heroWash) else Modifier)
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = if (folds(c.detail.pick(lang))) 8.dp else 16.dp),
+        verticalAlignment = Alignment.Top,
     ) {
         val accent = if (highlight) Brand.coral else Film.scan
-        Box(Modifier.size(44.dp).clip(CircleShape).background(accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-            GlyphIcon(glyph, accent, size = 22.dp)
-        }
+        IconBadge(glyph, accent, size = 44.dp)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(c.title.pick(lang), style = MaterialTheme.typography.titleMedium, color = Film.bone)
-            Text(c.detail.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+            FoldText(c.detail.pick(lang), Modifier.padding(top = 2.dp), moreLabel = lang.moreLabel, lessLabel = lang.lessLabel)
         }
+        Spacer(Modifier.width(8.dp))
+        GlyphIcon(Glyph.CHEVRON_RIGHT, Film.boneDim, Modifier.padding(top = 12.dp), size = 18.dp)
     }
 }
+
+/** True when [text] has more than one sentence, so its fold shows a More row (which brings its own spacing). */
+private fun folds(text: String): Boolean = leadSentence(text).length < text.trim().length

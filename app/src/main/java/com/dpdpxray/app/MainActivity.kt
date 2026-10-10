@@ -9,7 +9,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.ime
@@ -21,7 +24,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -78,7 +84,10 @@ import com.dpdpxray.app.ui.shell.AppBottomBar
 import com.dpdpxray.app.ui.shell.AppTab
 import com.dpdpxray.app.ui.shell.AppTabs
 import com.dpdpxray.app.ui.shell.openTab
+import com.dpdpxray.app.ui.shell.ScreenMotion
 import com.dpdpxray.app.ui.theme.Film
+import com.dpdpxray.app.ui.theme.FilmExtra
+import com.dpdpxray.app.ui.theme.LocalReduceMotion
 import com.dpdpxray.app.ui.theme.XrayTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.channels.Channel
@@ -151,13 +160,18 @@ class MainActivity : ComponentActivity() {
                     // Same gate as Home's "Check an app": without the VPN and watcher, Home shows what is missing.
                     if (target == AppTab.CHECK && !vm.prepareAudit()) nav.openTab(AppTab.HOME) else nav.openTab(target)
                 }
+                val reduceMotion = LocalReduceMotion.current
                 Scaffold(
-                    containerColor = Film.base,
+                    // A soft vertical gradient behind every screen; screens themselves stay transparent.
+                    modifier = Modifier.background(FilmExtra.backdrop),
+                    containerColor = Color.Transparent,
                     contentColor = Film.bone,
                     contentWindowInsets = WindowInsets.safeDrawing,
                     bottomBar = { if (tab != null && !keyboardOpen) AppBottomBar(tab, selectTab) },
                 ) { padding ->
-                Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+                // Content keeps a comfortable reading width on tablets and in landscape.
+                Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding), contentAlignment = Alignment.TopCenter) {
+                Box(Modifier.fillMaxHeight().widthIn(max = 680.dp).fillMaxWidth()) {
                     val progress by vm.progress.collectAsState()
                     val start = remember { OnboardingGate.startRoute(vm.settings.value.onboardingDone, vm.progress.value is AuditProgress.Running) }
                     // Guidance never talks over the voice copilot.
@@ -173,7 +187,13 @@ class MainActivity : ComponentActivity() {
                             nav.navigate(OnboardingGate.HOME) { popUpTo(OnboardingGate.ONBOARDING) { inclusive = true } }
                         }
                     }
-                    NavHost(nav, startDestination = start) {
+                    NavHost(
+                        nav, startDestination = start,
+                        enterTransition = { ScreenMotion.enter(reduceMotion, ScreenMotion.isTabSwitch(initialState.destination.route, targetState.destination.route)) },
+                        exitTransition = { ScreenMotion.exit(reduceMotion, ScreenMotion.isTabSwitch(initialState.destination.route, targetState.destination.route)) },
+                        popEnterTransition = { ScreenMotion.popEnter(reduceMotion, ScreenMotion.isTabSwitch(initialState.destination.route, targetState.destination.route)) },
+                        popExitTransition = { ScreenMotion.popExit(reduceMotion, ScreenMotion.isTabSwitch(initialState.destination.route, targetState.destination.route)) },
+                    ) {
                         composable(OnboardingGate.ONBOARDING) {
                             OnboardingScreen(
                                 onDone = leaveOnboarding,
@@ -323,6 +343,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     VoiceAssistantHost(nav, vm)
+                }
                 }
                 }
                 }

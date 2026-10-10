@@ -1,5 +1,9 @@
 package com.dpdpxray.app.ui.modes
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -18,19 +22,31 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.data.Audience
-import com.dpdpxray.app.ui.components.Note
+import com.dpdpxray.app.ui.components.FoldText
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.guide.GuideLang
+import com.dpdpxray.app.ui.guide.lessLabel
+import com.dpdpxray.app.ui.guide.moreLabel
+import com.dpdpxray.app.ui.onboarding.OnboardingCopy
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
+import com.dpdpxray.app.ui.theme.LocalReduceMotion
+import com.dpdpxray.app.ui.theme.Motion
 import com.dpdpxray.app.ui.theme.Radii
 
 /**
@@ -40,13 +56,14 @@ import com.dpdpxray.app.ui.theme.Radii
 @Composable
 fun ModeSwitch(current: Audience, onChange: (Audience) -> Unit, modifier: Modifier = Modifier, lang: GuideLang = GuideLang.EN) {
     Column(modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             listOf(Audience.USER, Audience.DEVELOPER).forEach { a ->
                 ModeTile(a, a == current, lang, Modifier.weight(1f).fillMaxHeight()) { if (a != current) onChange(a) }
             }
         }
-        Spacer(Modifier.height(10.dp))
-        Note(ModeCopy.note.pick(lang))
+        Spacer(Modifier.height(8.dp))
+        // Text diet: the first sentence shows; "your checks stay the same" folds behind More.
+        FoldText(ModeCopy.note.pick(lang), moreLabel = lang.moreLabel, lessLabel = lang.lessLabel)
     }
 }
 
@@ -54,10 +71,18 @@ fun ModeSwitch(current: Audience, onChange: (Audience) -> Unit, modifier: Modifi
 private fun ModeTile(audience: Audience, selected: Boolean, lang: GuideLang, modifier: Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(Radii.tile)
     val accent = if (audience == Audience.USER) Brand.coral else Film.scan
+    val reduce = LocalReduceMotion.current
+    val fill by animateColorAsState(
+        if (selected) accent.copy(alpha = 0.12f) else FilmExtra.raisedHigh.copy(alpha = 0.5f),
+        if (reduce) snap() else tween(Motion.MEDIUM, easing = Motion.emphasized), label = "mode-tile",
+    )
     Column(
         modifier.heightIn(min = 96.dp).clip(shape)
-            .background(if (selected) accent.copy(alpha = 0.10f) else FilmExtra.raisedHigh.copy(alpha = 0.5f))
-            .border(if (selected) 1.5.dp else 1.dp, if (selected) accent else FilmExtra.hairline, shape)
+            .background(fill)
+            .then(
+                if (selected) Modifier.border(1.5.dp, if (audience == Audience.USER) Brand.horizontal else SolidColor(accent), shape)
+                else Modifier.border(1.dp, FilmExtra.hairline, shape),
+            )
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .padding(14.dp),
     ) {
@@ -74,28 +99,56 @@ private fun ModeTile(audience: Audience, selected: Boolean, lang: GuideLang, mod
 /**
  * The always-visible mode switch in Home's header: two segments, "Everyday" and "Developer". TraceVeil is built first
  * for app developers; Everyday is the same engine with a simpler front door for people who use apps.
+ *
+ * The selected segment is a brand-gradient pill with dark text; it glides to the other side when the mode changes
+ * (instantly when the system asks for no animations). The pill is drawn behind the row, so a switch only redraws.
  */
 @Composable
-fun ModePill(current: Audience, onChange: (Audience) -> Unit, modifier: Modifier = Modifier) {
+fun ModePill(current: Audience, onChange: (Audience) -> Unit, modifier: Modifier = Modifier, lang: GuideLang = GuideLang.EN) {
     val shape = RoundedCornerShape(50)
+    val reduce = LocalReduceMotion.current
+    val slide by animateFloatAsState(
+        if (current == Audience.USER) 0f else 1f,
+        if (reduce) snap() else tween(Motion.LONG, easing = Motion.emphasized), label = "mode-pill",
+    )
     Row(
-        modifier.clip(shape).background(Film.raised).border(1.dp, Film.line, shape).padding(3.dp).selectableGroup(),
+        modifier.clip(shape).background(Film.raised).border(1.dp, Film.line, shape)
+            .drawWithCache {
+                val inset = 3.dp.toPx()
+                val pill = Size((size.width - inset * 2) / 2f, size.height - inset * 2)
+                val corner = CornerRadius(pill.height / 2f)
+                val brush = Brand.horizontal
+                val halo = Brand.coral.copy(alpha = 0.22f)
+                val haloCorner = CornerRadius(pill.height / 2f + inset)
+                val haloSize = Size(pill.width + inset * 2, pill.height + inset * 2)
+                onDrawBehind {
+                    // Read the animated position here, in draw, so the glide never recomposes.
+                    val x = inset + pill.width * slide
+                    translate(left = x - inset, top = 0f) { drawRoundRect(halo, size = haloSize, cornerRadius = haloCorner) }
+                    translate(left = x, top = inset) { drawRoundRect(brush, size = pill, cornerRadius = corner) }
+                }
+            }
+            .padding(3.dp).selectableGroup(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        listOf(Audience.USER to "Everyday\nI use apps", Audience.DEVELOPER to "Developer\nI build apps").forEach { (audience, label) ->
+        listOf(Audience.USER, Audience.DEVELOPER).forEach { audience ->
             val on = audience == current
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (on) Film.base else Film.boneDim,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                maxLines = 2,
-                modifier = Modifier.weight(1f).clip(shape)
-                    .background(if (on) Brand.coral else Film.raised)
-                    .selectable(selected = on, role = Role.RadioButton, onClick = { if (!on) onChange(audience) })
-                    .heightIn(min = 36.dp)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            val ink by animateColorAsState(
+                if (on) Film.base else Film.boneDim,
+                if (reduce) snap() else tween(Motion.MEDIUM, easing = Motion.emphasized), label = "mode-ink",
             )
+            val who = OnboardingCopy.audiences.first { it.audience == audience }.title
+            Column(
+                Modifier.weight(1f).clip(shape)
+                    .selectable(selected = on, role = Role.RadioButton, onClick = { if (!on) onChange(audience) })
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(ModeCopy.name(audience).pick(lang), style = MaterialTheme.typography.labelLarge, color = ink, textAlign = TextAlign.Center, maxLines = 1)
+                Text(who.pick(lang), style = MaterialTheme.typography.labelSmall, color = ink.copy(alpha = if (on) 0.82f else 0.75f), textAlign = TextAlign.Center, maxLines = 1)
+            }
         }
     }
 }

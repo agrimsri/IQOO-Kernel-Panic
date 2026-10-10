@@ -10,10 +10,10 @@ import android.os.Looper
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,7 +40,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,9 +50,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -66,10 +66,18 @@ import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.ChipFlow
+import com.dpdpxray.app.ui.components.DisclosureRow
+import com.dpdpxray.app.ui.components.FoldText
 import com.dpdpxray.app.ui.components.GroupHeader
 import com.dpdpxray.app.ui.components.Hairline
 import com.dpdpxray.app.ui.components.Tag
+import com.dpdpxray.app.ui.components.cardSurface
+import com.dpdpxray.app.ui.components.foldSpec
+import com.dpdpxray.app.ui.components.pressClickable
+import com.dpdpxray.app.ui.components.reveal
+import com.dpdpxray.app.ui.guide.Bi
 import com.dpdpxray.app.ui.guide.EmptyState
+import com.dpdpxray.app.ui.guide.GradientAction
 import com.dpdpxray.app.ui.guide.GuideBanner
 import com.dpdpxray.app.ui.guide.GuideFlow
 import com.dpdpxray.app.ui.guide.GuideLang
@@ -82,6 +90,8 @@ import com.dpdpxray.app.ui.guide.SetupKind
 import com.dpdpxray.app.ui.guide.SetupNeed
 import com.dpdpxray.app.ui.guide.SetupSteps
 import com.dpdpxray.app.ui.guide.guideLang
+import com.dpdpxray.app.ui.guide.lessLabel
+import com.dpdpxray.app.ui.guide.moreLabel
 import com.dpdpxray.app.ui.screens.SetupRow
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
@@ -93,9 +103,9 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Everyday ("Protect my phone") Home: a short hero, five big plain cards, compact recent checks and a way back to
- * developer mode. Same engine and destinations as developer mode; only the front door is simpler. Cards whose screen
- * is not in this build (null callback) are left out rather than shown broken.
+ * Everyday ("Protect my phone") Home: a hero that carries the main "No" check, four plain cards, compact recent checks
+ * and a way back to developer mode. Same engine and destinations as developer mode; only the front door is simpler.
+ * Cards whose screen is not in this build (null callback) are left out rather than shown broken.
  */
 @Composable
 fun EverydayHomeScreen(
@@ -152,6 +162,18 @@ fun EverydayHomeScreen(
     val running = progress as? AuditProgress.Running
     val alertStatus = EverydayCopy.alertStatus(notifications, pf.accessibilityOn)
 
+    val checkApp = { if (vm.prepareAudit()) onCheckApp() }
+    val setupRows: @Composable ColumnScope.() -> Unit = {
+        // The readiness gate folded to its first line, then only the steps still to do, each with its own button.
+        if (required > 0) FoldText(EverydayCopy.readiness.pick(lang), Modifier.padding(top = 4.dp), color = Film.bone, moreLabel = lang.moreLabel, lessLabel = lang.lessLabel)
+        todo.forEachIndexed { i, item ->
+            val plain = if (item.kind == SetupKind.VPN && pf.otherVpnActive)
+                item.copy(title = EverydayCopy.otherVpnTitle.pick(lang), detail = EverydayCopy.otherVpnDetail.pick(lang))
+            else item.copy(title = EverydayCopy.setupTitle(item.kind).pick(lang), detail = EverydayCopy.setupDetail(item.kind).pick(lang))
+            SetupRow(plain, number = if (item.need == SetupNeed.REQUIRED) i + 1 else null) { fix(item.kind) }
+        }
+    }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -163,66 +185,53 @@ fun EverydayHomeScreen(
             }
         }
         val modeSettings by vm.settings.collectAsState()
-        com.dpdpxray.app.ui.modes.ModePill(
+        ModePill(
             modeSettings.audience, { a -> vm.updateSettings { it.copy(audience = a) } },
-            Modifier.fillMaxWidth().padding(top = 12.dp),
+            Modifier.fillMaxWidth().padding(top = 12.dp), lang = lang,
         )
 
         Spacer(Modifier.height(16.dp))
-        EverydayHero(lang)
+        // The hero carries the one main action: the "No" check, with its readiness and any steps still to do.
+        EverydayHero(
+            lang, Modifier.reveal(0),
+            onCheck = checkApp,
+            status = {
+                if (required == 0) StatusPill(EverydayCopy.ready.pick(lang), Film.clear)
+                else StatusPill(EverydayCopy.stepsFirst(required).pick(lang), Film.warn)
+            },
+            showSetup = todo.isNotEmpty(),
+            setup = setupRows,
+        )
 
         if (running != null) {
             Spacer(Modifier.height(16.dp))
             GuideBanner(GuideFlow.homeRunning(running.config.targetLabel), speak = false, action = EverydayCopy.running.pick(lang) to onLive)
         }
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(16.dp))
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             FrontCard(
-                EverydayCopy.file, lang, accent = Film.scan,
-                icon = { GlyphIcon(Glyph.APK, it, size = 28.dp) },
+                EverydayCopy.file, lang, accent = Film.scan, modifier = Modifier.reveal(1),
+                icon = { GlyphIcon(Glyph.APK, it, size = 24.dp) },
                 onClick = { filePicker.launch(arrayOf(IncomingApk.APK_MIME, "application/octet-stream")) },
             )
             if (onCheckup != null) FrontCard(
-                EverydayCopy.apps, lang, accent = Film.scan,
-                icon = { ModeGlyphIcon(ModeGlyph.PHONE, it, size = 28.dp) },
+                EverydayCopy.apps, lang, accent = Film.scan, modifier = Modifier.reveal(2),
+                icon = { ModeGlyphIcon(ModeGlyph.PHONE, it, size = 24.dp) },
                 onClick = onCheckup,
             )
             FrontCard(
-                EverydayCopy.alerts, lang, accent = Film.scan,
-                icon = { GlyphIcon(Glyph.BELL, it, size = 28.dp) },
+                EverydayCopy.alerts, lang, accent = Brand.peach, modifier = Modifier.reveal(3),
+                icon = { GlyphIcon(Glyph.BELL, it, size = 24.dp) },
                 onClick = onAlerts,
                 status = {
                     val color = when (alertStatus) { AlertStatus.ON -> Film.clear; AlertStatus.WHILE_OPEN -> Film.warn; AlertStatus.BLOCKED -> Film.high }
                     StatusPill(EverydayCopy.alertLabel(alertStatus, settings.speakApkGuardAlerts).pick(lang), color)
                 },
             )
-            FrontCard(
-                EverydayCopy.sayNo, lang, accent = Brand.coral, highlight = true,
-                icon = { ModeGlyphIcon(ModeGlyph.SAY_NO, it, size = 28.dp) },
-                onClick = { if (vm.prepareAudit()) onCheckApp() },
-                status = {
-                    if (required == 0) StatusPill(EverydayCopy.ready.pick(lang), Film.clear)
-                    else StatusPill(EverydayCopy.stepsFirst(required).pick(lang), Film.warn)
-                },
-                showExtra = todo.isNotEmpty(),
-            ) {
-                // The readiness gate in one plain sentence, then only the steps still to do, each with its own button.
-                Hairline()
-                if (required > 0) Text(
-                    EverydayCopy.readiness.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.bone,
-                    modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
-                )
-                todo.forEachIndexed { i, item ->
-                    val plain = if (item.kind == SetupKind.VPN && pf.otherVpnActive)
-                        item.copy(title = EverydayCopy.otherVpnTitle.pick(lang), detail = EverydayCopy.otherVpnDetail.pick(lang))
-                    else item.copy(title = EverydayCopy.setupTitle(item.kind).pick(lang), detail = EverydayCopy.setupDetail(item.kind).pick(lang))
-                    SetupRow(plain, number = if (item.need == SetupNeed.REQUIRED) i + 1 else null) { fix(item.kind) }
-                }
-            }
             if (onTrust != null) FrontCard(
-                EverydayCopy.trust, lang, accent = Film.clear,
-                icon = { GlyphIcon(Glyph.LOCK, it, size = 28.dp) },
+                EverydayCopy.trust, lang, accent = Film.clear, modifier = Modifier.reveal(4),
+                icon = { GlyphIcon(Glyph.LOCK, it, size = 24.dp) },
                 onClick = onTrust,
             )
         }
@@ -236,8 +245,7 @@ fun EverydayHomeScreen(
                 action = EverydayCopy.seeSample.pick(lang) to { vm.openSample(onOpen) },
             )
         } else {
-            val shape = RoundedCornerShape(Radii.card)
-            Column(Modifier.fillMaxWidth().clip(shape).background(Film.raised).border(1.dp, FilmExtra.hairline, shape).padding(horizontal = 14.dp, vertical = 4.dp)) {
+            Column(Modifier.fillMaxWidth().reveal(5).cardSurface().padding(horizontal = 12.dp, vertical = 4.dp)) {
                 audits.take(RECENT_ON_HOME).forEachIndexed { i, meta ->
                     if (i > 0) Hairline()
                     CompactCheckRow(meta, lang) { onOpen(meta.id) }
@@ -257,26 +265,42 @@ fun EverydayHomeScreen(
 
 private const val RECENT_ON_HOME = 3
 
-/** The lightbox from developer Home, reworded: mode chip, the promise, one sentence, two plain assurances. */
+/** The hero's fold label, in both languages. */
+private val HowItWorks = Bi("How it works", "यह कैसे काम करता है")
+private val HideHowItWorks = Bi("Hide", "छिपाएँ")
+
+/**
+ * The lightbox: mode chip, the promise, one sentence, two plain assurances, then the main action ("Does this app
+ * respect my 'No'?") as the brand gradient with a slow light sweep. Readiness sits under the action; how the check
+ * works folds behind "How it works"; steps still to do follow with their own buttons. A faint film grid, a consent
+ * line and a warm brand wash sit behind it, with a soft coral glow beneath the card.
+ */
 @Composable
-private fun EverydayHero(lang: GuideLang) {
-    val shape = RoundedCornerShape(22.dp)
-    Box(Modifier.fillMaxWidth().clip(shape).background(Film.raised).border(1.dp, FilmExtra.hairline, shape)) {
+private fun EverydayHero(
+    lang: GuideLang,
+    modifier: Modifier,
+    onCheck: () -> Unit,
+    status: @Composable () -> Unit,
+    showSetup: Boolean,
+    setup: @Composable ColumnScope.() -> Unit,
+) {
+    Box(modifier.fillMaxWidth().cardSurface(22.dp, glow = Brand.coral).background(Brand.heroWash)) {
         Canvas(Modifier.matchParentSize()) {
             val step = 22.dp.toPx()
+            val grid = FilmExtra.hairline.copy(alpha = 0.55f)
             var x = step
-            while (x < size.width) { drawLine(FilmExtra.hairline, Offset(x, 0f), Offset(x, size.height), 1f); x += step }
+            while (x < size.width) { drawLine(grid, Offset(x, 0f), Offset(x, size.height), 1f); x += step }
             var y = step
-            while (y < size.height) { drawLine(FilmExtra.hairline, Offset(0f, y), Offset(size.width, y), 1f); y += step }
-            val line = size.height * 0.42f
+            while (y < size.height) { drawLine(grid, Offset(0f, y), Offset(size.width, y), 1f); y += step }
+            val line = 150.dp.toPx().coerceAtMost(size.height * 0.42f)
             drawLine(
-                Brush.horizontalGradient(listOf(Color.Transparent, Film.scan.copy(alpha = 0.55f), Color.Transparent)),
+                Brush.horizontalGradient(listOf(Color.Transparent, Film.scan.copy(alpha = 0.45f), Color.Transparent)),
                 Offset(0f, line), Offset(size.width, line), 2.dp.toPx(),
             )
         }
         Column(Modifier.padding(20.dp)) {
             Row(
-                Modifier.clip(CircleShape).background(Brand.coral.copy(alpha = 0.12f)).border(1.dp, Brand.coral.copy(alpha = 0.4f), CircleShape)
+                Modifier.clip(CircleShape).background(Brand.coral.copy(alpha = 0.14f)).border(1.dp, Brand.coral.copy(alpha = 0.45f), CircleShape)
                     .padding(start = 8.dp, end = 12.dp, top = 5.dp, bottom = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -286,23 +310,43 @@ private fun EverydayHero(lang: GuideLang) {
             }
             Text(
                 EverydayCopy.heroTitle.pick(lang), style = MaterialTheme.typography.headlineMedium, color = Film.bone,
-                modifier = Modifier.padding(top = 14.dp).semantics { heading() },
+                modifier = Modifier.padding(top = 16.dp).semantics { heading() },
             )
-            Text(
-                EverydayCopy.heroBody.pick(lang), style = MaterialTheme.typography.bodyLarge, color = Film.boneDim,
-                modifier = Modifier.padding(top = 8.dp, bottom = 14.dp),
+            FoldText(
+                EverydayCopy.heroBody.pick(lang), Modifier.padding(top = 8.dp),
+                style = MaterialTheme.typography.bodyLarge, moreLabel = lang.moreLabel, lessLabel = lang.lessLabel,
             )
-            ChipFlow {
+            ChipFlow(Modifier.padding(top = 12.dp)) {
                 Tag(EverydayCopy.onPhone.pick(lang), Film.clear)
                 Tag(EverydayCopy.readsOnly.pick(lang), Film.scan)
+            }
+
+            GradientAction(EverydayCopy.sayNo.title.pick(lang), onCheck, Modifier.padding(top = 20.dp), sweep = true)
+
+            var open by rememberSaveable { mutableStateOf(false) }
+            Column(Modifier.fillMaxWidth().padding(top = 8.dp).animateContentSize(foldSpec())) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    status()
+                    Spacer(Modifier.weight(1f))
+                    DisclosureRow(open, HowItWorks.pick(lang), HideHowItWorks.pick(lang), { open = !open })
+                }
+                if (open) Text(
+                    EverydayCopy.sayNo.body.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+                )
+            }
+            if (showSetup) {
+                Hairline(Modifier.padding(top = 8.dp))
+                Column(Modifier.fillMaxWidth().padding(top = 4.dp), content = setup)
             }
         }
     }
 }
 
 /**
- * One big plain card: a tinted glyph, a title, an optional status pill, one sentence and a chevron. The top part is one
- * button for TalkBack; [extra] (for example setup steps) sits below it with its own buttons.
+ * One plain card: a tinted glyph badge, a title, an optional status pill, at most two lines of description and a
+ * chevron. The whole card is one button for TalkBack (which still reads the full description) and shrinks slightly
+ * while pressed.
  */
 @Composable
 private fun FrontCard(
@@ -311,31 +355,34 @@ private fun FrontCard(
     accent: Color,
     icon: @Composable (Color) -> Unit,
     onClick: () -> Unit,
-    highlight: Boolean = false,
+    modifier: Modifier = Modifier,
     status: (@Composable () -> Unit)? = null,
-    showExtra: Boolean = false,
-    extra: @Composable ColumnScope.() -> Unit = {},
 ) {
     val shape = RoundedCornerShape(Radii.card)
-    Column(
-        Modifier.fillMaxWidth().clip(shape).background(Film.raised)
-            .border(if (highlight) 1.5.dp else 1.dp, if (highlight) Brand.horizontal else SolidColor(FilmExtra.hairline), shape),
+    Row(
+        modifier.fillMaxWidth()
+            .pressClickable(shape = shape, onClick = onClick)
+            .cardSurface()
+            .heightIn(min = 84.dp).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 96.dp).clickable(role = Role.Button, onClick = onClick).padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(52.dp).clip(CircleShape).background(accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) { icon(accent) }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(card.title.pick(lang), style = MaterialTheme.typography.titleLarge, color = Film.bone)
-                if (status != null) Box(Modifier.padding(top = 6.dp)) { status() }
-                Text(card.body.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 6.dp))
-            }
-            Spacer(Modifier.width(8.dp))
-            GlyphIcon(Glyph.CHEVRON_RIGHT, Film.boneDim, size = 20.dp)
+        Box(
+            Modifier.size(48.dp).clip(CircleShape)
+                .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.26f), accent.copy(alpha = 0.08f))))
+                .border(1.dp, accent.copy(alpha = 0.25f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) { icon(accent) }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(card.title.pick(lang), style = MaterialTheme.typography.titleMedium, color = Film.bone)
+            if (status != null) Box(Modifier.padding(top = 6.dp)) { status() }
+            Text(
+                card.body.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp),
+            )
         }
-        if (showExtra) Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp), content = extra)
+        Spacer(Modifier.width(8.dp))
+        GlyphIcon(Glyph.CHEVRON_RIGHT, Film.boneDim, size = 20.dp)
     }
 }
 
@@ -358,7 +405,9 @@ private fun StatusPill(text: String, color: Color) {
 private fun CompactCheckRow(meta: AuditMeta, lang: GuideLang, onClick: () -> Unit) {
     val color = bandColor(meta.band)
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(role = Role.Button, onClick = onClick).padding(vertical = 8.dp),
+        Modifier.fillMaxWidth().heightIn(min = 64.dp)
+            .pressClickable(shape = RoundedCornerShape(Radii.small), onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ScoreChip(RecentChecks.scoreText(meta), color, size = 44.dp)
