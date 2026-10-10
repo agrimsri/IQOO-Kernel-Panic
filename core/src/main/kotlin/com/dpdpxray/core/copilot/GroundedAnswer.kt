@@ -53,7 +53,8 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
         val t = if (language == CopilotLanguage.HI) Hindi else English
         val body = buildString {
             if (evidence.sample) append(t.samplePrefix)
-            if (evidence.result.band == ScoreBand.INCONCLUSIVE) append(t.inconclusive)
+            val reason = com.dpdpxray.core.rules.Inconclusive.reason(evidence.result.findings)
+            if (evidence.result.band == ScoreBand.INCONCLUSIVE || reason != null) append(t.inconclusive(reason))
             append(compose(intent, evidence, t))
             evidence.plans.filter { it != AuditPlan.SILENT && evidence.completedPlans?.contains(it) == false }
                 .forEach { plan ->
@@ -103,7 +104,7 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
 
     private interface Texts {
         val samplePrefix: String
-        val inconclusive: String
+        fun inconclusive(reason: com.dpdpxray.core.rules.Inconclusive.Reason?): String
         val noTrackers: String
         fun childrenFound(c9: Finding): String
         fun childrenAbsent(label: String, entities: List<String>): String
@@ -123,7 +124,12 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
 
     private object English : Texts {
         override val samplePrefix = "Sample audit, not a live result. "
-        override val inconclusive = "Network visibility was low, so this audit is inconclusive. "
+        override fun inconclusive(reason: com.dpdpxray.core.rules.Inconclusive.Reason?) = when (reason) {
+            com.dpdpxray.core.rules.Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN ->
+                "The app kept its data, so consent history is unknown and this audit gives no readiness verdict. "
+            com.dpdpxray.core.rules.Inconclusive.Reason.LOW_VISIBILITY -> "Network visibility was low, so this audit is inconclusive. "
+            null -> "This audit is inconclusive. "
+        }
         override val noTrackers = "None of this audit's findings name a known tracker."
         override fun childrenFound(c9: Finding) = "This audit recorded ${c9.checkId.code}, “${c9.title}”: ${c9.explanation}"
         override fun childrenAbsent(label: String, entities: List<String>) =
@@ -148,7 +154,7 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
             AuditPlan.REJECT -> "The intended ${plan.label} choice was not recorded; C2 not tested. The score is not a completed refusal assessment."
             AuditPlan.SILENT -> ""
         }
-        override fun score(r: AuditResult) = if (r.score == null) "This audit is inconclusive and has no score."
+        override fun score(r: AuditResult) = if (r.score == null || com.dpdpxray.core.rules.Inconclusive.reason(r.findings) != null) "This audit is inconclusive and has no score."
         else "It scored ${r.score} out of 100 (${r.band.label}) with ${r.findings.size} finding${if (r.findings.size == 1) "" else "s"}" +
             (if (r.findings.isEmpty()) "." else ": ${r.findings.joinToString(", ") { it.checkId.code }}.")
         override fun trackers(entities: List<String>) = "This audit's findings name these trackers: ${entities.joinToString()}."
@@ -157,7 +163,12 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
 
     private object Hindi : Texts {
         override val samplePrefix = "नमूना ऑडिट, लाइव परिणाम नहीं। "
-        override val inconclusive = "नेटवर्क की जानकारी कम थी, इसलिए यह ऑडिट अनिर्णायक है। "
+        override fun inconclusive(reason: com.dpdpxray.core.rules.Inconclusive.Reason?) = when (reason) {
+            com.dpdpxray.core.rules.Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN ->
+                "ऐप ने अपना डेटा रखा, इसलिए सहमति का इतिहास पता नहीं है और यह ऑडिट तैयारी पर कोई निष्कर्ष नहीं देता। "
+            com.dpdpxray.core.rules.Inconclusive.Reason.LOW_VISIBILITY -> "नेटवर्क की जानकारी कम थी, इसलिए यह ऑडिट अनिर्णायक है। "
+            null -> "यह ऑडिट अनिर्णायक है। "
+        }
         override val noTrackers = "इस ऑडिट के किसी निष्कर्ष में कोई ज्ञात ट्रैकर नहीं है।"
         override fun childrenFound(c9: Finding) =
             "इस ऑडिट में ${c9.checkId.code} दर्ज हुआ: बच्चों के ऐप में ट्रैकिंग। ट्रैकर: ${c9.entities.joinToString()}।"
@@ -182,7 +193,7 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
             AuditPlan.REJECT -> "इस ऑडिट में मना करने का चुनाव दर्ज नहीं हुआ; C2 की जाँच नहीं हुई। स्कोर को पूरी हुई अस्वीकृति-जाँच न मानें।"
             AuditPlan.SILENT -> ""
         }
-        override fun score(r: AuditResult) = if (r.score == null) "यह ऑडिट अनिर्णायक है और इसका कोई स्कोर नहीं है।"
+        override fun score(r: AuditResult) = if (r.score == null || com.dpdpxray.core.rules.Inconclusive.reason(r.findings) != null) "यह ऑडिट अनिर्णायक है और इसका कोई स्कोर नहीं है।"
         else "स्कोर ${r.score}/100 (${r.band.label}), ${r.findings.size} निष्कर्ष" +
             (if (r.findings.isEmpty()) "।" else ": ${r.findings.joinToString(", ") { it.checkId.code }}।")
         override fun trackers(entities: List<String>) = "इस ऑडिट के निष्कर्षों में ये ट्रैकर हैं: ${entities.joinToString()}।"
