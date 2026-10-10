@@ -212,6 +212,22 @@ fun ResultsScreen(
                     }
                 }
 
+                // The server map has its own open section, so nobody has to find it inside "Evidence and limits".
+                GroupHeader("Where it connects")
+                CollapsibleCard(
+                    "Server map",
+                    summary = if (b.meta.sample) "Synthetic sample: example IPs do not establish real locations." else "Which countries answered this app's lookups, and who runs those services",
+                    summaryColor = if (b.meta.sample) Film.warn else Film.boneDim,
+                    glyph = Glyph.PRIVATE_DNS,
+                    initiallyOpen = !b.meta.sample,
+                ) {
+                    if (b.meta.sample) Note("Synthetic sample: example IPs do not establish real locations.", Film.warn)
+                    val mapSettings by vm.settings.collectAsState()
+                    val mapCatalog = remember(vm, mapSettings.firstPartyDomains) { vm.graph.catalog() }
+                    val mapOwners = remember(mapCatalog) { EndpointMapIntegration.owners(mapCatalog) }
+                    EndpointMapCard(b.sessions, mapCatalog, owners = mapOwners)
+                }
+
                 GroupHeader("Evidence and limits")
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     CollapsibleCard(
@@ -225,18 +241,6 @@ fun ResultsScreen(
                         NetworkProofCard(AuditNetworkReadings.proof(b.sessions, b.networkReadings))
                     }
 
-                    CollapsibleCard(
-                        "Endpoint evidence",
-                        summary = if (b.meta.sample) "Synthetic sample: example IPs do not establish real locations." else "Where lookups were answered, and who runs those services",
-                        summaryColor = if (b.meta.sample) Film.warn else Film.boneDim,
-                        glyph = Glyph.PRIVATE_DNS,
-                    ) {
-                        if (b.meta.sample) Note("Synthetic sample: example IPs do not establish real locations.", Film.warn)
-                        val mapSettings by vm.settings.collectAsState()
-                        val mapCatalog = remember(vm, mapSettings.firstPartyDomains) { vm.graph.catalog() }
-                        val mapOwners = remember(mapCatalog) { EndpointMapIntegration.owners(mapCatalog) }
-                        EndpointMapCard(b.sessions, mapCatalog, owners = mapOwners)
-                    }
 
                     val comparison by produceState<AuditComparisonResult?>(null, b.meta.id) { value = vm.previousComparison(b) }
                     val change = comparison
