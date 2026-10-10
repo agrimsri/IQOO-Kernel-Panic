@@ -97,6 +97,11 @@ import com.dpdpxray.app.ui.components.pressClickable
 import com.dpdpxray.app.ui.components.reveal
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
+import com.dpdpxray.app.ui.system.Group
+import com.dpdpxray.app.ui.system.ListRow
+import com.dpdpxray.app.ui.system.PrimaryButton
+import com.dpdpxray.app.ui.system.SearchField
+import com.dpdpxray.app.ui.system.SegmentedControl
 import com.dpdpxray.app.ui.guide.GradientAction
 import com.dpdpxray.app.ui.guide.OutlineAction
 import com.dpdpxray.app.ui.theme.Brand
@@ -121,7 +126,11 @@ import java.util.Locale
 // --- hub ------------------------------------------------------------------------------------------------------------
 
 @Composable
-fun ApkGuardHubScreen(onBack: (() -> Unit)?, onOpenApp: (String) -> Unit, onOpenFile: (String) -> Unit, onCheckup: (() -> Unit)? = null) {
+fun ApkGuardHubScreen(
+    onBack: (() -> Unit)?, onOpenApp: (String) -> Unit, onOpenFile: (String) -> Unit, onCheckup: (() -> Unit)? = null,
+    /** Shows the Live check / APK Guard switch under the title; null hides it. */
+    onSwitchToLive: (() -> Unit)? = null,
+) {
     val ctx = LocalContext.current
     val store = remember(ctx) { ctx.graph.settings }
     val settings by store.settings.collectAsState()
@@ -144,26 +153,24 @@ fun ApkGuardHubScreen(onBack: (() -> Unit)?, onOpenApp: (String) -> Unit, onOpen
     Column(Modifier.fillMaxSize()) {
         TopBar("APK Guard", onBack)
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
+            if (onSwitchToLive != null) item(key = "switch") {
+                SegmentedControl(listOf("Live check", "APK Guard"), 1, { if (it == 0) onSwitchToLive() }, Modifier.padding(top = 4.dp, bottom = 16.dp))
+            }
             item(key = "intro") {
-                // Hero: one lead line, three chips, the main action. Everything else folds under "How APK Guard works".
-                Column(Modifier.reveal(0).fillMaxWidth().cardSurface().background(Brand.heroWash).padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconBadge(Glyph.APK, Film.scan, size = 48.dp)
-                        Spacer(Modifier.width(14.dp))
-                        Text(
-                            "Check an app's powers before you install or open it.", style = MaterialTheme.typography.titleLarge, color = Film.bone,
-                            modifier = Modifier.weight(1f).semantics { heading() },
-                        )
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    ChipFlow {
-                        Tag("Not an antivirus", Film.warn)
-                        Tag("Reads only, never installs", Film.scan)
-                        Tag("Stays on this phone", Film.clear)
-                    }
+                // One lead line, the main action, one footnote. How it works is a single disclosure.
+                Column(Modifier.reveal(0).fillMaxWidth().cardSurface().padding(20.dp)) {
+                    Text("Check an app file", style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+                    Text(
+                        "See what an app can do before you install it. TraceVeil only reads the file.",
+                        style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 6.dp),
+                    )
                     Spacer(Modifier.height(16.dp))
-                    GradientAction("Check an APK file", { picker.launch(arrayOf(IncomingApk.APK_MIME, "application/octet-stream")) }, glyph = Glyph.APK)
-                    LearnMore(Modifier.padding(top = 8.dp), label = "How APK Guard works") {
+                    PrimaryButton("Choose a file", { picker.launch(arrayOf(IncomingApk.APK_MIME, "application/octet-stream")) })
+                    Text(
+                        "Not an antivirus. It never installs anything.",
+                        style = MaterialTheme.typography.bodySmall, color = Film.boneDim, modifier = Modifier.padding(top = 12.dp),
+                    )
+                    LearnMore(Modifier.padding(top = 4.dp), label = "How APK Guard works") {
                         Note("Reads permissions, special services, where an app came from and who signed it.")
                         Note("APK Guard explains what an app can do from what Android shows about it: permissions, special services, where it came from and who signed it. It is not an antivirus and cannot say whether an app is harmful. Keep Google Play Protect on as well (Play Store › your profile › Play Protect).")
                         Note("Got an app file on WhatsApp or in Files? Tap it and choose TraceVeil, or share it to TraceVeil. TraceVeil only reads the file; it never installs it.")
@@ -171,13 +178,10 @@ fun ApkGuardHubScreen(onBack: (() -> Unit)?, onOpenApp: (String) -> Unit, onOpen
                 }
             }
             if (onCheckup != null) item(key = "checkup") {
-                SectionCard(Modifier.padding(top = 16.dp).reveal(1)) {
-                    NavRow(
-                        "My phone checkup",
-                        "Which installed apps can read SMS, control your screen, read notifications and more.",
-                        onCheckup,
-                        glyph = Glyph.CHECK,
-                        accent = Film.warn,
+                Group(Modifier.padding(top = 16.dp).reveal(1)) {
+                    ListRow(
+                        "Phone checkup", subtitle = "Which installed apps can read SMS, control your screen, read notifications and more.",
+                        leading = { GlyphIcon(Glyph.CHECK, Film.boneDim, size = 24.dp) }, onClick = onCheckup,
                     )
                 }
             }
@@ -215,21 +219,10 @@ fun ApkGuardHubScreen(onBack: (() -> Unit)?, onOpenApp: (String) -> Unit, onOpen
             }
             item(key = "installed-header") {
                 Column(Modifier.reveal(3)) {
-                    GroupHeader("Check an installed app", trailing = { if (shown != null) CountChip(shown.size) })
-                    OutlinedTextField(
-                        value = query, onValueChange = { query = it }, singleLine = true,
-                        placeholder = { Text("Search by name or package") },
-                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = Film.boneDim) },
-                        trailingIcon = {
-                            if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, contentDescription = "Clear search", tint = Film.boneDim) }
-                        },
-                        shape = RoundedCornerShape(Radii.button),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Film.scan, unfocusedBorderColor = Film.line, cursorColor = Film.scan),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    GroupHeader("Installed apps", trailing = { if (shown != null) CountChip(shown.size) })
+                    SearchField(query, { query = it }, "Search by name or package")
                     SwitchRow("Show system apps", "Apps that came with the phone.", showSystem, { showSystem = it })
-                    Text("Newest installs first. Apps without a launcher screen are listed too.", style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(8.dp))
                 }
             }
             if (shown == null) {
@@ -249,6 +242,7 @@ private fun CountChip(n: Int) {
     Box(Modifier.clearAndSetSemantics { contentDescription = "$n apps" }) { Tag("$n", Film.boneDim) }
 }
 
+/** One installed app: icon, name, and a second line only when something is worth saying (system app, no launcher screen). */
 @Composable
 private fun InstalledRow(app: ApkInspector.ListedApp, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val ctx = LocalContext.current
@@ -258,32 +252,27 @@ private fun InstalledRow(app: ApkInspector.ListedApp, modifier: Modifier = Modif
         }
     }
     val shape = RoundedCornerShape(Radii.row)
+    val note = when {
+        app.isSystem -> "Came with the phone"
+        !app.hasLauncher -> "No launcher screen"
+        else -> null
+    }
     Row(
-        modifier.fillMaxWidth().heightIn(min = 72.dp)
+        modifier.fillMaxWidth().heightIn(min = 64.dp)
             .pressClickable(shape = shape, onClick = onClick)
             .cardSurface(Radii.row)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        icon?.let { Image(it, contentDescription = null, modifier = Modifier.size(44.dp).clip(RoundedCornerShape(Radii.small))) }
-            ?: Spacer(Modifier.size(44.dp).clip(RoundedCornerShape(Radii.small)).background(FilmExtra.raisedHigh))
+        icon?.let { Image(it, contentDescription = null, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(Radii.small))) }
+            ?: Spacer(Modifier.size(40.dp).clip(RoundedCornerShape(Radii.small)).background(Film.fill))
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(app.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(app.packageName, fontFamily = Mono, fontSize = 12.sp, color = Film.boneDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                when {
-                    app.isSystem -> "Came with the phone"
-                    ApkInspector.plausibleInstallTime(app.firstInstallTime) -> "Installed ${date(app.firstInstallTime)}"
-                    else -> "Install date not reported (preloaded)"
-                }, style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
-        }
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (!app.hasLauncher) Tag("No launcher screen", Film.warn)
-            if (app.isSystem) Tag("System", Film.boneDim)
+            if (note != null) Text(note, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
         }
         Spacer(Modifier.width(6.dp))
-        GlyphIcon(Glyph.CHEVRON_RIGHT, Film.boneDim, size = 18.dp)
+        GlyphIcon(Glyph.CHEVRON_RIGHT, Film.tertiary, size = 16.dp)
     }
 }
 

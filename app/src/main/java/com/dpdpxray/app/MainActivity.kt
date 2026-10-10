@@ -156,8 +156,11 @@ class MainActivity : ComponentActivity() {
                 val tab = AppTabs.tabOf(route)
                 val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
                 val selectTab: (AppTab) -> Unit = { target ->
-                    // Same gate as Home's "Check an app": without the VPN and watcher, Home shows what is missing.
-                    if (target == AppTab.CHECK && !vm.prepareAudit()) nav.openTab(AppTab.HOME) else nav.openTab(target)
+                    // Check opens the live check when the VPN and consent watcher are ready; otherwise it opens APK Guard,
+                    // which needs neither, and its Live check segment sends the person Home to finish setup.
+                    if (target == AppTab.CHECK && !(vm.preflight.value.canAudit && vm.prepareAudit())) {
+                        if (tab != AppTab.CHECK) nav.navigate(ApkGuardRoutes.HUB) { popUpTo(AppTab.HOME.route); launchSingleTop = true }
+                    } else nav.openTab(target)
                 }
                 val reduceMotion = LocalReduceMotion.current
                 Scaffold(
@@ -243,6 +246,7 @@ class MainActivity : ComponentActivity() {
                                 vm, onBack = { nav.popBackStack() }, onStarted = { nav.navigate("live") { popUpTo("home") } },
                                 initialQuery = e.arguments?.getString("q").orEmpty(),
                                 onQuarantine = { nav.navigateToQuarantine(it) },
+                                onSwitchToApk = { nav.navigate(ApkGuardRoutes.HUB) { popUpTo(AppTab.HOME.route); launchSingleTop = true } },
                             )
                         }
                         composable(QuarantineRoutes.ROUTE) { e ->
@@ -286,6 +290,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenApp = { nav.navigate(ApkGuardRoutes.app(it)) },
                                 onOpenFile = { nav.navigate(ApkGuardRoutes.file(it)) },
                                 onCheckup = { nav.navigate(AutoGuardRoutes.CHECKUP) },
+                                onSwitchToLive = { if (vm.preflight.value.canAudit && vm.prepareAudit()) nav.navigate("pick") { popUpTo(AppTab.HOME.route); launchSingleTop = true } else nav.openTab(AppTab.HOME) },
                             )
                         }
                         // Auto-guard "My phone checkup"; also opened by its weekly notification.

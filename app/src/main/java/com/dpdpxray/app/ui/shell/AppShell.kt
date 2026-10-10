@@ -42,13 +42,12 @@ import com.dpdpxray.app.ui.theme.LocalReduceMotion
 import com.dpdpxray.app.ui.theme.Motion
 
 /**
- * The five top-level destinations shown in the bottom navigation bar. Each tab opens an existing route; the bar only
+ * The four top-level destinations shown in the bottom navigation bar. APK Guard lives under Check (the same bar item stays selected on both). Each tab opens an existing route; the bar only
  * changes how people move between them, never what a screen does.
  */
 enum class AppTab(val route: String, val label: String, val glyph: Glyph) {
     HOME("home", "Home", Glyph.HOME),
     CHECK("pick", "Check", Glyph.SEARCH),
-    APK("apkguard", "APK Guard", Glyph.APK),
     REPORTS(AppTabs.REPORTS, "Reports", Glyph.REPORTS),
     MORE(AppTabs.MORE, "More", Glyph.MORE),
 }
@@ -65,8 +64,7 @@ object AppTabs {
      */
     fun tabOf(route: String?): AppTab? = when (route?.substringBefore('?')) {
         AppTab.HOME.route -> AppTab.HOME
-        AppTab.CHECK.route -> AppTab.CHECK
-        AppTab.APK.route -> AppTab.APK
+        AppTab.CHECK.route, "apkguard" -> AppTab.CHECK
         REPORTS -> AppTab.REPORTS
         MORE -> AppTab.MORE
         else -> null

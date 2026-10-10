@@ -301,7 +301,7 @@ private fun SectionHeader(text: String, trailing: (@Composable () -> Unit)? = nu
 
 /** A saved check: name, plain result and date on the left, the score tinted by its band on the right. */
 @Composable
-private fun CheckRow(meta: AuditMeta, lang: GuideLang, onClick: () -> Unit) {
+internal fun CheckRow(meta: AuditMeta, lang: GuideLang, onClick: () -> Unit) {
     val partial = RecentChecks.coverageWarning(meta) != null
     val subtitle = (if (partial) EverydayCopy.partial.pick(lang) + " · " else "") +
         EverydayCopy.band(meta.band).pick(lang) + " · " + SimpleDateFormat("d MMM", Locale.US).format(Date(meta.createdAtMs))
