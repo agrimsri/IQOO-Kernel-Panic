@@ -5,6 +5,7 @@ import com.dpdpxray.core.audit.PhaseAssigner
 import com.dpdpxray.core.model.*
 import com.dpdpxray.core.notice.RightsNotice
 import com.dpdpxray.core.notice.RightsNoticeBuilder
+import com.dpdpxray.core.rules.SessionClassifier
 import com.dpdpxray.core.trackers.TrackerCatalog
 import java.time.ZoneId
 
@@ -16,8 +17,14 @@ internal class EvidenceUi(private val catalog: TrackerCatalog, private val corpu
         else event.copy(entity = info.entity, category = info.category, disguisedVia = event.disguisedVia ?: info.disguisedVia)
     }
 
-    fun timeline(session: AuditSession): List<NetEvent> =
-        PhaseAssigner.assign(session.netEvents, session.consentEvents).map(::classify).sortedBy { it.tNanos }
+    /** Same labels as the rules engine: a catalogued tracker owned by the audited app's own publisher is first-party. */
+    fun timeline(session: AuditSession): List<NetEvent> {
+        val context = SessionClassifier(catalog)
+        val owner = context.ownerOf(session)
+        return PhaseAssigner.assign(session.netEvents, session.consentEvents).map(::classify)
+            .map { e -> if (owner != null && e.category.isTracking && context.companyOf(e) == owner.company) e.copy(category = Category.FIRST_PARTY_SAME_COMPANY) else e }
+            .sortedBy { it.tNanos }
+    }
 
     fun aliasLabel(event: NetEvent): String? = observedAliasLabel(event)
 
