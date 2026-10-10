@@ -1,0 +1,292 @@
+{
+    "schema": "traceveil.audit.v1",
+    "exportedAt": "2026-10-10T00:00:00Z",
+    "app": {
+        "package": "com.leakyshop.demo.fixed",
+        "label": "LeakyShop Fixed (sample)"
+    },
+    "meta": {
+        "id": "sample-leakyshop-fixed",
+        "targetPackage": "com.leakyshop.demo.fixed",
+        "targetLabel": "LeakyShop Fixed (sample)",
+        "createdAtMs": 1791590400000,
+        "score": 100,
+        "band": "READY",
+        "findingCount": 0,
+        "plans": [
+            "Plan C · No interaction",
+            "Plan B · Reject",
+            "Plan A · Accept"
+        ],
+        "sample": true,
+        "timingProfile": null
+    },
+    "sessions": [
+        {
+            "id": "sample-fixed-c",
+            "targetPackage": "com.leakyshop.demo.fixed",
+            "targetLabel": "LeakyShop Fixed (sample)",
+            "plan": "SILENT",
+            "childFacing": false,
+            "startedAtNanos": 0,
+            "endedAtNanos": 30000000000,
+            "startedAtEpochMs": 1791590400000,
+            "netEvents": [
+                {
+                    "tNanos": 400000000,
+                    "hostname": "api.leakyshop.example",
+                    "queryType": 1,
+                    "entity": null,
+                    "category": "UNKNOWN",
+                    "phase": "NO_CONSENT_SEEN",
+                    "viaPackage": null,
+                    "cnameChain": [],
+                    "answerIps": [],
+                    "disguisedVia": null,
+                    "answerStatus": null,
+                    "rcode": null
+                },
+                {
+                    "tNanos": 9000000000,
+                    "hostname": "api.leakyshop.example",
+                    "queryType": 1,
+                    "entity": null,
+                    "category": "UNKNOWN",
+                    "phase": "NO_CONSENT_SEEN",
+                    "viaPackage": null,
+                    "cnameChain": [],
+                    "answerIps": [],
+                    "disguisedVia": null,
+                    "answerStatus": null,
+                    "rcode": null
+                }
+            ],
+            "consentEvents": [
+                {
+                    "tNanos": 2100000000,
+                    "kind": "SCREEN_APPEARED",
+                    "nodeText": null,
+                    "screenshotPath": null,
+                    "tree": null
+                }
+            ],
+            "screenAudit": {
+                "isConsentScreen": true,
+                "preTicked": false,
+                "rejectOption": "VISIBLE",
+                "purposesCount": null,
+                "separateChoices": null,
+                "itemisedData": null,
+                "purposeStated": null,
+                "withdrawalInfo": null,
+                "languageOptions": null,
+                "childAudienceSignals": null,
+                "darkPatterns": [],
+                "summary": "",
+                "confidence": 1.0,
+                "source": "DETERMINISTIC",
+                "observedFields": [
+                    "preTicked",
+                    "rejectOption"
+                ],
+                "conflicts": [],
+                "modelId": null,
+                "latencyMs": null
+            },
+            "deviceModel": "",
+            "androidVersion": "",
+            "privateDnsActive": null,
+            "notes": [],
+            "captureHealth": null,
+            "freshState": true
+        },
+        {
+            "id": "sample-fixed-b",
+            "targetPackage": "com.leakyshop.demo.fixed",
+            "targetLabel": "LeakyShop Fixed (sample)",
+            "plan": "REJECT",
+            "childFacing": false,
+            "startedAtNanos": 0,
+            "endedAtNanos": 35000000000,
+            "startedAtEpochMs": 1791590400000,
+            "netEvents": [
+                {
+                    "tNanos": 400000000,
+                    "hostname": "api.leakyshop.example",
+                    "queryType": 1,
+                    "entity": null,
+                    "category": "UNKNOWN",
+                    "phase": "NO_CONSENT_SEEN",
+                    "viaPackage": null,
+                    "cnameChain": [],
+                    "answerIps": [],
+                    "disguisedVia": null,
+                    "answerStatus": null,
+                    "rcode": null
+                },
+                {
+                    "tNanos": 9000000000,
+                    "hostname": "api.leakyshop.example",
+                    "queryType": 1,
+                    "entity": null,
+                    "category": "UNKNOWN",
+                    "phase": "NO_CONSENT_SEEN",
+                    "viaPackage": null,
+                    "cnameChain": [],
+                    "answerIps": [],
+                    "disguisedVia": null,
+                    "answerStatus": null,
+                    "rcode": null
+                }
+            ],
+            "consentEvents": [
+                {
+                    "tNanos": 2100000000,
+                    "kind": "SCREEN_APPEARED",
+                    "nodeText": null,
+                    "screenshotPath": null,
+                    "tree": null
+                },
+                {
+                    "tNanos": 6000000000,
+                    "kind": "SETTINGS",
+                    "nodeText": "Manage",
+                    "screenshotPath": null,
+                    "tree": null
+                },
+                {
+                    "tNanos": 8300000000,
+                    "kind": "REJECT",
+                    "nodeText": "Reject all",
+                    "screenshotPath": null,
+                    "tree": null
+                }
+            ],
+            "screenAudit": {
+                "isConsentScreen": true,
+                "preTicked": false,
+                "rejectOption": "VISIBLE",
+                "purposesCount": null,
+                "separateChoices": null,
+                "itemisedData": null,
+                "purposeStated": null,
+                "withdrawalInfo": null,
+                "languageOptions": null,
+                "childAudienceSignals": null,
+                "darkPatterns": [],
+                "summary": "",
+                "confidence": 1.0,
+                "source": "DETERMINISTIC",
+                "observedFields": [
+                    "preTicked",
+                    "rejectOption"
+                ],
+                "conflicts": [],
+                "modelId": null,
+                "latencyMs": null
+            },
+            "deviceModel": "",
+            "androidVersion": "",
+            "privateDnsActive": null,
+            "notes": [],
+            "captureHealth": null,
+            "freshState": true
+        },
+        {
+            "id": "sample-fixed-a",
+            "targetPackage": "com.leakyshop.demo.fixed",
+            "targetLabel": "LeakyShop Fixed (sample)",
+            "plan": "ACCEPT",
+            "childFacing": false,
+            "startedAtNanos": 0,
+            "endedAtNanos": 30000000000,
+            "startedAtEpochMs": 1791590400000,
+            "netEvents": [
+                {
+                    "tNanos": 400000000,
+                    "hostname": "api.leakyshop.example",
+                    "queryType": 1,
+                    "entity": null,
+                    "category": "UNKNOWN",
+                    "phase": "NO_CONSENT_SEEN",
+                    "viaPackage": null,
+                    "cnameChain": [],
+                    "answerIps": [],
+                    "disguisedVia": null,
+                    "answerStatus": null,
+                    "rcode": null
+                },
+                {
+                    "tNanos": 9000000000,
+                    "hostname": "api.leakyshop.example",
+                    "queryType": 1,
+                    "entity": null,
+                    "category": "UNKNOWN",
+                    "phase": "NO_CONSENT_SEEN",
+                    "viaPackage": null,
+                    "cnameChain": [],
+                    "answerIps": [],
+                    "disguisedVia": null,
+                    "answerStatus": null,
+                    "rcode": null
+                }
+            ],
+            "consentEvents": [
+                {
+                    "tNanos": 2100000000,
+                    "kind": "SCREEN_APPEARED",
+                    "nodeText": null,
+                    "screenshotPath": null,
+                    "tree": null
+                },
+                {
+                    "tNanos": 4900000000,
+                    "kind": "ACCEPT",
+                    "nodeText": "Accept & Continue",
+                    "screenshotPath": null,
+                    "tree": null
+                }
+            ],
+            "screenAudit": {
+                "isConsentScreen": true,
+                "preTicked": false,
+                "rejectOption": "VISIBLE",
+                "purposesCount": null,
+                "separateChoices": null,
+                "itemisedData": null,
+                "purposeStated": null,
+                "withdrawalInfo": null,
+                "languageOptions": null,
+                "childAudienceSignals": null,
+                "darkPatterns": [],
+                "summary": "",
+                "confidence": 1.0,
+                "source": "DETERMINISTIC",
+                "observedFields": [
+                    "preTicked",
+                    "rejectOption"
+                ],
+                "conflicts": [],
+                "modelId": null,
+                "latencyMs": null
+            },
+            "deviceModel": "",
+            "androidVersion": "",
+            "privateDnsActive": null,
+            "notes": [],
+            "captureHealth": null,
+            "freshState": true
+        }
+    ],
+    "result": {
+        "findings": [],
+        "score": 100,
+        "band": "READY"
+    },
+    "networkReadings": null,
+    "tool": {
+        "name": "TraceVeil",
+        "version": "1.1.0-samples"
+    },
+    "note": "SYNTHETIC SAMPLE: test data, not a device observation. Generated by ./gradlew :cli:writeSamples from the same plans for the LeakyShop fixed build (first-party lookups only, no pre-ticked box, Reject visible), as in core DemoScoreRegressionTest."
+}

@@ -1,0 +1,9 @@
+{
+    "_comment": "TraceVeil CI release gate. Every key is optional; see docs/CI_MODE.md for each key and its default. Keys starting with _ are comments.",
+    "failOn": ["C2", "C9"],
+    "minScore": 85,
+    "maxHigh": 0,
+    "requireFreshState": true,
+    "allowInconclusive": false,
+    "requirePlans": ["ACCEPT", "REJECT", "SILENT"]
+}
