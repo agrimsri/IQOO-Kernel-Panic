@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -136,9 +138,9 @@ fun AiLabScreen(vm: XrayViewModel, onBack: () -> Unit) {
             val shownId = chosenId?.takeIf { id -> recent.any { it.id == id } } ?: recent.firstOrNull()?.id
             var shownBundle by remember(shownId) { mutableStateOf<com.dpdpxray.app.data.AuditBundle?>(null) }
             LaunchedEffect(shownId) { shownBundle = shownId?.let { vm.graph.repository.load(it) } }
-            if (recent.size > 1) Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (recent.size > 1) Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 recent.forEach { m ->
-                    SecondaryAction("${m.targetLabel} · ${m.score ?: "–"}", { chosenId = m.id }, Modifier.weight(1f), enabled = m.id != shownId)
+                    SecondaryAction("${m.targetLabel} · ${m.score ?: "–"}", { chosenId = m.id }, Modifier.widthIn(min = 150.dp), enabled = m.id != shownId)
                 }
             }
             shownBundle?.let { EndpointMapCard(it.sessions, vm.graph.catalog(), Modifier.padding(top = 8.dp)) }
