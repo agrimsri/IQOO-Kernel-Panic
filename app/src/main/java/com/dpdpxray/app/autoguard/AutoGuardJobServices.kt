@@ -7,13 +7,15 @@ import android.util.Log
 import com.dpdpxray.app.apkguard.ApkAlertSpeaker
 import com.dpdpxray.app.apkguard.InstallAlert
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
 
 internal const val AUTOGUARD_LOG = "TraceVeilAutoGuard"
@@ -23,51 +25,50 @@ internal const val AUTOGUARD_LOG = "TraceVeilAutoGuard"
  * [AutoGuardJobs.NEW_APPS_NOW]. Android starts it even when TraceVeil is closed. If the person switched spoken alerts
  * on, the job stays alive until the offline voice has finished (at most [SPEECH_TIMEOUT_MS]).
  */
-class NewAppCheckJobService : JobService() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    override fun onStartJob(params: JobParameters): Boolean {
-        scope.launch {
-            try {
-                val outcome = NewAppCheck.run(applicationContext)
-                Log.i(AUTOGUARD_LOG, "new-app check job=${params.jobId} read=${outcome?.read ?: "switched off"} alerted=${outcome?.alerted?.size ?: 0}")
-                outcome?.speak?.let { speakAndWait(applicationContext, it) }
-            } finally {
-                jobFinished(params, false)
-            }
-        }
-        return true
-    }
-
-    override fun onStopJob(params: JobParameters): Boolean {
-        scope.coroutineContext.cancelChildren()
-        return false
-    }
-
-    override fun onDestroy() {
-        scope.cancel()
-        super.onDestroy()
+class NewAppCheckJobService : AutoGuardJobService() {
+    override suspend fun work(jobId: Int) {
+        val outcome = NewAppCheck.run(applicationContext)
+        Log.i(AUTOGUARD_LOG, "new-app check job=$jobId read=${outcome?.read ?: "switched off"} alerted=${outcome?.alerted?.size ?: 0}")
+        outcome?.speak?.let { speakAndWait(applicationContext, it) }
     }
 }
 
 /** Runs the weekly phone checkup ([PhoneCheckupRun]) for job id [AutoGuardJobs.WEEKLY_CHECKUP]. */
-class PhoneCheckupJobService : JobService() {
+class PhoneCheckupJobService : AutoGuardJobService() {
+    override suspend fun work(jobId: Int) {
+        val result = PhoneCheckupRun.weekly(applicationContext)
+        Log.i(AUTOGUARD_LOG, "phone checkup job=$jobId checked=${result?.appsChecked ?: "switched off or unreadable"} toReview=${result?.appsToReview ?: 0}")
+    }
+}
+
+/**
+ * Runs [work] off the main thread and tells Android when it is done. Each job id has its own coroutine, so Android
+ * stopping one job (for example the 15-minute one) never cuts short another that happens to run at the same time.
+ * Only package counts are logged, never app names.
+ */
+abstract class AutoGuardJobService : JobService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val running = ConcurrentHashMap<Int, Job>()
+
+    protected abstract suspend fun work(jobId: Int)
 
     override fun onStartJob(params: JobParameters): Boolean {
-        scope.launch {
+        // Registered before it starts, so a very fast job cannot finish before it is tracked.
+        val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                val result = PhoneCheckupRun.weekly(applicationContext)
-                Log.i(AUTOGUARD_LOG, "phone checkup job=${params.jobId} checked=${result?.appsChecked ?: "switched off"} toReview=${result?.appsToReview ?: 0}")
+                work(params.jobId)
             } finally {
+                running.remove(params.jobId)
                 jobFinished(params, false)
             }
         }
+        running[params.jobId] = job
+        job.start()
         return true
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
-        scope.coroutineContext.cancelChildren()
+        running.remove(params.jobId)?.cancel()
         return false
     }
 
