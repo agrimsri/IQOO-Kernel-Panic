@@ -700,6 +700,7 @@ object HtmlReport {
             Category.FIRST_PARTY -> "First party (marked)"
             Category.FIRST_PARTY_SAME_COMPANY -> "Same company as the app (first party)"
             Category.CONTENT_DELIVERY -> "Content delivery (CDN)"
+            Category.COMPANY_SERVICE -> "Company service (catalogue match, not a tracking endpoint)"
             Category.UNKNOWN -> "Unknown category"
         }
     }

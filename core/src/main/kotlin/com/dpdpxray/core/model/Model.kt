@@ -14,6 +14,14 @@ enum class Category {
     CONTENT_DELIVERY,
 
     /**
+     * A catalogued company's general service domain (for example facebook.com: login, sharing, the company's own apps'
+     * APIs). A lookup to it is a catalogue match only: it is not a known tracking endpoint, so no consent check counts it.
+     * The company's specific tracking endpoints (graph.facebook.com, connect.facebook.net, an.facebook.com) keep their
+     * own entries and categories.
+     */
+    COMPANY_SERVICE,
+
+    /**
      * A catalogued analytics, advertising or social service run by the same company that publishes the audited app
      * (for example Meta servers contacted by Instagram). First-party data collection by the app's own company, not a
      * third-party tracker. Assigned in context by the rules engine, never by the catalogue alone.
@@ -194,8 +202,8 @@ data class AuditSession(
 /** Saved results store these by name: add new checks at the end and never rename one. */
 @Serializable
 enum class CheckId(val code: String, val title: String) {
-    C1("C1", "Trackers contacted before consent"),
-    C2("C2", "Trackers contacted after the user refused"),
+    C1("C1", "Tracker hosts looked up before consent"),
+    C2("C2", "Tracker hosts looked up after the user refused"),
     C3("C3", "Pre-ticked consent option"),
     C4("C4", "No clear way to refuse"),
     C5("C5", "Bundled consent for several purposes"),
@@ -204,7 +212,7 @@ enum class CheckId(val code: String, val title: String) {
     C8("C8", "Notice offered only in English"),
     C9("C9", "Tracking in a child-facing app"),
     C10("C10", "Device identifiers likely shared before consent"),
-    NC("NC", "No consent mechanism detected"),
+    NC("NC", "No consent screen seen during the capture"),
     V0("V0", "Low network visibility — result inconclusive"),
     U1("U1", "Consent history unknown — app kept its data"),
     S1("S1", "Same-company servers contacted (first-party data collection)"),

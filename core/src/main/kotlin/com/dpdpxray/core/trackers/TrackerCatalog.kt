@@ -46,7 +46,8 @@ data class TrackerInfo(
 /**
  * Suffix-matching hostname classifier. Longest matching domain wins; user first-party marks win for the name they
  * cover. An observed CNAME alias to a catalogue domain wins over the queried name's first-party mark (CNAME cloaking).
- * An alias to a content-delivery entry is ordinary infrastructure, not cloaking, so it never decides a classification.
+ * An alias to a content-delivery or company-service entry is ordinary infrastructure, not cloaking, so it never decides
+ * a classification.
  */
 class TrackerCatalog(
     private val entries: List<TrackerEntry>,
@@ -64,7 +65,7 @@ class TrackerCatalog(
         if (!hostFirstParty) entryForHost(host)?.let { return info(it) }
         // Checked before the first-party shortcut: a first-party name can be an alias for a tracker.
         cnameChain.asSequence().map(::normalise).filter { it != host && !isFirstParty(it) }
-            .firstNotNullOfOrNull { alias -> entryForHost(alias)?.takeIf { it.category != Category.CONTENT_DELIVERY }?.let { info(it, alias) } }
+            .firstNotNullOfOrNull { alias -> entryForHost(alias)?.takeIf { it.category !in INFRASTRUCTURE }?.let { info(it, alias) } }
             ?.let { return it }
         return TrackerInfo(null, if (hostFirstParty) Category.FIRST_PARTY else Category.UNKNOWN)
     }
@@ -97,6 +98,7 @@ class TrackerCatalog(
 
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
+        private val INFRASTRUCTURE = setOf(Category.CONTENT_DELIVERY, Category.COMPANY_SERVICE)
 
         /** Fails with [IllegalArgumentException] if any company fact lacks its citation or basis. */
         fun fromJson(text: String): TrackerCatalog =

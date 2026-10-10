@@ -72,7 +72,9 @@ class TrackerCatalogTest {
         assertTrue(default.classify("graph.facebook.com").category.isTracking)
         assertTrue(default.classify("connect.facebook.net").category.isTracking)
         assertTrue(default.classify("an.facebook.com").category.isTracking)
-        assertEquals(Category.SOCIAL, default.classify("www.facebook.com").category)
+        // facebook.com itself is Meta's general service domain: a catalogue match, not a tracking endpoint.
+        assertEquals(Category.COMPANY_SERVICE, default.classify("www.facebook.com").category)
+        assertFalse(default.classify("www.facebook.com").category.isTracking)
         assertTrue(default.entryFor("Meta CDN")!!.note!!.contains("content"))
     }
 

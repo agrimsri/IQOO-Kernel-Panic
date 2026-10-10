@@ -9,7 +9,8 @@ import com.dpdpxray.core.trackers.AppOwners
 import com.dpdpxray.core.trackers.TrackerCatalog
 
 /**
- * Classifies one session's lookups in context: consent phase, catalogue category (a stored entity wins, as before), and
+ * Classifies one session's lookups in context: consent phase, catalogue category (a stored entity wins, with its current
+ * catalogue category), and
  * whether a catalogued tracker belongs to the same company that publishes the audited app. Same-company lookups keep
  * their entity but get [Category.FIRST_PARTY_SAME_COMPANY], so no consent check counts them as third-party tracking.
  * The rules engine uses this; screens can use it to show the same labels.
@@ -26,8 +27,15 @@ class SessionClassifier(private val catalog: TrackerCatalog, private val owners:
     }
 
     fun classify(event: NetEvent, owner: AppOwner?): NetEvent {
-        val e = if (event.entity != null) event else catalog.classify(event.hostname, event.cnameChain)
-            .let { event.copy(entity = it.entity, category = it.category, disguisedVia = event.disguisedVia ?: it.disguisedVia) }
+        val stored = event.entity?.let { catalog.entryFor(it) }
+        val e = when {
+            // A stored catalogue entity takes the catalogue's current category, so corrections (facebook.com is now a
+            // company service, not a tracker) also apply to audits recorded before them.
+            stored != null -> if (stored.category == event.category) event else event.copy(category = stored.category)
+            event.entity != null -> event
+            else -> catalog.classify(event.hostname, event.cnameChain)
+                .let { event.copy(entity = it.entity, category = it.category, disguisedVia = event.disguisedVia ?: it.disguisedVia) }
+        }
         return if (owner != null && e.category.isTracking && companyOf(e) == owner.company) e.copy(category = Category.FIRST_PARTY_SAME_COMPANY) else e
     }
 
