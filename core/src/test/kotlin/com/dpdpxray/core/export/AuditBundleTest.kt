@@ -106,6 +106,23 @@ class AuditBundleTest {
     }
 
     @Test
+    fun `sdk attribution is optional, written only when set, and round-trips`() {
+        assertFalse("sdkAttribution" in tree(AuditBundles.encode(bundle())))
+        val groups = com.dpdpxray.core.attribution.SdkAttribution(TrackerCatalog.loadDefault(), com.dpdpxray.core.fixes.FixCatalog.loadDefault())
+            .groups(result, listOf(session))
+        val attributed = bundle().copy(sdkAttribution = SdkAttributionExport(groups = groups))
+        val obj = tree(AuditBundles.encode(attributed))
+        assertEquals(
+            listOf("schema", "exportedAt", "app", "meta", "sessions", "result", "networkReadings", "tool", "sdkAttribution"),
+            obj.keys.toList(),
+        )
+        assertEquals("Meta (Facebook SDK)", obj["sdkAttribution"]!!.jsonObject["groups"]!!.jsonArray[0].jsonObject["name"]!!.jsonPrimitive.content)
+        assertEquals(attributed, AuditBundles.decode(AuditBundles.encode(attributed)))
+        // A reader that predates the field still gets the same evidence.
+        assertEquals(bundle(), AuditBundles.decode(AuditBundles.encode(attributed)).copy(sdkAttribution = null))
+    }
+
+    @Test
     fun `note is written only when set`() {
         assertFalse("note" in tree(AuditBundles.encode(bundle())))
         assertEquals("synthetic", tree(AuditBundles.encode(bundle(note = "synthetic")))["note"]!!.jsonPrimitive.content)
