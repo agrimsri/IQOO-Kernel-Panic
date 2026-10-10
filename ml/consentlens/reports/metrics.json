@@ -1,0 +1,2988 @@
+{
+ "model_id": "ConsentLens-1",
+ "data": {
+  "rows": 18655,
+  "by_role": {
+   "OTHER": 14701,
+   "ACCEPT": 957,
+   "REJECT": 601,
+   "MANAGE": 488,
+   "PURPOSE_NOTICE": 1515,
+   "PRIVACY_LINK": 211,
+   "WITHDRAW_INFO": 182
+  },
+  "by_source": {
+   "aosp-framework": 9419,
+   "aosp-permissioncontroller": 8197,
+   "klaro": 281,
+   "tarteaucitron": 701,
+   "traceveil-leakyshop": 13,
+   "traceveil-lexicon": 44
+  },
+  "by_source_role": {
+   "aosp-framework": {
+    "OTHER": 9112,
+    "ACCEPT": 88,
+    "REJECT": 219
+   },
+   "aosp-permissioncontroller": {
+    "OTHER": 5353,
+    "MANAGE": 394,
+    "PURPOSE_NOTICE": 1099,
+    "ACCEPT": 722,
+    "REJECT": 308,
+    "PRIVACY_LINK": 159,
+    "WITHDRAW_INFO": 162
+   },
+   "klaro": {
+    "PURPOSE_NOTICE": 108,
+    "WITHDRAW_INFO": 12,
+    "OTHER": 38,
+    "ACCEPT": 60,
+    "PRIVACY_LINK": 26,
+    "MANAGE": 25,
+    "REJECT": 12
+   },
+   "tarteaucitron": {
+    "ACCEPT": 71,
+    "OTHER": 197,
+    "PURPOSE_NOTICE": 299,
+    "MANAGE": 61,
+    "REJECT": 47,
+    "PRIVACY_LINK": 26
+   },
+   "traceveil-leakyshop": {
+    "ACCEPT": 1,
+    "PURPOSE_NOTICE": 9,
+    "WITHDRAW_INFO": 2,
+    "OTHER": 1
+   },
+   "traceveil-lexicon": {
+    "ACCEPT": 15,
+    "REJECT": 15,
+    "MANAGE": 8,
+    "WITHDRAW_INFO": 6
+   }
+  },
+  "by_language_group": {
+   "af": 223,
+   "am": 227,
+   "ar": 249,
+   "as": 227,
+   "az": 226,
+   "be": 225,
+   "bg": 261,
+   "bn": 227,
+   "bs": 225,
+   "ca": 251,
+   "cs": 259,
+   "da": 246,
+   "de": 267,
+   "el": 252,
+   "en": 327,
+   "es": 403,
+   "et": 245,
+   "eu": 225,
+   "fa": 225,
+   "fi": 250,
+   "fr": 377,
+   "gl": 244,
+   "gu": 226,
+   "he": 227,
+   "hi": 244,
+   "hr": 251,
+   "hu": 245,
+   "hy": 227,
+   "id": 224,
+   "is": 225,
+   "it": 265,
+   "ja": 246,
+   "ka": 226,
+   "kk": 227,
+   "km": 226,
+   "kn": 228,
+   "ko": 238,
+   "ky": 225,
+   "lb": 22,
+   "lo": 223,
+   "lt": 247,
+   "lv": 247,
+   "mk": 226,
+   "ml": 226,
+   "mn": 225,
+   "mr": 226,
+   "ms": 227,
+   "my": 225,
+   "ne": 226,
+   "nl": 263,
+   "no": 250,
+   "oc": 42,
+   "or": 226,
+   "pa": 225,
+   "pl": 266,
+   "pt": 421,
+   "ro": 248,
+   "ru": 249,
+   "si": 227,
+   "sk": 248,
+   "sl": 224,
+   "sq": 246,
+   "sr": 440,
+   "sv": 251,
+   "sw": 226,
+   "ta": 224,
+   "te": 229,
+   "th": 224,
+   "tl": 226,
+   "tr": 228,
+   "uk": 249,
+   "ur": 224,
+   "uz": 225,
+   "vi": 246,
+   "zh": 569,
+   "zu": 228
+  },
+  "truncated_rows": 896
+ },
+ "leave_languages_out": {
+  "protocol": "5 folds of whole language groups (English always in training); every non-English group is tested exactly once by a model that never saw that language",
+  "folds": [
+   {
+    "fold": 0,
+    "held_out_language_groups": [
+     "az",
+     "ca",
+     "cs",
+     "et",
+     "gl",
+     "hr",
+     "hu",
+     "is",
+     "it",
+     "kk",
+     "ms",
+     "my",
+     "sl",
+     "sr",
+     "ta"
+    ],
+    "n_test": 3778,
+    "n_train": 14877,
+    "float_macro_f1": 0.5786,
+    "int8_macro_f1": 0.574,
+    "int8_float_agreement": 0.9915,
+    "max_abs_prob_diff": 0.2216,
+    "seconds": 233.8
+   },
+   {
+    "fold": 1,
+    "held_out_language_groups": [
+     "af",
+     "be",
+     "de",
+     "eu",
+     "fi",
+     "hy",
+     "ka",
+     "lv",
+     "ne",
+     "no",
+     "pt",
+     "te",
+     "th",
+     "uz",
+     "zu"
+    ],
+    "n_test": 3693,
+    "n_train": 14962,
+    "float_macro_f1": 0.4955,
+    "int8_macro_f1": 0.5001,
+    "int8_float_agreement": 0.9916,
+    "max_abs_prob_diff": 0.281,
+    "seconds": 237.0
+   },
+   {
+    "fold": 2,
+    "held_out_language_groups": [
+     "bg",
+     "da",
+     "gu",
+     "km",
+     "kn",
+     "ko",
+     "ky",
+     "oc",
+     "or",
+     "pa",
+     "si",
+     "sq",
+     "tr",
+     "uk",
+     "vi"
+    ],
+    "n_test": 3339,
+    "n_train": 15316,
+    "float_macro_f1": 0.4383,
+    "int8_macro_f1": 0.4395,
+    "int8_float_agreement": 0.9862,
+    "max_abs_prob_diff": 0.1959,
+    "seconds": 257.8
+   },
+   {
+    "fold": 3,
+    "held_out_language_groups": [
+     "am",
+     "ar",
+     "as",
+     "bs",
+     "el",
+     "he",
+     "hi",
+     "id",
+     "ja",
+     "lb",
+     "ml",
+     "mn",
+     "mr",
+     "sw",
+     "tl"
+    ],
+    "n_test": 3272,
+    "n_train": 15383,
+    "float_macro_f1": 0.5165,
+    "int8_macro_f1": 0.5153,
+    "int8_float_agreement": 0.9945,
+    "max_abs_prob_diff": 0.2386,
+    "seconds": 238.9
+   },
+   {
+    "fold": 4,
+    "held_out_language_groups": [
+     "bn",
+     "es",
+     "fa",
+     "fr",
+     "lo",
+     "lt",
+     "mk",
+     "nl",
+     "pl",
+     "ro",
+     "ru",
+     "sk",
+     "sv",
+     "ur",
+     "zh"
+    ],
+    "n_test": 4246,
+    "n_train": 14409,
+    "float_macro_f1": 0.5609,
+    "int8_macro_f1": 0.5536,
+    "int8_float_agreement": 0.9809,
+    "max_abs_prob_diff": 0.2309,
+    "seconds": 224.5
+   }
+  ],
+  "int8": {
+   "n": 18328,
+   "accuracy": 0.7908,
+   "macro_f1": 0.5207,
+   "per_class": {
+    "ACCEPT": {
+     "precision": 0.3197,
+     "recall": 0.394,
+     "f1": 0.3529,
+     "support": 929
+    },
+    "REJECT": {
+     "precision": 0.4275,
+     "recall": 0.2907,
+     "f1": 0.346,
+     "support": 578
+    },
+    "MANAGE": {
+     "precision": 0.4046,
+     "recall": 0.3319,
+     "f1": 0.3647,
+     "support": 473
+    },
+    "PURPOSE_NOTICE": {
+     "precision": 0.5136,
+     "recall": 0.5785,
+     "f1": 0.5441,
+     "support": 1471
+    },
+    "PRIVACY_LINK": {
+     "precision": 0.6194,
+     "recall": 0.401,
+     "f1": 0.4868,
+     "support": 207
+    },
+    "WITHDRAW_INFO": {
+     "precision": 0.7769,
+     "recall": 0.5872,
+     "f1": 0.6689,
+     "support": 172
+    },
+    "OTHER": {
+     "precision": 0.8816,
+     "recall": 0.8806,
+     "f1": 0.8811,
+     "support": 14498
+    }
+   },
+   "confusion_matrix": {
+    "labels": [
+     "ACCEPT",
+     "REJECT",
+     "MANAGE",
+     "PURPOSE_NOTICE",
+     "PRIVACY_LINK",
+     "WITHDRAW_INFO",
+     "OTHER"
+    ],
+    "rows_true_cols_pred": [
+     [
+      366,
+      24,
+      8,
+      36,
+      1,
+      0,
+      494
+     ],
+     [
+      61,
+      168,
+      7,
+      30,
+      0,
+      0,
+      312
+     ],
+     [
+      29,
+      9,
+      157,
+      26,
+      1,
+      0,
+      251
+     ],
+     [
+      26,
+      11,
+      30,
+      851,
+      11,
+      7,
+      535
+     ],
+     [
+      4,
+      2,
+      2,
+      33,
+      83,
+      1,
+      82
+     ],
+     [
+      1,
+      0,
+      1,
+      28,
+      1,
+      101,
+      40
+     ],
+     [
+      658,
+      179,
+      183,
+      653,
+      37,
+      21,
+      12767
+     ]
+    ]
+   }
+  },
+  "float": {
+   "n": 18328,
+   "accuracy": 0.796,
+   "macro_f1": 0.5225,
+   "per_class": {
+    "ACCEPT": {
+     "precision": 0.3318,
+     "recall": 0.3843,
+     "f1": 0.3561,
+     "support": 929
+    },
+    "REJECT": {
+     "precision": 0.4377,
+     "recall": 0.2855,
+     "f1": 0.3455,
+     "support": 578
+    },
+    "MANAGE": {
+     "precision": 0.416,
+     "recall": 0.3298,
+     "f1": 0.3679,
+     "support": 473
+    },
+    "PURPOSE_NOTICE": {
+     "precision": 0.5296,
+     "recall": 0.571,
+     "f1": 0.5496,
+     "support": 1471
+    },
+    "PRIVACY_LINK": {
+     "precision": 0.5957,
+     "recall": 0.4058,
+     "f1": 0.4828,
+     "support": 207
+    },
+    "WITHDRAW_INFO": {
+     "precision": 0.7727,
+     "recall": 0.593,
+     "f1": 0.6711,
+     "support": 172
+    },
+    "OTHER": {
+     "precision": 0.8801,
+     "recall": 0.8888,
+     "f1": 0.8845,
+     "support": 14498
+    }
+   },
+   "confusion_matrix": {
+    "labels": [
+     "ACCEPT",
+     "REJECT",
+     "MANAGE",
+     "PURPOSE_NOTICE",
+     "PRIVACY_LINK",
+     "WITHDRAW_INFO",
+     "OTHER"
+    ],
+    "rows_true_cols_pred": [
+     [
+      357,
+      25,
+      8,
+      33,
+      2,
+      0,
+      504
+     ],
+     [
+      60,
+      165,
+      6,
+      28,
+      0,
+      0,
+      319
+     ],
+     [
+      28,
+      9,
+      156,
+      25,
+      1,
+      0,
+      254
+     ],
+     [
+      23,
+      10,
+      26,
+      840,
+      12,
+      7,
+      553
+     ],
+     [
+      4,
+      2,
+      2,
+      31,
+      84,
+      1,
+      83
+     ],
+     [
+      0,
+      0,
+      1,
+      26,
+      1,
+      102,
+      42
+     ],
+     [
+      604,
+      166,
+      176,
+      603,
+      41,
+      22,
+      12886
+     ]
+    ]
+   }
+  },
+  "lexicon_baseline": {
+   "n": 18328,
+   "accuracy": 0.794,
+   "macro_f1": 0.1489,
+   "per_class": {
+    "ACCEPT": {
+     "precision": 0.9583,
+     "recall": 0.0495,
+     "f1": 0.0942,
+     "support": 929
+    },
+    "REJECT": {
+     "precision": 1.0,
+     "recall": 0.0104,
+     "f1": 0.0205,
+     "support": 578
+    },
+    "MANAGE": {
+     "precision": 1.0,
+     "recall": 0.0042,
+     "f1": 0.0084,
+     "support": 473
+    },
+    "PURPOSE_NOTICE": {
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0,
+     "support": 1471
+    },
+    "PRIVACY_LINK": {
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0,
+     "support": 207
+    },
+    "WITHDRAW_INFO": {
+     "precision": 1.0,
+     "recall": 0.0174,
+     "f1": 0.0343,
+     "support": 172
+    },
+    "OTHER": {
+     "precision": 0.7935,
+     "recall": 0.9999,
+     "f1": 0.8848,
+     "support": 14498
+    }
+   },
+   "confusion_matrix": {
+    "labels": [
+     "ACCEPT",
+     "REJECT",
+     "MANAGE",
+     "PURPOSE_NOTICE",
+     "PRIVACY_LINK",
+     "WITHDRAW_INFO",
+     "OTHER"
+    ],
+    "rows_true_cols_pred": [
+     [
+      46,
+      0,
+      0,
+      0,
+      0,
+      0,
+      883
+     ],
+     [
+      0,
+      6,
+      0,
+      0,
+      0,
+      0,
+      572
+     ],
+     [
+      0,
+      0,
+      2,
+      0,
+      0,
+      0,
+      471
+     ],
+     [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1471
+     ],
+     [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      207
+     ],
+     [
+      0,
+      0,
+      0,
+      0,
+      0,
+      3,
+      169
+     ],
+     [
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      14496
+     ]
+    ]
+   }
+  },
+  "int8_novel_strings_only": {
+   "n": 16586,
+   "accuracy": 0.7693,
+   "macro_f1": 0.4992,
+   "per_class": {
+    "ACCEPT": {
+     "precision": 0.2877,
+     "recall": 0.3581,
+     "f1": 0.3191,
+     "support": 874
+    },
+    "REJECT": {
+     "precision": 0.3924,
+     "recall": 0.2599,
+     "f1": 0.3127,
+     "support": 554
+    },
+    "MANAGE": {
+     "precision": 0.3646,
+     "recall": 0.2946,
+     "f1": 0.3259,
+     "support": 448
+    },
+    "PURPOSE_NOTICE": {
+     "precision": 0.5006,
+     "recall": 0.5658,
+     "f1": 0.5312,
+     "support": 1428
+    },
+    "PRIVACY_LINK": {
+     "precision": 0.6077,
+     "recall": 0.3892,
+     "f1": 0.4745,
+     "support": 203
+    },
+    "WITHDRAW_INFO": {
+     "precision": 0.7734,
+     "recall": 0.5824,
+     "f1": 0.6644,
+     "support": 170
+    },
+    "OTHER": {
+     "precision": 0.8673,
+     "recall": 0.8664,
+     "f1": 0.8669,
+     "support": 12909
+    }
+   },
+   "confusion_matrix": {
+    "labels": [
+     "ACCEPT",
+     "REJECT",
+     "MANAGE",
+     "PURPOSE_NOTICE",
+     "PRIVACY_LINK",
+     "WITHDRAW_INFO",
+     "OTHER"
+    ],
+    "rows_true_cols_pred": [
+     [
+      313,
+      24,
+      8,
+      36,
+      1,
+      0,
+      492
+     ],
+     [
+      61,
+      144,
+      7,
+      30,
+      0,
+      0,
+      312
+     ],
+     [
+      29,
+      9,
+      132,
+      26,
+      1,
+      0,
+      251
+     ],
+     [
+      26,
+      11,
+      30,
+      808,
+      11,
+      7,
+      535
+     ],
+     [
+      4,
+      2,
+      2,
+      33,
+      79,
+      1,
+      82
+     ],
+     [
+      1,
+      0,
+      1,
+      28,
+      1,
+      99,
+      40
+     ],
+     [
+      654,
+      177,
+      182,
+      653,
+      37,
+      21,
+      11185
+     ]
+    ]
+   }
+  },
+  "lexicon_baseline_novel_strings_only": {
+   "n": 16586,
+   "accuracy": 0.7806,
+   "macro_f1": 0.1436,
+   "per_class": {
+    "ACCEPT": {
+     "precision": 0.9355,
+     "recall": 0.0332,
+     "f1": 0.0641,
+     "support": 874
+    },
+    "REJECT": {
+     "precision": 1.0,
+     "recall": 0.0108,
+     "f1": 0.0214,
+     "support": 554
+    },
+    "MANAGE": {
+     "precision": 1.0,
+     "recall": 0.0045,
+     "f1": 0.0089,
+     "support": 448
+    },
+    "PURPOSE_NOTICE": {
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0,
+     "support": 1428
+    },
+    "PRIVACY_LINK": {
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0,
+     "support": 203
+    },
+    "WITHDRAW_INFO": {
+     "precision": 1.0,
+     "recall": 0.0176,
+     "f1": 0.0347,
+     "support": 170
+    },
+    "OTHER": {
+     "precision": 0.7802,
+     "recall": 0.9998,
+     "f1": 0.8764,
+     "support": 12909
+    }
+   },
+   "confusion_matrix": {
+    "labels": [
+     "ACCEPT",
+     "REJECT",
+     "MANAGE",
+     "PURPOSE_NOTICE",
+     "PRIVACY_LINK",
+     "WITHDRAW_INFO",
+     "OTHER"
+    ],
+    "rows_true_cols_pred": [
+     [
+      29,
+      0,
+      0,
+      0,
+      0,
+      0,
+      845
+     ],
+     [
+      0,
+      6,
+      0,
+      0,
+      0,
+      0,
+      548
+     ],
+     [
+      0,
+      0,
+      2,
+      0,
+      0,
+      0,
+      446
+     ],
+     [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1428
+     ],
+     [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      203
+     ],
+     [
+      0,
+      0,
+      0,
+      0,
+      0,
+      3,
+      167
+     ],
+     [
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      12907
+     ]
+    ]
+   }
+  },
+  "novel_strings_note": "test strings whose normalized text never appears (in any language) in the fold's training rows",
+  "int8_vs_float_agreement": 0.9887,
+  "per_language": {
+   "af": {
+    "n": 223,
+    "int8_accuracy": 0.8565,
+    "float_accuracy": 0.8655,
+    "lexicon_accuracy": 0.8206,
+    "int8_macro_f1": 0.6783
+   },
+   "am": {
+    "n": 227,
+    "int8_accuracy": 0.7797,
+    "float_accuracy": 0.7885,
+    "lexicon_accuracy": 0.8194,
+    "int8_macro_f1": 0.2233
+   },
+   "ar": {
+    "n": 249,
+    "int8_accuracy": 0.7671,
+    "float_accuracy": 0.7671,
+    "lexicon_accuracy": 0.7751,
+    "int8_macro_f1": 0.2369
+   },
+   "as": {
+    "n": 227,
+    "int8_accuracy": 0.8855,
+    "float_accuracy": 0.8855,
+    "lexicon_accuracy": 0.8194,
+    "int8_macro_f1": 0.5999
+   },
+   "az": {
+    "n": 226,
+    "int8_accuracy": 0.854,
+    "float_accuracy": 0.8628,
+    "lexicon_accuracy": 0.823,
+    "int8_macro_f1": 0.5006
+   },
+   "be": {
+    "n": 225,
+    "int8_accuracy": 0.8622,
+    "float_accuracy": 0.8578,
+    "lexicon_accuracy": 0.8222,
+    "int8_macro_f1": 0.485
+   },
+   "bg": {
+    "n": 261,
+    "int8_accuracy": 0.8238,
+    "float_accuracy": 0.8238,
+    "lexicon_accuracy": 0.7356,
+    "int8_macro_f1": 0.6217
+   },
+   "bn": {
+    "n": 227,
+    "int8_accuracy": 0.8502,
+    "float_accuracy": 0.8678,
+    "lexicon_accuracy": 0.8194,
+    "int8_macro_f1": 0.6631
+   },
+   "bs": {
+    "n": 225,
+    "int8_accuracy": 0.9867,
+    "float_accuracy": 0.9867,
+    "lexicon_accuracy": 0.8267,
+    "int8_macro_f1": 0.9688
+   },
+   "ca": {
+    "n": 251,
+    "int8_accuracy": 0.9004,
+    "float_accuracy": 0.9004,
+    "lexicon_accuracy": 0.7649,
+    "int8_macro_f1": 0.7741
+   },
+   "cs": {
+    "n": 259,
+    "int8_accuracy": 0.8919,
+    "float_accuracy": 0.888,
+    "lexicon_accuracy": 0.749,
+    "int8_macro_f1": 0.6895
+   },
+   "da": {
+    "n": 246,
+    "int8_accuracy": 0.8821,
+    "float_accuracy": 0.8902,
+    "lexicon_accuracy": 0.7805,
+    "int8_macro_f1": 0.7133
+   },
+   "de": {
+    "n": 267,
+    "int8_accuracy": 0.8015,
+    "float_accuracy": 0.8052,
+    "lexicon_accuracy": 0.7266,
+    "int8_macro_f1": 0.5844
+   },
+   "el": {
+    "n": 252,
+    "int8_accuracy": 0.8016,
+    "float_accuracy": 0.7976,
+    "lexicon_accuracy": 0.7778,
+    "int8_macro_f1": 0.3464
+   },
+   "es": {
+    "n": 403,
+    "int8_accuracy": 0.9082,
+    "float_accuracy": 0.9181,
+    "lexicon_accuracy": 0.7618,
+    "int8_macro_f1": 0.8482
+   },
+   "et": {
+    "n": 245,
+    "int8_accuracy": 0.751,
+    "float_accuracy": 0.751,
+    "lexicon_accuracy": 0.7796,
+    "int8_macro_f1": 0.4235
+   },
+   "eu": {
+    "n": 225,
+    "int8_accuracy": 0.8,
+    "float_accuracy": 0.8089,
+    "lexicon_accuracy": 0.8222,
+    "int8_macro_f1": 0.4327
+   },
+   "fa": {
+    "n": 225,
+    "int8_accuracy": 0.5867,
+    "float_accuracy": 0.6178,
+    "lexicon_accuracy": 0.8178,
+    "int8_macro_f1": 0.2558
+   },
+   "fi": {
+    "n": 250,
+    "int8_accuracy": 0.748,
+    "float_accuracy": 0.756,
+    "lexicon_accuracy": 0.78,
+    "int8_macro_f1": 0.4677
+   },
+   "fr": {
+    "n": 377,
+    "int8_accuracy": 0.7798,
+    "float_accuracy": 0.7878,
+    "lexicon_accuracy": 0.7666,
+    "int8_macro_f1": 0.5801
+   },
+   "gl": {
+    "n": 244,
+    "int8_accuracy": 0.9549,
+    "float_accuracy": 0.959,
+    "lexicon_accuracy": 0.7664,
+    "int8_macro_f1": 0.923
+   },
+   "gu": {
+    "n": 226,
+    "int8_accuracy": 0.6991,
+    "float_accuracy": 0.7212,
+    "lexicon_accuracy": 0.8274,
+    "int8_macro_f1": 0.3007
+   },
+   "he": {
+    "n": 227,
+    "int8_accuracy": 0.8062,
+    "float_accuracy": 0.8106,
+    "lexicon_accuracy": 0.815,
+    "int8_macro_f1": 0.2864
+   },
+   "hi": {
+    "n": 244,
+    "int8_accuracy": 0.8689,
+    "float_accuracy": 0.8689,
+    "lexicon_accuracy": 0.8361,
+    "int8_macro_f1": 0.6757
+   },
+   "hr": {
+    "n": 251,
+    "int8_accuracy": 0.8606,
+    "float_accuracy": 0.8606,
+    "lexicon_accuracy": 0.7649,
+    "int8_macro_f1": 0.6342
+   },
+   "hu": {
+    "n": 245,
+    "int8_accuracy": 0.7469,
+    "float_accuracy": 0.7469,
+    "lexicon_accuracy": 0.7796,
+    "int8_macro_f1": 0.3795
+   },
+   "hy": {
+    "n": 227,
+    "int8_accuracy": 0.7313,
+    "float_accuracy": 0.7269,
+    "lexicon_accuracy": 0.8194,
+    "int8_macro_f1": 0.248
+   },
+   "id": {
+    "n": 224,
+    "int8_accuracy": 0.8973,
+    "float_accuracy": 0.8973,
+    "lexicon_accuracy": 0.8259,
+    "int8_macro_f1": 0.6616
+   },
+   "is": {
+    "n": 225,
+    "int8_accuracy": 0.7822,
+    "float_accuracy": 0.7867,
+    "lexicon_accuracy": 0.8178,
+    "int8_macro_f1": 0.3802
+   },
+   "it": {
+    "n": 265,
+    "int8_accuracy": 0.8377,
+    "float_accuracy": 0.8415,
+    "lexicon_accuracy": 0.7321,
+    "int8_macro_f1": 0.6086
+   },
+   "ja": {
+    "n": 246,
+    "int8_accuracy": 0.7602,
+    "float_accuracy": 0.7602,
+    "lexicon_accuracy": 0.7805,
+    "int8_macro_f1": 0.397
+   },
+   "ka": {
+    "n": 226,
+    "int8_accuracy": 0.7566,
+    "float_accuracy": 0.7655,
+    "lexicon_accuracy": 0.8186,
+    "int8_macro_f1": 0.2636
+   },
+   "kk": {
+    "n": 227,
+    "int8_accuracy": 0.859,
+    "float_accuracy": 0.859,
+    "lexicon_accuracy": 0.815,
+    "int8_macro_f1": 0.5488
+   },
+   "km": {
+    "n": 226,
+    "int8_accuracy": 0.6726,
+    "float_accuracy": 0.6858,
+    "lexicon_accuracy": 0.823,
+    "int8_macro_f1": 0.2429
+   },
+   "kn": {
+    "n": 228,
+    "int8_accuracy": 0.5921,
+    "float_accuracy": 0.6009,
+    "lexicon_accuracy": 0.8333,
+    "int8_macro_f1": 0.2208
+   },
+   "ko": {
+    "n": 238,
+    "int8_accuracy": 0.7353,
+    "float_accuracy": 0.7437,
+    "lexicon_accuracy": 0.7941,
+    "int8_macro_f1": 0.213
+   },
+   "ky": {
+    "n": 225,
+    "int8_accuracy": 0.8,
+    "float_accuracy": 0.8,
+    "lexicon_accuracy": 0.8178,
+    "int8_macro_f1": 0.4388
+   },
+   "lb": {
+    "n": 22,
+    "int8_accuracy": 0.7727,
+    "float_accuracy": 0.7727,
+    "lexicon_accuracy": 0.2727,
+    "int8_macro_f1": 0.8024
+   },
+   "lo": {
+    "n": 223,
+    "int8_accuracy": 0.7982,
+    "float_accuracy": 0.8117,
+    "lexicon_accuracy": 0.8251,
+    "int8_macro_f1": 0.326
+   },
+   "lt": {
+    "n": 247,
+    "int8_accuracy": 0.6802,
+    "float_accuracy": 0.6883,
+    "lexicon_accuracy": 0.7773,
+    "int8_macro_f1": 0.4211
+   },
+   "lv": {
+    "n": 247,
+    "int8_accuracy": 0.7895,
+    "float_accuracy": 0.7895,
+    "lexicon_accuracy": 0.7814,
+    "int8_macro_f1": 0.4186
+   },
+   "mk": {
+    "n": 226,
+    "int8_accuracy": 0.823,
+    "float_accuracy": 0.8319,
+    "lexicon_accuracy": 0.823,
+    "int8_macro_f1": 0.5858
+   },
+   "ml": {
+    "n": 226,
+    "int8_accuracy": 0.7389,
+    "float_accuracy": 0.7611,
+    "lexicon_accuracy": 0.823,
+    "int8_macro_f1": 0.3283
+   },
+   "mn": {
+    "n": 225,
+    "int8_accuracy": 0.7778,
+    "float_accuracy": 0.7822,
+    "lexicon_accuracy": 0.8311,
+    "int8_macro_f1": 0.304
+   },
+   "mr": {
+    "n": 226,
+    "int8_accuracy": 0.8805,
+    "float_accuracy": 0.8761,
+    "lexicon_accuracy": 0.8274,
+    "int8_macro_f1": 0.6578
+   },
+   "ms": {
+    "n": 227,
+    "int8_accuracy": 0.8414,
+    "float_accuracy": 0.8458,
+    "lexicon_accuracy": 0.815,
+    "int8_macro_f1": 0.5553
+   },
+   "my": {
+    "n": 225,
+    "int8_accuracy": 0.5822,
+    "float_accuracy": 0.6,
+    "lexicon_accuracy": 0.8178,
+    "int8_macro_f1": 0.1538
+   },
+   "ne": {
+    "n": 226,
+    "int8_accuracy": 0.8761,
+    "float_accuracy": 0.8673,
+    "lexicon_accuracy": 0.823,
+    "int8_macro_f1": 0.5048
+   },
+   "nl": {
+    "n": 263,
+    "int8_accuracy": 0.8593,
+    "float_accuracy": 0.8669,
+    "lexicon_accuracy": 0.7338,
+    "int8_macro_f1": 0.734
+   },
+   "no": {
+    "n": 250,
+    "int8_accuracy": 0.884,
+    "float_accuracy": 0.88,
+    "lexicon_accuracy": 0.768,
+    "int8_macro_f1": 0.6775
+   },
+   "oc": {
+    "n": 42,
+    "int8_accuracy": 0.8095,
+    "float_accuracy": 0.8095,
+    "lexicon_accuracy": 0.2143,
+    "int8_macro_f1": 0.6564
+   },
+   "or": {
+    "n": 226,
+    "int8_accuracy": 0.7389,
+    "float_accuracy": 0.7522,
+    "lexicon_accuracy": 0.8186,
+    "int8_macro_f1": 0.4148
+   },
+   "pa": {
+    "n": 225,
+    "int8_accuracy": 0.5778,
+    "float_accuracy": 0.5956,
+    "lexicon_accuracy": 0.8178,
+    "int8_macro_f1": 0.2841
+   },
+   "pl": {
+    "n": 266,
+    "int8_accuracy": 0.6805,
+    "float_accuracy": 0.6955,
+    "lexicon_accuracy": 0.7406,
+    "int8_macro_f1": 0.3884
+   },
+   "pt": {
+    "n": 421,
+    "int8_accuracy": 0.8884,
+    "float_accuracy": 0.8884,
+    "lexicon_accuracy": 0.7648,
+    "int8_macro_f1": 0.6357
+   },
+   "ro": {
+    "n": 248,
+    "int8_accuracy": 0.8065,
+    "float_accuracy": 0.8226,
+    "lexicon_accuracy": 0.7823,
+    "int8_macro_f1": 0.5896
+   },
+   "ru": {
+    "n": 249,
+    "int8_accuracy": 0.8072,
+    "float_accuracy": 0.8112,
+    "lexicon_accuracy": 0.7631,
+    "int8_macro_f1": 0.6187
+   },
+   "si": {
+    "n": 227,
+    "int8_accuracy": 0.7841,
+    "float_accuracy": 0.7841,
+    "lexicon_accuracy": 0.8194,
+    "int8_macro_f1": 0.2187
+   },
+   "sk": {
+    "n": 248,
+    "int8_accuracy": 0.8105,
+    "float_accuracy": 0.8226,
+    "lexicon_accuracy": 0.7782,
+    "int8_macro_f1": 0.7259
+   },
+   "sl": {
+    "n": 224,
+    "int8_accuracy": 0.8571,
+    "float_accuracy": 0.8571,
+    "lexicon_accuracy": 0.8259,
+    "int8_macro_f1": 0.5566
+   },
+   "sq": {
+    "n": 246,
+    "int8_accuracy": 0.8171,
+    "float_accuracy": 0.8171,
+    "lexicon_accuracy": 0.7805,
+    "int8_macro_f1": 0.5805
+   },
+   "sr": {
+    "n": 440,
+    "int8_accuracy": 0.9273,
+    "float_accuracy": 0.9273,
+    "lexicon_accuracy": 0.8045,
+    "int8_macro_f1": 0.7415
+   },
+   "sv": {
+    "n": 251,
+    "int8_accuracy": 0.8845,
+    "float_accuracy": 0.8884,
+    "lexicon_accuracy": 0.7649,
+    "int8_macro_f1": 0.7019
+   },
+   "sw": {
+    "n": 226,
+    "int8_accuracy": 0.7876,
+    "float_accuracy": 0.7832,
+    "lexicon_accuracy": 0.823,
+    "int8_macro_f1": 0.2896
+   },
+   "ta": {
+    "n": 224,
+    "int8_accuracy": 0.7098,
+    "float_accuracy": 0.7232,
+    "lexicon_accuracy": 0.8214,
+    "int8_macro_f1": 0.2229
+   },
+   "te": {
+    "n": 229,
+    "int8_accuracy": 0.8122,
+    "float_accuracy": 0.8079,
+    "lexicon_accuracy": 0.8035,
+    "int8_macro_f1": 0.4837
+   },
+   "th": {
+    "n": 224,
+    "int8_accuracy": 0.683,
+    "float_accuracy": 0.692,
+    "lexicon_accuracy": 0.8259,
+    "int8_macro_f1": 0.2271
+   },
+   "tl": {
+    "n": 226,
+    "int8_accuracy": 0.8673,
+    "float_accuracy": 0.8717,
+    "lexicon_accuracy": 0.8274,
+    "int8_macro_f1": 0.5972
+   },
+   "tr": {
+    "n": 228,
+    "int8_accuracy": 0.7807,
+    "float_accuracy": 0.7807,
+    "lexicon_accuracy": 0.8202,
+    "int8_macro_f1": 0.3886
+   },
+   "uk": {
+    "n": 249,
+    "int8_accuracy": 0.7309,
+    "float_accuracy": 0.7309,
+    "lexicon_accuracy": 0.7711,
+    "int8_macro_f1": 0.5304
+   },
+   "ur": {
+    "n": 224,
+    "int8_accuracy": 0.5312,
+    "float_accuracy": 0.5536,
+    "lexicon_accuracy": 0.8259,
+    "int8_macro_f1": 0.2279
+   },
+   "uz": {
+    "n": 225,
+    "int8_accuracy": 0.7733,
+    "float_accuracy": 0.7733,
+    "lexicon_accuracy": 0.8311,
+    "int8_macro_f1": 0.3496
+   },
+   "vi": {
+    "n": 246,
+    "int8_accuracy": 0.626,
+    "float_accuracy": 0.626,
+    "lexicon_accuracy": 0.7846,
+    "int8_macro_f1": 0.2902
+   },
+   "zh": {
+    "n": 569,
+    "int8_accuracy": 0.6239,
+    "float_accuracy": 0.6344,
+    "lexicon_accuracy": 0.7821,
+    "int8_macro_f1": 0.353
+   },
+   "zu": {
+    "n": 228,
+    "int8_accuracy": 0.7149,
+    "float_accuracy": 0.7193,
+    "lexicon_accuracy": 0.8158,
+    "int8_macro_f1": 0.2206
+   }
+  },
+  "thresholds_int8": [
+   {
+    "threshold": 0.5,
+    "kept": 3630,
+    "precision": 0.4689,
+    "recall_of_consent_strings": 0.4444
+   },
+   {
+    "threshold": 0.6,
+    "kept": 3358,
+    "precision": 0.4955,
+    "recall_of_consent_strings": 0.4345
+   },
+   {
+    "threshold": 0.7,
+    "kept": 3001,
+    "precision": 0.5342,
+    "recall_of_consent_strings": 0.4185
+   },
+   {
+    "threshold": 0.8,
+    "kept": 2757,
+    "precision": 0.5622,
+    "recall_of_consent_strings": 0.4047
+   },
+   {
+    "threshold": 0.9,
+    "kept": 2408,
+    "precision": 0.608,
+    "recall_of_consent_strings": 0.3822
+   },
+   {
+    "threshold": 0.95,
+    "kept": 2098,
+    "precision": 0.664,
+    "recall_of_consent_strings": 0.3637
+   }
+  ]
+ },
+ "leave_source_out": {
+  "aosp-framework": {
+   "float": {
+    "n": 9419,
+    "accuracy": 0.6914,
+    "macro_f1": 0.3583,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.0378,
+      "recall": 0.2614,
+      "f1": 0.0661,
+      "support": 88
+     },
+     "REJECT": {
+      "precision": 0.1313,
+      "recall": 0.347,
+      "f1": 0.1905,
+      "support": 219
+     },
+     "OTHER": {
+      "precision": 0.9777,
+      "recall": 0.7038,
+      "f1": 0.8185,
+      "support": 9112
+     }
+    },
+    "confusion_matrix": {
+     "labels": [
+      "ACCEPT",
+      "REJECT",
+      "OTHER"
+     ],
+     "rows_true_cols_pred": [
+      [
+       23,
+       15,
+       43
+      ],
+      [
+       15,
+       76,
+       103
+      ],
+      [
+       570,
+       488,
+       6413
+      ]
+     ]
+    }
+   },
+   "lexicon_baseline": {
+    "n": 9419,
+    "accuracy": 0.9684,
+    "macro_f1": 0.3833,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.625,
+      "recall": 0.0568,
+      "f1": 0.1042,
+      "support": 88
+     },
+     "REJECT": {
+      "precision": 1.0,
+      "recall": 0.032,
+      "f1": 0.0619,
+      "support": 219
+     },
+     "OTHER": {
+      "precision": 0.9686,
+      "recall": 0.9997,
+      "f1": 0.9839,
+      "support": 9112
+     }
+    },
+    "confusion_matrix": {
+     "labels": [
+      "ACCEPT",
+      "REJECT",
+      "OTHER"
+     ],
+     "rows_true_cols_pred": [
+      [
+       5,
+       0,
+       83
+      ],
+      [
+       0,
+       7,
+       212
+      ],
+      [
+       3,
+       0,
+       9109
+      ]
+     ]
+    }
+   }
+  },
+  "aosp-permissioncontroller": {
+   "float": {
+    "n": 8197,
+    "accuracy": 0.6639,
+    "macro_f1": 0.2089,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.4511,
+      "recall": 0.0831,
+      "f1": 0.1404,
+      "support": 722
+     },
+     "REJECT": {
+      "precision": 0.3839,
+      "recall": 0.1396,
+      "f1": 0.2048,
+      "support": 308
+     },
+     "MANAGE": {
+      "precision": 0.359,
+      "recall": 0.0711,
+      "f1": 0.1186,
+      "support": 394
+     },
+     "PURPOSE_NOTICE": {
+      "precision": 0.6089,
+      "recall": 0.1119,
+      "f1": 0.1891,
+      "support": 1099
+     },
+     "PRIVACY_LINK": {
+      "precision": 0.0769,
+      "recall": 0.0063,
+      "f1": 0.0116,
+      "support": 159
+     },
+     "WITHDRAW_INFO": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 162
+     },
+     "OTHER": {
+      "precision": 0.6777,
+      "recall": 0.969,
+      "f1": 0.7976,
+      "support": 5353
+     }
+    },
+    "confusion_matrix": {
+     "labels": [
+      "ACCEPT",
+      "REJECT",
+      "MANAGE",
+      "PURPOSE_NOTICE",
+      "PRIVACY_LINK",
+      "WITHDRAW_INFO",
+      "OTHER"
+     ],
+     "rows_true_cols_pred": [
+      [
+       60,
+       11,
+       2,
+       2,
+       2,
+       4,
+       641
+      ],
+      [
+       10,
+       43,
+       0,
+       0,
+       0,
+       1,
+       254
+      ],
+      [
+       1,
+       2,
+       28,
+       6,
+       0,
+       0,
+       357
+      ],
+      [
+       1,
+       0,
+       41,
+       123,
+       4,
+       0,
+       930
+      ],
+      [
+       0,
+       0,
+       1,
+       17,
+       1,
+       0,
+       140
+      ],
+      [
+       0,
+       0,
+       0,
+       14,
+       3,
+       0,
+       145
+      ],
+      [
+       61,
+       56,
+       6,
+       40,
+       3,
+       0,
+       5187
+      ]
+     ]
+    }
+   },
+   "lexicon_baseline": {
+    "n": 8197,
+    "accuracy": 0.6568,
+    "macro_f1": 0.1283,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 1.0,
+      "recall": 0.0332,
+      "f1": 0.0643,
+      "support": 722
+     },
+     "REJECT": {
+      "precision": 1.0,
+      "recall": 0.0162,
+      "f1": 0.0319,
+      "support": 308
+     },
+     "MANAGE": {
+      "precision": 1.0,
+      "recall": 0.0051,
+      "f1": 0.0101,
+      "support": 394
+     },
+     "PURPOSE_NOTICE": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 1099
+     },
+     "PRIVACY_LINK": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 159
+     },
+     "WITHDRAW_INFO": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 162
+     },
+     "OTHER": {
+      "precision": 0.6555,
+      "recall": 1.0,
+      "f1": 0.7919,
+      "support": 5353
+     }
+    },
+    "confusion_matrix": {
+     "labels": [
+      "ACCEPT",
+      "REJECT",
+      "MANAGE",
+      "PURPOSE_NOTICE",
+      "PRIVACY_LINK",
+      "WITHDRAW_INFO",
+      "OTHER"
+     ],
+     "rows_true_cols_pred": [
+      [
+       24,
+       0,
+       0,
+       0,
+       0,
+       0,
+       698
+      ],
+      [
+       0,
+       5,
+       0,
+       0,
+       0,
+       0,
+       303
+      ],
+      [
+       0,
+       0,
+       2,
+       0,
+       0,
+       0,
+       392
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       1099
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       159
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       162
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       5353
+      ]
+     ]
+    }
+   }
+  },
+  "klaro": {
+   "float": {
+    "n": 281,
+    "accuracy": 0.5338,
+    "macro_f1": 0.4004,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.6111,
+      "recall": 0.3667,
+      "f1": 0.4583,
+      "support": 60
+     },
+     "REJECT": {
+      "precision": 0.4545,
+      "recall": 0.4167,
+      "f1": 0.4348,
+      "support": 12
+     },
+     "MANAGE": {
+      "precision": 0.2727,
+      "recall": 0.12,
+      "f1": 0.1667,
+      "support": 25
+     },
+     "PURPOSE_NOTICE": {
+      "precision": 0.8372,
+      "recall": 0.6667,
+      "f1": 0.7423,
+      "support": 108
+     },
+     "PRIVACY_LINK": {
+      "precision": 0.6316,
+      "recall": 0.4615,
+      "f1": 0.5333,
+      "support": 26
+     },
+     "WITHDRAW_INFO": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 12
+     },
+     "OTHER": {
+      "precision": 0.3103,
+      "recall": 0.9474,
+      "f1": 0.4675,
+      "support": 38
+     }
+    },
+    "confusion_matrix": {
+     "labels": [
+      "ACCEPT",
+      "REJECT",
+      "MANAGE",
+      "PURPOSE_NOTICE",
+      "PRIVACY_LINK",
+      "WITHDRAW_INFO",
+      "OTHER"
+     ],
+     "rows_true_cols_pred": [
+      [
+       22,
+       4,
+       1,
+       1,
+       0,
+       0,
+       32
+      ],
+      [
+       1,
+       5,
+       0,
+       0,
+       0,
+       0,
+       6
+      ],
+      [
+       9,
+       2,
+       3,
+       0,
+       0,
+       0,
+       11
+      ],
+      [
+       4,
+       0,
+       6,
+       72,
+       7,
+       0,
+       19
+      ],
+      [
+       0,
+       0,
+       0,
+       11,
+       12,
+       2,
+       1
+      ],
+      [
+       0,
+       0,
+       0,
+       1,
+       0,
+       0,
+       11
+      ],
+      [
+       0,
+       0,
+       1,
+       1,
+       0,
+       0,
+       36
+      ]
+     ]
+    }
+   },
+   "lexicon_baseline": {
+    "n": 281,
+    "accuracy": 0.153,
+    "macro_f1": 0.0742,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.8,
+      "recall": 0.0667,
+      "f1": 0.1231,
+      "support": 60
+     },
+     "REJECT": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 12
+     },
+     "MANAGE": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 25
+     },
+     "PURPOSE_NOTICE": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 108
+     },
+     "PRIVACY_LINK": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 26
+     },
+     "WITHDRAW_INFO": {
+      "precision": 1.0,
+      "recall": 0.0833,
+      "f1": 0.1538,
+      "support": 12
+     },
+     "OTHER": {
+      "precision": 0.1382,
+      "recall": 1.0,
+      "f1": 0.2428,
+      "support": 38
+     }
+    },
+    "confusion_matrix": {
+     "labels": [
+      "ACCEPT",
+      "REJECT",
+      "MANAGE",
+      "PURPOSE_NOTICE",
+      "PRIVACY_LINK",
+      "WITHDRAW_INFO",
+      "OTHER"
+     ],
+     "rows_true_cols_pred": [
+      [
+       4,
+       0,
+       0,
+       0,
+       0,
+       0,
+       56
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       12
+      ],
+      [
+       1,
+       0,
+       0,
+       0,
+       0,
+       0,
+       24
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       108
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       26
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       1,
+       11
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       38
+      ]
+     ]
+    }
+   }
+  },
+  "tarteaucitron": {
+   "float": {
+    "n": 701,
+    "accuracy": 0.6034,
+    "macro_f1": 0.5816,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.7812,
+      "recall": 0.7042,
+      "f1": 0.7407,
+      "support": 71
+     },
+     "REJECT": {
+      "precision": 0.9,
+      "recall": 0.383,
+      "f1": 0.5373,
+      "support": 47
+     },
+     "MANAGE": {
+      "precision": 0.6923,
+      "recall": 0.1475,
+      "f1": 0.2432,
+      "support": 61
+     },
+     "PURPOSE_NOTICE": {
+      "precision": 0.7354,
+      "recall": 0.5485,
+      "f1": 0.6284,
+      "support": 299
+     },
+     "PRIVACY_LINK": {
+      "precision": 0.85,
+      "recall": 0.6538,
+      "f1": 0.7391,
+      "support": 26
+     },
+     "OTHER": {
+      "precision": 0.4688,
+      "recall": 0.8376,
+      "f1": 0.6011,
+      "support": 197
+     }
+    },
+    "confusion_matrix": {
+     "labels": [
+      "ACCEPT",
+      "REJECT",
+      "MANAGE",
+      "PURPOSE_NOTICE",
+      "PRIVACY_LINK",
+      "OTHER"
+     ],
+     "rows_true_cols_pred": [
+      [
+       50,
+       2,
+       0,
+       2,
+       0,
+       17
+      ],
+      [
+       6,
+       18,
+       0,
+       1,
+       0,
+       22
+      ],
+      [
+       0,
+       0,
+       9,
+       28,
+       1,
+       23
+      ],
+      [
+       3,
+       0,
+       2,
+       164,
+       0,
+       123
+      ],
+      [
+       2,
+       0,
+       1,
+       3,
+       17,
+       2
+      ],
+      [
+       3,
+       0,
+       1,
+       25,
+       2,
+       165
+      ]
+     ]
+    }
+   },
+   "lexicon_baseline": {
+    "n": 701,
+    "accuracy": 0.3138,
+    "macro_f1": 0.1635,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 1.0,
+      "recall": 0.2958,
+      "f1": 0.4565,
+      "support": 71
+     },
+     "REJECT": {
+      "precision": 1.0,
+      "recall": 0.0213,
+      "f1": 0.0417,
+      "support": 47
+     },
+     "MANAGE": {
+      "precision": 1.0,
+      "recall": 0.0164,
+      "f1": 0.0323,
+      "support": 61
+     },
+     "PURPOSE_NOTICE": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 299
+     },
+     "PRIVACY_LINK": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 26
+     },
+     "OTHER": {
+      "precision": 0.2906,
+      "recall": 1.0,
+      "f1": 0.4503,
+      "support": 197
+     }
+    },
+    "confusion_matrix": {
+     "labels": [
+      "ACCEPT",
+      "REJECT",
+      "MANAGE",
+      "PURPOSE_NOTICE",
+      "PRIVACY_LINK",
+      "OTHER"
+     ],
+     "rows_true_cols_pred": [
+      [
+       21,
+       0,
+       0,
+       0,
+       0,
+       50
+      ],
+      [
+       0,
+       1,
+       0,
+       0,
+       0,
+       46
+      ],
+      [
+       0,
+       0,
+       1,
+       0,
+       0,
+       60
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       299
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       26
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       197
+      ]
+     ]
+    }
+   }
+  },
+  "traceveil": {
+   "float": {
+    "n": 57,
+    "accuracy": 0.2982,
+    "macro_f1": 0.3197,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.6154,
+      "recall": 0.5,
+      "f1": 0.5517,
+      "support": 16
+     },
+     "REJECT": {
+      "precision": 0.75,
+      "recall": 0.2,
+      "f1": 0.3158,
+      "support": 15
+     },
+     "MANAGE": {
+      "precision": 1.0,
+      "recall": 0.25,
+      "f1": 0.4,
+      "support": 8
+     },
+     "PURPOSE_NOTICE": {
+      "precision": 0.6,
+      "recall": 0.3333,
+      "f1": 0.4286,
+      "support": 9
+     },
+     "WITHDRAW_INFO": {
+      "precision": 1.0,
+      "recall": 0.125,
+      "f1": 0.2222,
+      "support": 8
+     },
+     "OTHER": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 1
+     }
+    },
+    "confusion_matrix": {
+     "labels": [
+      "ACCEPT",
+      "REJECT",
+      "MANAGE",
+      "PURPOSE_NOTICE",
+      "WITHDRAW_INFO",
+      "OTHER"
+     ],
+     "rows_true_cols_pred": [
+      [
+       8,
+       1,
+       0,
+       2,
+       0,
+       5
+      ],
+      [
+       5,
+       3,
+       0,
+       0,
+       0,
+       7
+      ],
+      [
+       0,
+       0,
+       2,
+       0,
+       0,
+       6
+      ],
+      [
+       0,
+       0,
+       0,
+       3,
+       0,
+       5
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       1,
+       7
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0
+      ]
+     ]
+    }
+   },
+   "lexicon_baseline": {
+    "n": 57,
+    "accuracy": 0.8421,
+    "macro_f1": 0.697,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 16
+     },
+     "REJECT": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 15
+     },
+     "MANAGE": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 8
+     },
+     "PURPOSE_NOTICE": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 9
+     },
+     "WITHDRAW_INFO": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 8
+     },
+     "OTHER": {
+      "precision": 0.1,
+      "recall": 1.0,
+      "f1": 0.1818,
+      "support": 1
+     }
+    },
+    "confusion_matrix": {
+     "labels": [
+      "ACCEPT",
+      "REJECT",
+      "MANAGE",
+      "PURPOSE_NOTICE",
+      "WITHDRAW_INFO",
+      "OTHER"
+     ],
+     "rows_true_cols_pred": [
+      [
+       16,
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       15,
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       8,
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       9
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       8,
+       0
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0,
+       1
+      ]
+     ]
+    }
+   }
+  },
+  "note": "macro-F1 over the roles present in the held-out source; float model"
+ },
+ "seen_languages_unseen_strings": {
+  "protocol": "5 random folds grouped by normalized string text; all languages seen in training",
+  "int8": {
+   "n": 18655,
+   "accuracy": 0.866,
+   "macro_f1": 0.671,
+   "per_class": {
+    "ACCEPT": {
+     "precision": 0.6037,
+     "recall": 0.5873,
+     "f1": 0.5953,
+     "support": 957
+    },
+    "REJECT": {
+     "precision": 0.4877,
+     "recall": 0.594,
+     "f1": 0.5356,
+     "support": 601
+    },
+    "MANAGE": {
+     "precision": 0.6313,
+     "recall": 0.5861,
+     "f1": 0.6079,
+     "support": 488
+    },
+    "PURPOSE_NOTICE": {
+     "precision": 0.7329,
+     "recall": 0.6845,
+     "f1": 0.7078,
+     "support": 1515
+    },
+    "PRIVACY_LINK": {
+     "precision": 0.6667,
+     "recall": 0.5592,
+     "f1": 0.6082,
+     "support": 211
+    },
+    "WITHDRAW_INFO": {
+     "precision": 0.8433,
+     "recall": 0.6209,
+     "f1": 0.7152,
+     "support": 182
+    },
+    "OTHER": {
+     "precision": 0.9236,
+     "recall": 0.9307,
+     "f1": 0.9272,
+     "support": 14701
+    }
+   },
+   "confusion_matrix": {
+    "labels": [
+     "ACCEPT",
+     "REJECT",
+     "MANAGE",
+     "PURPOSE_NOTICE",
+     "PRIVACY_LINK",
+     "WITHDRAW_INFO",
+     "OTHER"
+    ],
+    "rows_true_cols_pred": [
+     [
+      562,
+      68,
+      4,
+      5,
+      2,
+      0,
+      316
+     ],
+     [
+      44,
+      357,
+      4,
+      6,
+      0,
+      0,
+      190
+     ],
+     [
+      16,
+      12,
+      286,
+      37,
+      2,
+      1,
+      134
+     ],
+     [
+      18,
+      5,
+      37,
+      1037,
+      17,
+      2,
+      399
+     ],
+     [
+      0,
+      0,
+      3,
+      42,
+      118,
+      2,
+      46
+     ],
+     [
+      1,
+      2,
+      0,
+      19,
+      1,
+      113,
+      46
+     ],
+     [
+      290,
+      288,
+      119,
+      269,
+      37,
+      16,
+      13682
+     ]
+    ]
+   }
+  },
+  "lexicon_baseline": {
+   "n": 18655,
+   "accuracy": 0.7942,
+   "macro_f1": 0.1782,
+   "per_class": {
+    "ACCEPT": {
+     "precision": 0.9459,
+     "recall": 0.0731,
+     "f1": 0.1358,
+     "support": 957
+    },
+    "REJECT": {
+     "precision": 1.0,
+     "recall": 0.0466,
+     "f1": 0.089,
+     "support": 601
+    },
+    "MANAGE": {
+     "precision": 1.0,
+     "recall": 0.0225,
+     "f1": 0.0441,
+     "support": 488
+    },
+    "PURPOSE_NOTICE": {
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0,
+     "support": 1515
+    },
+    "PRIVACY_LINK": {
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0,
+     "support": 211
+    },
+    "WITHDRAW_INFO": {
+     "precision": 1.0,
+     "recall": 0.0495,
+     "f1": 0.0942,
+     "support": 182
+    },
+    "OTHER": {
+     "precision": 0.7931,
+     "recall": 0.9998,
+     "f1": 0.8845,
+     "support": 14701
+    }
+   },
+   "confusion_matrix": {
+    "labels": [
+     "ACCEPT",
+     "REJECT",
+     "MANAGE",
+     "PURPOSE_NOTICE",
+     "PRIVACY_LINK",
+     "WITHDRAW_INFO",
+     "OTHER"
+    ],
+    "rows_true_cols_pred": [
+     [
+      70,
+      0,
+      0,
+      0,
+      0,
+      0,
+      887
+     ],
+     [
+      0,
+      28,
+      0,
+      0,
+      0,
+      0,
+      573
+     ],
+     [
+      1,
+      0,
+      11,
+      0,
+      0,
+      0,
+      476
+     ],
+     [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1515
+     ],
+     [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      211
+     ],
+     [
+      0,
+      0,
+      0,
+      0,
+      0,
+      9,
+      173
+     ],
+     [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      14698
+     ]
+    ]
+   }
+  }
+ },
+ "export": {
+  "tflite_bytes": 145816,
+  "sha256": "5802e3dff77f70ee10778384cb548f7c832389ffdd52f8754c308d91a03fa6c2",
+  "params": 130311,
+  "ops": [
+   "GATHER",
+   "EXPAND_DIMS",
+   "CONV_2D",
+   "RESHAPE",
+   "EXPAND_DIMS",
+   "CONV_2D",
+   "RESHAPE",
+   "REDUCE_MAX",
+   "FULLY_CONNECTED",
+   "FULLY_CONNECTED",
+   "SOFTMAX"
+  ],
+  "output_quantization": {
+   "scale": 0.00390625,
+   "zero_point": -128
+  },
+  "int8_vs_float_agreement_on_training_rows": 0.9969,
+  "max_abs_prob_diff_on_training_rows": 0.2782,
+  "demo": [
+   {
+    "lang": "en",
+    "text": "Decline optional tracking",
+    "expected": "REJECT",
+    "in_training_data": false,
+    "reference_role": "PURPOSE_NOTICE",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "en",
+    "text": "Read our privacy notice",
+    "expected": "PRIVACY_LINK",
+    "in_training_data": false,
+    "reference_role": "PRIVACY_LINK",
+    "reference_confidence": 0.9492
+   },
+   {
+    "lang": "en",
+    "text": "Add to cart",
+    "expected": "OTHER",
+    "in_training_data": false,
+    "reference_role": "OTHER",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "hi",
+    "text": "सभी स्वीकार करें",
+    "expected": "ACCEPT",
+    "in_training_data": false,
+    "reference_role": "ACCEPT",
+    "reference_confidence": 0.5
+   },
+   {
+    "lang": "hi",
+    "text": "हम विज्ञापन दिखाने के लिए आपके डेटा का उपयोग करते हैं",
+    "expected": "PURPOSE_NOTICE",
+    "in_training_data": false,
+    "reference_role": "PURPOSE_NOTICE",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "de",
+    "text": "Alle ablehnen",
+    "expected": "REJECT",
+    "in_training_data": false,
+    "reference_role": "OTHER",
+    "reference_confidence": 0.6562
+   },
+   {
+    "lang": "de",
+    "text": "Einstellungen anpassen",
+    "expected": "MANAGE",
+    "in_training_data": false,
+    "reference_role": "MANAGE",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "fr",
+    "text": "Tout accepter",
+    "expected": "ACCEPT",
+    "in_training_data": true,
+    "reference_role": "ACCEPT",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "fr",
+    "text": "Vous pouvez retirer votre consentement à tout moment.",
+    "expected": "WITHDRAW_INFO",
+    "in_training_data": false,
+    "reference_role": "OTHER",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "es",
+    "text": "Rechazar todo",
+    "expected": "REJECT",
+    "in_training_data": false,
+    "reference_role": "REJECT",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "es",
+    "text": "Usamos sus datos para mostrar anuncios personalizados.",
+    "expected": "PURPOSE_NOTICE",
+    "in_training_data": false,
+    "reference_role": "PURPOSE_NOTICE",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "pt",
+    "text": "Aceitar todos",
+    "expected": "ACCEPT",
+    "in_training_data": true,
+    "reference_role": "ACCEPT",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "pt",
+    "text": "Política de privacidade",
+    "expected": "PRIVACY_LINK",
+    "in_training_data": true,
+    "reference_role": "PRIVACY_LINK",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "it",
+    "text": "Gestisci preferenze",
+    "expected": "MANAGE",
+    "in_training_data": false,
+    "reference_role": "MANAGE",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "ja",
+    "text": "すべて拒否",
+    "expected": "REJECT",
+    "in_training_data": false,
+    "reference_role": "REJECT",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "ja",
+    "text": "同意する",
+    "expected": "ACCEPT",
+    "in_training_data": true,
+    "reference_role": "ACCEPT",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "zh",
+    "text": "接受全部",
+    "expected": "ACCEPT",
+    "in_training_data": false,
+    "reference_role": "OTHER",
+    "reference_confidence": 0.9492
+   },
+   {
+    "lang": "zh",
+    "text": "管理偏好设置",
+    "expected": "MANAGE",
+    "in_training_data": false,
+    "reference_role": "MANAGE",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "ar",
+    "text": "رفض الكل",
+    "expected": "REJECT",
+    "in_training_data": false,
+    "reference_role": "OTHER",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "ar",
+    "text": "سياسة الخصوصية",
+    "expected": "PRIVACY_LINK",
+    "in_training_data": true,
+    "reference_role": "PRIVACY_LINK",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "ko",
+    "text": "모두 거부",
+    "expected": "REJECT",
+    "in_training_data": true,
+    "reference_role": "REJECT",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "ru",
+    "text": "Принять все",
+    "expected": "ACCEPT",
+    "in_training_data": false,
+    "reference_role": "ACCEPT",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "tr",
+    "text": "Tümünü kabul et",
+    "expected": "ACCEPT",
+    "in_training_data": false,
+    "reference_role": "ACCEPT",
+    "reference_confidence": 0.9961
+   },
+   {
+    "lang": "id",
+    "text": "Tolak semua",
+    "expected": "REJECT",
+    "in_training_data": false,
+    "reference_role": "REJECT",
+    "reference_confidence": 0.8164
+   }
+  ]
+ },
+ "summary": {
+  "default_threshold": 0.9,
+  "lolo_int8_macro_f1": 0.5207,
+  "lolo_lexicon_macro_f1": 0.1489
+ },
+ "environment": {
+  "python": "3.11.9",
+  "tensorflow": "2.20.0",
+  "keras": "3.15.1",
+  "numpy": "2.4.6",
+  "seed": 42,
+  "epochs_max": 30,
+  "quick": false,
+  "seconds": 3593.6
+ }
+}

@@ -102,3 +102,27 @@ Raw data is not in Git or the APK; only the trained weights are bundled. Full de
 | Majestic Million | Majestic (https://majestic.com/); CC BY 3.0 | Attribution to Majestic in the TrackerLens weights file and model card. |
 | AOSP platform manifests; Public Suffix List | Apache-2.0; MPL-2.0 | Training only (permission names and levels; registrable-domain grouping). Nothing from them is shipped. |
 | DuckDuckGo Tracker Radar | CC BY-NC-SA 4.0 | Considered, **not used** (non-commercial only). |
+
+## ConsentLens-1 on the NPU: runtime libraries and training data — 10 October 2026
+
+ConsentLens-1 is TraceVeil's own string-role model (`app/src/main/assets/consentlens/consentlens_int8.tflite`, about 50 KB). Its card is [ml/consentlens/MODEL_CARD.md](ml/consentlens/MODEL_CARD.md).
+
+| Component | Pinned version | Source and licence | Handling |
+| --- | --- | --- | --- |
+| LiteRT (`com.google.ai.edge.litert:litert`, with `litert-api`) | 1.4.2 | [Google Maven](https://dl.google.com/android/maven2/com/google/ai/edge/litert/litert/1.4.2/litert-1.4.2.pom); Apache License 2.0 ([LiteRT LICENSE](https://github.com/google-ai-edge/LiteRT/blob/main/LICENSE)) | Runtime dependency (Interpreter API); bundles `libtensorflowlite_jni.so`. Retain the Apache-2.0 notice. |
+| Qualcomm AI Engine Direct delegate for LiteRT (`com.qualcomm.qti:qnn-litert-delegate`) | 2.50.0 | [Maven Central](https://repo1.maven.org/maven2/com/qualcomm/qti/qnn-litert-delegate/2.50.0/); proprietary Qualcomm Technologies licence. The POM names "Qualcomm AI Hub Model License" ([PDF](https://softwarecenter.qualcomm.com/api/download/software/licenses/ai_model_hub/v1/LICENSE.pdf)); the AAR carries its own `LICENSE.pdf` | Runtime dependency; bundles `libQnnTFLiteDelegate.so` and `libqnn_delegate_jni.so` (arm64-v8a only). |
+| Qualcomm QNN runtime (`com.qualcomm.qti:qnn-runtime`) | 2.50.0 (must equal the delegate version) | [Maven Central](https://repo1.maven.org/maven2/com/qualcomm/qti/qnn-runtime/2.50.0/); the AAR's `LICENSE.pdf` is Qualcomm's **"AI Stack License"** (Terms and Conditions of Use); third-party notices in the AAR's `NOTICE.txt` | Bundles the HTP backend (`libQnnHtp.so`, `libQnnHtpPrepare.so`, `libQnnSystem.so`) and the HTP V69/V73/V75/V79/V81 stub and skel libraries. The DSP and GPU backends and HTP V68 are excluded from the APK (`app/build.gradle.kts`); ConsentLens never selects them. |
+
+**Licence decision (as relayed in the ConsentLens work brief, 10 October 2026):** the product owner approved accepting Qualcomm's AI Stack License for the QNN runtime and the LiteRT QNN delegate from Maven Central, including redistribution inside the TraceVeil app. The agent that integrated them did not accept anything on anyone's behalf beyond that recorded approval; the owner should confirm it in this register. What the runtime licence text (read from the 2.50.0 AAR) grants and requires, in short: use and copy to develop your applications, and **distribute only in object code as incorporated in your application** (never standalone); no reverse engineering; keep Qualcomm's proprietary notices; comply with third-party notices; it lists prohibited uses (none of which is consent-screen text classification). Open items before a public release: read the delegate AAR's own `LICENSE.pdf` (its text could not be extracted locally) and ship Qualcomm's `NOTICE.txt` third-party notices with the app.
+
+**Training data (all real, openly licensed UI strings; the processed set is committed as `ml/consentlens/data/consentlens_dataset.jsonl` with source, file, string key and language per row, and pinned revisions in `ml/consentlens/data/sources.json`):**
+
+| Source | Revision | Licence | Required handling |
+| --- | --- | --- | --- |
+| AOSP PermissionController strings (`platform/packages/modules/Permission`) | `26231a7eac744c7d2a8fea4740926620f56b20c6` | Apache-2.0 | Copyright The Android Open Source Project; keep the licence notice with the derived dataset. |
+| AOSP framework strings (`platform/frameworks/base`, `core/res`) | `1cdfff555f4a21f71ccc978290e2e212e2f8b168` | Apache-2.0 | As above. |
+| Klaro! consent manager translations (`kiprotect/klaro`, `src/translations`) | `db9f1aca906a392990c58c58475366a091012ea7` | BSD-3-Clause | Retain "Copyright (c) 2019-2020, KIProtect GmbH" and contributors, the licence conditions and disclaimer. |
+| tarteaucitron.js translations (`AmauriC/tarteaucitron.js`, `lang/`) | `07254bb6ff2858e2ab6a9b45c391d655a55a9c54` | MIT | Retain the MIT copyright and permission notice. |
+| TraceVeil's own lexicon and LeakyShop dialog strings | this repository | MIT | Ours. |
+
+The model weights are derived from these strings; no source string is shipped in the APK except the hand-written demo phrases in `consentlens_meta.json`.

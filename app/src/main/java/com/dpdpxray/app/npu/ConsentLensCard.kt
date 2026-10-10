@@ -127,7 +127,7 @@ fun ConsentLensCard(engine: ConsentLensEngine) {
         }
 
         LearnMore(label = "How to check it really ran on the NPU") {
-            Note("Run Load, then Benchmark, and read logcat tag TraceVeilNpu: backend=NPU with planNodes=1/${meta?.opCount ?: "N"} and fullyDelegated=true means LiteRT handed the whole graph to the Qualcomm QNN HTP delegate (the NPU interpreter has XNNPACK switched off, so a CPU fallback would show more plan nodes or backend=CPU). LiteRT also logs \"Replacing N out of N node(s) with delegate (TfLiteQnnDelegate)\".")
+            Note("Run Load, then Benchmark, and read logcat tag TraceVeilNpu: backend=NPU with planNodes=1/${meta?.opCount ?: "N"} and fullyDelegated=true means LiteRT handed the whole graph to the Qualcomm QNN HTP delegate (the NPU interpreter has XNNPACK switched off, so a CPU fallback would show more plan nodes or backend=CPU). LiteRT normally also logs \"Replacing N out of N node(s) with delegate …\" when the delegate is applied.")
         }
     }
 }

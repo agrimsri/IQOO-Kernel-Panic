@@ -9,6 +9,8 @@ Two small models that TraceVeil trained itself on public data and runs **on the 
 
 Data sources, licences, citations and file hashes: [DATA_SOURCES.md](DATA_SOURCES.md). Metrics and slide-ready plots: `ml/reports/<model>/metrics.json` and `*.png`.
 
+A third model, **ConsentLens-1**, labels consent-screen strings in many languages and runs through LiteRT on the phone's NPU (Qualcomm QNN HTP delegate) with a CPU fallback. It lives in its own folder with its dataset, training script, metrics and card: [consentlens/MODEL_CARD.md](consentlens/MODEL_CARD.md) (Python 3.11 + TensorFlow, `consentlens/requirements.txt`).
+
 ## Using them from the app
 
 ```kotlin

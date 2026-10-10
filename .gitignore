@@ -29,5 +29,5 @@ api.env
 /ml/data/
 __pycache__/
 
-# ConsentLens-1 ships in the APK (50 KB, trained by ml/consentlens/train_consentlens.py).
+# ConsentLens-1 ships in the APK (about 146 KB, trained by ml/consentlens/train_consentlens.py).
 !/app/src/main/assets/consentlens/*.tflite
