@@ -51,6 +51,8 @@ import com.dpdpxray.app.autoguard.CheckupScreen
 import com.dpdpxray.app.quarantine.QuarantineRoutes
 import com.dpdpxray.app.quarantine.QuarantineScreen
 import com.dpdpxray.app.quarantine.navigateToQuarantine
+import com.dpdpxray.app.notices.NoticesRoutes
+import com.dpdpxray.app.notices.noticesDestinations
 import com.dpdpxray.app.trust.TrustRoutes
 import com.dpdpxray.app.trust.trustDestination
 import com.dpdpxray.app.ui.XrayViewModel
@@ -251,9 +253,11 @@ class MainActivity : ComponentActivity() {
                                 onHowItWorks = { nav.navigate(OnboardingGate.ONBOARDING) },
                                 onOpen = { nav.navigate("results/$it") },
                                 onTrust = { nav.navigate(TrustRoutes.ROUTE) },
+                                onNotices = { nav.navigate(NoticesRoutes.LIST) },
                             )
                         }
                         trustDestination(nav)
+                        noticesDestinations(nav)
                         composable(
                             "pick?q={q}&select={select}",
                             arguments = listOf(

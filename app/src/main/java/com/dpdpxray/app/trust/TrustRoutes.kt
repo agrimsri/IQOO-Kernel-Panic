@@ -5,6 +5,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import com.dpdpxray.app.apkguard.ApkGuardRoutes
+import com.dpdpxray.app.notices.NoticesRoutes
 
 object TrustRoutes {
     /** Other screens (More, and the modes work) link here by this exact name. */
@@ -21,6 +22,10 @@ object TrustRoutes {
 fun NavGraphBuilder.trustDestination(nav: NavController) {
     composable(TrustRoutes.ROUTE) {
         val ctx = LocalContext.current
-        TrustScreen(onBack = { nav.popBackStack() }, onSelfCheck = { nav.navigate(TrustRoutes.selfCheck(ctx.packageName)) })
+        TrustScreen(
+            onBack = { nav.popBackStack() },
+            onSelfCheck = { nav.navigate(TrustRoutes.selfCheck(ctx.packageName)) },
+            onNotices = { nav.navigate(NoticesRoutes.LIST) },
+        )
     }
 }
