@@ -363,13 +363,17 @@ fun Hairline(modifier: Modifier = Modifier) {
 
 /**
  * A setting with a switch. The whole row is the touch target and reads as one switch to TalkBack. A long [detail]
- * shows its first sentence; the rest folds behind "More" below the row.
+ * shows its first sentence (at most two lines); "More" below the row opens the full text, and also appears when a
+ * single long sentence is cut off.
  */
 @Composable
 fun SwitchRow(title: String, detail: String?, checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    val lead = detail?.let { remember(it) { leadSentence(it) } }
-    val rest = if (detail != null && lead != null && lead.length < detail.trim().length) detail.trim().substring(lead.length).trim() else null
-    Column(modifier.fillMaxWidth()) {
+    val full = detail?.trim()
+    val lead = full?.let { remember(it) { leadSentence(it) } }
+    val multi = full != null && lead != null && lead.length < full.length
+    var clipped by remember(full) { mutableStateOf(false) }
+    var open by rememberSaveable(title) { mutableStateOf(false) }
+    Column(modifier.fillMaxWidth().animateContentSize(foldSpec())) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(Radii.small))
                 .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
@@ -378,7 +382,13 @@ fun SwitchRow(title: String, detail: String?, checked: Boolean, onChange: (Boole
         ) {
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, color = if (enabled) Film.bone else Film.boneDim)
-                if (lead != null) Text(lead, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (full != null && lead != null) {
+                    if (open) Text(full, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                    else Text(
+                        lead, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        onTextLayout = { if (it.hasVisualOverflow && !clipped) clipped = true },
+                    )
+                }
             }
             Spacer(Modifier.width(12.dp))
             Switch(
@@ -386,13 +396,7 @@ fun SwitchRow(title: String, detail: String?, checked: Boolean, onChange: (Boole
                 colors = SwitchDefaults.colors(checkedTrackColor = Film.scan, checkedThumbColor = Film.base, uncheckedTrackColor = FilmExtra.raisedHigh),
             )
         }
-        if (rest != null) {
-            var open by rememberSaveable(title) { mutableStateOf(false) }
-            Column(Modifier.fillMaxWidth().animateContentSize(foldSpec())) {
-                if (open) Text(rest, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(bottom = 4.dp))
-                DisclosureRow(open, "More", "Less", { open = !open }, glyph = null)
-            }
-        }
+        if (multi || clipped) DisclosureRow(open, "More", "Less", { open = !open }, glyph = null)
     }
 }
 
