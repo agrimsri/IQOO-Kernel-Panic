@@ -65,6 +65,8 @@ function buildAuditView(rec) {
     // "Which SDK caused this?" as exported by the phone (core SdkAttribution); null when the export has no such part.
     sdkGroups: Array.isArray(b.sdkAttribution?.groups) ? b.sdkAttribution.groups : null,
     sdkBasis: typeof b.sdkAttribution?.basis === "string" ? b.sdkAttribution.basis : null,
+    // A <file>.sig.json was imported with this export. Noted only; never verified in the browser.
+    signatureFile: rec.signatureFile || null,
   };
 }
 

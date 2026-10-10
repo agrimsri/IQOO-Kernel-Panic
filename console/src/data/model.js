@@ -12,6 +12,8 @@ export const BACKUP_SCHEMA = "traceveil.console-backup.v1";
 /** The phone's "Back up my checks" file: { schema, createdAt, appVersion, audits: [traceveil.audit.v1 ...], sha256 }. */
 export const PHONE_BACKUP_SCHEMA = "traceveil.backup.v1";
 export const POLICY_SCHEMA = "traceveil.policy.v1";
+/** The phone's detached hardware signature next to an export (<file>.sig.json). The console notes it; it never verifies it. */
+export const SIGNATURE_SCHEMA = "traceveil.signature.v1";
 
 export const PLAN = {
   SILENT: { code: "C", label: "Plan C · No interaction", short: "No interaction", order: 0, expects: null },

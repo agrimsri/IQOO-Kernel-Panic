@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { ClipboardCheck, Gauge as GaugeIcon, Waypoints, ListChecks, Globe2, Smartphone, GitCompareArrows, ChevronDown, ChevronRight, Wrench, ExternalLink, CheckCircle2, AlertTriangle, HelpCircle, FlaskConical, ScanEye, Trash2, Scale, Boxes } from "lucide-react";
+import { ClipboardCheck, Gauge as GaugeIcon, Waypoints, ListChecks, Globe2, Smartphone, GitCompareArrows, ChevronDown, ChevronRight, Wrench, ExternalLink, CheckCircle2, AlertTriangle, HelpCircle, FlaskConical, ScanEye, Trash2, Scale, Boxes, FileKey } from "lucide-react";
 import { Card, PageHead, Fade, Hud, Sheet, toast } from "../ui";
 import { Gauge } from "../ui/charts";
 import { EvidenceChip, SeverityBadge, BandBadge, PlanTag, SampleBadge, CodeBlock, DownloadButton, EmptyState, Truth, Meta, AppMark } from "../ui/tv";
@@ -26,7 +26,7 @@ export default function AuditDetail({ id }) {
   return (
     <div>
       <PageHead
-        kicker={<span className="row" style={{ gap: 8, display: "inline-flex" }}>Consent audit {a.sample && <SampleBadge info={a.sampleInfo} />}</span>}
+        kicker={<span className="row" style={{ gap: 8, display: "inline-flex" }}>Consent audit {a.sample && <SampleBadge info={a.sampleInfo} />}{a.signatureFile && <SignatureBadge a={a} />}</span>}
         title={<span className="row" style={{ gap: 12, display: "inline-flex" }}><AppMark label={a.label} size="lg" />{a.label}</span>}
         sub={<Meta items={[<span className="mono-s" key="p">{a.pkg}</span>, a.device && <span key="d"><Smartphone size={13} />{a.device}{a.android ? ` · Android ${a.android}` : ""}</span>, <span key="t">{fmtDate(a.createdAtMs)}</span>, a.versionName && <span key="v">Version {a.versionName}{a.versionCode != null ? ` (${a.versionCode})` : ""}</span>, <span key="l">{plural(a.lookups, "lookup")}</span>]} />}
         right={(
@@ -44,6 +44,8 @@ export default function AuditDetail({ id }) {
           <div>{!/^sample/i.test(a.sampleInfo.note) && <b>Sample data. </b>}<span className="text-2">{a.sampleInfo.note}</span>{a.sampleInfo.sources?.length > 0 && <div className="pill-src" style={{ marginTop: 6 }}>Sources: {a.sampleInfo.sources.join(" · ")}</div>}</div>
         </div>
       )}
+
+      {a.signatureFile && <SignatureNote a={a} />}
 
       <div className="grid g-12">
         <Fade className="span-8"><Coverage a={a} /></Fade>
@@ -224,6 +226,29 @@ function FixItem({ t }) {
       {t.code && <CodeBlock title="Kotlin" code={t.code} />}
       {t.steps?.length > 0 && <ul>{t.steps.map((x, i) => <li key={i}>{x}</li>)}</ul>}
       {t.docUrl && <a className="link small row" style={{ gap: 6 }} href={t.docUrl} target="_blank" rel="noreferrer noopener"><ExternalLink size={13} />Vendor documentation</a>}
+    </div>
+  );
+}
+
+/** A <file>.sig.json was imported with this export. Present is all the console can say; it never verifies it. */
+function SignatureBadge({ a }) {
+  return (
+    <span className="sig-badge" title={`${a.signatureFile.fileName} was imported with this export. Not verified in this browser: use traceveil-ci verify.`}>
+      <FileKey size={12} />Signature file present
+    </span>
+  );
+}
+
+function SignatureNote({ a }) {
+  const file = a.rec.fileName || "the exported file";
+  return (
+    <div className="callout sig-note" style={{ marginBottom: 16 }}>
+      <FileKey size={17} color="var(--scan)" style={{ flex: "none", marginTop: 2 }} />
+      <div className="text-2">
+        <b>Signature file present.</b> {a.signatureFile.fileName} (the phone's hardware signature) was imported with {file}. It is not verified in this browser.
+        Verify it on a laptop with <code className="mono-s">traceveil-ci verify {file}</code>, using the original file: it checks the exact bytes, the
+        secure-hardware key and the Google attestation root. This console's Export JSON writes new bytes, which the signature does not cover.
+      </div>
     </div>
   );
 }
