@@ -1,0 +1,14 @@
+Natural Earth country outlines
+
+Country outlines: Natural Earth (public domain).
+
+Data: Natural Earth 1:110m Admin 0 - Countries, release v5.1.2,
+https://www.naturalearthdata.com/downloads/110m-cultural-vectors/110m-admin-0-countries/
+from https://github.com/nvkelso/natural-earth-vector (commit f1890d9f152c896d250a77557a5751a93d494776).
+
+Natural Earth's terms of use (https://www.naturalearthdata.com/about/terms-of-use/) say:
+"All versions of Natural Earth raster + vector map data found on this website are in the public
+domain." and "No permission is needed to use Natural Earth. Crediting the authors is unnecessary."
+
+TraceVeil projected the outlines to Mercator and keyed them by country code for the endpoint
+map; the steps are listed in docs/ATTRIBUTION.md in TraceVeil's source.

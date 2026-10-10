@@ -1,0 +1,15 @@
+DB-IP IP to Country Lite
+
+IP Geolocation by DB-IP (https://db-ip.com)
+
+Data: IP to Country Lite, (c) DB-IP.com, October 2026 edition (database built 2026-10-01),
+https://db-ip.com/db/download/ip-to-country-lite
+
+Licence: Creative Commons Attribution 4.0 International (CC BY 4.0),
+https://creativecommons.org/licenses/by/4.0/
+The full licence text is included in this app ("Creative Commons Attribution 4.0 International").
+
+TraceVeil includes the database unmodified (assets/geo/dbip-country-lite.mmdb) and reads it on
+this phone only, to place the IP addresses in DNS answers in countries on the endpoint map.
+The map labels those countries as inferred and approximate, and prints this credit whenever the
+table placed them.
