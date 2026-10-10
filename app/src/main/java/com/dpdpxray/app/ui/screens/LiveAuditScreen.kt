@@ -1,6 +1,14 @@
 package com.dpdpxray.app.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -45,7 +53,15 @@ import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.observedAliasLabel
+import com.dpdpxray.app.ui.components.BreathingDot
 import com.dpdpxray.app.ui.components.Callout
+import com.dpdpxray.app.ui.components.ChipFlow
+import com.dpdpxray.app.ui.components.KeyCaveat
+import com.dpdpxray.app.ui.components.RecordingDot
+import com.dpdpxray.app.ui.components.SkeletonCard
+import com.dpdpxray.app.ui.components.SkeletonLines
+import com.dpdpxray.app.ui.components.cardSurface
+import com.dpdpxray.app.ui.components.reveal
 import com.dpdpxray.app.ui.components.ConsentLine
 import com.dpdpxray.app.ui.components.HostText
 import com.dpdpxray.app.ui.components.Note
@@ -63,6 +79,8 @@ import com.dpdpxray.app.ui.guide.LivePhase
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
+import com.dpdpxray.app.ui.theme.LocalReduceMotion
+import com.dpdpxray.app.ui.theme.Motion
 import com.dpdpxray.app.ui.theme.categoryColor
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.ConsentEvent
@@ -108,14 +126,19 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
             }
             is AuditProgress.Running -> {
                 Row(Modifier.fillMaxWidth().padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // A breathing red dot: the check is recording this app's lookups right now.
+                    RecordingDot(Film.leak, Modifier.semantics { contentDescription = "Recording" })
+                    Spacer(Modifier.width(6.dp))
                     Text(
                         p.config.targetLabel, style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f).semantics { heading() },
                     )
-                    Spacer(Modifier.width(8.dp))
+                }
+                ChipFlow(Modifier.padding(top = 8.dp)) {
+                    Tag("Live", Brand.coral)
                     Tag(if (p.config.fastPreview) "Fast Preview · limited evidence" else "Normal capture", if (p.config.fastPreview) Film.warn else Film.boneDim)
                 }
-                if (p.config.fastPreview) Callout("8-second observation; delayed traffic may be missed. Silent and Reject are not tested.", Modifier.padding(top = 8.dp))
+                if (p.config.fastPreview) Callout("8-second observation; delayed traffic may be missed. Silent and Reject are not tested.", Modifier.padding(top = 8.dp), fold = true)
                 // The plans really are a sequence, so they are shown as numbered frames.
                 RunFrames(p.config.plans, p.planIndex, Modifier.padding(top = 12.dp))
                 // Narrated in the background by GuideNarrator, so this banner only shows the step.
@@ -129,14 +152,17 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
                     Counter(trackers.size, "to trackers", if (trackers.isEmpty()) Film.bone else Film.high, Modifier.weight(1f))
                     Counter(before, "before any choice", if (before > 0) Film.leak else Film.bone, Modifier.weight(1f))
                 }
+                // The key caveat stays in view while numbers climb.
+                KeyCaveat("A lookup is an attempt to contact an address, not proof data was sent.", Modifier.padding(top = 6.dp), color = Film.boneDim)
                 // The orchestrator's own wording stays visible for developers; the banner above is the plain version.
                 if (LivePhase.of(p.step) != LivePhase.OTHER) {
                     Text("Status: ${p.step}", style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.padding(top = 10.dp))
                 }
-                Text(
-                    "Live lookups", style = MaterialTheme.typography.labelLarge, color = Film.boneDim,
-                    modifier = Modifier.padding(top = 14.dp).semantics { heading() },
-                )
+                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Live lookups", style = MaterialTheme.typography.titleSmall, color = Film.bone, modifier = Modifier.semantics { heading() })
+                    Spacer(Modifier.width(8.dp))
+                    BreathingDot(Film.scan, size = 7.dp)
+                }
                 Timeline(classified, consent, p.sessionStartNanos, Modifier.weight(1f))
                 Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     SecondaryAction("Mark consent now", { vm.markConsentNow() }, Modifier.weight(1f))
@@ -148,6 +174,10 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
                     CircularProgressIndicator(Modifier.size(22.dp), color = Film.scan, strokeWidth = 2.dp)
                     Spacer(Modifier.width(12.dp))
                     Text("Getting ready…", style = MaterialTheme.typography.titleMedium)
+                }
+                Column(Modifier.padding(top = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SkeletonLines(2)
+                    SkeletonCard()
                 }
             }
         }
@@ -191,9 +221,18 @@ private fun RunFrames(plans: List<AuditPlan>, current: Int, modifier: Modifier =
 
 @Composable
 private fun Counter(value: Int, label: String, color: Color, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(14.dp)
-    Column(modifier.fillMaxHeight().clip(shape).background(Film.raised).border(1.dp, FilmExtra.hairline, shape).padding(horizontal = 12.dp, vertical = 10.dp)) {
-        Text("$value", style = MaterialTheme.typography.headlineMedium, color = color)
+    val reduce = LocalReduceMotion.current
+    Column(modifier.fillMaxHeight().cardSurface(14.dp).padding(horizontal = 12.dp, vertical = 10.dp)) {
+        // The number rolls up as it changes (instant with reduced motion); TalkBack reads the current value.
+        AnimatedContent(
+            targetState = value,
+            transitionSpec = {
+                if (reduce) EnterTransition.None togetherWith ExitTransition.None
+                else (slideInVertically(tween(Motion.MEDIUM, easing = Motion.enter)) { it / 2 } + fadeIn(tween(Motion.MEDIUM)))
+                    .togetherWith(slideOutVertically(tween(Motion.SHORT, easing = Motion.exit)) { -it / 2 } + fadeOut(tween(Motion.SHORT)))
+            },
+            label = "counter",
+        ) { v -> Text("$v", style = MaterialTheme.typography.headlineMedium, color = color) }
         Text(label, style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
     }
 }
@@ -214,19 +253,22 @@ private fun Timeline(events: List<NetEvent>, consent: List<ConsentEvent>, start:
         if (rows.isEmpty()) {
             item {
                 Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(Film.scan))
+                    BreathingDot(Film.scan)
                     Spacer(Modifier.width(10.dp))
                     Note("No lookups yet. They appear here as the app tries to reach addresses.")
                 }
             }
         }
         items(rows) { r ->
-            when (r) {
-                is Row2.Choice -> ConsentLine(
-                    "${if (r.e.kind == ConsentKind.ACCEPT) "Accepted" else "Refused"} at ${secs(r.e.tNanos - start)} s  (${r.e.nodeText ?: ""})",
-                    if (r.e.kind == ConsentKind.ACCEPT) Film.scan else Film.warn,
-                )
-                is Row2.Net -> TimelineRow(r.e, start, beforeConsent = choiceAt == null || r.e.tNanos < choiceAt, afterRefusal = choiceKind == ConsentKind.REJECT)
+            // Each new lookup slides up and fades in once as it arrives; rows scrolled back into view do not replay.
+            Box(Modifier.reveal(0)) {
+                when (r) {
+                    is Row2.Choice -> ConsentLine(
+                        "${if (r.e.kind == ConsentKind.ACCEPT) "Accepted" else "Refused"} at ${secs(r.e.tNanos - start)} s  (${r.e.nodeText ?: ""})",
+                        if (r.e.kind == ConsentKind.ACCEPT) Film.scan else Film.warn,
+                    )
+                    is Row2.Net -> TimelineRow(r.e, start, beforeConsent = choiceAt == null || r.e.tNanos < choiceAt, afterRefusal = choiceKind == ConsentKind.REJECT)
+                }
             }
         }
     }
