@@ -238,7 +238,8 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit) {
             val onlineVoice = remember { SpeechOutputChoice.choose(ApiEnv.load(ctx)) == SpeechOutputChoice.ONLINE }
             Note(
                 (if (onlineVoice) "Apart from the online voice described below, TraceVeil uploads nothing. " else "TraceVeil uploads nothing. ") +
-                    "Its only other network use is relaying the audited app's own DNS lookups during an audit. " +
+                    "Its other network use is relaying the audited app's own DNS lookups during an audit, and downloads you start " +
+                    "yourself (the optional AI and wake-word models). " +
                     "Reports, screenshots and AI analysis stay on this phone until you export them.",
             )
             if (onlineVoice) Note(
