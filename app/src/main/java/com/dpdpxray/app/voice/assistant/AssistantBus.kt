@@ -57,7 +57,11 @@ object AssistantBus {
         _routes.value = routes
     }
 
-    /** Queues [action] and waits up to [waitMs] for the host to perform it. On a timeout the request stays queued. */
+    /**
+     * Queues [action] and waits up to [waitMs] for the host to perform it. On a timeout the request stays queued (the
+     * user may still tap the notification); if the caller is cancelled first, the request is withdrawn, so a command
+     * that was stopped can never run later.
+     */
     suspend fun request(
         action: AssistantAction,
         hindi: Boolean,
@@ -66,7 +70,14 @@ object AssistantBus {
         nowMs: Long = SystemClock.elapsedRealtime(),
     ): UiOutcome {
         val req = enqueue(action, hindi, speak, nowMs)
-        return withTimeoutOrNull(waitMs) { req.result.await() } ?: UiOutcome.NotReached()
+        var answered = false
+        try {
+            val outcome = withTimeoutOrNull(waitMs) { req.result.await() } ?: UiOutcome.NotReached()
+            answered = true
+            return outcome
+        } finally {
+            if (!answered) withdraw(req)
+        }
     }
 
     /** Queues [action] without waiting, replacing any older request. */
@@ -74,6 +85,11 @@ object AssistantBus {
         val req = UiRequest(action, hindi, speak, nowMs)
         _pending.getAndUpdate { req }?.result?.complete(UiOutcome.NotReached())
         return req
+    }
+
+    /** Drops [req] unless the host has already taken it. */
+    private fun withdraw(req: UiRequest) {
+        if (_pending.compareAndSet(req, null)) req.result.complete(UiOutcome.NotReached())
     }
 
     /** Takes the waiting request for the host to perform, unless it is stale. */
