@@ -164,6 +164,11 @@ class UpdateAlertsTest {
     }
 
     @Test
+    fun `the picker route with a pre-selected app still belongs to the Check tab`() {
+        assertEquals(com.dpdpxray.app.ui.shell.AppTab.CHECK, com.dpdpxray.app.ui.shell.AppTabs.tabOf("pick?q={q}&select={select}"))
+    }
+
+    @Test
     fun `a crafted or missing package opens nothing`() {
         assertNull(AutoGuardRoutes.route(AutoGuardRoutes.ACTION_RECHECK, null))
         assertNull(AutoGuardRoutes.route(AutoGuardRoutes.ACTION_RECHECK, "home&select=x"))

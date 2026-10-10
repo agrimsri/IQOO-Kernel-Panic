@@ -43,6 +43,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -107,6 +108,8 @@ fun AppPickerScreen(
     onStarted: () -> Unit,
     initialQuery: String = "",
     onQuarantine: (String) -> Unit = {},
+    /** Package to select once the list loads (Update Watch "Re-check"): its check sheet opens; nothing starts by itself. */
+    preselect: String = "",
 ) {
     val apps by vm.apps.collectAsState()
     val pf by vm.preflight.collectAsState()
@@ -114,6 +117,11 @@ fun AppPickerScreen(
     var query by remember { mutableStateOf(initialQuery) }
     var selected by remember { mutableStateOf<AuditableApp?>(null) }
     LaunchedEffect(Unit) { vm.refreshPreflight(); vm.loadApps() }
+    var preselected by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(apps, preselect) {
+        if (preselected || preselect.isBlank()) return@LaunchedEffect
+        apps.firstOrNull { it.packageName == preselect }?.let { selected = it; preselected = true }
+    }
 
     val demos = apps.filter { it.packageName in demoPackages }
     Column(Modifier.fillMaxSize()) {

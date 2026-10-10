@@ -73,8 +73,9 @@ import java.util.Locale
 
 /** The Reports tab: every saved check, newest first, with a one-line count per score band. */
 @Composable
-fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit) {
+fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit, onRecheck: (String) -> Unit = {}) {
     val audits by vm.audits.collectAsState()
+    val updated by vm.updatedApps.collectAsState()
     Column(Modifier.fillMaxSize()) {
         TopBar("Reports", onBack = null)
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -88,6 +89,7 @@ fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit) {
                     Spacer(Modifier.height(2.dp))
                 }
             }
+            if (updated.isNotEmpty()) item(key = "updated") { UpdatedSinceCard(updated, onRecheck, Modifier.reveal(1).padding(bottom = 4.dp)) }
             if (audits.isEmpty()) item(key = "empty") {
                 EmptyState(
                     "No checks yet",
