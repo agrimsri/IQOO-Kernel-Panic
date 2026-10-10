@@ -14,6 +14,13 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import androidx.core.content.FileProvider
+import com.dpdpxray.core.dpdp.CitationService
+import com.dpdpxray.core.fixes.FixTemplate
+import com.dpdpxray.core.model.AuditResult
+import com.dpdpxray.core.model.AuditSession
+import com.dpdpxray.core.report.HtmlCoverage
+import com.dpdpxray.core.report.HtmlReport
+import com.dpdpxray.core.trackers.TrackerCatalog
 import java.io.File
 
 /** Renders the Markdown report into a clean A4 PDF with Android's built-in PdfDocument (no network, no library). */
@@ -213,6 +220,31 @@ internal object PdfPagination {
             else { need += b.before + (b.lineBottoms.getOrNull(LEAD_LINES - 1) ?: b.height); break }
         }
         return need
+    }
+}
+
+/** Builds the offline interactive HTML report with the same coverage statements as the Markdown/PDF export. */
+object HtmlExporter {
+    const val MIME = "text/html"
+
+    fun build(
+        result: AuditResult, sessions: List<AuditSession>, timingProfile: String?, sample: Boolean,
+        fixes: List<FixTemplate>, citations: CitationService, catalog: TrackerCatalog,
+    ): String = HtmlReport.build(
+        result, sessions, fixes, citations, catalog,
+        HtmlCoverage(
+            statements = EvidenceReport.coverageNotes(sessions, timingProfile, sample),
+            scope = EvidenceReport.LOCAL_SCOPE,
+            noGaps = EvidenceReport.NO_GAPS,
+            sample = sample,
+            sampleNotes = if (sample) sessions.flatMap { it.notes }.distinct() else emptyList(),
+        ),
+    )
+
+    fun write(html: String, out: File): File {
+        out.parentFile?.mkdirs()
+        out.writeText(html, Charsets.UTF_8)
+        return out
     }
 }
 

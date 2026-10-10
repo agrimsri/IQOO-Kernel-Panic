@@ -24,6 +24,7 @@ import com.dpdpxray.app.data.SampleAudit
 import com.dpdpxray.app.graph
 import com.dpdpxray.app.report.ExportManager
 import com.dpdpxray.app.report.EvidenceReport
+import com.dpdpxray.app.report.HtmlExporter
 import com.dpdpxray.app.report.PdfExporter
 import com.dpdpxray.app.report.SampleReport
 import com.dpdpxray.core.audit.PhaseAssigner
@@ -254,6 +255,21 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         }
         val ok = withContext(Dispatchers.IO) { ExportManager.saveToDownloads(ctx, f, "TraceVeil-${bundle.meta.id}.md", "text/markdown") }
         _toast.value = if (ok) "Markdown saved to Downloads/TraceVeil" else "Could not save the report"
+    }
+
+    /** Offline single-file HTML (inline CSS/JS, no network requests) to open in any browser, e.g. on the laptop. */
+    fun exportHtml(bundle: AuditBundle, share: Boolean) = viewModelScope.launch {
+        val file = runCatching {
+            val html = withContext(Dispatchers.Default) {
+                HtmlExporter.build(bundle.result, bundle.sessions, bundle.meta.timingProfile, bundle.meta.sample, fixesFor(bundle), graph.citations(), graph.catalog())
+            }
+            withContext(Dispatchers.IO) { HtmlExporter.write(html, File(bundle.dir, "TraceVeil-${bundle.meta.targetLabel.filter { it.isLetterOrDigit() }}.html")) }
+        }.getOrElse { _toast.value = "Could not build the HTML report"; return@launch }
+        if (share) ExportManager.share(ctx, file, HtmlExporter.MIME)
+        else {
+            val ok = withContext(Dispatchers.IO) { ExportManager.saveToDownloads(ctx, file, file.name, HtmlExporter.MIME) }
+            _toast.value = if (ok) "Interactive report saved to Downloads/TraceVeil" else "Could not save the HTML report"
+        }
     }
 
     fun markdown(bundle: AuditBundle): String = EvidenceReport.annotate(
