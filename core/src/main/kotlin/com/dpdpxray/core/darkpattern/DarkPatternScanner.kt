@@ -21,8 +21,9 @@ import java.util.Locale
  * Annexure 1 opens: "The dark pattern practices and illustrations specified below provide only guidance and shall not be
  * construed as an interpretation of law or as a binding opinion or decision as different facts or conditions may entail
  * different interpretations". TraceVeil therefore reports SIGNALS that resemble a listed pattern, never a finding that a
- * screen "is" one, and none of them enters the score. The quotes in [CcpaPattern.definition] are verbatim (shortened
- * with "…"); docs/DARK_PATTERNS.md carries the full text of each one used.
+ * screen "is" one, and none of them enters the score. The quoted [CcpaPattern.definition]s of the six checkable patterns
+ * are verbatim (shortened with "…"); the seven unchecked ones carry a short plain summary, not a quote.
+ * docs/DARK_PATTERNS.md carries the full text of each definition used.
  */
 
 /** The 13 specified dark patterns of Annexure 1, in its order. [checkable] = can be seen at a consent screen. */
