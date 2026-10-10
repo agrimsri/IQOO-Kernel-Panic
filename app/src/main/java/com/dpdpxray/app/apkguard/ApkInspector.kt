@@ -55,6 +55,7 @@ object ApkInspector {
     /** Larger files are refused rather than copied; normal app APKs are far smaller. */
     const val MAX_FILE_BYTES = 400L * 1024 * 1024
     private const val CACHE_DIR = "apkguard"
+    private const val STALE_COPY_MS = 10 * 60 * 1000L
 
     private const val COMPONENT_FLAGS = PackageManager.GET_PERMISSIONS or PackageManager.GET_SERVICES or
         PackageManager.GET_RECEIVERS or PackageManager.MATCH_DISABLED_COMPONENTS
@@ -154,7 +155,8 @@ object ApkInspector {
     fun readArchive(context: Context, uri: Uri): ArchiveRead {
         val resolver = context.contentResolver
         val dir = File(context.cacheDir, CACHE_DIR).apply { mkdirs() }
-        dir.listFiles()?.forEach { it.delete() } // leftovers from an interrupted check
+        // Leftovers from an interrupted check; a copy that another check is reading right now is left alone.
+        dir.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > STALE_COPY_MS }?.forEach { it.delete() }
         val (name, declaredSize) = runCatching {
             resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
                 if (!c.moveToFirst()) null to null
