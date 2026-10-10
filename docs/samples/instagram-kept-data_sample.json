@@ -1,0 +1,154 @@
+{
+    "schema": "traceveil.audit.v1",
+    "exportedAt": "2026-10-10T00:00:00Z",
+    "app": {
+        "package": "com.instagram.android",
+        "label": "Instagram (synthetic sample)"
+    },
+    "meta": {
+        "id": "sample-instagram-kept-data",
+        "targetPackage": "com.instagram.android",
+        "targetLabel": "Instagram (synthetic sample)",
+        "createdAtMs": 1791590400000,
+        "score": 100,
+        "band": "READY",
+        "findingCount": 2,
+        "plans": [
+            "Plan C · No interaction"
+        ],
+        "sample": true,
+        "timingProfile": null
+    },
+    "sessions": [
+        {
+            "id": "sample-kept-c",
+            "targetPackage": "com.instagram.android",
+            "targetLabel": "Instagram (synthetic sample)",
+            "plan": "SILENT",
+            "childFacing": false,
+            "startedAtNanos": 0,
+            "endedAtNanos": 30000000000,
+            "startedAtEpochMs": 1791590400000,
+            "netEvents": [
+                {
+                    "tNanos": 1000000000,
+                    "hostname": "graph.facebook.com",
+                    "queryType": 1,
+                    "entity": null,
+                    "category": "UNKNOWN",
+                    "phase": "NO_CONSENT_SEEN",
+                    "viaPackage": null,
+                    "cnameChain": [],
+                    "answerIps": [],
+                    "disguisedVia": null,
+                    "answerStatus": null,
+                    "rcode": null
+                },
+                {
+                    "tNanos": 2000000000,
+                    "hostname": "i.instagram.com",
+                    "queryType": 1,
+                    "entity": null,
+                    "category": "UNKNOWN",
+                    "phase": "NO_CONSENT_SEEN",
+                    "viaPackage": null,
+                    "cnameChain": [],
+                    "answerIps": [],
+                    "disguisedVia": null,
+                    "answerStatus": null,
+                    "rcode": null
+                },
+                {
+                    "tNanos": 3000000000,
+                    "hostname": "scontent.cdninstagram.com",
+                    "queryType": 1,
+                    "entity": null,
+                    "category": "UNKNOWN",
+                    "phase": "NO_CONSENT_SEEN",
+                    "viaPackage": null,
+                    "cnameChain": [
+                        "scontent.cdninstagram.com",
+                        "scontent.xx.fbcdn.net"
+                    ],
+                    "answerIps": [],
+                    "disguisedVia": null,
+                    "answerStatus": null,
+                    "rcode": null
+                },
+                {
+                    "tNanos": 4000000000,
+                    "hostname": "static.xx.fbcdn.net",
+                    "queryType": 1,
+                    "entity": null,
+                    "category": "UNKNOWN",
+                    "phase": "NO_CONSENT_SEEN",
+                    "viaPackage": null,
+                    "cnameChain": [],
+                    "answerIps": [],
+                    "disguisedVia": null,
+                    "answerStatus": null,
+                    "rcode": null
+                }
+            ],
+            "consentEvents": [],
+            "screenAudit": null,
+            "deviceModel": "",
+            "androidVersion": "",
+            "privateDnsActive": false,
+            "notes": [
+                "App data was not cleared (reset not approved or Shizuku not authorised) — results reflect the app's current state."
+            ],
+            "captureHealth": null,
+            "freshState": false
+        }
+    ],
+    "result": {
+        "findings": [
+            {
+                "checkId": "U1",
+                "severity": "INFO",
+                "evidenceType": "OBSERVED",
+                "title": "Consent history unknown — app kept its data",
+                "explanation": "This app kept its data from earlier use and no consent screen appeared during this run, so consent may have been given earlier (for example at sign-up). TraceVeil cannot check that history, so these lookups are not treated as made before consent and do not change the score. No third-party tracker lookups were recorded in these plans. To test first-launch consent, audit a test install with an approved reset.",
+                "evidence": [
+                    "Plan C · No interaction: the app kept its data (it did not start from an approved fresh reset) and no consent screen appeared.",
+                    "No third-party tracker lookups were recorded in these plans."
+                ],
+                "plans": [
+                    "SILENT"
+                ],
+                "dpdpRefs": [],
+                "penaltyBand": "NONE",
+                "confidence": 1.0,
+                "entities": []
+            },
+            {
+                "checkId": "S1",
+                "severity": "INFO",
+                "evidenceType": "INFERRED",
+                "title": "Same-company servers contacted (first-party data collection)",
+                "explanation": "The app's cited listing names its developer as \"Meta Platforms, Inc.\" (Instagram, https://play.google.com/store/apps/details?id=com.instagram.android, read 2026-10-10), and these lookups went to servers the tracker catalogue attributes to the same company (Meta). They are treated as first-party data collection by the app's own company, not as third-party tracking, so the consent checks and the score do not count them. A lookup is an attempt to contact a host, not proof that personal data was sent. Some laws still require consent for first-party analytics or advertising; this audit does not assess that.",
+                "evidence": [
+                    "graph.facebook.com (Meta (Facebook SDK)) — Same company as the app (Meta); catalogued as advertising — 1.0 s after launch [Plan C · No interaction]"
+                ],
+                "plans": [
+                    "SILENT"
+                ],
+                "dpdpRefs": [],
+                "penaltyBand": "NONE",
+                "confidence": 1.0,
+                "entities": [
+                    "Meta (Facebook SDK)"
+                ]
+            }
+        ],
+        "score": 100,
+        "band": "READY"
+    },
+    "networkReadings": null,
+    "tool": {
+        "name": "TraceVeil",
+        "version": "1.1.0-samples"
+    },
+    "note": "SYNTHETIC SAMPLE: test data, not a device observation. Generated by ./gradlew :cli:writeSamples from the Instagram-like lookups in core ContextRulesTest (G1): one plan on the app's kept data with no consent screen, so consent history is unknown (U1) and Meta servers are same-company collection (S1). Not a statement about the real app."
+}

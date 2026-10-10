@@ -1,0 +1,150 @@
+{
+    "schema": "traceveil.quarantine.v1",
+    "exportedAt": "2026-10-10T00:00:00Z",
+    "report": {
+        "schemaVersion": 1,
+        "id": "quarantine-sample",
+        "targetPackage": "com.traceveil.riskdemo",
+        "targetLabel": "Risk Demo (TEST app, sample)",
+        "startedAtEpochMs": 1791590400000,
+        "startedAtNanos": 1000000000,
+        "endedAtNanos": 61000000000,
+        "plannedDurationMs": 60000,
+        "stopReason": "TIMER",
+        "resolverAddresses": [
+            "10.111.0.53",
+            "fd00:111::53"
+        ],
+        "observations": {
+            "domains": [
+                {
+                    "hostname": "panel.example.com",
+                    "queryTypes": [
+                        1
+                    ],
+                    "resolvers": [
+                        "10.111.0.53"
+                    ],
+                    "firstNanos": 1500000000,
+                    "lastNanos": 1600000000,
+                    "count": 2
+                }
+            ],
+            "blocked": [
+                {
+                    "protocol": "TCP_SYN",
+                    "protocolNumber": 6,
+                    "ipVersion": 4,
+                    "address": "203.0.113.9",
+                    "port": 443,
+                    "scope": "PUBLIC",
+                    "role": "APP_DESTINATION",
+                    "firstNanos": 2000000000,
+                    "lastNanos": 2000000000,
+                    "packets": 1
+                }
+            ],
+            "permissionDialogs": [
+                {
+                    "packageName": "com.google.android.permissioncontroller",
+                    "text": "Allow Risk Demo to send and view SMS messages?",
+                    "namesTarget": true,
+                    "firstNanos": 3000000000,
+                    "lastNanos": 3000000000,
+                    "timesShown": 1
+                }
+            ],
+            "settingsScreens": [
+                {
+                    "kind": "DISPLAY_OVER_OTHER_APPS",
+                    "title": "Display over other apps",
+                    "firstNanos": 4000000000,
+                    "lastNanos": 4000000000,
+                    "timesShown": 1
+                }
+            ],
+            "targetOnScreenNanos": 1200000000,
+            "dnsQueries": 2,
+            "blockedPackets": 1,
+            "networkControlPackets": 0,
+            "unreadablePackets": 0,
+            "domainsOverflow": 0,
+            "destinationsOverflow": 0,
+            "uiEventsOverflow": 0
+        },
+        "summary": {
+            "domainsAttempted": [
+                "panel.example.com"
+            ],
+            "ipsAttempted": [
+                "203.0.113.9"
+            ],
+            "uniqueDomains": 1,
+            "uniqueIps": 1,
+            "uniqueDestinations": 1,
+            "dnsQueries": 2,
+            "blockedPackets": 1,
+            "addressesWithoutLookup": [
+                "203.0.113.9"
+            ],
+            "dnsBypassSignal": true,
+            "directResolvers": [],
+            "encryptedDnsDestinations": [],
+            "phoneResolverDnsAttempts": [],
+            "permissionDialogs": 1,
+            "settingsScreens": [
+                "DISPLAY_OVER_OTHER_APPS"
+            ],
+            "appCameToScreen": true,
+            "nothingObserved": false
+        },
+        "timeline": [
+            {
+                "atMs": 200,
+                "kind": "APP_ON_SCREEN",
+                "text": "The app's window appeared",
+                "evidence": "OBSERVED"
+            },
+            {
+                "atMs": 500,
+                "kind": "LOOKUP",
+                "text": "Tried to look up panel.example.com (answered: does not exist) · 2 lookups",
+                "evidence": "OBSERVED"
+            },
+            {
+                "atMs": 1000,
+                "kind": "BLOCKED",
+                "text": "Blocked TCP SYN to 203.0.113.9:443",
+                "evidence": "OBSERVED"
+            },
+            {
+                "atMs": 2000,
+                "kind": "PERMISSION_DIALOG",
+                "text": "Permission dialog: \"Allow Risk Demo to send and view SMS messages?\"",
+                "evidence": "OBSERVED"
+            },
+            {
+                "atMs": 3000,
+                "kind": "SETTINGS_SCREEN",
+                "text": "Display over other apps screen opened",
+                "evidence": "OBSERVED"
+            }
+        ],
+        "limits": [
+            "Not a malware verdict and not a full sandbox: it records what this app tried to reach during this run only.",
+            "Only this app's own internet is cut off. SMS, phone calls, and requests it hands to other apps or system services (for example Android's download manager or push messaging) are neither blocked nor seen.",
+            "After quarantine ends the app has its normal internet again and may then send what it could not send now.",
+            "Apps that wait longer than this run, need a login, or wait for a remote command may show little or nothing.",
+            "Encrypted DNS inside the app (DNS over HTTPS) shows only as blocked connections to an address, not as names.",
+            "Every lookup is answered \"does not exist\", so the app may give up early or try other addresses. Attempts are not proof that any data would have been sent.",
+            "If the app was already open before the run, it may reuse addresses or connections from before.",
+            "Packet counts include Android's automatic retries; they are not separate decisions by the app.",
+            "Permission dialogs and settings screens are recognised from Android's own screens and English titles; other languages or some phone brands' screens may be missed. A settings screen opening does not show whether the app or you opened it."
+        ],
+        "notes": [],
+        "deviceModel": null,
+        "androidVersion": null,
+        "privateDnsActive": null
+    },
+    "note": "SYNTHETIC SAMPLE: test data, not a device observation. Generated by ./gradlew :cli:writeSamples from the recorder calls in core QuarantineReportTest (documentation-range address 203.0.113.9)."
+}

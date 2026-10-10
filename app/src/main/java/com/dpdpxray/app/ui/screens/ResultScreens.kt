@@ -502,7 +502,10 @@ fun ReportScreen(vm: XrayViewModel, id: String, onBack: () -> Unit) {
                 }
                 SecondaryAction("Save interactive report (HTML)", { vm.exportHtml(b, share = false) }, Modifier.fillMaxWidth().padding(top = 10.dp))
                 TextButton(onClick = { vm.exportHtml(b, share = true) }) { Text("Share interactive report", color = Film.scan) }
+                SecondaryAction("Export audit data (JSON)", { vm.exportAuditJson(b, share = false) }, Modifier.fillMaxWidth())
+                TextButton(onClick = { vm.exportAuditJson(b, share = true) }) { Text("Share audit data (JSON)", color = Film.scan) }
                 Note("Saved files land in Downloads/TraceVeil, ready to share or move to your laptop. The HTML report opens offline in any browser.")
+                Note("Audit data (JSON) is this audit's full evidence (lookups, consent-screen text, device model) for TraceVeil CI on a laptop or build server. Review it before sharing it or committing it to a repository.")
             }
             Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp)) {
                 Text(vm.markdown(b), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)

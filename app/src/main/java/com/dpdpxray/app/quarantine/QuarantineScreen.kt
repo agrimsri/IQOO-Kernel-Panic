@@ -1,5 +1,6 @@
 package com.dpdpxray.app.quarantine
 
+import android.content.Context
 import android.net.VpnService
 import android.os.SystemClock
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -24,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -31,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +42,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.control.DeviceChecks
+import com.dpdpxray.app.report.AuditJsonExport
+import com.dpdpxray.app.report.ExportManager
+import com.dpdpxray.app.report.QuarantineJsonExport
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.HostText
 import com.dpdpxray.app.ui.components.Note
@@ -59,7 +65,9 @@ import com.dpdpxray.core.quarantine.QuarantineReport
 import com.dpdpxray.core.quarantine.QuarantineReports
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.DateFormat
 import java.util.Date
 
@@ -236,6 +244,8 @@ private fun LiveView(run: QuarantineRunState.Running, live: QuarantineObservatio
 private fun ReportView(report: QuarantineReport, saved: Boolean, path: String?, onBack: () -> Unit, onAgain: () -> Unit, onDone: () -> Unit) {
     val ctx = LocalContext.current
     val s = report.summary
+    val exportScope = rememberCoroutineScope()
+    var exportNote by remember(report.id) { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize()) {
         TopBar("Behaviour report", onBack)
         LazyColumn(Modifier.weight(1f).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -304,6 +314,10 @@ private fun ReportView(report: QuarantineReport, saved: Boolean, path: String?, 
                 Note(if (path != null && saved) "Saved on this phone: $path" else if (path != null) "Could not save this report on the phone." else "Saved on this phone.")
                 Spacer(Modifier.height(8.dp))
                 Note("To remove an app you do not trust, uninstall it from App info. TraceVeil never removes apps itself.")
+                Spacer(Modifier.height(8.dp))
+                SecondaryAction("Export report (JSON)", { exportScope.launch { exportNote = exportQuarantineJson(ctx, report, share = false) } }, Modifier.fillMaxWidth())
+                TextButton(onClick = { exportScope.launch { exportNote = exportQuarantineJson(ctx, report, share = true) } }) { Text("Share report (JSON)", color = Film.scan) }
+                exportNote?.let { Note(it) }
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -312,6 +326,18 @@ private fun ReportView(report: QuarantineReport, saved: Boolean, path: String?, 
             PrimaryAction("Done", onDone, Modifier.weight(1f))
         }
     }
+}
+
+/** Writes the traceveil.quarantine.v1 file, then saves it to Downloads/TraceVeil or opens the share sheet. */
+private suspend fun exportQuarantineJson(ctx: Context, report: QuarantineReport, share: Boolean): String? {
+    val file = withContext(Dispatchers.IO) { runCatching { QuarantineJsonExport.write(File(ctx.cacheDir, "exports"), report) }.getOrNull() }
+        ?: return "Could not build the JSON export."
+    if (share) {
+        ExportManager.share(ctx, file, AuditJsonExport.MIME)
+        return null
+    }
+    val ok = withContext(Dispatchers.IO) { ExportManager.saveToDownloads(ctx, file, file.name, AuditJsonExport.MIME) }
+    return if (ok) "Saved to Downloads/TraceVeil as ${file.name}" else "Could not save the report to Downloads."
 }
 
 /** Names, blocked destinations: shared by the live list and the report. */
