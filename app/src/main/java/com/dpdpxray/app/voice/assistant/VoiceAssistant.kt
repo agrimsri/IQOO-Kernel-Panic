@@ -54,10 +54,12 @@ class VoiceAssistant private constructor(private val app: Application) {
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
 
     /**
-     * Packages a developer has allowed the agent to tap consent for (the Developer automation allowlist, when that
-     * feature is present). Empty by default: only the LeakyShop demo apps are auto-tapped.
+     * Packages a developer has allowed the agent to tap consent for: the Developer automation "test apps the runner may
+     * reset" allowlist (empty by default, so only the LeakyShop demo apps are auto-tapped).
      */
-    @Volatile var automationAllowlist: () -> Set<String> = { emptySet() }
+    @Volatile var automationAllowlist: () -> Set<String> = {
+        com.dpdpxray.app.automation.AutomationStore.get(app).settings.value.resetAllowlist
+    }
 
     data class Turn(
         val reply: Said,
