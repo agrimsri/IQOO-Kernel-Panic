@@ -1,6 +1,7 @@
 package com.dpdpxray.core.export
 
 import com.dpdpxray.core.attribution.SdkGroup
+import com.dpdpxray.core.datasafety.PlayLabelExport
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.ScoreBand
@@ -35,7 +36,9 @@ import java.time.temporal.ChronoUnit
  * when unset. "legalProfile" names the legal lens selected when the bundle was exported (a core LegalProfile name such
  * as "EU"); it is omitted when unset and never changes the evidence or the stored result. "sdkAttribution" (optional,
  * omitted when unset) groups the bundle's own lookups and findings by the catalogue service behind them; it is derived
- * from "sessions" and "result" with TraceVeil's tracker catalogue and adds no new evidence.
+ * from "sessions" and "result" with TraceVeil's tracker catalogue and adds no new evidence. "playLabel" (optional, omitted
+ * when unset) is the Google Play Data safety text a person attached to the audit and, when computed, its comparison with
+ * the bundle's lookups; it is separate from the score and never changes "result".
  */
 
 /** The audited app named at the top of a bundle. */
@@ -64,6 +67,8 @@ data class AuditBundleV1(
     val legalProfile: String? = null,
     /** "Which SDK caused this?", derived on the phone from [sessions] and [result]. Not written when null. */
     val sdkAttribution: SdkAttributionExport? = null,
+    /** "Play label vs what this check saw": the attached Data safety text and its comparison. Not written when null. */
+    val playLabel: PlayLabelExport? = null,
 )
 
 /**
@@ -144,10 +149,11 @@ object AuditBundles {
         note: String? = null,
         legalProfile: String? = null,
         sdkAttribution: SdkAttributionExport? = null,
+        playLabel: PlayLabelExport? = null,
     ) = AuditBundleV1(
         exportedAt = exportedAt, app = app, meta = meta, sessions = sessions, result = result,
         networkReadings = networkReadings, tool = BundleTool(TOOL_NAME, toolVersion), note = note, legalProfile = legalProfile,
-        sdkAttribution = sdkAttribution,
+        sdkAttribution = sdkAttribution, playLabel = playLabel,
     )
 
     fun quarantine(report: QuarantineReport, exportedAt: String = now(), note: String? = null) =
@@ -197,7 +203,7 @@ object AuditBundles {
         return JsonObject(obj.filterNot { (k, v) -> k in OPTIONAL_TOP_LEVEL && v == JsonNull })
     }
 
-    private val OPTIONAL_TOP_LEVEL = setOf("note", "legalProfile", "sdkAttribution")
+    private val OPTIONAL_TOP_LEVEL = setOf("note", "legalProfile", "sdkAttribution", "playLabel")
 
     private fun expectSchema(text: String, expected: String): JsonObject {
         val parsed = try {
