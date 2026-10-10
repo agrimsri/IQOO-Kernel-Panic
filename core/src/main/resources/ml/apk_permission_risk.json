@@ -140,7 +140,7 @@
  ],
  "limits": [
   "Training apps date from about 2010-2019; current malware and current Android permission rules differ (temporal drift).",
-  "Labels come from the dataset authors (antivirus-based) and contain noise; some identical permission sets carry both labels.",
+  "Labels come from the dataset authors and could not be verified app by app; some identical permission sets carry both labels.",
   "Declared permissions are not behaviour: a benign app can request many permissions and malware can request few.",
   "Easy to evade: an attacker can drop or add permissions to change the score.",
   "Dataset class balance (about 50% malware) is far above real-world prevalence, so precision on a phone will be lower than in testing."
