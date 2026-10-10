@@ -204,7 +204,7 @@ class MainActivity : ComponentActivity() {
                             ApkGuardResultScreen(
                                 ApkGuardSubject.Installed(e.arguments?.getString("pkg").orEmpty()),
                                 onBack = { nav.popBackStack() },
-                                onAudit = { nav.navigate(ApkGuardRoutes.AUDIT_PICKER) },
+                                onAudit = { nav.navigate(ApkGuardRoutes.auditPicker(it)) },
                                 onOpenInstalled = { nav.navigate(ApkGuardRoutes.app(it)) },
                             )
                         }
@@ -212,7 +212,7 @@ class MainActivity : ComponentActivity() {
                             ApkGuardResultScreen(
                                 ApkGuardSubject.File(e.arguments?.getString("key").orEmpty()),
                                 onBack = { nav.popBackStack() },
-                                onAudit = { nav.navigate(ApkGuardRoutes.AUDIT_PICKER) },
+                                onAudit = { nav.navigate(ApkGuardRoutes.auditPicker(it)) },
                                 onOpenInstalled = { nav.navigate(ApkGuardRoutes.app(it)) },
                             )
                         }

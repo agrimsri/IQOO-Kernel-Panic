@@ -185,7 +185,7 @@ private sealed interface ResultState {
 fun ApkGuardResultScreen(
     subject: ApkGuardSubject,
     onBack: () -> Unit,
-    onAudit: () -> Unit,
+    onAudit: (String) -> Unit,
     onOpenInstalled: (String) -> Unit,
 ) {
     val ctx = LocalContext.current
@@ -230,13 +230,12 @@ private fun ReadyResult(
     report: ApkGuardReport,
     hindi: Boolean,
     onLanguage: (Boolean) -> Unit,
-    onAudit: () -> Unit,
+    onAudit: (String) -> Unit,
     onOpenInstalled: (String) -> Unit,
 ) {
     val ctx = LocalContext.current
     val facts = app.facts
     val isFile = facts.origin.source == InstallSource.NOT_INSTALLED
-    val label = facts.label ?: facts.packageName
 
     IdentityCard(app)
     Spacer(Modifier.height(16.dp))
@@ -263,10 +262,8 @@ private fun ReadyResult(
     SectionTitle(if (hindi) "आगे क्या करें" else "What next")
     if (!isFile) {
         val launchable = facts.hasLauncherIcon == true
-        PrimaryAction("Run a privacy audit of this app", {
-            Toast.makeText(ctx, "Choose \"$label\" in the list to set up its audit.", Toast.LENGTH_LONG).show()
-            onAudit()
-        }, enabled = launchable)
+        // Opens the audit picker already searched for this app; the audit is set up and started there.
+        PrimaryAction("Run a privacy audit of this app", { onAudit(facts.packageName) }, enabled = launchable)
         if (!launchable) Note("This app has no launcher screen, so TraceVeil cannot start it for an audit.")
         Spacer(Modifier.height(8.dp))
         SecondaryAction("Open Android app settings", { DeviceChecks.openAppInfo(ctx, facts.packageName) }, Modifier.fillMaxWidth())

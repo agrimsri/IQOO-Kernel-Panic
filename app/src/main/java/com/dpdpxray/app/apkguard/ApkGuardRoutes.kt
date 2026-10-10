@@ -26,4 +26,10 @@ object ApkGuardRoutes {
         require(KEY.matches(key)) { "A file-check key is required" }
         return FILE.replace("{key}", key)
     }
+
+    /** The audit picker, already searched for [pkg], so the person sees just that app. Nothing starts by itself. */
+    fun auditPicker(pkg: String): String {
+        require(isPackageName(pkg)) { "A valid package name is required" }
+        return "$AUDIT_PICKER?q=$pkg"
+    }
 }

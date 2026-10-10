@@ -78,6 +78,13 @@ class ApkGuardMappingTest {
         listOf("", "a/b", "a?b").forEach { assertThrows(IllegalArgumentException::class.java) { ApkGuardRoutes.file(it) } }
     }
 
+    @Test fun `audit picker opens pre-searched only for a real package name`() {
+        assertEquals("pick?q=com.sbi.lotusintouch", ApkGuardRoutes.auditPicker("com.sbi.lotusintouch"))
+        listOf("", "settings", "../home", "com.x?y=1", "com.x&q=2", "com x.y").forEach {
+            assertThrows(IllegalArgumentException::class.java) { ApkGuardRoutes.auditPicker(it) }
+        }
+    }
+
     @Test fun `only content uris for APK files are accepted from other apps`() {
         val apk = IncomingApk.APK_MIME
         assertEquals("content://wa/1", IncomingApk.pickUri("android.intent.action.VIEW", apk, "content://wa/1", null))
