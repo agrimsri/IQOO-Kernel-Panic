@@ -16,7 +16,7 @@ Use only the build and features merged before the evaluation freeze. Check [veri
 
 1. Select a permitted test app. Quick defaults preserve real-app data and use manual consent choices; explicit reset approval and Shizuku enable repeatable developer tests.
 2. A per-app Android VPN observes and relays supported DNS traffic. No TLS certificate is installed, and encrypted application payloads are not decrypted. A DNS query shows a lookup, not proof of uploaded personal data or a completed server connection.
-3. The accessibility watcher reads the armed target app's consent UI. It timestamps detected screens and choices; an inferred choice is labeled. It does not automatically approve Android permission dialogs.
+3. The accessibility watcher reads the armed target app's consent UI. It timestamps detected screens, observed choice actions and explicit agent button actions. A dialog disappearing does not establish Accept or Reject; that choice remains unknown. Legacy inferred-choice records are not verified taps. It does not automatically approve Android permission dialogs.
 4. Each session saves a consistent capture snapshot, health counters and separately bracketed UID readings. Unknown data remains unknown, not zero.
 5. Deterministic checks classify tracker hosts and recorded aliases, relate events to consent phases and produce findings. The optional local model can assist screen review; model availability is not required for the deterministic DNS checks.
 6. Results show evidence coverage, findings, alias trails and a qualified byte estimate. The saved-audit copilot gives deterministic answers with relevant retrieved passages, not unrestricted model-generated advice. Exports retain coverage warnings.
@@ -51,7 +51,7 @@ Fallback: clearly labeled synthetic samples demonstrate the UI if the live devic
 
 **Is the cited framework already enforceable in full?** Do not claim that. The official [commencement notification](https://upload.indiacode.nic.in/showfile?actid=AC_CEN_45_0_00003_2023-22_1763464807080&filename=c56ceae6c383460ca69577428d36828b.pdf&type=hindinotification) stages provisions, scheduling Section 3 eighteen months after 13 November 2025. As of this demonstration, use readiness language and check commencement, exceptions and applicability with qualified reviewers.
 
-**What has actually been built by the team?** Explain the baseline and new contributions honestly: Agrim owns evidence parsing/classification/health, Yashvi owns voice/network presentation and forthcoming map, Nitya integrates persistence/navigation/evidence UI and validation. Preserve provenance, genuine commit authors and attributions. Baseline reuse eligibility needs organizer confirmation; commit timestamps do not prove originality.
+**What has actually been built by the team?** Explain the baseline and new contributions honestly: Agrim owns evidence parsing/classification/health and sourced company facts; Yashvi owns voice/network presentation and the published map; Nitya integrates persistence/navigation/evidence UI and validation, including the separately identified review fixes. Preserve provenance, genuine commit authors and attributions. Baseline reuse eligibility needs organizer confirmation; commit timestamps do not prove originality.
 
 ## Before main is accepted
 

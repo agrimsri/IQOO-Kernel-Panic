@@ -101,7 +101,7 @@ fun HomeScreen(
             )
             CheckLine(
                 "Fresh-install reset", when {
-                    pf.shizukuGranted -> "Shizuku ready: each plan starts from a clean app"
+                    pf.shizukuGranted -> "Shizuku ready: reset is available only when approved in audit setup"
                     pf.shizukuRunning -> "Shizuku is running; allow TraceVeil to use it"
                     else -> "Optional. Start Shizuku for full audits (reject + accept)"
                 },

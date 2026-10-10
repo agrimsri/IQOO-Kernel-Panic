@@ -113,7 +113,8 @@ fun ResultsScreen(vm: XrayViewModel, id: String, onBack: () -> Unit, onFinding: 
 
                 SectionTitle("Endpoint evidence")
                 if (b.meta.sample) Note("Synthetic sample: example IPs do not establish real locations.", Film.warn)
-                val mapCatalog = remember(vm) { vm.graph.catalog() }
+                val mapSettings by vm.settings.collectAsState()
+                val mapCatalog = remember(vm, mapSettings.firstPartyDomains) { vm.graph.catalog() }
                 val mapOwners = remember(mapCatalog) { EndpointMapIntegration.owners(mapCatalog) }
                 EndpointMapCard(b.sessions, mapCatalog, owners = mapOwners)
 

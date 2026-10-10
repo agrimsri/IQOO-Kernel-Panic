@@ -31,11 +31,17 @@ object ConsentBus {
     /** Screenshot/tree storage folder for the current session. */
     @Volatile var shotDir: java.io.File? = null
 
-    /**
-     * Manual mode: the choice the user was asked to make. Some UI toolkits (e.g. Jetpack Compose) do not report finger
-     * taps to accessibility, so when the consent dialog disappears we record this choice, labelled as inferred.
-     */
+    /** The requested manual choice is guidance only, never evidence that the user made it. */
     @Volatile var expectedChoice: ConsentKind? = null
+
+    @Volatile var unconfirmedDialogClosedAtNanos: Long? = null
+        private set
+
+    fun onConsentDialogClosed(tNanos: Long) = synchronized(lock) {
+        if (_armed.value != null && !choiceMade) {
+            unconfirmedDialogClosedAtNanos = tNanos
+        }
+    }
 
     val screenSeen: Boolean
         get() = _events.value.any { it.kind == ConsentKind.SCREEN_APPEARED || it.kind == ConsentKind.MANUAL_MARK }
@@ -48,6 +54,7 @@ object ConsentBus {
         _events.value = emptyList()
         _targetSeen.value = false
         expectedChoice = null
+        unconfirmedDialogClosedAtNanos = null
         shotDir = dir.apply { mkdirs() }
         _armed.value = pkg
     }

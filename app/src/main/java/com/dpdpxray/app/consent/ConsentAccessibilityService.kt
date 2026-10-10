@@ -99,11 +99,9 @@ class ConsentAccessibilityService : AccessibilityService() {
         checkScreen()
     }
 
-    /** Manual mode on toolkits that don't report taps: the dialog went away, so the user made the choice we asked for. */
+    /** Closing a dialog establishes no choice identity; never fabricate Accept/Reject from the plan. */
     private fun onConsentGone() {
-        val expected = ConsentBus.expectedChoice ?: return
-        if (ConsentBus.choiceMade) return
-        ConsentBus.emit(ConsentEvent(SystemClock.elapsedRealtimeNanos(), expected, "(your tap, inferred when the dialog closed)"))
+        ConsentBus.onConsentDialogClosed(SystemClock.elapsedRealtimeNanos())
     }
 
     private fun recordScreen(tree: UiNode) {

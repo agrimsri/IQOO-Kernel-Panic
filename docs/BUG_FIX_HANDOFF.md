@@ -12,6 +12,12 @@ Source: user-supplied `bug_agrim_claude_suggest_fixes.md`, read in full. This re
 
 Core score thresholds are unchanged. No new legal verdict or INFO check ID was invented in Agrim-owned rules. Direct core-only report consumers need Agrim's equivalent coverage/scope treatment; the Android UI and exports apply the new app-owned treatment to old saved audits too.
 
+## Review corrections before publication
+
+The integration review found six additional evidence/voice defects. Local regressions now pass for country-by-phase association, COMPLETE/PARTIAL-only IP placement, corrupt MMDB pointer/date handling, unconfirmed dialog disappearance, missing Accept voice warnings and cancelling a delayed answer when microphone input starts. A dialog closing no longer emits the requested Accept/Reject: unsupported click-event toolkits keep the choice unknown and coverage incomplete. Actual observed taps or successful explicit agent button actions are still recorded. Legacy saved inferred choices are not retroactively rewritten; inspect their inference notes and do not present them as verified taps.
+
+The single fix pass also refreshes the map when first-party settings change and corrects its stale licence comment. Fresh full verification is 455 passing tests; that is not completion of the remaining phone, accounting or licence checks. Agrim should review the core geo/copilot changes, and Yashvi should reconcile the voice/map changes before editing the same files.
+
 ## Real-app mentor demo
 
 1. Obtain permission and choose a non-sensitive app. Avoid banking/payment/authentication and private content. Do not use an app whose data must be erased to make the demonstration work.

@@ -56,6 +56,34 @@ class EndpointGeoAggregatorTest {
         assertEquals(mapOf(Phase.AFTER_REJECT to listOf("launches.appsflyersdk.com")), m.countries.single { it.iso == "IN" }.hostsByPhase)
     }
 
+    @Test fun `changing answer countries retain only their own observed phase`() {
+        val m = build(
+            ev(1.0, "graph.facebook.com", listOf("8.8.8.8"), status = AnswerStatus.COMPLETE),
+            ev(9.0, "graph.facebook.com", listOf("103.5.5.5"), status = AnswerStatus.COMPLETE),
+        )
+        assertEquals(mapOf(Phase.BEFORE_CONSENT to listOf("graph.facebook.com")), m.countries.single { it.iso == "US" }.hostsByPhase)
+        assertEquals(mapOf(Phase.AFTER_REJECT to listOf("graph.facebook.com")), m.countries.single { it.iso == "IN" }.hostsByPhase)
+    }
+
+    @Test fun `failed later lookup never acquires an earlier answers country phase`() {
+        val m = build(
+            ev(1.0, "graph.facebook.com", listOf("8.8.8.8"), status = AnswerStatus.COMPLETE),
+            ev(9.0, "graph.facebook.com", status = AnswerStatus.NO_REPLY),
+        )
+        assertEquals(mapOf(Phase.BEFORE_CONSENT to listOf("graph.facebook.com")), m.countries.single().hostsByPhase)
+        assertEquals(setOf(Phase.BEFORE_CONSENT, Phase.AFTER_REJECT), m.hosts.single().phases)
+        assertTrue(m.hosts.single().answerSummary.contains("no reply"))
+    }
+
+    @Test fun `addresses on unusable replies never supply a country or answered summary`() {
+        listOf(AnswerStatus.NO_REPLY, AnswerStatus.MALFORMED, AnswerStatus.MISMATCHED).forEach { status ->
+            val m = build(ev(9.0, "graph.facebook.com", listOf("8.8.8.8"), status = status))
+            assertTrue("$status must remain unplaced", m.countries.isEmpty())
+            assertFalse(m.hosts.single().answerSummary, m.hosts.single().answerSummary.contains("answered"))
+            assertTrue(m.hosts.single().addresses.isEmpty())
+        }
+    }
+
     @Test
     fun `registered country is kept apart from the located one`() {
         val m = EndpointGeoAggregator.build(listOf(base), catalog, geo)
@@ -192,10 +220,11 @@ class EndpointGeoAggregatorTest {
     }
 
     @Test
-    fun `addresses from an older audit with no recorded status are still placed`() {
-        val m = build(ev(9.0, "graph.facebook.com", listOf("8.8.8.8")))
-        assertEquals(listOf("US"), m.countries.map { it.iso })
-        assertEquals("A: answered", m.hosts.single().answerSummary)
+    fun `legacy addresses with unrecorded reply status remain unknown`() {
+        val m = build(ev(9.0, "graph.facebook.com", listOf("8.8.8.8"), status = null))
+        assertTrue(m.countries.isEmpty())
+        assertEquals(listOf("graph.facebook.com"), m.unknown[UnknownReason.NOT_RECORDED])
+        assertEquals("A: not recorded", m.hosts.single().answerSummary)
     }
 
     // ---- aliases, CDN, several countries ----------------------------------------------------------------------------
@@ -236,8 +265,8 @@ class EndpointGeoAggregatorTest {
 
     @Test
     fun `the same host in several sessions merges its phases and addresses`() {
-        val a = rejectSession(ev(1.0, "graph.facebook.com", listOf("8.8.8.8")), plan = AuditPlan.REJECT)
-        val b = rejectSession(ev(9.0, "graph.facebook.com", listOf("8.8.8.8")), plan = AuditPlan.ACCEPT)
+        val a = rejectSession(ev(1.0, "graph.facebook.com", listOf("8.8.8.8"), status = AnswerStatus.COMPLETE), plan = AuditPlan.REJECT)
+        val b = rejectSession(ev(9.0, "graph.facebook.com", listOf("8.8.8.8"), status = AnswerStatus.COMPLETE), plan = AuditPlan.ACCEPT)
         val h = EndpointGeoAggregator.build(listOf(a, b), catalog, geo).hosts.single()
         assertEquals(setOf(Phase.BEFORE_CONSENT, Phase.AFTER_REJECT), h.phases)
         assertEquals(listOf("8.8.8.8"), h.addresses)
@@ -265,10 +294,10 @@ class EndpointGeoAggregatorTest {
 
     @Test
     fun `a country is wholly uncertain only when every host placed there is`() {
-        val sure = rejectSession(ev(1.0, "graph.facebook.com", listOf("8.8.8.8")), ev(2.0, "app-measurement.com", listOf("8.8.4.4"),
-            chain = listOf("app-measurement.com", "x.cloudfront.net")))
+        val sure = rejectSession(ev(1.0, "graph.facebook.com", listOf("8.8.8.8"), status = AnswerStatus.COMPLETE), ev(2.0, "app-measurement.com", listOf("8.8.4.4"),
+            chain = listOf("app-measurement.com", "x.cloudfront.net"), status = AnswerStatus.COMPLETE))
         assertFalse(EndpointGeoAggregator.build(listOf(sure), catalog, geo).countries.single { it.iso == "US" }.allUncertain)
-        val cdn = rejectSession(ev(1.0, "app-measurement.com", listOf("8.8.4.4"), chain = listOf("app-measurement.com", "x.cloudfront.net")))
+        val cdn = rejectSession(ev(1.0, "app-measurement.com", listOf("8.8.4.4"), chain = listOf("app-measurement.com", "x.cloudfront.net"), status = AnswerStatus.COMPLETE))
         assertTrue(EndpointGeoAggregator.build(listOf(cdn), catalog, geo).countries.single { it.iso == "US" }.allUncertain)
     }
 

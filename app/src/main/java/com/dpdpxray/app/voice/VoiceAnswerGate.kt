@@ -5,5 +5,6 @@ internal class VoiceAnswerGate {
     private var version = 0L
     fun begin(): Long = ++version
     fun invalidate() { ++version }
+    fun beginListening() = invalidate()
     fun isCurrent(request: Long): Boolean = request == version
 }

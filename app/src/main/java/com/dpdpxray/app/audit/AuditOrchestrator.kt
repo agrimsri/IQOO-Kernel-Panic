@@ -236,6 +236,9 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         val tEnd = snapshot.health.captureEndedNanos ?: SystemClock.elapsedRealtimeNanos()
         val captured = snapshot.events
         val consentEvents = ConsentBus.events.value
+        if (ConsentBus.unconfirmedDialogClosedAtNanos != null && !ConsentBus.choiceMade) {
+            notes += "Consent dialog closed without an observed button action; the choice remains unknown."
+        }
         ConsentBus.disarm()
         step("Finishing AI review of the consent screen", t0)
         val screen = review?.let { d -> withTimeoutOrNull(REVIEW_TIMEOUT_MS) { d.await() }.also { if (it == null) d.cancel() } }

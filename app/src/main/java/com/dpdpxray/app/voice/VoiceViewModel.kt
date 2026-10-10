@@ -155,6 +155,7 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (_state.value.mic != MicState.Ready) return
+        cancelAnswer(forListening = true)
         voice.stop()
         val started = recognizer.start(_state.value.language, object : OnDeviceRecognizer.Listener {
             override fun onPartial(text: String) = _state.update { it.copy(transcript = text) }
@@ -210,8 +211,8 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
         voice.stop()
     }
 
-    private fun cancelAnswer() {
-        answerGate.invalidate()
+    private fun cancelAnswer(forListening: Boolean = false) {
+        if (forListening) answerGate.beginListening() else answerGate.invalidate()
         answerJob?.cancel()
         answerJob = null
         _state.update { it.copy(answering = false) }

@@ -11,7 +11,8 @@ import java.io.File
 
 /**
  * Finds the MaxMind GeoLite2-Country database on the phone. The file is not part of the APK or the repository (its
- * licence does not allow public redistribution); it is placed next to the AI models, like them:
+ * distribution requires the GeoLite terms, attribution and update obligations described in docs/ATTRIBUTION.md).
+ * The team supplies its licensed copy next to the AI models:
  *   adb push GeoLite2-Country.mmdb /sdcard/Android/data/com.dpdpxray.app/files/geo/
  * Parsed once and reused until the file changes.
  */

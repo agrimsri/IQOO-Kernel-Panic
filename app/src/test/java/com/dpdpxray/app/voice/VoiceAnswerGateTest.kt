@@ -19,4 +19,14 @@ class VoiceAnswerGateTest {
         gate.invalidate()
         assertFalse(gate.isCurrent(request))
     }
+
+    @Test fun `starting microphone rejects a chip answer that completes during listening`() {
+        val gate = VoiceAnswerGate()
+        val delayedChip = gate.begin()
+        gate.beginListening()
+        assertFalse("retrieval completion must not start speech into the microphone", gate.isCurrent(delayedChip))
+        val recognizedQuestion = gate.begin()
+        assertTrue(gate.isCurrent(recognizedQuestion))
+        assertFalse(gate.isCurrent(delayedChip))
+    }
 }
