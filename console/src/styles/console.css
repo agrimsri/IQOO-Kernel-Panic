@@ -111,7 +111,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 
 /* code */
 .code-block { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: #070E15; }
 .code-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 4px 12px; border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, 0.02); }
-.code-block pre { margin: 0; padding: 12px 14px; overflow: auto; font: 12px/1.6 var(--font-mono); color: #CFE3EC; max-height: 360px; }
+.code-block pre { margin: 0; padding: 12px 14px; overflow: auto; font: 12px/1.6 var(--font-mono); color: #CFE3EC; max-height: 560px; }
 .copy-btn { height: 30px; }
 
 /* ---------- import drop overlay ---------- */

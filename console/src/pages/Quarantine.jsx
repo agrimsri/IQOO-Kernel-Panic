@@ -98,6 +98,12 @@ export default function Quarantine({ id, onImport }) {
             {!s.dnsBypassSignal && !q.dialogs.length && !q.settings.length && <p className="small muted">No inferred signal in this run.</p>}
             {s.nothingObserved && <Truth>Nothing was observed. That is not proof the app does nothing: it may wait longer than the run, need a login or wait for a remote command.</Truth>}
             <div className="row wrap" style={{ gap: 6 }}><span className="pill-src">Settings screens watched: Accessibility, Display over other apps.</span>{!q.settings.length && <span className="pill-src">None opened during this run.</span>}</div>
+            <dl className="kv" style={{ marginTop: 4 }}>
+              <dt>App on screen</dt><dd>{q.appOnScreenMs != null ? `${ms(q.appOnScreenMs)} after the run started` : "Not seen (it may have run in the background)"}</dd>
+              <dt>Phone's resolver</dt><dd className="mono-s">{(q.rec.bundle.report.resolverAddresses || []).join(", ") || "Not recorded"}</dd>
+              <dt>Private DNS</dt><dd>{q.privateDns === true ? "On" : q.privateDns === false ? "Off" : "Not recorded"}</dd>
+              <dt>Device</dt><dd>{q.device ? `${q.device}${q.android ? ` · Android ${q.android}` : ""}` : "Not recorded"}</dd>
+            </dl>
           </div>
         </Card></Fade>
 
