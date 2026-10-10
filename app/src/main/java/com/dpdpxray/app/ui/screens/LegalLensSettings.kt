@@ -1,5 +1,6 @@
 package com.dpdpxray.app.ui.screens
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,12 +21,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.data.LegalLensSetting
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.Callout
+import com.dpdpxray.app.ui.components.FoldText
 import com.dpdpxray.app.ui.components.Hairline
-import com.dpdpxray.app.ui.components.Note
+import com.dpdpxray.app.ui.components.foldSpec
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.Radii
 import com.dpdpxray.core.law.LegalProfile
@@ -38,7 +41,7 @@ import com.dpdpxray.core.law.LegalProfile
 fun LegalLensSection(vm: XrayViewModel, setting: String) {
     val auto = remember { LegalLensSetting.resolve(LegalLensSetting.AUTOMATIC, java.util.Locale.getDefault().country) }
     val chosen = LegalProfile.parse(setting)
-    Note(
+    FoldText(
         "Choose which law results and reports quote. The evidence and the consent-first score stay the same; each finding " +
             "shows whether this law requires what it tests, treats it as context, or does not cover it. Not legal advice.",
     )
@@ -57,19 +60,27 @@ fun LegalLensSection(vm: XrayViewModel, setting: String) {
     if (chosen == null) auto.hint?.let { Callout(it, Modifier.padding(top = 8.dp)) }
 }
 
+/**
+ * One lens. Unselected rows show their laws on one line so the list stays short; the selected row opens to the full
+ * text. TalkBack always reads the full text.
+ */
 @Composable
 private fun LensOption(title: String, detail: String, selected: Boolean, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(Radii.small))
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(vertical = 8.dp)
+            .animateContentSize(foldSpec()),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(selected = selected, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = Film.scan, unselectedColor = Film.boneDim))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, color = Film.bone)
-            Text(detail, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+            Text(title, style = MaterialTheme.typography.titleMedium, color = if (selected) Film.scan else Film.bone)
+            Text(
+                detail, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim,
+                maxLines = if (selected) Int.MAX_VALUE else 1, overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
