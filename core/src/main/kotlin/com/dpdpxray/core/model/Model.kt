@@ -235,7 +235,7 @@ data class Finding(
 
 @Serializable
 enum class ScoreBand(val label: String) {
-    READY("DPDP-ready"),
+    READY("Ready"),
     NEEDS_WORK("Needs work"),
     AT_RISK("At risk"),
     INCONCLUSIVE("Inconclusive"),
