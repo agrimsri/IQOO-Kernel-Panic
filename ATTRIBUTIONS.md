@@ -81,3 +81,12 @@ CleverTap is deliberately unresolved (three entities in three countries, no head
 | Tested 10 October 2026 | Two real calls through the app's own `SarvamTts` code, with the real grounded answers: English (497 characters, request `20261010_73884898-bf84-475b-8666-9c7884686da7`, about 32 s of 22,050 Hz mono 16-bit WAV) and Hindi (101 characters, request `20261010_dc25fd6b-1ef9-452f-a25b-60059e3db971`, about 11 s). About 600 characters in total, roughly ₹1.8 at the listed price. Not yet confirmed on the phone: audible playback of the online voice. |
 | Not yet read | Sarvam's terms, data-retention and training policy. **No team sign-off is recorded.** Do not describe the product as "uploads nothing" while this is enabled, and do not enable it for a real-app audit. |
 
+## Optional "Hey TraceVeil" wake word (Vosk) — 10 October 2026
+
+Experimental, off by default; see [docs/HEY_TRACEVEIL.md](docs/HEY_TRACEVEIL.md). Intended use: offline keyword spotting for one phrase while the user has explicitly started listening.
+
+| Component | Pinned version | Source and licence | Handling |
+| --- | --- | --- | --- |
+| Vosk Android (`com.alphacephei:vosk-android`) | 0.3.75 | [Maven Central](https://repo1.maven.org/maven2/com/alphacephei/vosk-android/0.3.75/), [vosk-api COPYING](https://github.com/alphacep/vosk-api/blob/master/COPYING), Apache License 2.0 (POM and COPYING read 10 October 2026) | Runtime dependency; bundles `libvosk.so` (about 10 MB per ABI). Native/transitive notice review (Kaldi, OpenFST and the math libraries inside the native library) is still needed for a release. |
+| JNA (`net.java.dev.jna:jna`, aar) | 5.18.1, pulled by Vosk | [Published POM](https://repo1.maven.org/maven2/net/java/dev/jna/jna/5.18.1/jna-5.18.1.pom) and [LICENSE](https://github.com/java-native-access/jna/blob/master/LICENSE): Apache-2.0 OR LGPL-2.1-or-later | Used under Apache-2.0. Bundles `libjnidispatch.so`. |
+| Vosk small US-English model | `vosk-model-small-en-us-0.15` | [alphacephei.com model list](https://alphacephei.com/vosk/models), listed as Apache 2.0 | **Not in Git or the APK.** Downloaded only after the user taps Download, from the official URL, into the app's own storage. Checked against the official list's MD5 (`09ab50cc…`) and a SHA-256 (`30f26242…`) computed from a copy whose size and MD5 matched that list. |

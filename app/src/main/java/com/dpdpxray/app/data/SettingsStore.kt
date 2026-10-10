@@ -13,6 +13,8 @@ data class XraySettings(
     val autoLoadModel: Boolean = true,
     /** Read APK Guard new-install alerts aloud with an offline voice. Off unless the user switches it on. */
     val speakApkGuardAlerts: Boolean = false,
+    /** Opt-in for the experimental "Hey TraceVeil" wake word; it reveals the controls but never starts the microphone. */
+    val heyTraceVeil: Boolean = false,
 )
 
 class SettingsStore(context: Context) {
@@ -26,6 +28,7 @@ class SettingsStore(context: Context) {
         fastDemo = prefs.getBoolean("fast_demo", false),
         autoLoadModel = prefs.getBoolean("auto_load_model", true),
         speakApkGuardAlerts = prefs.getBoolean("speak_apk_guard_alerts", false),
+        heyTraceVeil = prefs.getBoolean("hey_traceveil", false),
     )
 
     fun update(transform: (XraySettings) -> XraySettings) {
@@ -36,6 +39,7 @@ class SettingsStore(context: Context) {
             putBoolean("fast_demo", next.fastDemo)
             putBoolean("auto_load_model", next.autoLoadModel)
             putBoolean("speak_apk_guard_alerts", next.speakApkGuardAlerts)
+            putBoolean("hey_traceveil", next.heyTraceVeil)
         }
         _settings.value = next
     }

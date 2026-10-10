@@ -10,6 +10,7 @@ coroutines = "1.11.0"
 serialization = "1.11.0"
 shizuku = "13.1.5"
 litertlm = "0.17.1"
+vosk = "0.3.75"
 junit = "4.13.2"
 materialIcons = "1.7.8"
 
@@ -34,6 +35,8 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
 shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
 litertlm-android = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litertlm" }
+# Offline keyword spotting for the opt-in "Hey TraceVeil" wake word (Apache-2.0; pulls JNA 5.18.1 as an aar).
+vosk-android = { module = "com.alphacephei:vosk-android", version.ref = "vosk" }
 junit = { module = "junit:junit", version.ref = "junit" }
 
 [plugins]

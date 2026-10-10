@@ -30,6 +30,9 @@ import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.AuditRoutes
 import com.dpdpxray.app.voice.VoiceCopilotScreen
+import com.dpdpxray.app.voice.wake.AssistantEntry
+import com.dpdpxray.app.voice.wake.AssistantFeature
+import com.dpdpxray.app.voice.wake.HeyTraceVeilHooks
 import com.dpdpxray.app.ui.screens.AiLabScreen
 import com.dpdpxray.app.ui.screens.AppPickerScreen
 import com.dpdpxray.app.ui.screens.CameraCheckScreen
@@ -43,6 +46,7 @@ import com.dpdpxray.app.ui.screens.SettingsScreen
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.XrayTheme
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -55,6 +59,8 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         ApkGuardIntents.route(this, intent)?.let { apkGuardRoute.value = it }
     }
+    /** Launcher shortcut, "Hey Google" App Action or wake-word notification request, consumed once. */
+    private val assistantFeatures = Channel<AssistantFeature>(Channel.CONFLATED)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,6 +72,8 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) { vm.refreshPreflight() }
         }
+        if (savedInstanceState == null) AssistantEntry.featureFrom(intent)?.let { assistantFeatures.trySend(it) }
+        addOnNewIntentListener { AssistantEntry.featureFrom(it)?.let { f -> assistantFeatures.trySend(f) } }
         setContent {
             val settings by vm.settings.collectAsState()
             val toast by vm.toast.collectAsState()
@@ -150,6 +158,12 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(incoming) {
                         incoming?.let { nav.navigate(it); apkGuardRoute.value = null }
                     }
+                    LaunchedEffect(nav) {
+                        for (feature in assistantFeatures) {
+                            AssistantEntry.open(nav, feature, this@MainActivity)?.let { Toast.makeText(this@MainActivity, it, Toast.LENGTH_LONG).show() }
+                        }
+                    }
+                    HeyTraceVeilHooks(nav)
                 }
             }
         }

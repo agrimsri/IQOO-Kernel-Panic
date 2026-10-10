@@ -52,6 +52,7 @@ import com.dpdpxray.app.ui.components.TopBar
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.voice.ApiEnv
 import com.dpdpxray.app.voice.SpeechOutputChoice
+import com.dpdpxray.app.voice.wake.HeyTraceVeilSection
 import com.dpdpxray.core.model.RejectOption
 import com.dpdpxray.core.model.ScreenAudit
 import kotlinx.coroutines.launch
@@ -229,6 +230,8 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit) {
                     TextButton(onClick = { vm.updateSettings { it.copy(firstPartyDomains = it.firstPartyDomains - d) } }) { Text("Remove", color = Film.leak) }
                 }
             }
+
+            HeyTraceVeilSection(s.heyTraceVeil) { v -> vm.updateSettings { it.copy(heyTraceVeil = v) } }
 
             SectionTitle("Privacy")
             val ctx = LocalContext.current

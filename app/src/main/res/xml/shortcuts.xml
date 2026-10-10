@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Static launcher shortcuts (long-press the TraceVeil icon) and App Actions for Google Assistant:
+    "Hey Google, open TraceVeil check an app". The assistant passes either the matched shortcut id or the spoken
+    feature text in the "feature" extra; MainActivity maps it to an existing screen (AssistantFeatures). Nothing here
+    starts an audit, opens the microphone or changes the default assistant.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <capability android:name="actions.intent.OPEN_APP_FEATURE">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.dpdpxray.app.MainActivity"
+            android:targetPackage="com.dpdpxray.app">
+            <parameter
+                android:name="feature"
+                android:key="feature" />
+        </intent>
+    </capability>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="check_app"
+        android:shortcutLongLabel="@string/shortcut_check_app_long"
+        android:shortcutShortLabel="@string/shortcut_check_app_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.dpdpxray.app.MainActivity"
+            android:targetPackage="com.dpdpxray.app">
+            <extra
+                android:name="feature"
+                android:value="check_app" />
+        </intent>
+        <capability-binding android:key="actions.intent.OPEN_APP_FEATURE">
+            <parameter-binding
+                android:key="feature"
+                android:value="@array/shortcut_check_app_synonyms" />
+        </capability-binding>
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="check_apk"
+        android:shortcutLongLabel="@string/shortcut_check_apk_long"
+        android:shortcutShortLabel="@string/shortcut_check_apk_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.dpdpxray.app.MainActivity"
+            android:targetPackage="com.dpdpxray.app">
+            <extra
+                android:name="feature"
+                android:value="check_apk" />
+        </intent>
+        <capability-binding android:key="actions.intent.OPEN_APP_FEATURE">
+            <parameter-binding
+                android:key="feature"
+                android:value="@array/shortcut_check_apk_synonyms" />
+        </capability-binding>
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="ask_last_check"
+        android:shortcutLongLabel="@string/shortcut_ask_last_check_long"
+        android:shortcutShortLabel="@string/shortcut_ask_last_check_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.dpdpxray.app.MainActivity"
+            android:targetPackage="com.dpdpxray.app">
+            <extra
+                android:name="feature"
+                android:value="ask_last_check" />
+        </intent>
+        <capability-binding android:key="actions.intent.OPEN_APP_FEATURE">
+            <parameter-binding
+                android:key="feature"
+                android:value="@array/shortcut_ask_last_check_synonyms" />
+        </capability-binding>
+    </shortcut>
+</shortcuts>
