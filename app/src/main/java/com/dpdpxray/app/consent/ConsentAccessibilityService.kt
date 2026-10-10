@@ -8,6 +8,7 @@ import android.os.SystemClock
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.dpdpxray.app.quarantine.QuarantineBus
 import com.dpdpxray.app.quarantine.QuarantineUiWatcher
 import com.dpdpxray.core.consent.ConsentLexicon
@@ -116,9 +117,18 @@ class ConsentAccessibilityService : AccessibilityService() {
     /** Android's Home action, used by the audit's background step (C12). Callers use the main dispatcher. */
     fun pressHome(): Boolean = performGlobalAction(GLOBAL_ACTION_HOME)
 
-    /** Whether any on-screen window belongs to [pkg]; null when the window list cannot be read. */
+    /**
+     * Whether an on-screen app window belongs to [pkg]. null when that cannot be told: no app window is readable, or one
+     * of them cannot be attributed to a package. Never false by default.
+     */
     fun packageOnScreen(pkg: String): Boolean? = runCatching {
-        windows.any { it.root?.packageName?.toString() == pkg }
+        val apps = windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }.map { it.root?.packageName?.toString() }
+        when {
+            apps.isEmpty() -> null
+            pkg in apps -> true
+            apps.any { it == null } -> null
+            else -> false
+        }
     }.getOrNull()
 
     /** Bounded orchestrator polling complements event debounce; callers use the main dispatcher. */
