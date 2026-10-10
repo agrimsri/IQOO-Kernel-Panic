@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dpdpxray.app.R
 import com.dpdpxray.core.model.Category
@@ -52,6 +53,19 @@ object FilmExtra {
     val raisedHigh = Color(0xFF1D3649)
     val scanWash = Color(0x1A7FD3E6)
     val hairline = Color(0xFF223B4D)
+    /** Bottom navigation bar: between [Film.base] and [Film.raised], with a hairline on top. */
+    val bar = Color(0xFF132736)
+    /** Faint warm wash behind caveat callouts. */
+    val warnWash = Color(0x1AF2B544)
+}
+
+/** Corner radii used across the app, so cards, buttons and chips share one rhythm. */
+object Radii {
+    val card = 18.dp
+    val tile = 16.dp
+    val button = 16.dp
+    val row = 14.dp
+    val small = 12.dp
 }
 
 fun severityColor(s: Severity) = when (s) {
@@ -94,15 +108,23 @@ class Scale(val k: Float) {
 
 val LocalScale = staticCompositionLocalOf { Scale(1f) }
 
+/**
+ * Type scale tuned for reading on a phone: body text 15-16sp with roomy line height, titles a clear step above body,
+ * labels never below 12sp. Every M3 slot is set so dialogs, sheets and the navigation bar use Archivo too.
+ */
 private fun typography(k: Float) = Typography(
     displayLarge = TextStyle(fontFamily = ArchivoDisplay, fontWeight = FontWeight(800), fontSize = (64 * k).sp, lineHeight = (64 * k).sp),
-    headlineMedium = TextStyle(fontFamily = ArchivoDisplay, fontWeight = FontWeight(700), fontSize = (28 * k).sp, lineHeight = (32 * k).sp),
-    titleLarge = TextStyle(fontFamily = ArchivoDisplay, fontWeight = FontWeight(700), fontSize = (21 * k).sp, lineHeight = (26 * k).sp),
-    titleMedium = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (16 * k).sp, lineHeight = (22 * k).sp),
+    headlineMedium = TextStyle(fontFamily = ArchivoDisplay, fontWeight = FontWeight(700), fontSize = (28 * k).sp, lineHeight = (34 * k).sp),
+    headlineSmall = TextStyle(fontFamily = ArchivoDisplay, fontWeight = FontWeight(700), fontSize = (24 * k).sp, lineHeight = (30 * k).sp),
+    titleLarge = TextStyle(fontFamily = ArchivoDisplay, fontWeight = FontWeight(700), fontSize = (21 * k).sp, lineHeight = (27 * k).sp),
+    titleMedium = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (17 * k).sp, lineHeight = (23 * k).sp),
+    titleSmall = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (15 * k).sp, lineHeight = (20 * k).sp),
     bodyLarge = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(400), fontSize = (16 * k).sp, lineHeight = (24 * k).sp),
-    bodyMedium = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(400), fontSize = (14 * k).sp, lineHeight = (21 * k).sp),
-    labelLarge = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (15 * k).sp),
-    labelMedium = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(500), fontSize = (12.5f * k).sp),
+    bodyMedium = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(400), fontSize = (15 * k).sp, lineHeight = (22 * k).sp),
+    bodySmall = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(400), fontSize = (13.5f * k).sp, lineHeight = (19 * k).sp),
+    labelLarge = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (15 * k).sp, lineHeight = (20 * k).sp),
+    labelMedium = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(500), fontSize = (13 * k).sp, lineHeight = (18 * k).sp),
+    labelSmall = TextStyle(fontFamily = ArchivoText, fontWeight = FontWeight(600), fontSize = (12 * k).sp, lineHeight = (16 * k).sp),
 )
 
 @Composable
@@ -114,7 +136,9 @@ fun XrayTheme(stageMode: Boolean, content: @Composable () -> Unit) {
             colorScheme = darkColorScheme(
                 primary = Film.scan, onPrimary = Film.base, background = Film.base, onBackground = Film.bone,
                 surface = Film.base, onSurface = Film.bone, surfaceVariant = Film.raised, onSurfaceVariant = Film.boneDim,
-                outline = Film.line, error = Film.leak,
+                surfaceContainer = FilmExtra.bar, surfaceContainerHigh = Film.raised, surfaceContainerHighest = FilmExtra.raisedHigh,
+                surfaceContainerLow = Film.raised, secondaryContainer = Film.scan.copy(alpha = 0.18f), onSecondaryContainer = Film.bone,
+                outline = Film.line, outlineVariant = FilmExtra.hairline, error = Film.leak,
             ),
             typography = typography(k),
             content = content,
