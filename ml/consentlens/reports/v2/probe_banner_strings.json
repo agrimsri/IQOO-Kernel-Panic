@@ -1,0 +1,410 @@
+{
+ "note": "hand-written spot check of common banner wording; expected roles are ours; not a benchmark",
+ "thresholds": {
+  "v1": 0.9,
+  "v2": 0.68,
+  "v2_at_0.90": 0.9
+ },
+ "rows": [
+  {
+   "text": "Cookie settings",
+   "expected": "MANAGE",
+   "lexicon": null,
+   "v1": {
+    "role": "MANAGE",
+    "confidence": 0.99,
+    "used_by_app": true
+   },
+   "v2": {
+    "role": "MANAGE",
+    "confidence": 0.99,
+    "used_by_app": true
+   },
+   "v2_at_0.90": {
+    "role": "MANAGE",
+    "confidence": 0.99,
+    "used_by_app": true
+   }
+  },
+  {
+   "text": "Cookie preferences",
+   "expected": "MANAGE",
+   "lexicon": null,
+   "v1": {
+    "role": "PRIVACY_LINK",
+    "confidence": 0.45,
+    "used_by_app": false
+   },
+   "v2": {
+    "role": "REJECT",
+    "confidence": 0.77,
+    "used_by_app": true
+   },
+   "v2_at_0.90": {
+    "role": "REJECT",
+    "confidence": 0.77,
+    "used_by_app": false
+   }
+  },
+  {
+   "text": "Manage cookies",
+   "expected": "MANAGE",
+   "lexicon": "MANAGE",
+   "v1": {
+    "role": "PURPOSE_NOTICE",
+    "confidence": 0.98,
+    "used_by_app": false
+   },
+   "v2": {
+    "role": "REJECT",
+    "confidence": 0.77,
+    "used_by_app": false
+   },
+   "v2_at_0.90": {
+    "role": "REJECT",
+    "confidence": 0.77,
+    "used_by_app": false
+   }
+  },
+  {
+   "text": "Customise cookies",
+   "expected": "MANAGE",
+   "lexicon": "MANAGE",
+   "v1": {
+    "role": "OTHER",
+    "confidence": 0.81,
+    "used_by_app": false
+   },
+   "v2": {
+    "role": "REJECT",
+    "confidence": 0.54,
+    "used_by_app": false
+   },
+   "v2_at_0.90": {
+    "role": "REJECT",
+    "confidence": 0.54,
+    "used_by_app": false
+   }
+  },
+  {
+   "text": "Configurar cookies",
+   "expected": "MANAGE",
+   "lexicon": null,
+   "v1": {
+    "role": "MANAGE",
+    "confidence": 0.95,
+    "used_by_app": true
+   },
+   "v2": {
+    "role": "REJECT",
+    "confidence": 0.7,
+    "used_by_app": true
+   },
+   "v2_at_0.90": {
+    "role": "REJECT",
+    "confidence": 0.7,
+    "used_by_app": false
+   }
+  },
+  {
+   "text": "Paramètres des cookies",
+   "expected": "MANAGE",
+   "lexicon": null,
+   "v1": {
+    "role": "MANAGE",
+    "confidence": 0.9,
+    "used_by_app": false
+   },
+   "v2": {
+    "role": "MANAGE",
+    "confidence": 0.56,
+    "used_by_app": false
+   },
+   "v2_at_0.90": {
+    "role": "MANAGE",
+    "confidence": 0.56,
+    "used_by_app": false
+   }
+  },
+  {
+   "text": "Einstellungen",
+   "expected": "MANAGE",
+   "lexicon": null,
+   "v1": {
+    "role": "MANAGE",
+    "confidence": 1.0,
+    "used_by_app": true
+   },
+   "v2": {
+    "role": "MANAGE",
+    "confidence": 1.0,
+    "used_by_app": true
+   },
+   "v2_at_0.90": {
+    "role": "MANAGE",
+    "confidence": 1.0,
+    "used_by_app": true
+   }
+  },
+  {
+   "text": "More options",
+   "expected": "MANAGE",
+   "lexicon": "MANAGE",
+   "v1": {
+    "role": "MANAGE",
+    "confidence": 1.0,
+    "used_by_app": false
+   },
+   "v2": {
+    "role": "MANAGE",
+    "confidence": 0.98,
+    "used_by_app": false
+   },
+   "v2_at_0.90": {
+    "role": "MANAGE",
+    "confidence": 0.98,
+    "used_by_app": false
+   }
+  },
+  {
+   "text": "About cookies",
+   "expected": "OTHER",
+   "lexicon": null,
+   "v1": {
+    "role": "ACCEPT",
+    "confidence": 0.25,
+    "used_by_app": false
+   },
+   "v2": {
+    "role": "REJECT",
+    "confidence": 1.0,
+    "used_by_app": true
+   },
+   "v2_at_0.90": {
+    "role": "REJECT",
+    "confidence": 1.0,
+    "used_by_app": true
+   }
+  },
+  {
+   "text": "Cookie details",
+   "expected": "OTHER",
+   "lexicon": null,
+   "v1": {
+    "role": "REJECT",
+    "confidence": 0.99,
+    "used_by_app": true
+   },
+   "v2": {
+    "role": "REJECT",
+    "confidence": 0.85,
+    "used_by_app": true
+   },
+   "v2_at_0.90": {
+    "role": "REJECT",
+    "confidence": 0.85,
+    "used_by_app": false
+   }
+  },
+  {
+   "text": "Cookie policy",
+   "expected": "PRIVACY_LINK",
+   "lexicon": null,
+   "v1": {
+    "role": "ACCEPT",
+    "confidence": 0.9,
+    "used_by_app": true
+   },
+   "v2": {
+    "role": "PRIVACY_LINK",
+    "confidence": 1.0,
+    "used_by_app": true
+   },
+   "v2_at_0.90": {
+    "role": "PRIVACY_LINK",
+    "confidence": 1.0,
+    "used_by_app": true
+   }
+  },
+  {
+   "text": "Your privacy choices",
+   "expected": "PRIVACY_LINK",
+   "lexicon": null,
+   "v1": {
+    "role": "PRIVACY_LINK",
+    "confidence": 1.0,
+    "used_by_app": true
+   },
+   "v2": {
+    "role": "PRIVACY_LINK",
+    "confidence": 1.0,
+    "used_by_app": true
+   },
+   "v2_at_0.90": {
+    "role": "PRIVACY_LINK",
+    "confidence": 1.0,
+    "used_by_app": true
+   }
+  },
+  {
+   "text": "Essential cookies only",
+   "expected": "REJECT",
+   "lexicon": null,
+   "v1": {
+    "role": "REJECT",
+    "confidence": 0.68,
+    "used_by_app": false
+   },
+   "v2": {
+    "role": "REJECT",
+    "confidence": 0.99,
+    "used_by_app": true
+   },
+   "v2_at_0.90": {
+    "role": "REJECT",
+    "confidence": 0.99,
+    "used_by_app": true
+   }
+  },
+  {
+   "text": "Use necessary cookies only",
+   "expected": "REJECT",
+   "lexicon": "REJECT",
+   "v1": {
+    "role": "REJECT",
+    "confidence": 1.0,
+    "used_by_app": false
+   },
+   "v2": {
+    "role": "REJECT",
+    "confidence": 1.0,
+    "used_by_app": false
+   },
+   "v2_at_0.90": {
+    "role": "REJECT",
+    "confidence": 1.0,
+    "used_by_app": false
+   }
+  },
+  {
+   "text": "Reject non-essential cookies",
+   "expected": "REJECT",
+   "lexicon": "REJECT",
+   "v1": {
+    "role": "REJECT",
+    "confidence": 1.0,
+    "used_by_app": false
+   },
+   "v2": {
+    "role": "REJECT",
+    "confidence": 0.49,
+    "used_by_app": false
+   },
+   "v2_at_0.90": {
+    "role": "REJECT",
+    "confidence": 0.49,
+    "used_by_app": false
+   }
+  },
+  {
+   "text": "Tout refuser",
+   "expected": "REJECT",
+   "lexicon": null,
+   "v1": {
+    "role": "REJECT",
+    "confidence": 1.0,
+    "used_by_app": true
+   },
+   "v2": {
+    "role": "REJECT",
+    "confidence": 0.99,
+    "used_by_app": true
+   },
+   "v2_at_0.90": {
+    "role": "REJECT",
+    "confidence": 0.99,
+    "used_by_app": true
+   }
+  },
+  {
+   "text": "Rechazar todo",
+   "expected": "REJECT",
+   "lexicon": null,
+   "v1": {
+    "role": "REJECT",
+    "confidence": 1.0,
+    "used_by_app": true
+   },
+   "v2": {
+    "role": "REJECT",
+    "confidence": 0.58,
+    "used_by_app": false
+   },
+   "v2_at_0.90": {
+    "role": "REJECT",
+    "confidence": 0.58,
+    "used_by_app": false
+   }
+  },
+  {
+   "text": "Alle ablehnen",
+   "expected": "REJECT",
+   "lexicon": null,
+   "v1": {
+    "role": "OTHER",
+    "confidence": 0.66,
+    "used_by_app": false
+   },
+   "v2": {
+    "role": "OTHER",
+    "confidence": 0.54,
+    "used_by_app": false
+   },
+   "v2_at_0.90": {
+    "role": "OTHER",
+    "confidence": 0.54,
+    "used_by_app": false
+   }
+  },
+  {
+   "text": "Accept all cookies",
+   "expected": "ACCEPT",
+   "lexicon": "ACCEPT",
+   "v1": {
+    "role": "ACCEPT",
+    "confidence": 1.0,
+    "used_by_app": false
+   },
+   "v2": {
+    "role": "ACCEPT",
+    "confidence": 1.0,
+    "used_by_app": false
+   },
+   "v2_at_0.90": {
+    "role": "ACCEPT",
+    "confidence": 1.0,
+    "used_by_app": false
+   }
+  },
+  {
+   "text": "Allow all cookies",
+   "expected": "ACCEPT",
+   "lexicon": "ACCEPT",
+   "v1": {
+    "role": "ACCEPT",
+    "confidence": 1.0,
+    "used_by_app": false
+   },
+   "v2": {
+    "role": "ACCEPT",
+    "confidence": 1.0,
+    "used_by_app": false
+   },
+   "v2_at_0.90": {
+    "role": "ACCEPT",
+    "confidence": 1.0,
+    "used_by_app": false
+   }
+  }
+ ]
+}
