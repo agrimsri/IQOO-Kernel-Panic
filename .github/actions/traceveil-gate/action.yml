@@ -1,0 +1,152 @@
+# TraceVeil gate: a composite GitHub Action that re-checks TraceVeil consent-audit bundles (traceveil.audit.v1 JSON,
+# exported from the phone's Report screen or saved by TraceVeil Runner) with traceveil-ci, uploads the findings to
+# code scanning as SARIF, and fails the step when the policy is violated.
+#
+# It runs only when a workflow calls it; no workflow in this repository does. Inputs, outputs and an example workflow:
+# docs/CI_MODE.md ("GitHub Action") and docs/ci/traceveil-action-example.yml.
+#
+# A <bundle>.sig.json next to a bundle (the phone's hardware signature, docs/SIGNED_EVIDENCE.md) is verified offline
+# and reported; with require-signature: 'true' a bundle whose signature is missing or does not verify fails.
+# CI does not capture anything: the evidence comes from a phone, and a pass is not a compliance certificate.
+name: TraceVeil gate
+description: Re-check TraceVeil consent-audit bundles with traceveil-ci, upload SARIF to code scanning and fail on a policy violation.
+
+inputs:
+  bundles:
+    description: >-
+      Bundle files to gate (traceveil.audit.v1 JSON), separated by spaces or new lines. Shell globs such as
+      privacy/traceveil/*/bundle.json are expanded. Paths without spaces only.
+    required: true
+  policy:
+    description: Policy file (see docs/CI_MODE.md, Policy reference). Empty uses the traceveil-ci defaults.
+    required: false
+    default: ''
+  sarif:
+    description: Where to write the SARIF 2.1.0 report (relative to the working directory, normally the repository root).
+    required: false
+    default: traceveil.sarif
+  require-signature:
+    description: "'true' fails every bundle whose hardware signature (<bundle>.sig.json) is missing or does not verify."
+    required: false
+    default: 'false'
+  upload-sarif:
+    description: "'true' uploads the SARIF report to GitHub code scanning (the job needs permissions: security-events: write)."
+    required: false
+    default: 'true'
+  sarif-category:
+    description: Code scanning category for the upload, so several TraceVeil gates do not replace each other's alerts.
+    required: false
+    default: traceveil
+  traceveil-ci:
+    description: >-
+      Path to an existing traceveil-ci launcher (for example cli/build/install/traceveil-ci/bin/traceveil-ci from an
+      earlier step). Empty builds it from this action's repository with ./gradlew :cli:installDist.
+    required: false
+    default: ''
+
+outputs:
+  exit-code:
+    description: "traceveil-ci check's exit code: 0 pass, 1 policy violation, 2 usage error or unreadable input."
+    value: ${{ steps.gate.outputs.exit-code }}
+  sarif:
+    description: Path of the SARIF report, empty when none was written.
+    value: ${{ steps.gate.outputs.sarif }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up JDK 17
+      uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1, same pin as .github/workflows/checks.yml
+      with:
+        distribution: temurin
+        java-version: '17'
+
+    # Inputs reach the scripts through env, never pasted into the script text.
+    - name: Build or locate traceveil-ci
+      id: tool
+      shell: bash
+      env:
+        TRACEVEIL_CI: ${{ inputs.traceveil-ci }}
+      run: |
+        set -euo pipefail
+        if [ -n "$TRACEVEIL_CI" ]; then
+          tool="$TRACEVEIL_CI"
+        else
+          # The action sits in .github/actions/traceveil-gate of the TraceVeil repository; build the CLI there.
+          root="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
+          (cd "$root" && ./gradlew :cli:installDist --no-daemon --console=plain)
+          tool="$root/cli/build/install/traceveil-ci/bin/traceveil-ci"
+        fi
+        if [ ! -f "$tool" ]; then
+          echo "::error::traceveil-ci not found at $tool"
+          exit 2
+        fi
+        echo "path=$tool" >> "$GITHUB_OUTPUT"
+
+    # The exit code is recorded, not acted on yet, so the SARIF upload below still runs when the gate fails.
+    - name: Gate the bundles
+      id: gate
+      shell: bash
+      env:
+        TOOL: ${{ steps.tool.outputs.path }}
+        BUNDLES: ${{ inputs.bundles }}
+        POLICY: ${{ inputs.policy }}
+        SARIF: ${{ inputs.sarif }}
+        REQUIRE_SIGNATURE: ${{ inputs.require-signature }}
+      run: |
+        set -uo pipefail
+        # Word splitting and glob expansion of the bundle list are intended.
+        # shellcheck disable=SC2206
+        files=( $BUNDLES )
+        if [ "${#files[@]}" -eq 0 ]; then
+          echo "::error::the bundles input names no file"
+          echo "exit-code=2" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        args=(check "${files[@]}" --format sarif --out "$SARIF")
+        if [ -n "$POLICY" ]; then
+          args+=(--policy "$POLICY")
+        fi
+        case "$REQUIRE_SIGNATURE" in
+          true|True|TRUE) args+=(--require-signature) ;;
+          false|False|FALSE|'') ;;
+          *)
+            echo "::error::require-signature must be 'true' or 'false', not '$REQUIRE_SIGNATURE'"
+            echo "exit-code=2" >> "$GITHUB_OUTPUT"
+            exit 0
+            ;;
+        esac
+        # A report left by an earlier step must not be uploaded as this run's result.
+        rm -f -- "$SARIF"
+        code=0
+        "$TOOL" "${args[@]}" || code=$?
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        if [ -f "$SARIF" ]; then
+          echo "sarif=$SARIF" >> "$GITHUB_OUTPUT"
+        fi
+
+    # Code scanning needs GitHub Advanced Security on private repositories; set upload-sarif: 'false' without it.
+    - name: Upload SARIF to code scanning
+      if: ${{ !cancelled() && inputs.upload-sarif == 'true' && steps.gate.outputs.sarif != '' }}
+      uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+      with:
+        sarif_file: ${{ steps.gate.outputs.sarif }}
+        category: ${{ inputs.sarif-category }}
+
+    - name: Fail on a policy violation
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        CODE: ${{ steps.gate.outputs.exit-code }}
+      run: |
+        case "$CODE" in
+          0) echo "TraceVeil gate: PASS (exit 0)" ;;
+          1)
+            echo "::error::TraceVeil gate: FAIL, policy violation (exit 1). The report above lists each violation."
+            exit 1
+            ;;
+          *)
+            echo "::error::TraceVeil gate: ERROR (exit ${CODE:-none}): bad input, an unreadable bundle or an unusable policy."
+            exit 2
+            ;;
+        esac
