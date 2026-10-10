@@ -229,6 +229,10 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
             _cameraResult.value = CameraCheckState.Error("The on-device model is not loaded. Push a Gemma model and open AI lab.")
             return@launch
         }
+        if (!graph.llm.canReadImages) {
+            _cameraResult.value = CameraCheckState.Error("The loaded model reads text only, so the photo was not sent to it. Load the GPU model (Gemma 4) in AI lab for Camera Check.")
+            return@launch
+        }
         val file = File(ctx.cacheDir, "camera_check.jpg")
         withContext(Dispatchers.IO) { file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 92, it) } }
         val audit = graph.llm.auditConsentScreen(file, "(photo of a screen; no accessibility tree)")
