@@ -98,7 +98,10 @@
             "privateDnsActive": null,
             "notes": [],
             "captureHealth": null,
-            "freshState": true
+            "freshState": true,
+            "backgroundStartedNanos": null,
+            "permissionDialogsWatched": null,
+            "manifestFacts": null
         },
         {
             "id": "sample-fixed-b",
@@ -190,7 +193,10 @@
             "privateDnsActive": null,
             "notes": [],
             "captureHealth": null,
-            "freshState": true
+            "freshState": true,
+            "backgroundStartedNanos": null,
+            "permissionDialogsWatched": null,
+            "manifestFacts": null
         },
         {
             "id": "sample-fixed-a",
@@ -275,7 +281,10 @@
             "privateDnsActive": null,
             "notes": [],
             "captureHealth": null,
-            "freshState": true
+            "freshState": true,
+            "backgroundStartedNanos": null,
+            "permissionDialogsWatched": null,
+            "manifestFacts": null
         }
     ],
     "result": {

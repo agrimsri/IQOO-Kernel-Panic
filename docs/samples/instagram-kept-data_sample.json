@@ -99,7 +99,10 @@
                 "App data was not cleared (reset not approved or Shizuku not authorised) — results reflect the app's current state."
             ],
             "captureHealth": null,
-            "freshState": false
+            "freshState": false,
+            "backgroundStartedNanos": null,
+            "permissionDialogsWatched": null,
+            "manifestFacts": null
         }
     ],
     "result": {
