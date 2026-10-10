@@ -45,18 +45,22 @@ object PhoneCheckupCollector {
                 val ai = info.applicationInfo ?: return@mapNotNull null
                 if (ai.flags and ApplicationInfo.FLAG_SYSTEM != 0) return@mapNotNull null
                 val requested = info.requestedPermissions?.toSet().orEmpty()
+                // Android only reads these switches for apps that declare the permission; skip the call otherwise.
+                val overlayDeclared = SpecialAccess.SYSTEM_ALERT_WINDOW in requested
+                val installEligible = SpecialAccess.installEligible(SpecialAccess.REQUEST_INSTALL_PACKAGES in requested, ai.targetSdkVersion)
                 val raw = RawCheckupApp(
                     packageName = info.packageName,
                     label = runCatching { ai.loadLabel(pm).toString() }.getOrNull(),
                     grantedPermissions = ApkFactsMapper.granted(info.requestedPermissions, info.requestedPermissionsFlags, PackageInfo.REQUESTED_PERMISSION_GRANTED),
                     displayOverApps = SpecialAccess.displayOverApps(
-                        declared = SpecialAccess.SYSTEM_ALERT_WINDOW in requested,
-                        mode = opMode(ops, AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW, ai.uid, info.packageName),
-                        permissionGranted = runCatching { pm.checkPermission(SpecialAccess.SYSTEM_ALERT_WINDOW, info.packageName) == PackageManager.PERMISSION_GRANTED }.getOrNull(),
+                        declared = overlayDeclared,
+                        mode = if (overlayDeclared) opMode(ops, AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW, ai.uid, info.packageName) else null,
+                        permissionGranted = if (!overlayDeclared) null
+                        else runCatching { pm.checkPermission(SpecialAccess.SYSTEM_ALERT_WINDOW, info.packageName) == PackageManager.PERMISSION_GRANTED }.getOrNull(),
                     ),
                     installApps = SpecialAccess.installApps(
-                        eligible = SpecialAccess.installEligible(SpecialAccess.REQUEST_INSTALL_PACKAGES in requested, ai.targetSdkVersion),
-                        mode = opMode(ops, SpecialAccess.OP_REQUEST_INSTALL_PACKAGES, ai.uid, info.packageName),
+                        eligible = installEligible,
+                        mode = if (installEligible) opMode(ops, SpecialAccess.OP_REQUEST_INSTALL_PACKAGES, ai.uid, info.packageName) else null,
                     ),
                     origin = runCatching { ApkInspector.origin(context, info.packageName, isSystem = false) }.getOrNull(),
                 )
