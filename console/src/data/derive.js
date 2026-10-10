@@ -59,6 +59,9 @@ function buildAuditView(rec) {
     gaps,
     plansKey: sessions.map((s) => s.plan).sort().join(","),
     lens: lensOf(b),
+    // "Which SDK caused this?" as exported by the phone (core SdkAttribution); null when the export has no such part.
+    sdkGroups: Array.isArray(b.sdkAttribution?.groups) ? b.sdkAttribution.groups : null,
+    sdkBasis: typeof b.sdkAttribution?.basis === "string" ? b.sdkAttribution.basis : null,
   };
 }
 

@@ -287,3 +287,15 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 
   .q-timeline li { grid-template-columns: 32px 52px minmax(0, 1fr); }
 }
 .pill-src { overflow-wrap: anywhere; }
+
+/* ---------- which SDK caused this (the export's sdkAttribution) ---------- */
+.sdk-groups { display: grid; gap: 10px; margin-top: 12px; }
+.sdk-group { border: 1px solid var(--line); border-left: 3px solid var(--c, var(--line-2)); border-radius: 12px; padding: 10px 12px; background: var(--surface); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sdk-name { font-size: 15px; overflow-wrap: anywhere; }
+.sdk-hosts { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 12.5px; }
+.sdk-hosts .host { font-family: var(--font-mono); overflow-wrap: anywhere; }
+.sdk-more, .sdk-fix { margin-top: 6px; }
+.sdk-more > summary, .sdk-fix > summary { cursor: pointer; display: flex; align-items: flex-start; gap: 6px; list-style: none; }
+.sdk-more > summary::-webkit-details-marker, .sdk-fix > summary::-webkit-details-marker { display: none; }
+.sdk-more > summary svg, .sdk-fix > summary svg { flex: none; margin-top: 2px; }
+.sdk-more[open] > summary .chev, .sdk-fix[open] > summary .chev { transform: rotate(90deg); }

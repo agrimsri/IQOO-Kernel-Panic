@@ -2,8 +2,8 @@
 //   node scripts/smoke.mjs        (or: npm run smoke)
 // Checks: first visit loads the labelled samples and starts the tour; importing a valid audit, a bare quarantine
 // report and a broken file; importing the traceveil-ci sample bundles from ../docs/samples (the same files the CLI
-// tests gate); same-package compare; the policy preview with the CLI's defaults and rules; deleting all data stays
-// deleted on reload; no console errors and no network requests.
+// tests gate); the SDK groups (sdkAttribution) those samples carry; same-package compare; the policy preview with the
+// CLI's defaults and rules; deleting all data stays deleted on reload; no console errors and no network requests.
 import puppeteer from "puppeteer-core";
 import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -87,6 +87,14 @@ check(t.includes("6 audits"), "the three traceveil-ci sample audits were importe
 await go("/audits/sample-leakyshop-leaky");
 t = await text();
 check(t.includes("LeakyShop (sample)") && /\b21\b/.test(t), "the CLI leaky sample opens with its score of 21");
+// the samples carry sdkAttribution like a phone export (derived by core SdkAttribution, see cli SampleBundles)
+const sdk = await page.evaluate(() => document.querySelector("[data-tour=sdk]")?.innerText || "");
+check(/which sdk caused this\?/i.test(sdk) && sdk.includes("Meta (Facebook SDK)") && sdk.includes("graph.facebook.com"), "the export's SDK groups are shown on the audit page");
+check(sdk.includes("first seen 0.7 s after launch · before consent"), "an SDK group says when it was first seen relative to consent");
+check(sdk.includes("Meta (Facebook) SDK: delay initialisation and app events"), "an SDK group names its fix template");
+check(/C1\s*C2\s*C10/.test(sdk), "an SDK group lists the checks that name it");
+check(sdk.includes("Unknown hosts") && sdk.includes("api.leakyshop.example"), "hosts the catalogue does not list stay in Unknown hosts");
+check(sdk.includes("A lookup is an attempt to contact a host, not proof that data was sent."), "the SDK card carries the lookup caveat");
 await go("/audits/sample-instagram-kept-data");
 t = await text();
 check(t.includes("Instagram (synthetic sample)"), "the CLI kept-data sample opens");
@@ -144,6 +152,7 @@ t = await text();
 check(t.includes("Legal lens: US children (COPPA)") && t.includes("named in the export") && t.includes("skips C3, C4 (not applicable)"),
   "an export's legalProfile selects its lens and the lens score skips not-applicable checks");
 check(t.includes("US children (COPPA): Not applicable"), "a not-applicable finding is labelled, not hidden");
+check(await page.$("[data-tour=sdk]") === null, "an export without sdkAttribution shows no SDK card");
 
 // 6. delete everything, reload: samples do not come back
 await go("/settings");

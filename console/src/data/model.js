@@ -132,6 +132,33 @@ export function fixesForFinding(finding) {
   return out;
 }
 
+export const fixTemplate = (id) => fixById.get(id) || null;
+
+// ---------- "Which SDK caused this?" (the export's optional sdkAttribution part, written by core SdkAttribution) ----------
+// The groups are read as exported; these helpers only word them the way the app does (SdkAttribution companion).
+export const SDK_BEFORE_CONSENT = "before consent";
+export const SDK_AFTER_REJECT = "after Reject";
+export const SDK_LOOKUP_CAVEAT = "A lookup is an attempt to contact a host, not proof that data was sent.";
+/** "first seen 3.0 s after launch · before consent", or "" when no host of the group has a timed sighting. */
+export function sdkFirstSeenLine(group) {
+  const timed = (group.hosts || []).filter((h) => typeof h.firstSeenSeconds === "number");
+  if (!timed.length) return "";
+  const first = timed.reduce((a, h) => (h.firstSeenSeconds < a.firstSeenSeconds ? h : a));
+  return `first seen ${first.firstSeenSeconds.toFixed(1)} s after launch · ${first.firstRelation}`;
+}
+/** One calm sentence naming the services behind the weighted findings, or null (core SdkAttribution.headline, by service). */
+export function sdkHeadline(groups) {
+  const weights = new Map();
+  for (const g of groups) if (g.known !== false && g.impact > 0) weights.set(g.name, (weights.get(g.name) || 0) + g.impact);
+  if (!weights.size) return null;
+  const total = [...weights.values()].reduce((a, b) => a + b, 0);
+  const names = [...weights.entries()].sort((a, z) => z[1] - a[1]).map(([n]) => n);
+  if (names.length > 1 && weights.get(names[0]) > total / 2) return `Most of what this check found involves ${names[0]}.`;
+  const shown = names.slice(0, 3);
+  const list = names.length === 1 ? shown[0] : names.length <= 3 ? `${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}` : `${shown.join(", ")} and ${names.length - 3} more`;
+  return `What this check found involves ${list}.`;
+}
+
 // ---------- DPDP passages (context, not a verdict). The penalty schedule is never shown. ----------
 const passageById = new Map(passages.filter((p) => p.id !== "schedule").map((p) => [p.id, p]));
 export const passageFor = (ref) => passageById.get(ref) || null;
