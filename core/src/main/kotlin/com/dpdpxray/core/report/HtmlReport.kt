@@ -642,12 +642,18 @@ object HtmlReport {
     // ---------------------------------------------------------------- evidence helpers
 
     /** Same labelling as the Results screen: phase from the recorded choice, catalogue class unless one was recorded. */
-    private fun timeline(s: AuditSession, catalog: TrackerCatalog): List<NetEvent> =
-        PhaseAssigner.assign(s.netEvents, s.consentEvents).map { e ->
+    private fun timeline(s: AuditSession, catalog: TrackerCatalog): List<NetEvent> {
+        // Same-company context exactly as the rules engine applies it (the audited app's own publisher is first party).
+        val context = com.dpdpxray.core.rules.SessionClassifier(catalog)
+        val owner = context.ownerOf(s)
+        return PhaseAssigner.assign(s.netEvents, s.consentEvents).map { e ->
             val info = catalog.classify(e.hostname, e.cnameChain)
             if (e.entity != null) e.copy(disguisedVia = e.disguisedVia ?: info.disguisedVia)
             else e.copy(entity = info.entity, category = info.category, disguisedVia = e.disguisedVia ?: info.disguisedVia)
+        }.map { e ->
+            if (owner != null && e.category.isTracking && context.companyOf(e) == owner.company) e.copy(category = Category.FIRST_PARTY_SAME_COMPANY) else e
         }.sortedBy { it.tNanos }
+    }
 
     private fun aliasTrail(e: NetEvent): String? = when {
         e.cnameChain.size >= 2 -> e.cnameChain.joinToString(" → ") + if (e.disguisedVia != null) " (alias observed)" else ""
@@ -692,6 +698,8 @@ object HtmlReport {
             Category.CRASH_REPORTING -> "Crash reporting"
             Category.ENGAGEMENT -> "Engagement"
             Category.FIRST_PARTY -> "First party (marked)"
+            Category.FIRST_PARTY_SAME_COMPANY -> "Same company as the app (first party)"
+            Category.CONTENT_DELIVERY -> "Content delivery (CDN)"
             Category.UNKNOWN -> "Unknown category"
         }
     }
