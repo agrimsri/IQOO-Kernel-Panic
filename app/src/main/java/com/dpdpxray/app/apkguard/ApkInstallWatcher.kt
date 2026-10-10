@@ -12,6 +12,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import com.dpdpxray.app.MainActivity
+import com.dpdpxray.app.autoguard.AutoGuardRoutes
+import com.dpdpxray.app.autoguard.AutoGuardStore
 import com.dpdpxray.app.graph
 import com.dpdpxray.core.apk.ApkRiskRules
 import kotlinx.coroutines.CoroutineScope
@@ -20,11 +22,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * New-install watcher. A receiver registered from [com.dpdpxray.app.XrayApp] hears ACTION_PACKAGE_ADDED while
- * TraceVeil's process is alive. Android delivers this broadcast only to running apps' registered receivers, so alerts
- * appear only while TraceVeil is running; an enabled consent watcher (accessibility service) keeps the process alive.
- * It posts one notification per new install and, if the user switched it on, speaks it with an offline voice.
- * It never starts an audit, a VPN or anything else.
+ * Live new-install watcher. A receiver registered from [com.dpdpxray.app.XrayApp] hears ACTION_PACKAGE_ADDED while
+ * TraceVeil's process is alive, so an install is alerted at once. When TraceVeil is closed, the Auto-guard background
+ * check ([com.dpdpxray.app.autoguard.NewAppCheck]) finds the install instead, a few minutes later. Both record each
+ * alerted install (package + first-install time) in one ledger, so an install is never alerted twice. Both honour the
+ * "Check new apps automatically" setting. It posts one notification per new install and, if the user switched it on,
+ * speaks it with an offline voice. It never starts an audit, a VPN or anything else.
  */
 object ApkInstallWatcher {
     const val CHANNEL = "apk_guard_installs"
@@ -47,7 +50,7 @@ object ApkInstallWatcher {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL, "APK Guard: new apps", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "Asks you to check a newly installed app before you open it. Shown only while TraceVeil is running."
+                description = "Asks you to check a newly installed app before you open it. Checked on this phone only."
             },
         )
     }
@@ -66,25 +69,50 @@ object ApkInstallWatcher {
     }
 
     private fun onNewInstall(context: Context, pkg: String) {
+        val settings = runCatching { context.graph.settings.settings.value }.getOrNull()
+        if (settings?.autoCheckNewApps == false) return
         val inspected = ApkInspector.readInstalled(context, pkg) ?: return
+        // Same scope as the background check: apps that came with the phone are not new installs to check.
+        if (inspected.isSystemApp) return
+        val firstInstall = ApkInspector.firstInstallTime(context, pkg) ?: return
+        // The background check may have found this install first; never alert the same install twice.
+        if (!AutoGuardStore(context).claim(pkg, firstInstall)) return
         val report = ApkRiskRules.evaluate(inspected.facts)
         val alert = InstallAlertPolicy.alert(inspected.facts.label, report.summary, pkg)
-        notify(context, pkg, alert)
-        val speak = runCatching { context.graph.settings.settings.value.speakApkGuardAlerts }.getOrDefault(false)
-        if (speak) ApkAlertSpeaker.speak(context, alert.spokenEn, alert.spokenHi)
+        postInstallAlert(context, pkg, alert)
+        if (settings?.speakApkGuardAlerts == true) ApkAlertSpeaker.speak(context, alert.spokenEn, alert.spokenHi)
     }
 
-    private fun notify(context: Context, pkg: String, alert: InstallAlert) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) return
-        val nm = context.getSystemService(NotificationManager::class.java) ?: return
-        ensureChannel(context)
+    /** One app's alert; tapping it opens that app's APK Guard result. Re-posting for the same package replaces it. */
+    fun postInstallAlert(context: Context, pkg: String, alert: InstallAlert) {
         val open = Intent(context, MainActivity::class.java)
             .setAction(IncomingApk.ACTION_OPEN_INSTALLED)
             .putExtra(IncomingApk.EXTRA_PACKAGE, pkg)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        val tap = PendingIntent.getActivity(context, pkg.hashCode(), open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        post(context, NOTIFICATION_BASE + (pkg.hashCode() and 0xFFFF), pkg.hashCode(), open, alert)
+    }
+
+    /** One alert for several new apps; tapping it opens APK Guard, which lists the newest installs first. */
+    fun postCombinedAlert(context: Context, alert: InstallAlert) {
+        val open = Intent(context, MainActivity::class.java)
+            .setAction(AutoGuardRoutes.ACTION_OPEN_APK_GUARD)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        post(context, COMBINED_NOTIFICATION, COMBINED_NOTIFICATION, open, alert)
+    }
+
+    /** False when Android will not show TraceVeil's notifications (permission refused or notifications switched off). */
+    fun notificationsAllowed(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return false
+        return context.getSystemService(NotificationManager::class.java)?.areNotificationsEnabled() != false
+    }
+
+    private fun post(context: Context, id: Int, requestCode: Int, open: Intent, alert: InstallAlert) {
+        if (!notificationsAllowed(context)) return
+        val nm = context.getSystemService(NotificationManager::class.java) ?: return
+        ensureChannel(context)
+        val tap = PendingIntent.getActivity(context, requestCode, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val n = Notification.Builder(context, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(alert.title)
@@ -93,8 +121,9 @@ object ApkInstallWatcher {
             .setContentIntent(tap)
             .setAutoCancel(true)
             .build()
-        runCatching { nm.notify(NOTIFICATION_BASE + (pkg.hashCode() and 0xFFFF), n) }
+        runCatching { nm.notify(id, n) }
     }
 
     private const val NOTIFICATION_BASE = 0x4A0000
+    private const val COMBINED_NOTIFICATION = 0x4A0000 - 1
 }

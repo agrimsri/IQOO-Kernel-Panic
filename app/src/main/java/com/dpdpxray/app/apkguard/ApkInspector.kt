@@ -95,6 +95,15 @@ object ApkInspector {
         )
     }
 
+    /** Where Android says [pkg] was installed from (same rules as the APK Guard result). */
+    fun origin(context: Context, pkg: String, isSystem: Boolean): InstallOrigin {
+        val (installer, _, hint) = installSource(context.packageManager, pkg)
+        return InstallSources.classify(installer, hint, isSystem)
+    }
+
+    /** The first-install time exactly as Android reports it (no plausibility filter), or null when not installed. */
+    fun firstInstallTime(context: Context, pkg: String): Long? = packageInfo(context.packageManager, pkg, 0)?.firstInstallTime
+
     private fun packageInfo(pm: PackageManager, pkg: String, flags: Int): PackageInfo? = runCatching {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) pm.getPackageInfo(pkg, PackageManager.PackageInfoFlags.of(flags.toLong()))
         else @Suppress("DEPRECATION") pm.getPackageInfo(pkg, flags)

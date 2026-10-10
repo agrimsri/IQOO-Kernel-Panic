@@ -13,7 +13,7 @@ object InstallAlertPolicy {
         action == PACKAGE_ADDED && !replacing && !packageName.isNullOrBlank() && packageName != ownPackage
 
     fun alert(label: String?, summary: ApkSummary, packageName: String = ""): InstallAlert {
-        val name = (label?.trim()?.takeIf { it.isNotEmpty() } ?: packageName).let { if (it.length > MAX_LABEL) it.take(MAX_LABEL - 1) + "…" else it }
+        val name = displayName(label, packageName)
         val headline = summary.headline.en.let { if (it.endsWith(".")) it else "$it." }
         val headlineHi = summary.headline.hi.let { if (it.endsWith("।")) it else "$it।" }
         val review = summary.reviewCarefully
@@ -27,4 +27,29 @@ object InstallAlertPolicy {
                 if (review > 0) " ध्यान से जाँचने लायक $review ${if (review == 1) "बात मिली" else "बातें मिलीं"}।" else "",
         )
     }
+
+    /**
+     * One notification for several apps installed between two background checks (for example while a phone restores
+     * its apps), instead of one notification each. It names the apps and asks for a check; tapping opens APK Guard.
+     */
+    fun combined(names: List<String>): InstallAlert {
+        val count = names.size
+        val shown = names.take(MAX_NAMED).map { displayName(it, it) }
+        val rest = count - shown.size
+        val listEn = shown.joinToString(", ") + if (rest > 0) " and $rest more" else ""
+        val listHi = shown.joinToString(", ") + if (rest > 0) " और $rest अन्य" else ""
+        return InstallAlert(
+            title = "$count new apps installed — check them before you open them",
+            text = "$listEn. Tap to see them in APK Guard.",
+            hindi = "$count नए ऐप इंस्टॉल हुए — खोलने से पहले जाँच लें: $listHi।",
+            spokenEn = "$count new apps were installed. Check them in TraceVeil before you open them.",
+            spokenHi = "$count नए ऐप इंस्टॉल हुए। खोलने से पहले उन्हें TraceVeil में जाँच लें।",
+        )
+    }
+
+    private const val MAX_NAMED = 4
+
+    /** The app's name, or its package name when it has none, shortened so a notification title stays readable. */
+    private fun displayName(label: String?, packageName: String): String =
+        (label?.trim()?.takeIf { it.isNotEmpty() } ?: packageName).let { if (it.length > MAX_LABEL) it.take(MAX_LABEL - 1) + "…" else it }
 }
