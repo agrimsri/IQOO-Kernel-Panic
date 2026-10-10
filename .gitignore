@@ -21,3 +21,6 @@ google-services.json
 *.key
 
 /tools/tests/__pycache__/
+
+# Local online-voice settings may hold an API key; never commit it.
+api.env
