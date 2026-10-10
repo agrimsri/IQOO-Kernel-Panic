@@ -29,6 +29,24 @@ class SettingsCodecTest {
         assertEquals(XraySettings(setOf("shop.test"), stageMode = true, fastDemo = true, autoLoadModel = false), s)
     }
 
+    @Test fun `auto-guard checks are on for a fresh install and for an upgrade`() {
+        val fresh = SettingsCodec.read(MapKv())
+        assertEquals(true, fresh.autoCheckNewApps)
+        assertEquals(true, fresh.weeklyCheckup)
+        val upgraded = SettingsCodec.read(MapKv(mutableMapOf("stage_mode" to true, "speak_apk_guard_alerts" to true)))
+        assertEquals(true, upgraded.autoCheckNewApps)
+        assertEquals(true, upgraded.weeklyCheckup)
+    }
+
+    @Test fun `switching auto-guard checks off is remembered`() {
+        val kv = MapKv()
+        val next = XraySettings(autoCheckNewApps = false, weeklyCheckup = false)
+        SettingsCodec.write(next, kv)
+        assertEquals(next, SettingsCodec.read(kv))
+        assertEquals(false, kv.map["auto_check_new_apps"])
+        assertEquals(false, kv.map["weekly_checkup"])
+    }
+
     @Test fun `guide fields round trip`() {
         val kv = MapKv()
         val next = XraySettings(onboardingDone = true, spokenGuidance = true, guideLanguage = "hi", stageMode = true)
