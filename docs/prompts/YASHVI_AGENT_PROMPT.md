@@ -1,59 +1,61 @@
-# Yashvi coding agent prompt
-
-Paste everything below into Yashvi's coding agent, opened in Yashvi's own TraceVeil clone.
-
----
-
 We are team Kernel Panic building TraceVeil at the iQOO hackathon. I am Yashvi, GitHub `yashviup`. Work as my coding partner on my own branch. Do not make commits as Agrim or Nitya, alter dates, request anyone else's credentials, rewrite published history or push to main.
 
-Repository: https://github.com/agrimsri/IQOO-Kernel-Panic.git. Nitya has prepared `nitya/integration`, a working documentation/handoff checkpoint based on the integrated application at `7b153de`. **First confirm Agrim reviewed and merged this checkpoint into `origin/main`.** If not, inspect its documents read-only and tell me to wait for that merge before feature commits. Do not clone only the original six commits or import baseline files again.
+Repository: https://github.com/agrimsri/IQOO-Kernel-Panic.git. **`IMPLEMENTATION_MILESTONES.md` is the active plan**; older roadmaps do not override it. Follow live venue Red/Green instructions.
 
-## Inspect before implementation
+## Where things stand
 
-1. Check `git status --short`, remotes, active branch and recent commits. Preserve local edits; do not reset or force checkout. Fetch, update clean main with `git pull --ff-only origin main`, then create `yashvi/phone-experience` if absent. Inspect existing feature branches instead of recreating them. Shared branches receive safe merge updates from main, not rebases/force pushes.
-2. Use repository-local identity `Yashvi Upadhyay <24f2007780@ds.study.iitm.ac.in>`, confirm my verified email, and use my private existing GitHub authentication. Never ask for a token/password in chat.
-3. Read `docs/TEAM_HANDOFF.md`, the three new planning files under `docs/planning`, `docs/VERIFICATION.md`, README, PROVENANCE and the scoring register. Read the supplied reference ZIP if available. **IMPLEMENTATION_MILESTONES.md is the active plan**; older greenfield/camera-upgrade roadmaps do not override it. Follow live venue Red/Green instructions.
-4. Inspect the whole app flow before touching code: `XrayApp.kt`, MainActivity/shared ViewModel, saved sessions/results/sample data, AI services/LlmEngine/ModelFiles, ToolScreens, existing corpus/retrievers/rules, capture/audit, reports and the demo module. The real modules are `core`, `app`, `leakyshop`; keep that layout.
-5. Run the existing core suite and assemble all three debug APKs. Start from a working local baseline; request needed SDK/dependency installation approval. Reuse pinned versions and existing APIs rather than fabricating interfaces.
+| Item | State |
+| --- | --- |
+| Y1 Voice Copilot | On `main` (PR #4). Not yet mounted: Nitya adds the route and `RECORD_AUDIO`. |
+| Y2 Network Proof | Calculator and card on `main` (PR #4). Not yet mounted or fed: Nitya samples `UidTx` per plan. |
+| Y3 Endpoint map | On `yashvi/phone-experience` only (7 commits ahead, 4 behind `main`). Not on `main`. |
+| Y4, Y5, Y6 | Not started. |
+| Agrim A0–A5 | All on `main` as of PR #5 (`ebdafae`). `agrim/evidence-engine` and `agrim/a4-capture-health` are **deleted**: merge from `origin/main` from now on. |
 
-## Your work and order
+## Start here: sync with `main`
 
-Implement **Yashvi Y1–Y6** from `IMPLEMENTATION_MILESTONES.md`, test-first, using new self-contained files:
+1. `git status --short`; preserve any local edits (no reset, no force checkout). `git fetch --prune origin`. Your remote-tracking refs for the two deleted Agrim branches disappear; that is expected.
+2. On `yashvi/phone-experience`: `git merge origin/main` (a merge commit, not a rebase). Agrim checked it with `git merge-tree`: **no conflicts**. You already merged A4 at `dbd0305`; this brings the "under 0.1 s" notice fix and A5.
+3. Run `:core:test :app:testDebugUnitTest :app:assembleDebug :leakyshop:assembleLeakyDebug :leakyshop:assembleFixedDebug`. On `main` + Agrim's work the suite was 197 core and 52 app tests, 0 failures; record your actual numbers.
+4. Read `docs/reports/BUG_REPORT_2026-10-10.md` (live iQOO results, contract changes) and the PR #5 description.
 
-- **Y1 first, independent of Agrim A0:** push-to-talk Voice Copilot, tappable question chips, evidence-grounded answers, offline TTS, English/Hindi and a self-contained screen/ViewModel. Read only the selected audit's actual evidence and at most three retrieved corpus passages. Validate citations and assertions against those sources; refuse off-topic questions and say unknown rather than declare an app safe. A sample must remain visibly sample. Keep questions usable without model/speech availability.
-- **Observed AI defect:** the GPU model loads and benchmarks, but existing English explanation attempts twice and Hindi once returned “The model returned no text. Try again.” All six full-audit screen reviews fell back to deterministic checks. `LlmEngine.generate` uses `runCatching(...).getOrNull()`, hiding the underlying failure. Diagnose with a controlled local prompt and safe error reporting, preserve coroutine cancellation and existing call-site compatibility, then fix the demonstrated cause with tests. Do not guess that temperature zero is invalid, assume a CPU backend can run any GPU bundle, or replace a failed model answer with text labelled AI-generated.
-- For microphone input, use **only verified on-device recognition** when available, not a generic recognizer with a preference flag that can send audio to a service. If unavailable or denied, disable the mic with a clear reason and retain question chips. Release recognition/mic on pause/dispose; no continuous listener, recording history, cloud fallback or silent model/voice downloads. Nitya owns adding `RECORD_AUDIO`, any required package-visibility queries and the navigation route. Send her exact one-line manifest/interface requests; do not edit her files yourself.
-- Speech output uses a verified local voice, separate user-controlled speaker toggle, normal audio routing and audio focus. Stop/pause appropriately on calls, interruptions and leaving the screen. Do not force public speaker output over headphones or silently use a network-required TTS voice. Keep Google as the default assistant. This is audit Q&A, not “Hey TraceVeil” while closed.
-- **Y2:** self-contained measured Network Proof adapter/card, arithmetic tests and actual device measurements. Start with fakes until Agrim's A4 supplies agreed byte counters. Treat `TrafficStats.UNSUPPORTED`, counter reset/wrap, interval mismatch and layer differences explicitly. UID bytes minus relay payload bytes is an estimated residual, **not proof of zero upload, malicious upload or a measured audit payload**. Do not clamp a negative/unknown measurement into a claimed zero. Display raw figures, units, formula, tolerance and uncertainty; coordinate begin/end persistence with Nitya rather than editing the orchestrator.
-- **Y3:** new pure geo lookup/aggregator types and self-contained endpoint-country list card, with controlled fixtures while waiting for A0/A2. Keep offline data out until the original source's licence and redistribution/attribution terms are read and recorded with Nitya. Never reuse TrackerControl's map/database/assets. Unknown IPs stay unknown/omitted; CDN/anycast is uncertain; no countries guessed from hostnames. Label DNS-IP country as inferred, not a transfer or legal violation. If no data source is cleared, ship an honest jurisdiction/IP-only fallback; optional cloud lookup needs an explicit team decision and off-by-default consent.
-- **Y4:** separate company jurisdiction layer only for sourced entries from Agrim A5. Headquarters is not automatically registration; use labels supported by each source. Do not phase-color this reference-data layer.
-- **Y5:** after Nitya removes the Camera Check Home entry/route, remove its screen and unused camera helpers from **your owned** `ToolScreens.kt`. Preserve AI Lab and Settings. Do not improve Camera Check: the newest milestone plan explicitly removes it. Coordinate the two commits; do not push a broken dangling route as ready.
-- **Y6 last:** a controlled aliased host in the leaky flavor only if the team controls a real CNAME and Agrim's parser/classifier has passed. Otherwise retain a labelled synthetic fixture; no fake live-domain claim. Preserve Fixed behavior and the demo contrast.
+Use repository-local identity `Yashvi Upadhyay <24f2007780@ds.study.iitm.ac.in>` and your own GitHub authentication. Never ask for a token or password in chat.
 
-Cut lower-priority items using the milestone plan rather than adding unrelated features. Do not implement a full fraud scanner, permission interceptor or a second Safety Coach.
+## Changes needed from you after A5 (do these before opening the Y3 PR)
+
+1. **One ownership mapping.** A5 put cited company facts into `trackers.json` using exactly your `owners.json` field names (`location` / `incorporation` / `note`; each with `country`, `source`, `kind`, `asOf`, `quote`, `basis`). Build `OwnerRegistry` from the catalogue instead of `geo/owners.json`, then delete `owners.json`:
+   ```kotlin
+   catalog.entries().filter { it.location != null || it.incorporation != null || it.note != null }
+       .map { e -> OwnerFacts(e.entity, e.location?.toSourced(), e.incorporation?.toSourced(), e.note) }
+   ```
+   where `toSourced()` maps `CompanyCountry(country, source, kind, asOf, quote, basis)` 1:1 onto your `SourcedCountry` (the `kind` and `basis` enum names are identical). Do not parse `trackers.json` with your existing loader: it rejects the 22 entries that have no facts. The catalogue already validates every fact (ISO code, https source, date, quote length, basis) and fails the load otherwise.
+2. **Do not keep both files.** They now disagree: `owners.json` has Google and Meta as `STATED_ADDRESS` (terms of service), while `trackers.json` has them as `HEADQUARTERS` with quotes from their SEC 10-K filings (Item 2). AppsFlyer is `STATED_ADDRESS` in both; CleverTap has only a note.
+3. **Footer wording.** Your owner view says "Parent-company ownership is not established." The four Google entries now cite Alphabet Inc. (the parent) for headquarters and Google LLC for incorporation, with a note saying so. Reword, for example: "A parent company is named only where the cited source names it."
+4. **Y4 labels.** A headquarters is labelled as a headquarters (`TrackerEntry.hqCountry` / `hqSource`, non-null only when the source says "headquarters"); a stated address as a stated address; an incorporation as an incorporation. Never write "registered in" for a company, even though the old milestone text says so. Show only entries with a source; do not colour this layer by consent phase.
+5. **Optional clarity:** your map fill constant `MapColors.HEADQUARTERS` is also used for stated addresses. It is never shown to users; rename it (for example `COMPANY_LOCATION`) if you touch that code.
+
+What A5 contains, for reference: headquarters (US) for Google ×4, Meta ×3, Microsoft Clarity, Braze, Unity Ads, AppLovin; stated address only for AppsFlyer (IL) and Amplitude (US, "principal executive office"); CleverTap not established; 22 entities not researched (null, shown as "Not established").
+
+## Your remaining work, in order
+
+- **Y3 to `main`:** finish the changes above, re-run tests, then open a PR from `yashvi/phone-experience` to `main` with test output and screenshots. Keep GeoLite2 data out of Git as you decided; Nitya records it in `ATTRIBUTIONS.md` (it does not exist yet; send her the exact entry). A filled map with real countries has not been seen on a phone yet: the live audits on 10 Oct produced real `answerIps` (see the bug report), so test with your own GeoLite2 file and a Full audit of LeakyShop.
+- **Network Proof check against live data:** a leaky Reject plan relayed 8 datagrams, 322 B sent, 653 B received. Encrypted-DNS attempts appear as `CaptureHealth.hiddenDnsPackets` (8 in each audit's first plan with Private DNS on Automatic) and never reach the relay; `nonDnsPackets` are IPv6 control traffic. Make sure your card states both where relevant, and still never clamps an unknown or negative remainder to 0.
+- **Y4:** the company layer from the catalogue, per point 4 above.
+- **Y5:** after Nitya removes the Camera Check Home button and route (still present on `main`: `MainActivity.kt` route `camera`, `HomeScreen.kt` "Camera check"), remove `CameraCheckScreen` and its unused helpers from your `ToolScreens.kt`. Keep AI Lab and Settings working. Coordinate so no commit leaves a dangling route.
+- **Y6 last:** a controlled aliased host in the leaky flavour only if the team controls a real CNAME. Otherwise keep the labelled synthetic fixture (Nitya's `nitya/sample-fixtures` has one). Fixed must stay at 100.
+
+Do not implement a fraud scanner, a permission interceptor, a second Safety Coach, wake words or camera improvements. Any cloud feature (including the Sarvam online voice mode) must stay off by default with explicit consent and be recorded with Nitya.
 
 ## Ownership boundaries
 
-You own `app/.../voice/**`, `netproof/**`, `ui/screens/map/**`, `ToolScreens.kt`, `ai/**`, `core/.../geo` and `copilot`, and `leakyshop/**`. Agrim owns Model.kt/evidence/capture/rules/score/notice/tracker resources. Nitya owns MainActivity/AppGraph/shared ViewModel/Home/Results/Live/Components/theme, manifest/Gradle configuration, audit/data/report/consent/control, fixtures and CI/docs.
+You own `app/.../voice/**`, `netproof/**`, `ui/screens/map/**`, `ToolScreens.kt`, `ai/**`, `core/.../geo` and `copilot`, and `leakyshop/**`. Agrim owns `Model.kt`, `CaptureHealth`, capture, DNS, trackers (`trackers.json`, `TrackerCatalog`, `CompanyFacts`), rules, score and notice. Nitya owns `MainActivity`/AppGraph/shared ViewModel/Home/Results/Live/Components/theme, manifest/Gradle, audit/data/report/consent/control, fixtures and CI/docs.
 
-Do not modify another owner's file to make integration easier. Deliver exact signatures, standalone components, error states and short wiring requests. Nitya will mount the voice screen, add permissions/routes, persist proof, and place cards. Request licence register updates rather than inventing clearance. Shared documentation changes can be proposed for Nitya to integrate.
+Do not edit another owner's file. Need a field or behaviour from Agrim's code? Ask with the exact signature. Need wiring? Send Nitya the exact call and route.
 
-## Run it on my own iQOO 15
+## Phone rules (unchanged)
 
-Connecting Office Kit/ADB does not copy Nitya's phone state. Identify **my own** serial; every device command uses `adb -s MY_SERIAL`. Build/install TraceVeil plus both demos; manually enable VPN and TraceVeil accessibility while keeping HackTracker enabled, set Private DNS off for DNS tests, and start/authorize Shizuku on this phone. Keep Google assistant unchanged. No root/bootloader changes, automatic Android Allow/Deny clicks or silent uninstall after a signing mismatch.
-
-Current Quick/Full audits can clear target data with Shizuku, even with the agent toggle off. Only test on controlled LeakyShop or explicitly confirmed developer-owned test packages; never banking/messaging/personal apps. No live malware downloads.
-
-Optional GPU model: `gemma-4-E2B-it-gpu.litertlm`, 2,008,432,640 bytes, SHA-256 `a53a59001894c58e6bdb5b9b227709f91a2e3e556baa7d85acf9c55402ba5cf5`, app external models directory `/sdcard/Android/data/com.dpdpxray.app/files/models/`. Cloning does not transfer it; verify hash/licence and use the existing model-loading flow. Embedding/NPU models are not validated; do not install an SM8750 bundle on SM8850 assuming compatibility.
-
-Verify actual English/Hindi speech recognition, denied permission, missing pack/model, interruption cleanup, local speech output and offline behavior on this phone after Nitya's manifest wiring lands. Typed or injected transcript input tests only the answer path, **not microphone recognition**. Confirm Office Kit mirroring, real clipboard paste and report transfer separately. Different devices/networks/settings can produce different observations; never promise identical results.
+Use `adb -s YOUR_SERIAL` for every command. Grant VPN, Accessibility and Shizuku by hand on your own phone (start Shizuku with the command its app shows under *View command*); keep HackTracker and Google assistant unchanged. Only audit or reset `com.leakyshop.demo` and `com.leakyshop.demo.fixed`; never a real app. No root, no automatic Android Allow/Deny taps, no uninstall to bypass a signing mismatch. Private DNS on Automatic adds hidden-DNS packets; set it Off for clean DNS tests and record which setting you used.
 
 ## Verification and handoff
 
-Each completed slice needs new failing tests first, the observed failure, implementation, fresh full core tests plus affected builds, and phone evidence where required. Preserve baseline controlled regression expectations LeakyShop 21 and Fixed 100 without hardcoding; recorded model failures do not count as working AI. Tests must also cover grounded refusal, absent C9 evidence, invented citation rejection, missing speech/model services, and uncertain counters.
-
-Commit genuine work as me and push only `yashvi/phone-experience` through my authenticated account. Keep public history, truthful provenance and AI-use disclosure; no artificial commit counts or changed timestamps. Agrim reviews and merges into main.
-
-Report: branch/commit, Y milestone status, tests/actual outputs, phone behaviors genuinely tested, exported component/signature contracts, requested Nitya wiring, licences/dependencies, model diagnosis evidence, and remaining coverage limits. Never claim comprehensive fraud prevention, payload exfiltration or legal certification from permissions/DNS. On-device recognition and local TTS requirements should be checked against the official Android documentation, not memory.
-
-Primary Android references: [SpeechRecognizer](https://developer.android.com/reference/android/speech/SpeechRecognizer), [TTS Voice](https://developer.android.com/reference/android/speech/tts/Voice), and [TrafficStats](https://developer.android.com/reference/android/net/TrafficStats).
+Each slice: failing tests first, then the fix, then the full core and app suites plus the three APK builds, and phone evidence where the change touches the device. Keep LeakyShop 21 / Fixed 100 as expected observations, never hard-coded. Commit genuine work as you; push only `yashvi/phone-experience`; open a PR to `main` for Agrim to review and merge. Report: branch and commit, Y status, test output, what was actually tested on the phone, exported signatures, wiring requests for Nitya, licence decisions, and remaining limits. Never claim data was sent, a law was broken, or a score is a legal certificate.

@@ -47,7 +47,8 @@ class SpeechOutputTest {
     }
 
     @Test
-    fun `ui state has no cloud flag by default`() {
+    fun `cloud voice is off by default`() {
+        assertFalse(VoiceUiState().cloudVoice)
         assertNull(VoiceUiState().voiceNote)
         assertFalse(VoiceUiState().speaking)
     }

@@ -111,11 +111,15 @@ object NetworkProofText {
                 (proof.packetRemainder?.let { " Packets beyond the DNS datagrams: ${n(it)}." } ?: ""))
             add(when (proof.status) {
                 ProofStatus.WITHIN_TOLERANCE -> "The remainder is within tolerance of zero."
-                ProofStatus.ABOVE_TOLERANCE -> "${n(proof.remainderBytes)} bytes are not explained by the DNS relay."
+                ProofStatus.ABOVE_TOLERANCE -> "${n(proof.remainderBytes)} bytes are not explained by the DNS relay. This does not show that data was sent anywhere."
                 ProofStatus.INCONSISTENT -> "The counters disagree (more DNS relayed than upload measured), so no conclusion is drawn."
                 ProofStatus.UNCERTAIN -> "An online feature's bytes were not measured, so the remainder is uncertain."
             })
-            add("This is an estimate from two counters at different network layers, not proof of what was or was not sent.")
+            add(
+                "Android's per-app counter may also include other TraceVeil traffic and possibly TraceVeil's own writes into the tunnel; " +
+                    "whether it does has not been measured. The remainder is an estimate, not proof: unexplained bytes do not show that data " +
+                    "was sent anywhere, and a zero or near-zero figure does not prove the absence of uploads.",
+            )
         }
     }
 }

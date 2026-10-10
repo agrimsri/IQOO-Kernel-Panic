@@ -10,7 +10,7 @@ import com.dpdpxray.core.copilot.CopilotLanguage
 
 /**
  * Speaks answers with the phone's own text-to-speech and an installed offline voice only. It makes no network request
- * and has no cloud fallback. Takes transient audio focus with normal routing (headphones stay in use) and stops when
+ * itself; the optional online voice is a separate [CloudSpeechOutput]. Takes transient audio focus with normal routing (headphones stay in use) and stops when
  * focus is lost, e.g. for a call.
  */
 class AnswerVoice(private val context: Context, private val onState: (VoiceOutputState) -> Unit) : SpeechOutput {

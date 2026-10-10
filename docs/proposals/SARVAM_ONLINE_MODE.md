@@ -1,6 +1,6 @@
 # Proposal: optional Sarvam online voice mode (NOT enabled, no requests made)
 
-Status: proposal for team review. No Sarvam request has been sent from this project's code or by this analysis.
+Status: team decided (10 Oct) to add an online TTS-only demo voice: `CloudSpeechOutput`, enabled only by `USE_API=true` plus `SARVAM_API_KEY` in the adb-pushed `api.env`. Voices: `ishita` (en-IN), `priya` (hi-IN). STT stays on-device. The rest of this proposal (consent screen, STT, comparison) is still open.
 
 ## Principles
 - Offline Y1 is the product. Answers come from `GroundedAnswerer` (audit evidence + at most 3 corpus passages) and never depend on a GPU model or Sarvam.

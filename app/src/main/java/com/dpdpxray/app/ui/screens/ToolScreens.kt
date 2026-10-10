@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +43,7 @@ import com.dpdpxray.app.ai.DiagnosticRow
 import com.dpdpxray.app.ai.LlmOutcome
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.ai.ModelFiles
+import com.dpdpxray.app.ui.screens.map.EndpointMapCard
 import com.dpdpxray.app.ui.CameraCheckState
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.CodeBlock
@@ -51,6 +54,7 @@ import com.dpdpxray.app.ui.components.SecondaryAction
 import com.dpdpxray.app.ui.components.SectionTitle
 import com.dpdpxray.app.ui.components.TopBar
 import com.dpdpxray.app.ui.theme.Film
+import com.dpdpxray.app.voice.ApiEnv
 import com.dpdpxray.core.model.RejectOption
 import com.dpdpxray.core.model.ScreenAudit
 import kotlinx.coroutines.launch
@@ -126,6 +130,22 @@ fun AiLabScreen(vm: XrayViewModel, onBack: () -> Unit) {
 
             SectionTitle("Legal search")
             Note(if (vm.graph.semanticSearch) "Semantic search with the on-device embedding model is active." else "Keyword search (BM25) over the DPDP Act and Rules. Add an EmbeddingGemma model to the folder for semantic search.")
+
+            SectionTitle("Endpoint map")
+            // Stopgap home so the card can be seen without touching the shared screens; it moves to Results when mounted there.
+            val audits by vm.audits.collectAsState()
+            val recent = audits.filter { !it.sample }.sortedByDescending { it.createdAtMs }.take(4)
+            var chosenId by remember { mutableStateOf<String?>(null) }
+            val shownId = chosenId?.takeIf { id -> recent.any { it.id == id } } ?: recent.firstOrNull()?.id
+            var shownBundle by remember(shownId) { mutableStateOf<com.dpdpxray.app.data.AuditBundle?>(null) }
+            LaunchedEffect(shownId) { shownBundle = shownId?.let { vm.graph.repository.load(it) } }
+            if (recent.size > 1) Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                recent.forEach { m ->
+                    SecondaryAction("${m.targetLabel} · ${m.score ?: "–"}", { chosenId = m.id }, Modifier.widthIn(min = 150.dp), enabled = m.id != shownId)
+                }
+            }
+            shownBundle?.let { EndpointMapCard(it.sessions, vm.graph.catalog(), Modifier.padding(top = 8.dp)) }
+                ?: Note("Run an audit to see where its lookups were answered.")
 
             SectionTitle("Install models")
             Note("Copy model files into this folder from your laptop. No root needed.")
@@ -229,6 +249,12 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit) {
             Note(
                 "TraceVeil uploads nothing. Its only network use is relaying the audited app's own DNS lookups during an audit. " +
                     "Reports, screenshots and AI analysis stay on this phone until you export them.",
+            )
+            val ctx = LocalContext.current
+            if (remember { ApiEnv.load(ctx).useApi }) Note(
+                "Online voice is switched on for this build: Voice Copilot sends each spoken answer's text to Sarvam AI to make speech. " +
+                    "Speech recognition and answers still stay on this phone.",
+                Film.high,
             )
             SectionTitle("Not legal advice")
             Note("Results are an automated technical assessment with citations to the DPDP Act 2023 and DPDP Rules 2025.")

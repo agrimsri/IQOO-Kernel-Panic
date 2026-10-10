@@ -51,4 +51,12 @@ class SarvamTtsTest {
 
     @Test
     fun `empty audios is a failure`() = assertTrue(SarvamTts.parseResponse("""{"request_id":null,"audios":[]}""") is SarvamResult.Failed)
+
+    @Test
+    fun `uses a female Indian voice per language`() {
+        fun speaker(l: CopilotLanguage) =
+            Json.parseToJsonElement(SarvamTts.requestBody("x", l)).jsonObject["speaker"]!!.jsonPrimitive.content
+        assertEquals("ishita", speaker(CopilotLanguage.EN))
+        assertEquals("priya", speaker(CopilotLanguage.HI))
+    }
 }
