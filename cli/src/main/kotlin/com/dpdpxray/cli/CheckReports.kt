@@ -122,6 +122,10 @@ object CheckText {
         appendLine("== ${c.source.displayPath}")
         appendLine("App:      ${b.app.label} · ${b.app.packageName}")
         appendLine("Exported: ${b.exportedAt} by ${b.tool.name} ${b.tool.version}")
+        c.signature?.let { s ->
+            val hint = if (s.state == SignatureStatus.State.FAILED) " · traceveil-ci verify shows every check" else ""
+            appendLine("Signature: ${s.summary}${s.path?.let { " · $it" } ?: ""}$hint")
+        }
         c.warnings.forEach { appendLine("Warning:  $it") }
         appendLine("Plans:    " + if (c.coverage.isEmpty()) "none" else c.coverage.joinToString(" | ") { "${it.plan.label}: ${Wording.choice(it)}" })
         appendLine("Fresh:    ${Wording.fresh(c.coverage)}")
@@ -215,6 +219,7 @@ object CheckJson {
             c.outcomes.forEach { o -> add(buildJsonObject { put("rule", o.rule); put("status", o.status.name); put("message", o.message) }) }
         })
         put("legalLens", lens(c))
+        put("signature", c.signature?.toJson() ?: JsonNull)
         put("warnings", JsonArray(c.warnings.map(::JsonPrimitive)))
         put("passed", c.passed)
     }

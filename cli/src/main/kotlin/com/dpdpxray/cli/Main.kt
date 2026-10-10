@@ -41,7 +41,7 @@ fun main(args: Array<String>) {
 }
 
 /**
- * `traceveil-ci check <bundle.json>... [--policy policy.json] [--format text|json|sarif] [--out file]`
+ * `traceveil-ci check <bundle.json>... [--policy policy.json] [--format text|json|sarif] [--out file] [--sig file] [--require-signature]`
  * `traceveil-ci diff <old.json> <new.json> [--format text|json] [--out file]`
  *
  * `traceveil-ci run --package <pkg> [options]` (see [RunCommand]): runs the audit on a USB-connected phone first.
@@ -72,7 +72,7 @@ class TraceVeilCi(
             null -> throw UsageException("no command given")
             "-h", "--help", "help" -> { out.print(USAGE); Exit.PASS }
             "-V", "--version", "version" -> { out.println("${CliInfo.NAME} ${CliInfo.version}"); Exit.PASS }
-            "check" -> check(Args.parse(args.drop(1), setOf("--policy", "--format", "--out", "--profile")))
+            "check" -> check(Args.parse(args.drop(1), setOf("--policy", "--format", "--out", "--profile", "--sig"), setOf(REQUIRE_SIGNATURE)))
             "diff" -> diff(Args.parse(args.drop(1), setOf("--format", "--out")))
             "verify" -> verify(Args.parse(args.drop(1), setOf("--sig", "--format", "--package", "--signer-sha256")))
             "run" -> RunCommand(out, err, cwd, { gate }, env, adbFactory, clock, newRunId).run(args.drop(1))
@@ -92,16 +92,22 @@ class TraceVeilCi(
     private fun check(a: Args): Int {
         if (a.positional.isEmpty()) throw UsageException("check needs at least one bundle file (traceveil.audit.v1 JSON)")
         val format = a.format(setOf("text", "json", "sarif"))
-        val (policy, policySource) = a.options["--policy"]?.let { path ->
+        val (filePolicy, fileSource) = a.options["--policy"]?.let { path ->
             val f = resolve(path)
             if (!f.isFile) throw UsageException("policy file not found: $path")
             Policy.parse(f.readText(Charsets.UTF_8)) to "policy file ${LoadedBundle.displayPath(f, cwd)}"
-        } ?: (Policy() to "defaults (failOn C2, C9; not-established fails; requireFreshState; requirePlans ACCEPT, REJECT, SILENT; inconclusive fails)")
+        } ?: (Policy() to RunOptions.DEFAULT_POLICY_SOURCE)
+        val (policy, policySource) = withRequireSignature(filePolicy, fileSource, REQUIRE_SIGNATURE in a.flags)
         val profile = a.options["--profile"]?.let { id ->
             LegalProfile.parse(id) ?: throw UsageException("unknown legal profile \"$id\" (use ${LegalProfile.entries.joinToString("|") { it.name }})")
         }
+        val explicitSig = a.options["--sig"]?.let { path ->
+            if (a.positional.size != 1) throw UsageException("--sig names the signature of one bundle; pass exactly one bundle with it")
+            resolve(path).also { if (!it.isFile) throw UsageException("signature file not found: $path") }
+        }
         val bundles = load(a.positional)
-        val checks = bundles.map { gate.check(it, policy, profile) }
+        val roots = trustedRoots()
+        val checks = bundles.map { b -> gate.check(b, policy, profile, b.file?.let { SignatureStatus.of(it, explicitSig, cwd, roots) }) }
         val text = CheckText.render(checks, policy, policySource)
         emit(a, format, text) {
             when (format) {
@@ -179,7 +185,7 @@ class TraceVeilCi(
 
     private fun resolve(path: String): File = File(path).let { if (it.isAbsolute) it else File(cwd, path) }
 
-    private class Args(val positional: List<String>, val options: Map<String, String>) {
+    private class Args(val positional: List<String>, val options: Map<String, String>, val flags: Set<String> = emptySet()) {
         fun format(allowed: Set<String>): String {
             val f = options["--format"]?.lowercase() ?: "text"
             if (f !in allowed) throw UsageException("unknown format \"$f\" (use ${allowed.joinToString("|")})")
@@ -187,9 +193,10 @@ class TraceVeilCi(
         }
 
         companion object {
-            fun parse(args: List<String>, known: Set<String>): Args {
+            fun parse(args: List<String>, known: Set<String>, knownFlags: Set<String> = emptySet()): Args {
                 val positional = mutableListOf<String>()
                 val options = mutableMapOf<String, String>()
+                val flags = mutableSetOf<String>()
                 var i = 0
                 var onlyFiles = false
                 while (i < args.size) {
@@ -197,9 +204,13 @@ class TraceVeilCi(
                     when {
                         onlyFiles -> positional += arg
                         arg == "--" -> onlyFiles = true
+                        arg.startsWith("--") && arg.substringBefore('=') in knownFlags -> {
+                            if ('=' in arg) throw UsageException("${arg.substringBefore('=')} takes no value")
+                            flags += arg
+                        }
                         arg.startsWith("--") -> {
                             val name = arg.substringBefore('=')
-                            if (name !in known) throw UsageException("unknown option \"$name\" (known: ${known.sorted().joinToString()})")
+                            if (name !in known) throw UsageException("unknown option \"$name\" (known: ${(known + knownFlags).sorted().joinToString()})")
                             val value = if ('=' in arg) arg.substringAfter('=') else args.getOrNull(++i) ?: throw UsageException("$name needs a value")
                             if (value.isBlank()) throw UsageException("$name needs a value")
                             options[name] = value
@@ -209,17 +220,24 @@ class TraceVeilCi(
                     }
                     i++
                 }
-                return Args(positional, options)
+                return Args(positional, options, flags)
             }
         }
     }
 
     companion object {
+        const val REQUIRE_SIGNATURE = "--require-signature"
+
+        /** --require-signature turns requireSignature on over any policy (file or defaults) and says so in the source. */
+        fun withRequireSignature(policy: Policy, source: String, flag: Boolean): Pair<Policy, String> =
+            if (flag) policy.copy(requireSignature = true) to "$source + $REQUIRE_SIGNATURE" else policy to source
+
         val USAGE = """
             |TraceVeil CI: gate a release on consent evidence captured on a phone with TraceVeil.
             |
             |Usage:
             |  traceveil-ci check <bundle.json>... [--policy policy.json] [--profile id] [--format text|json|sarif] [--out file]
+            |                     [--sig file] [--require-signature]
             |  traceveil-ci diff <old.json> <new.json> [--format text|json] [--out file]
             |  traceveil-ci run --package <pkg> [--device SERIAL] [--apk file.apk] [--mode full|quick] [--token T]
             |                   [--policy policy.json] [--timeout 300] [--out traceveil-out] [--adb path]
@@ -229,6 +247,9 @@ class TraceVeilCi(
             |
             |check  Re-evaluates each traceveil.audit.v1 bundle (from TraceVeil's Report screen: "Export audit data
             |       (JSON)") with this build's rules, shows stored and re-evaluated scores, and applies the policy.
+            |       It also reports the hardware signature next to each bundle (<bundle>.sig.json, or --sig with one
+            |       bundle): verified, NOT verified or absent. With requireSignature (or --require-signature) anything
+            |       but verified fails the bundle.
             |diff   Compares two bundles (e.g. last release and this one): resolved, new and unchanged findings and
             |       the score change. A new finding at Low severity or above, a lower score, an inconclusive new
             |       result, or an old finding the new capture could not test (NOT ESTABLISHED) is a regression.
@@ -255,6 +276,7 @@ class TraceVeilCi(
             |  requireFreshState [true]         every plan must have started from an approved fresh reset
             |  allowInconclusive [false]        an inconclusive result (low network visibility) fails unless true
             |  requirePlans      ["ACCEPT", "REJECT", "SILENT"]  plans that must be captured with their choice recorded
+            |  requireSignature  [false]        fail unless the bundle's hardware signature verifies (see verify)
             |
             |--profile reads the findings under a legal lens: INDIA, EU, UK, US_CALIFORNIA, US_CHILDREN, BRAZIL,
             |       SINGAPORE or GLOBAL_BASELINE (case and - or _ do not matter). Default: the bundle's legalProfile, else
