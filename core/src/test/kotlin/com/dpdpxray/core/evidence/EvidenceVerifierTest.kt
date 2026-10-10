@@ -172,6 +172,14 @@ class EvidenceVerifierTest {
     }
 
     @Test
+    fun `an unspecific secure-hardware label (Android 10 and 11) is not a disagreement`() {
+        val chain = TestPki.chain()
+        val r = verify(signed(chain, level = SecurityLevel.UNKNOWN_SECURE), chain)
+        assertNull(r.status("claim"))
+        assertTrue(r.verified)
+    }
+
+    @Test
     fun `boot state and challenge are reported as information, never as a pass`() {
         val chain = TestPki.chain(TestAttestation(deviceLocked = false, verifiedBootState = 2))
         val r = verify(signed(chain), chain)

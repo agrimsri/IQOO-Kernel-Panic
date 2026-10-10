@@ -105,7 +105,8 @@ object EvidenceVerifier {
         checks += appCheck(kd, expectedPackage, expectedSignerSha256)
 
         val claimed = SecurityLevel.parse(sig.securityLevel)
-        if (claimed != kd.attestationSecurityLevel) {
+        val agrees = claimed == kd.attestationSecurityLevel || (claimed == SecurityLevel.UNKNOWN_SECURE && kd.attestationSecurityLevel.isHardware)
+        if (!agrees) {
             checks += EvidenceCheck(
                 "claim", CheckStatus.WARN, "Security label",
                 "The signature file says \"${sig.securityLevel}\" but the attestation says ${kd.attestationSecurityLevel.wire}; the attestation is what counts.",
