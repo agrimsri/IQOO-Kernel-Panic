@@ -55,6 +55,25 @@ class PlayLabelReportTest {
     }
 
     @Test
+    fun `html section for the offline report escapes text and links sources only as plain anchors`() {
+        val evil = record.copy(text = "No data shared with third parties\n<script>alert(1)</script>\nThis app may collect these data types\nApp activity")
+        val evilCheck = PlayLabelComparator(catalog).compare(evil.parsed, DemoSessions.leaky)
+        val html = PlayLabelReport.html(evil, evilCheck)
+        assertTrue(html, html.startsWith("<section id=\"play-label\""))
+        assertFalse(html, html.contains("<script"))
+        assertTrue(html, html.contains("Points to review (4)"))
+        assertTrue(html, html.contains("&quot;collects and shares"))
+        val stripped = html.replace(Regex("<a\\s[^>]*>.*?</a>", RegexOption.DOT_MATCHES_ALL), "")
+        assertFalse(stripped.contains("https://"))
+        assertTrue(html.contains("<a href=\"https://support.google.com/analytics/answer/11582702\" target=\"_blank\" rel=\"noopener noreferrer\">"))
+
+        val page = "<html><body><main><p>x</p><footer class=\"foot\"><p>d</p></footer></main></body></html>"
+        val placed = PlayLabelReport.insertHtml(page, html)
+        assertTrue(placed.indexOf("<section id=\"play-label\"") < placed.indexOf("<footer class=\"foot\">"))
+        assertEquals(page, PlayLabelReport.insertHtml(page, ""))
+    }
+
+    @Test
     fun `label lines say what the text states and nothing more`() {
         assertEquals(
             listOf("Sharing: not in the pasted text", "Collection: Location and Personal info (and 5 others not named)", "Security: Data isn't encrypted; Data can't be deleted"),

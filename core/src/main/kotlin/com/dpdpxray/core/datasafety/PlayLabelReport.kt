@@ -157,6 +157,78 @@ object PlayLabelReport {
         else markdown.substring(0, at).trimEnd() + "\n\n" + block + markdown.substring(at)
     }
 
+    /**
+     * The same section for the offline HTML report: escaped text, and web addresses only as plain anchors (the page's
+     * Content-Security-Policy blocks every fetch; a link opens only when clicked). Uses the report's own section styles.
+     */
+    fun html(record: PlayLabelRecord, check: PlayLabelCheck): String = buildString {
+        append("<section id=\"play-label\" class=\"sect\" aria-labelledby=\"play-label-h\"><div class=\"sect-head\">")
+        append("<p class=\"eyebrow\">").append(esc(SEPARATE_SHORT)).append("</p><h2 id=\"play-label-h\">").append(esc(TITLE)).append("</h2>")
+        append("<p class=\"lede\">").append(esc("A label is the developer's own declaration; Google says \"$PLAY_REVIEW_QUOTE\" ")).append(link(PLAY_HELP_URL))
+        append(esc(" A lookup is an attempt to contact a host, not proof that data was sent.")).append("</p></div>")
+        append("<div class=\"plate\"><ul class=\"method\">")
+        append("<li>").append(esc("Label: ${PlayLabelRecord.sourceWords(record.source)}, attached ${date(record.addedAtMs)}")).append("</li>")
+        labelLines(check.label).forEach { append("<li>").append(esc(it)).append("</li>") }
+        check.label.notes.forEach { append("<li>").append(esc("Reading note: $it")).append("</li>") }
+        append("</ul>")
+        if (!check.label.readable) append("<p>").append(esc(PlayLabelComparator.UNREADABLE)).append("</p>")
+        else if (check.toReview.isEmpty()) append("<p>").append(esc("No points to review in this comparison.")).append("</p>")
+        else {
+            append("<h3>").append(esc("Points to review (${check.toReview.size})")).append("</h3><ol class=\"method\">")
+            check.toReview.forEach { p ->
+                append("<li>").append(esc(p.text))
+                p.caveat?.let { append("<br><small>").append(esc(it)).append("</small>") }
+                append("</li>")
+            }
+            append("</ol>")
+        }
+        val info = check.points.filter { it.informational }
+        if (info.isNotEmpty() || check.notCompared.isNotEmpty()) {
+            append("<ul class=\"method\">")
+            info.forEach { append("<li>").append(esc("For information: ${it.text}")).append("</li>") }
+            check.notCompared.forEach { append("<li>").append(esc("Not compared: $it")).append("</li>") }
+            append("</ul>")
+        }
+        if (check.observed.isNotEmpty()) {
+            append("<h3>").append(esc("Sources behind the SDK expectations")).append("</h3><ul class=\"method\">")
+            check.observed.forEach { o ->
+                val e = o.expectation
+                append("<li>").append(esc("${o.entity} (seen ${o.relations.joinToString(", ")}): "))
+                if (!e.verified) append(esc("${SdkExpectations.UNVERIFIED} (${PlayLabelComparator.join(e.categories.map { it.label })})."))
+                else {
+                    append(esc(e.types.joinToString("; ") { "${it.category.label}: \"${it.quote}\"" } + ". ${e.sourceTitle}, read ${e.checked}: "))
+                    e.sourceUrl?.let { append(link(it)) }
+                }
+                append("</li>")
+            }
+            append("</ul><p><small>").append(esc(SdkExpectations.MAPPING_NOTE)).append("</small></p>")
+        }
+        append("<p><small>").append(esc(RESEARCH_CONTEXT.substringBefore(" https://"))).append(" ")
+            .append(link(RESEARCH_CONTEXT.substringAfter(" https://").let { "https://$it" })).append("</small></p>")
+        append("</div></section>\n")
+    }
+
+    /** Puts [section] before the HTML report's footer, or returns [html] unchanged when there is no section or footer. */
+    fun insertHtml(html: String, section: String): String {
+        val at = html.indexOf("<footer class=\"foot\">")
+        return if (section.isBlank() || at < 0) html else html.substring(0, at) + section + html.substring(at)
+    }
+
+    private const val SEPARATE_SHORT = "Separate from the score"
+
+    private fun link(url: String) = "<a href=\"${esc(url)}\" target=\"_blank\" rel=\"noopener noreferrer\">${esc(url)}</a>"
+
+    private fun esc(s: String): String = buildString(s.length + 16) {
+        for (c in s) when (c) {
+            '&' -> append("&amp;")
+            '<' -> append("&lt;")
+            '>' -> append("&gt;")
+            '"' -> append("&quot;")
+            '\'' -> append("&#39;")
+            else -> append(c)
+        }
+    }
+
     /** Plain text for `traceveil-ci check --play-label`. */
     fun text(check: PlayLabelCheck, labelFile: String): String = buildString {
         appendLine("$TITLE ($labelFile)")

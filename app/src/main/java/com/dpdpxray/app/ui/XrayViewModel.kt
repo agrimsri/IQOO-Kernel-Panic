@@ -468,6 +468,9 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
                 HtmlExporter.build(
                     bundle.result, bundle.sessions, bundle.meta.timingProfile, bundle.meta.sample, fixesFor(bundle), graph.citations(), graph.catalog(),
                     profile = lensProfile(),
+                    playLabelSection = bundle.playLabel?.let { rec ->
+                        runCatching { PlayLabelReport.html(rec, playLabelCheck(rec, sdkGroups(bundle))) }.getOrNull()
+                    }.orEmpty(),
                 )
             }
             withContext(Dispatchers.IO) { HtmlExporter.write(html, File(bundle.dir, "TraceVeil-${bundle.meta.targetLabel.filter { it.isLetterOrDigit() }}.html")) }

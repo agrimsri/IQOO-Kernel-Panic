@@ -233,7 +233,9 @@ object HtmlExporter {
         fixes: List<FixTemplate>, citations: CitationService, catalog: TrackerCatalog,
         /** The legal lens selected in Settings; it changes the quoted law, never the evidence. */
         profile: LegalProfile = LegalProfile.INDIA,
-    ): String = HtmlReport.build(
+        /** "Play label vs what this check saw" as an HTML section (PlayLabelReport.html); empty when no label is attached. */
+        playLabelSection: String = "",
+    ): String = com.dpdpxray.core.datasafety.PlayLabelReport.insertHtml(HtmlReport.build(
         result, sessions, fixes, citations, catalog,
         HtmlCoverage(
             statements = EvidenceReport.coverageNotes(sessions, timingProfile, sample),
@@ -243,7 +245,7 @@ object HtmlExporter {
             sampleNotes = if (sample) sessions.flatMap { it.notes }.distinct() else emptyList(),
         ),
         profile = profile,
-    )
+    ), playLabelSection)
 
     fun write(html: String, out: File): File {
         out.parentFile?.mkdirs()
