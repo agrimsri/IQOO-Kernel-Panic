@@ -1,6 +1,8 @@
 package com.dpdpxray.core.report
 
 import com.dpdpxray.core.audit.PhaseAssigner
+import com.dpdpxray.core.darkpattern.DarkPatternScanner
+import com.dpdpxray.core.darkpattern.DarkPatternText
 import com.dpdpxray.core.dpdp.CitationService
 import com.dpdpxray.core.fixes.FixTemplate
 import com.dpdpxray.core.law.LawRelation
@@ -121,6 +123,7 @@ object HtmlReport {
             timelineSection(lanes)
             constellationSection(lanes)
             findingsSection(result, fixes, citations, catalog, lanes, view, lens)
+            darkPatternSection(sessions)
             networkSection(lanes)
             methodSection(view)
             append("<footer class=\"foot\"><p class=\"disclaimer\">").append(esc(MarkdownReport.DISCLAIMER)).append("</p>")
@@ -142,7 +145,7 @@ object HtmlReport {
         append("<path d=\"M9 13h14M11 17h10M13 21h6\" stroke=\"url(#bg)\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>TraceVeil</span>")
         append("<nav aria-label=\"Report sections\">")
         for ((id, name) in listOf("coverage" to "Coverage", "summary" to "Summary", "timeline" to "Timeline", "constellation" to "Constellation",
-            "findings" to "Findings", "network" to "Network", "method" to "Method")) {
+            "findings" to "Findings", "darkpatterns" to "Dark patterns", "network" to "Network", "method" to "Method")) {
             append("<a href=\"#").append(id).append("\">").append(name).append("</a>")
         }
         append("</nav></div></header>\n")
@@ -573,9 +576,31 @@ object HtmlReport {
             .append(id).append("\">Copy</button></div><pre id=\"").append(id).append("\"><code>").append(esc(text)).append("</code></pre></div>")
     }
 
+    /** Dark-pattern signals (India CCPA 2023): a separate plate, never findings and never in the score. */
+    private fun StringBuilder.darkPatternSection(sessions: List<AuditSession>) {
+        val signals = DarkPatternScanner.scan(sessions)
+        val summary = DarkPatternText.summary(signals, DarkPatternScanner.screensChecked(sessions))
+        sectionHead("darkpatterns", "04", DarkPatternText.CARD_TITLE, "$summary. ${DarkPatternText.FOOTER}")
+        if (signals.isEmpty()) append("<div class=\"plate empty\"><p>").append(esc(summary)).append(".</p></div>")
+        for (s in signals) {
+            append("<article class=\"plate dp\" id=\"dp-").append(s.pattern.number).append("\"><header class=\"f-head\">")
+            if (s.evidenceType == EvidenceType.OBSERVED) append("<span class=\"chip ev-observed\">Observed</span>")
+            else append("<span class=\"chip ev-inferred\">AI-inferred</span>")
+            append("<span class=\"f-meta\">").append(esc(DarkPatternText.plans(s))).append("</span></header>")
+            append("<h3>").append(esc(DarkPatternText.rowTitle(s))).append("</h3><p>").append(esc(DarkPatternText.resembles(s))).append("</p>")
+            append("<div class=\"f-block\"><h4>Evidence</h4><ul class=\"evidence\">")
+            s.evidence.forEach { append("<li>").append(esc(it)).append("</li>") }
+            append("</ul></div><blockquote><p>").append(esc(s.pattern.definition)).append("</p><footer>— ")
+                .append(esc("${DarkPatternText.SOURCE_TITLE} #${s.pattern.number}")).append(" · ").append(link(DarkPatternText.SOURCE_URL))
+                .append("</footer></blockquote></article>")
+        }
+        if (signals.any { it.evidenceType == EvidenceType.INFERRED }) append("<p class=\"dim small\">").append(esc(DarkPatternText.AI_NOTE)).append("</p>")
+        append("</section>\n")
+    }
+
     private fun StringBuilder.networkSection(lanes: List<Lane>) {
         val total = lanes.sumOf { minOf(it.events.size, MAX_LOOKUPS_PER_SESSION) }
-        sectionHead("network", "04", "Network timeline",
+        sectionHead("network", "05", "Network timeline",
             "Every recorded DNS lookup, per session, in time order. $LOOKUP_CAVEAT")
         append("<div class=\"plate net\"><div class=\"net-tools\"><label>Search <input type=\"search\" id=\"net-q\" placeholder=\"host or entity\" autocomplete=\"off\"></label>")
         append("<label>Session <select id=\"net-plan\"><option value=\"\">All</option>")
@@ -603,7 +628,7 @@ object HtmlReport {
     }
 
     private fun StringBuilder.methodSection(view: LensView) {
-        sectionHead("method", "05", "Method and limitations", "What this evidence can and cannot show.")
+        sectionHead("method", "06", "Method and limitations", "What this evidence can and cannot show.")
         append("<div class=\"plate\"><ul class=\"method\">")
         listOf(
             "Network evidence is the DNS lookups made by the audited app, captured by a local per-app VPN on the phone. A lookup shows the app tried to contact a server; payloads are not decrypted and no TLS certificate is installed.",

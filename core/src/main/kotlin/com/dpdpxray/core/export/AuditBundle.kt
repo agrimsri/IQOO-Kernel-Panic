@@ -1,6 +1,7 @@
 package com.dpdpxray.core.export
 
 import com.dpdpxray.core.attribution.SdkGroup
+import com.dpdpxray.core.darkpattern.DarkPatternExport
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.ScoreBand
@@ -35,7 +36,9 @@ import java.time.temporal.ChronoUnit
  * when unset. "legalProfile" names the legal lens selected when the bundle was exported (a core LegalProfile name such
  * as "EU"); it is omitted when unset and never changes the evidence or the stored result. "sdkAttribution" (optional,
  * omitted when unset) groups the bundle's own lookups and findings by the catalogue service behind them; it is derived
- * from "sessions" and "result" with TraceVeil's tracker catalogue and adds no new evidence.
+ * from "sessions" and "result" with TraceVeil's tracker catalogue and adds no new evidence. "darkPatterns" (optional,
+ * omitted when unset) lists the dark-pattern signals (India CCPA 2023) read from the same sessions' consent-screen trees
+ * and taps; they are signals for review, never findings, and never change "result".
  */
 
 /** The audited app named at the top of a bundle. */
@@ -64,6 +67,8 @@ data class AuditBundleV1(
     val legalProfile: String? = null,
     /** "Which SDK caused this?", derived on the phone from [sessions] and [result]. Not written when null. */
     val sdkAttribution: SdkAttributionExport? = null,
+    /** Dark-pattern signals (India CCPA 2023), derived on the phone from [sessions]; never part of [result]. Not written when null. */
+    val darkPatterns: DarkPatternExport? = null,
 )
 
 /**
@@ -144,10 +149,11 @@ object AuditBundles {
         note: String? = null,
         legalProfile: String? = null,
         sdkAttribution: SdkAttributionExport? = null,
+        darkPatterns: DarkPatternExport? = null,
     ) = AuditBundleV1(
         exportedAt = exportedAt, app = app, meta = meta, sessions = sessions, result = result,
         networkReadings = networkReadings, tool = BundleTool(TOOL_NAME, toolVersion), note = note, legalProfile = legalProfile,
-        sdkAttribution = sdkAttribution,
+        sdkAttribution = sdkAttribution, darkPatterns = darkPatterns,
     )
 
     fun quarantine(report: QuarantineReport, exportedAt: String = now(), note: String? = null) =
@@ -197,7 +203,7 @@ object AuditBundles {
         return JsonObject(obj.filterNot { (k, v) -> k in OPTIONAL_TOP_LEVEL && v == JsonNull })
     }
 
-    private val OPTIONAL_TOP_LEVEL = setOf("note", "legalProfile", "sdkAttribution")
+    private val OPTIONAL_TOP_LEVEL = setOf("note", "legalProfile", "sdkAttribution", "darkPatterns")
 
     private fun expectSchema(text: String, expected: String): JsonObject {
         val parsed = try {
