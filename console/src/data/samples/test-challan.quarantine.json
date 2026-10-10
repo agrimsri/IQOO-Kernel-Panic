@@ -1,0 +1,187 @@
+{
+  "schema": "traceveil.quarantine.v1",
+  "exportedAt": "2026-10-10T00:52:10Z",
+  "report": {
+    "schemaVersion": 1,
+    "id": "quarantine-1791593460000",
+    "targetPackage": "com.traceveil.riskdemo",
+    "targetLabel": "TEST Challan (TraceVeil demo)",
+    "startedAtEpochMs": 1791593460000,
+    "startedAtNanos": 61244903000000,
+    "endedAtNanos": 61304903000000,
+    "plannedDurationMs": 60000,
+    "stopReason": "TIMER",
+    "resolverAddresses": [
+      "10.111.0.53",
+      "fd00:111::53"
+    ],
+    "observations": {
+      "domains": [
+        {
+          "hostname": "c2.traceveil-demo.invalid",
+          "queryTypes": [
+            1,
+            28
+          ],
+          "resolvers": [
+            "10.111.0.53"
+          ],
+          "firstNanos": 61246523000000,
+          "lastNanos": 61246533000000,
+          "count": 2
+        },
+        {
+          "hostname": "pay-challan-update.invalid",
+          "queryTypes": [
+            1,
+            28
+          ],
+          "resolvers": [
+            "10.111.0.53"
+          ],
+          "firstNanos": 61246563000000,
+          "lastNanos": 61246573000000,
+          "count": 2
+        },
+        {
+          "hostname": "otp-relay.example",
+          "queryTypes": [
+            1,
+            28
+          ],
+          "resolvers": [
+            "10.111.0.53"
+          ],
+          "firstNanos": 61246603000000,
+          "lastNanos": 61246613000000,
+          "count": 2
+        }
+      ],
+      "blocked": [
+        {
+          "protocol": "TCP_SYN",
+          "protocolNumber": 6,
+          "ipVersion": 4,
+          "address": "203.0.113.10",
+          "port": 443,
+          "scope": "PUBLIC",
+          "role": "APP_DESTINATION",
+          "firstNanos": 61246643000000,
+          "lastNanos": 61247663000000,
+          "packets": 2
+        }
+      ],
+      "permissionDialogs": [
+        {
+          "packageName": "com.google.android.permissioncontroller",
+          "text": "Allow TEST Challan (TraceVeil demo) to send and view SMS messages?",
+          "namesTarget": true,
+          "firstNanos": 61259103000000,
+          "lastNanos": 61259103000000,
+          "timesShown": 1
+        }
+      ],
+      "settingsScreens": [],
+      "targetOnScreenNanos": 61246113000000,
+      "dnsQueries": 6,
+      "blockedPackets": 2,
+      "networkControlPackets": 4,
+      "unreadablePackets": 0,
+      "domainsOverflow": 0,
+      "destinationsOverflow": 0,
+      "uiEventsOverflow": 0
+    },
+    "summary": {
+      "domainsAttempted": [
+        "c2.traceveil-demo.invalid",
+        "pay-challan-update.invalid",
+        "otp-relay.example"
+      ],
+      "ipsAttempted": [
+        "203.0.113.10"
+      ],
+      "uniqueDomains": 3,
+      "uniqueIps": 1,
+      "uniqueDestinations": 1,
+      "dnsQueries": 6,
+      "blockedPackets": 2,
+      "addressesWithoutLookup": [
+        "203.0.113.10"
+      ],
+      "dnsBypassSignal": true,
+      "directResolvers": [],
+      "encryptedDnsDestinations": [],
+      "phoneResolverDnsAttempts": [],
+      "permissionDialogs": 1,
+      "settingsScreens": [],
+      "appCameToScreen": true,
+      "nothingObserved": false
+    },
+    "timeline": [
+      {
+        "atMs": 1210,
+        "kind": "APP_ON_SCREEN",
+        "text": "The app's window appeared",
+        "evidence": "OBSERVED"
+      },
+      {
+        "atMs": 1620,
+        "kind": "LOOKUP",
+        "text": "Tried to look up c2.traceveil-demo.invalid (answered: does not exist) · 2 lookups",
+        "evidence": "OBSERVED"
+      },
+      {
+        "atMs": 1660,
+        "kind": "LOOKUP",
+        "text": "Tried to look up pay-challan-update.invalid (answered: does not exist) · 2 lookups",
+        "evidence": "OBSERVED"
+      },
+      {
+        "atMs": 1700,
+        "kind": "LOOKUP",
+        "text": "Tried to look up otp-relay.example (answered: does not exist) · 2 lookups",
+        "evidence": "OBSERVED"
+      },
+      {
+        "atMs": 1740,
+        "kind": "BLOCKED",
+        "text": "Blocked TCP SYN to 203.0.113.10:443 · 2 packets",
+        "evidence": "OBSERVED"
+      },
+      {
+        "atMs": 14200,
+        "kind": "PERMISSION_DIALOG",
+        "text": "Permission dialog: \"Allow TEST Challan (TraceVeil demo) to send and view SMS messages?\"",
+        "evidence": "OBSERVED"
+      }
+    ],
+    "limits": [
+      "Not a malware verdict and not a full sandbox: it records what this app tried to reach during this run only.",
+      "Only this app's own internet is cut off. SMS, phone calls, and requests it hands to other apps or system services (for example Android's download manager or push messaging) are neither blocked nor seen.",
+      "After quarantine ends the app has its normal internet again and may then send what it could not send now.",
+      "Apps that wait longer than this run, need a login, or wait for a remote command may show little or nothing.",
+      "Encrypted DNS inside the app (DNS over HTTPS) shows only as blocked connections to an address, not as names.",
+      "Every lookup is answered \"does not exist\", so the app may give up early or try other addresses. Attempts are not proof that any data would have been sent.",
+      "If the app was already open before the run, it may reuse addresses or connections from before.",
+      "Packet counts include Android's automatic retries; they are not separate decisions by the app.",
+      "Permission dialogs and settings screens are recognised from Android's own screens and English titles; other languages or some phone brands' screens may be missed. A settings screen opening does not show whether the app or you opened it."
+    ],
+    "notes": [],
+    "deviceModel": null,
+    "androidVersion": null,
+    "privateDnsActive": false
+  },
+  "tool": {
+    "name": "TraceVeil Console sample",
+    "version": "1"
+  },
+  "sample": {
+    "kind": "illustrative",
+    "note": "Illustrative sample, not a recorded phone run. It shows what a quarantine run of the TEST Challan fixture is expected to record: the app is coded to look up three reserved names and connect to a documentation-only address (203.0.113.10:443), and its button opens Android's SMS permission dialog. Nothing in the fixture can reach a real server.",
+    "sources": [
+      "riskdemo/src/main/java/com/traceveil/riskdemo/DemoSignals.kt",
+      "docs/DEMO_RISK_APP.md",
+      "core QuarantineReport / QuarantineSummary / QuarantineTimeline"
+    ]
+  }
+}
