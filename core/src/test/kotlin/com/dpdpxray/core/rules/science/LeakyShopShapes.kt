@@ -73,7 +73,7 @@ object LeakyShopShapes {
         )
     }
 
-    /** The Facebook Quick check recorded on the iQOO 15 (audit-1791603680860), as used by CatalogueMatchTest. */
+    /** The Facebook Quick check recorded on the test phone (audit-1791603680860), as used by CatalogueMatchTest. */
     val facebook: List<AuditSession> by lazy {
         AuditJson.decodeSessions(LeakyShopShapes::class.java.getResource("/replays/facebook-audit-1791603680860.sessions.json")!!.readText())
     }
