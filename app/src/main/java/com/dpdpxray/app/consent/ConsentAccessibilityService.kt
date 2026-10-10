@@ -14,6 +14,7 @@ import com.dpdpxray.core.consent.ConsentLexicon
 import com.dpdpxray.core.model.ConsentEvent
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.UiNode
+import com.dpdpxray.core.quarantine.QuarantineUiRules
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.Executors
@@ -35,6 +36,9 @@ class ConsentAccessibilityService : AccessibilityService() {
     /** Read-only watcher used only during a quarantine run; it never taps. */
     private val quarantineWatcher = QuarantineUiWatcher(this, main)
 
+    /** Read-only: Android's own permission dialogs while an audit is armed (check C14); it never taps. */
+    private val permissionWatcher = PermissionDialogWatcher(this, main)
+
     override fun onServiceConnected() {
         instance = this
     }
@@ -43,6 +47,7 @@ class ConsentAccessibilityService : AccessibilityService() {
         if (instance === this) instance = null
         main.removeCallbacks(check)
         quarantineWatcher.cancel()
+        permissionWatcher.cancel()
         io.shutdown()
         super.onDestroy()
     }
@@ -52,11 +57,19 @@ class ConsentAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (QuarantineBus.watchedPackage != null) quarantineWatcher.onEvent(event)
         val armed = ConsentBus.armedPackage.value ?: run { consentVisible = false; return }
-        if (event.packageName?.toString() != armed) return
+        val pkg = event.packageName?.toString()
+        if (pkg != armed) {
+            // Android's permission dialog over the audited app is recorded (C14), never treated as its consent screen.
+            if (pkg != null && QuarantineUiRules.isPermissionController(pkg) && event.eventType != AccessibilityEvent.TYPE_VIEW_CLICKED) {
+                permissionWatcher.onPermissionControllerEvent(pkg, ConsentBus.generation)
+            }
+            return
+        }
         ConsentBus.markTargetSeen()
         when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_CLICKED -> onClick(event)
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED, AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
+                if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) permissionWatcher.onTargetWindowChanged()
                 // Trailing debounce: always re-check once things settle, so a dialog that appears a moment after the
                 // activity window is never missed.
                 main.removeCallbacks(check)
@@ -99,6 +112,14 @@ class ConsentAccessibilityService : AccessibilityService() {
         if (consentVisible && !isConsent) onConsentGone()
         consentVisible = isConsent
     }
+
+    /** Android's Home action, used by the audit's background step (C12). Callers use the main dispatcher. */
+    fun pressHome(): Boolean = performGlobalAction(GLOBAL_ACTION_HOME)
+
+    /** Whether any on-screen window belongs to [pkg]; null when the window list cannot be read. */
+    fun packageOnScreen(pkg: String): Boolean? = runCatching {
+        windows.any { it.root?.packageName?.toString() == pkg }
+    }.getOrNull()
 
     /** Bounded orchestrator polling complements event debounce; callers use the main dispatcher. */
     fun probeNow() {
