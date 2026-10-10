@@ -320,8 +320,9 @@ private fun ReadyPanel(items: List<SetupItem>, aiLine: String, fix: (SetupKind) 
     }
 }
 
+/** One setup step with its Fix button; also used inside the everyday Home's "No" card. */
 @Composable
-private fun SetupRow(item: SetupItem, number: Int?, onFix: () -> Unit) {
+internal fun SetupRow(item: SetupItem, number: Int?, onFix: () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         val accent = when {
             item.done -> Film.clear
