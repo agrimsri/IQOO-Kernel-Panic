@@ -37,6 +37,19 @@ class AnswerCheckTest {
     }
 
     @Test
+    fun `the constrained JSON check needs a real JSON object, not just the word true`() {
+        val json = AnswerCheck.cases(canReadImages = false).single { it.id == "json" }
+        assertTrue(AnswerCheck.isExpected(json, LlmOutcome.Text("""{"ok": true}""")))
+        assertTrue(AnswerCheck.isExpected(json, LlmOutcome.Text(" {\"ok\":true}\n")))
+        // Seen on the iQOO 15 GPU bundle: 15 characters that contain "true" but are not the requested object.
+        assertFalse(AnswerCheck.isExpected(json, LlmOutcome.Text("""{"{"ok": true}}""")))
+        assertFalse(AnswerCheck.isExpected(json, LlmOutcome.Text("""{"ok": false}""")))
+        assertFalse(AnswerCheck.isExpected(json, LlmOutcome.Text("true")))
+        val c = AnswerCheck.conclude(run("json" to LlmOutcome.Text("""{"{"ok": true}}""")))
+        assertTrue(c.toString(), c.any { it.contains("Constrained JSON did not work") })
+    }
+
+    @Test
     fun `a missing encoder is named instead of blaming the sampler or thinking settings`() {
         val missing = LlmOutcome.Failed(
             "com.google.ai.edge.litertlm.LiteRtLmJniException",

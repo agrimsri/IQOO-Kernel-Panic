@@ -1,5 +1,10 @@
 package com.dpdpxray.app.ai
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonPrimitive
+
 /** One fixed, data-free prompt run under one conversation setting by AI lab's "Answer check". */
 data class AnswerCheckCase(
     val id: String,
@@ -41,8 +46,17 @@ object AnswerCheck {
         add(AnswerCheckCase("legacy", "Old settings exactly: temperature 0, thinking not set", AskOptions.LEGACY.copy(maxOutputTokens = SHORT)))
     }
 
-    fun isExpected(case: AnswerCheckCase, outcome: LlmOutcome): Boolean =
-        outcome is LlmOutcome.Text && Regex("\\b${Regex.escape(case.expected)}\\b", RegexOption.IGNORE_CASE).containsMatchIn(outcome.text)
+    /** Answered as asked: the expected word, or for the constrained-JSON case a JSON object whose `ok` is true. */
+    fun isExpected(case: AnswerCheckCase, outcome: LlmOutcome): Boolean = when {
+        outcome !is LlmOutcome.Text -> false
+        case.jsonSchema != null -> okField(outcome.text) == true
+        else -> Regex("\\b${Regex.escape(case.expected)}\\b", RegexOption.IGNORE_CASE).containsMatchIn(outcome.text)
+    }
+
+    /** The boolean `ok` of a JSON-object reply; null when the reply is not that object (e.g. `{"{"ok": true}}`). */
+    private fun okField(text: String): Boolean? = runCatching {
+        (Json.parseToJsonElement(text.trim()) as? JsonObject)?.get("ok")?.jsonPrimitive?.booleanOrNull
+    }.getOrNull()
 
     /** First line of a test answer, at most 60 characters. Empty for anything that is not an answer. */
     fun preview(outcome: LlmOutcome): String = (outcome as? LlmOutcome.Text)?.text?.lineSequence()?.firstOrNull()?.trim()?.take(PREVIEW).orEmpty()
