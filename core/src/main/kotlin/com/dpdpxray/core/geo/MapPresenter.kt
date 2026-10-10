@@ -1,8 +1,6 @@
 package com.dpdpxray.core.geo
 
 import com.dpdpxray.core.model.Phase
-import java.time.Instant
-import java.time.ZoneOffset
 
 enum class MapMode(val label: String) {
     SOURCE_DNS("Source country / DNS"),
@@ -49,7 +47,6 @@ data class LegalContext(val label: String, val name: String, val quotes: List<St
 
 object MapPresenter {
     const val ATTRIBUTION = "This product includes GeoLite Data created by MaxMind, available from https://www.maxmind.com"
-    private const val STALE_AFTER_DAYS = 30L
     private const val MIN_REPEAT_LENGTH = 40
 
     private val phaseLabel = mapOf(
@@ -156,17 +153,18 @@ object MapPresenter {
         return "${h.host}: $addresses$alias"
     }
 
+    /** Names the table used (DB-IP Lite or GeoLite2), where it came from, its build date and the credit its licence asks for. */
     private fun sourceFooter(s: GeoSource, now: Long): List<String> = buildList {
-        val built = (s as? GeoSource.Loaded)?.lookup?.buildEpochSeconds
+        val table = (s as? GeoSource.Loaded)?.let { GeoTableInfo.of(it) }
         add(
-            "Countries are inferred from IP addresses" + (built?.let { " using GeoLite2-Country (database built ${Instant.ofEpochSecond(it).atZone(ZoneOffset.UTC).toLocalDate()})" } ?: "") +
+            "Countries are inferred from IP addresses" + (table?.let { " using ${it.description}" } ?: "") +
                 ". They show where an address is placed, not where data went, and are not proof of where a server is or of whether any law applies. " +
                 "CDN and anycast addresses can be answered from a country other than the one listed.",
         )
-        if (built != null) {
-            val days = (now - built) / 86_400
-            if (days > STALE_AFTER_DAYS) add("This database was built $days days ago. MaxMind publishes newer releases and the GeoLite EULA asks users to move to the updated version.")
-            add(ATTRIBUTION)
+        if (s is GeoSource.Loaded && table != null) {
+            table.ageNote(now)?.let { add(it) }
+            addAll(s.notes)
+            add(table.credit ?: "TraceVeil does not recognise this table (database type ${table.databaseType ?: "not recorded"}), so it cannot name its source or licence.")
         }
     }
 
