@@ -13,18 +13,35 @@ laptop                                   phone (debug build of Traceveil)
 
 The trigger exists **only in debug builds**. Release builds have no way to start an audit from adb.
 
-## 1. One-time setup
+## Quick start with pip (no repo checkout)
 
-You need: Python 3.11+, JDK 17, Android platform-tools (adb), a phone with USB debugging on.
-
-Install the CLI (from PyPI once published, or from a checkout):
+This is what `final.bash` does, as plain commands. You need Python 3.11+ and `adb` (Android platform-tools) on PATH, and the **Traceveil debug APK** already installed on the phone (it is built from the Traceveil Android app repo; it is not part of the pip package).
 
 ```bash
-pipx install traceveil          # or: pip install traceveil
-pip install -e .                # from a checkout; `python3 -m traceveil` also works
+# 1. Install the CLI in a clean virtual environment
+python3 -m venv .venv
+source .venv/bin/activate            # Windows: .venv\Scripts\activate
+pip install traceveil==0.1.0         # or: pipx install traceveil
+traceveil --version
+
+# 2. Check the phone (USB debugging on, Traceveil debug APK installed)
+traceveil doctor
+
+# 3. (Optional) install the app you want to audit
+adb install -r path/to/your-app-debug.apk
+
+# 4. Audit it and save the JSON report
+traceveil audit --package com.example.yourapp --out report.json
+echo $?                              # 0 pass, 1 findings, 2 inconclusive, 3 device/trigger, 6 timeout
 ```
 
-The examples below use `python3 -m traceveil`; the installed `traceveil` command is identical.
+Useful variations: `--plans silent` (quick, often inconclusive), `--auto-drive` (Traceveil taps Accept/Reject), `--serial <id>` with several phones, `--adb <path>` to choose the adb binary, `traceveil init` to create a `traceveil.toml`. Under WSL2 use the Windows adb (see the WSL2 note in section 1).
+
+From a repo checkout instead (section 1 below also builds the APKs): `pip install -e .` (then `traceveil ...` or `python3 -m traceveil ...`). The examples below use `python3 -m traceveil`; the installed `traceveil` command is identical.
+
+## 1. One-time setup (repo checkout: build the APKs)
+
+You need: Python 3.11+, JDK 17, Android platform-tools (adb), a phone with USB debugging on.
 
 ```bash
 # 1. Build and install the debug app (run from the repo root)
