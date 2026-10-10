@@ -4,6 +4,7 @@ import com.dpdpxray.core.automation.AutomationContract
 import com.dpdpxray.core.automation.AutomationMode
 import com.dpdpxray.core.automation.AutomationStatus
 import com.dpdpxray.core.automation.AutomationStatuses
+import com.dpdpxray.core.automation.BundleSignatures
 import com.dpdpxray.core.automation.RefusalCode
 import com.dpdpxray.core.automation.RunState
 import com.dpdpxray.core.model.ScoreBand
@@ -75,11 +76,15 @@ class DeviceRunner(
             else "Install the test build first, or pass --apk <file.apk> to install it with adb install -r."
             throw RunFailure("${p.packageName} is not installed on $s.", fix)
         }
-        log("Target:   ${p.packageName} (installed)")
-        // Android gives every install a new folder, so an unchanged one means the APK did not update this package.
+        // Android gives every install a new folder, so an unchanged one means the APK did not update this package: the
+        // run would check the older build, and a gate must not pass a build it never installed.
         if (!before.isNullOrEmpty() && before == after) {
-            log("Warning:  ${p.packageName} looks unchanged after adb install -r; the APK may be a different app. Check --package.")
+            throw RunFailure(
+                "${p.packageName} did not change on the phone after adb install -r, so the APK is probably a different app and the run would check the older build.",
+                "Check that --package is the package name inside the APK.",
+            )
         }
+        log("Target:   ${p.packageName} (installed)")
 
         val start = AdbCommands.startRun(s, StartRequest(p.token, p.packageName, p.mode.wire, autoTap = true, childFacing = p.childFacing, runId = p.runId))
         log("Start:    ${AdbCommands.display(adbName, start)}")
@@ -108,6 +113,15 @@ class DeviceRunner(
                 status,
             )
         }
+        // Only TraceVeil, holding the token that started this run, can sign the bundle; anything else is not gated.
+        if (!BundleSignatures.verify(p.token, bundleFile.readBytes(), status.bundleSignature)) {
+            throw RunFailure(
+                "bundle.json is not signed with this run's pairing token, so it was not written by TraceVeil for this run (or it was changed). It was not gated.",
+                "Run again. If it repeats, check which apps on the test phone have shell rights through Shizuku, and use matching TraceVeil and traceveil-ci builds.",
+                status,
+            )
+        }
+        log("Verified: bundle.json is signed with this run's pairing token")
         return DeviceRunResult(s, status, bundleFile, statusFile)
     }
 
@@ -168,7 +182,10 @@ class DeviceRunner(
                 "Android refused to open TraceVeil's runner screen: ${line("Permission Denial", "SecurityException")}",
                 "The runner screen accepts requests from adb (the shell user) only: run traceveil-ci on a computer connected over adb.",
             )
-            "Activity not started" in t -> throw RunFailure("Android did not open TraceVeil's runner screen: ${line("Activity not started")}", "Unlock the phone and run again.")
+            "Activity not started" in t -> throw RunFailure(
+                "Android brought an earlier TraceVeil screen to the front instead of starting the run (${line("Activity not started")}).",
+                "Close TraceVeil's runner screen on the phone (or force-stop TraceVeil) and run again; if it repeats, update TraceVeil and traceveil-ci together.",
+            )
             !r.ok || "Error" in t || "Exception" in t -> throw RunFailure("adb could not start the run: ${line("Error", "Exception")}", "Unlock the phone and run again.")
         }
     }

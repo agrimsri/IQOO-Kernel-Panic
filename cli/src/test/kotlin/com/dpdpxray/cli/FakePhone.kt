@@ -5,6 +5,7 @@ import com.dpdpxray.core.automation.AutomationContract
 import com.dpdpxray.core.automation.AutomationMode
 import com.dpdpxray.core.automation.AutomationStatus
 import com.dpdpxray.core.automation.AutomationStatuses
+import com.dpdpxray.core.automation.BundleSignatures
 import com.dpdpxray.core.automation.RefusalCode
 import com.dpdpxray.core.automation.RunDecision
 import com.dpdpxray.core.automation.RunRequest
@@ -91,8 +92,14 @@ class FakePhone(private val clock: FakeClock = FakeClock()) : Adb {
         fun runningStatus(step: String, atSec: Int = 0, pkg: String = LEAKY, mode: AutomationMode = AutomationMode.FULL): AutomationStatus =
             AutomationStatuses.step(AutomationStatuses.running(request(pkg, mode), resetAppData = mode == AutomationMode.FULL, startedMs = FakeClock.T0, appVersion = "1.1.0"), step, FakeClock.T0 + atSec * 1000L)
 
-        fun done(score: Int?, band: String, findings: Int, atSec: Int = 70, pkg: String = LEAKY, mode: AutomationMode = AutomationMode.FULL, auditId: String = AUDIT_ID): ExecResult =
-            ok(AutomationStatuses.encode(AutomationStatuses.done(runningStatus("Evaluating", atSec, pkg, mode), auditId, score, band, findings, FakeClock.T0 + atSec * 1000L)))
+        /** A "done" status signed for [bundle] with [TOKEN], as the phone signs the bundle.json it serves. */
+        fun done(
+            score: Int?, band: String, findings: Int, atSec: Int = 70, pkg: String = LEAKY, mode: AutomationMode = AutomationMode.FULL,
+            auditId: String = AUDIT_ID, bundle: String? = leakyBundle(),
+        ): ExecResult = ok(AutomationStatuses.encode(AutomationStatuses.done(
+            runningStatus("Evaluating", atSec, pkg, mode), auditId, score, band, findings, FakeClock.T0 + atSec * 1000L,
+            bundleSignature = bundle?.let { BundleSignatures.sign(TOKEN, it.toByteArray(Charsets.UTF_8)) },
+        )))
 
         fun refused(code: RefusalCode, reason: String, fix: String, pkg: String = LEAKY): ExecResult {
             val input = RunRequestInput(TOKEN, pkg, "full", true, false, RUN_ID)

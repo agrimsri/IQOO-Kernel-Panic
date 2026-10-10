@@ -15,6 +15,8 @@ class AdbCommandsTest {
         assertEquals(
             listOf(
                 "-s", serial, "shell", "am", "start", "-n", "com.dpdpxray.app/com.dpdpxray.app.automation.AutomationActivity",
+                // Always a new task: an earlier runner screen's task is never just brought to the front.
+                "--activity-multiple-task",
                 "--es", "token", "'$token'",
                 "--es", "package", "'com.leakyshop.demo'",
                 "--es", "mode", "'full'",

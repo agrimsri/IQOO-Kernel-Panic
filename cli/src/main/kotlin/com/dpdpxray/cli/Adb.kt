@@ -87,6 +87,9 @@ object AdbCommands {
 
     fun startRun(serial: String, r: StartRequest): List<String> = listOf(
         "-s", serial, "shell", "am", "start", "-n", AutomationContract.COMPONENT,
+        // NEW_TASK (always set by am) plus MULTIPLE_TASK: every request starts a new instance. Without it Android may
+        // only bring an earlier runner screen's task to the front, because it compares intents without their extras.
+        "--activity-multiple-task",
         "--es", AutomationContract.EXTRA_TOKEN, DeviceShell.quote(r.token),
         "--es", AutomationContract.EXTRA_PACKAGE, DeviceShell.quote(r.packageName),
         "--es", AutomationContract.EXTRA_MODE, DeviceShell.quote(r.mode),

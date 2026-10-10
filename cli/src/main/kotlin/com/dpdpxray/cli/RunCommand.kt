@@ -12,6 +12,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
+import java.io.IOException
 import java.io.PrintStream
 
 /** `traceveil-ci run` options after validation. Nothing here has touched a phone yet. */
@@ -151,6 +152,8 @@ class RunCommand(
             return failure(o, runner, runId, e.message ?: "the run failed", e.fix, e.status)
         } catch (e: AdbUnavailableException) {
             return failure(o, runner, runId, e.message ?: "could not run adb", DeviceRunner.FIX_ADB, null)
+        } catch (e: IOException) {
+            return failure(o, runner, runId, "Could not save the run's files: ${e.message}", "Make --out a folder this user can write to.", null)
         }
         log("Saved:    ${shown(result.bundleFile)}, ${shown(result.statusFile)}")
 

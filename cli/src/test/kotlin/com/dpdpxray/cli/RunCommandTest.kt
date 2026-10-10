@@ -89,7 +89,7 @@ class RunCommandTest {
     }
 
     @Test fun `a fixed full run passes the example policy with exit 0`() {
-        phone.statuses = listOf(running("Starting", pkg = FIXED), done(100, "READY", 0, pkg = FIXED))
+        phone.statuses = listOf(running("Starting", pkg = FIXED), done(100, "READY", 0, pkg = FIXED, bundle = FakePhone.fixedBundle()))
         phone.bundleText = FakePhone.fixedBundle()
         val r = run("run", "--package", FIXED, "--policy", policyFile, "--device", SERIAL)
         assertEquals(r.toString(), Exit.PASS, r.exit)
@@ -240,7 +240,9 @@ class RunCommandTest {
         phone.installResult = ExecResult(0, "Performing Streamed Install\nSuccess\n")
         phone.statuses = listOf(running("Starting"))
         run("run", "--package", LEAKY, "--apk", "builds/app debug.apk", "--timeout", "2").let {
-            assertTrue(it.out, it.out.contains("Warning:  $LEAKY looks unchanged after adb install -r; the APK may be a different app."))
+            assertEquals(it.toString(), Exit.USAGE, it.exit)
+            assertTrue(it.err, it.err.contains("$LEAKY did not change on the phone after adb install -r"))
+            assertTrue("the older build is never checked", phone.callsStartingWith("shell", "am").size == 1)
         }
         run("run", "--package", LEAKY, "--apk", "missing.apk").let {
             assertEquals(Exit.USAGE, it.exit)
@@ -260,7 +262,38 @@ class RunCommandTest {
             assertTrue(it.err, it.err.contains("Android refused to open TraceVeil's runner screen"))
             assertTrue(it.err, it.err.contains("requires android.permission.DUMP"))
         }
+        phone.startResult = ExecResult(0, "Starting: Intent { cmp=com.dpdpxray.app/.automation.AutomationActivity }\nWarning: Activity not started, its current task has been brought to the front\n")
+        run("run", "--package", LEAKY).let {
+            assertEquals(Exit.USAGE, it.exit)
+            assertTrue(it.err, it.err.contains("Android brought an earlier TraceVeil screen to the front instead of starting the run"))
+        }
         assertEquals("no polling after a failed start", 0, phone.polls)
+    }
+
+    @Test fun `a bundle that is not signed with the run's token is rejected, not gated`() {
+        // A done status signed for the real bundle, but a different bundle.json on the phone (e.g. written by another app).
+        phone.statuses = listOf(done(21, "AT_RISK", 5, bundle = FakePhone.leakyBundle()))
+        phone.bundleText = FakePhone.fixedBundle().replace(FIXED, LEAKY)
+        run("run", "--package", LEAKY).let {
+            assertEquals(it.toString(), Exit.USAGE, it.exit)
+            assertTrue(it.err, it.err.contains("bundle.json is not signed with this run's pairing token"))
+            assertFalse(it.out, it.out.contains("Overall:"))
+        }
+        phone.statuses = listOf(done(21, "AT_RISK", 5, bundle = null))
+        phone.bundleText = FakePhone.leakyBundle()
+        run("run", "--package", LEAKY).let {
+            assertEquals(Exit.USAGE, it.exit)
+            assertTrue(it.err, it.err.contains("bundle.json is not signed with this run's pairing token"))
+        }
+    }
+
+    @Test fun `files that cannot be saved are exit 2, and json mode still prints its document`() {
+        leakyRun()
+        File(cwd, "taken").writeText("a file where the output folder should be")
+        val r = run("run", "--package", LEAKY, "--out", "taken", "--format", "json")
+        assertEquals(r.toString(), Exit.USAGE, r.exit)
+        val o = Json.parseToJsonElement(r.out).jsonObject
+        assertTrue(o["error"]!!.jsonPrimitive.content, o["error"]!!.jsonPrimitive.content.contains("Could not save the run's files"))
     }
 
     @Test fun `adb that cannot be started is exit 2 with where to get it`() {
@@ -289,7 +322,7 @@ class RunCommandTest {
             assertEquals(it.toString(), Exit.USAGE, it.exit)
             assertTrue(it.err, it.err.contains("bundle.json is audit $AUDIT_ID, but the phone reported audit-other"))
         }
-        phone.statuses = listOf(done(100, "READY", 0))
+        phone.statuses = listOf(done(100, "READY", 0, bundle = FakePhone.fixedBundle()))
         phone.bundleText = FakePhone.fixedBundle()
         run("run", "--package", LEAKY).let {
             assertEquals(Exit.USAGE, it.exit)
