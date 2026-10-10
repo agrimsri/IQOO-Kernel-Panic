@@ -105,6 +105,7 @@ import com.dpdpxray.app.ui.guide.ResultGuide
 import com.dpdpxray.app.ui.guide.GuideLang
 import com.dpdpxray.app.ui.guide.guideLang
 import com.dpdpxray.app.ui.guide.lessLabel
+import com.dpdpxray.app.ui.guide.moreLabel
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
@@ -329,6 +330,14 @@ private fun ScorePanel(b: AuditBundle, grade: ConfidenceGrade?, view: LensView, 
             ScoreRing(if (inconclusive) null else r.score, r.band, key = b.meta.id)
             Text(r.band.label, style = MaterialTheme.typography.titleLarge, color = color, modifier = Modifier.padding(top = 10.dp))
             Text("Consent readiness", style = MaterialTheme.typography.labelLarge, color = Film.boneDim)
+        }
+        // How far AI and documentation readings could move this score; shown only when they can move it at all.
+        ScoreRobustnessLine.of(r)?.let { rob ->
+            val lang = guideLang()
+            FoldText(
+                ScoreRobustnessLine.text(rob, lang), Modifier.padding(top = 10.dp),
+                color = if (rob.bandStable) Film.boneDim else Film.warn, moreLabel = lang.moreLabel, lessLabel = lang.lessLabel,
+            )
         }
         val preview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW
         val rejectTested = b.sessions.any { it.plan == AuditPlan.REJECT }
