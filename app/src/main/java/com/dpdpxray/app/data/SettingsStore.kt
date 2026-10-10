@@ -11,6 +11,8 @@ data class XraySettings(
     val stageMode: Boolean = false,
     val fastDemo: Boolean = false,
     val autoLoadModel: Boolean = true,
+    /** Opt-in for the experimental "Hey TraceVeil" wake word; it reveals the controls but never starts the microphone. */
+    val heyTraceVeil: Boolean = false,
 )
 
 class SettingsStore(context: Context) {
@@ -23,6 +25,7 @@ class SettingsStore(context: Context) {
         stageMode = prefs.getBoolean("stage_mode", false),
         fastDemo = prefs.getBoolean("fast_demo", false),
         autoLoadModel = prefs.getBoolean("auto_load_model", true),
+        heyTraceVeil = prefs.getBoolean("hey_traceveil", false),
     )
 
     fun update(transform: (XraySettings) -> XraySettings) {
@@ -32,6 +35,7 @@ class SettingsStore(context: Context) {
             putBoolean("stage_mode", next.stageMode)
             putBoolean("fast_demo", next.fastDemo)
             putBoolean("auto_load_model", next.autoLoadModel)
+            putBoolean("hey_traceveil", next.heyTraceVeil)
         }
         _settings.value = next
     }
