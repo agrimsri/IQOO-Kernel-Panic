@@ -85,6 +85,14 @@ class ApkGuardMappingTest {
         }
     }
 
+    @Test fun `quarantine is offered only for an installed app other than TraceVeil`() {
+        val own = "com.dpdpxray.app"
+        assertTrue(ApkGuardRoutes.quarantineOffered(installed = true, packageName = "com.traceveil.riskdemo", ownPackage = own))
+        assertFalse(ApkGuardRoutes.quarantineOffered(installed = false, packageName = "com.traceveil.riskdemo", ownPackage = own))
+        assertFalse(ApkGuardRoutes.quarantineOffered(installed = true, packageName = own, ownPackage = own))
+        assertFalse(ApkGuardRoutes.quarantineOffered(installed = true, packageName = "../home", ownPackage = own))
+    }
+
     @Test fun `only content uris for APK files are accepted from other apps`() {
         val apk = IncomingApk.APK_MIME
         assertEquals("content://wa/1", IncomingApk.pickUri("android.intent.action.VIEW", apk, "content://wa/1", null))

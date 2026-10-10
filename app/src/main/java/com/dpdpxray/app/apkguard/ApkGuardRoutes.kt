@@ -1,5 +1,7 @@
 package com.dpdpxray.app.apkguard
 
+import com.dpdpxray.app.quarantine.QuarantineRoutes
+
 /**
  * APK Guard navigation routes. Home (owned by the UX work) navigates to the literal [HUB] route. Arguments are
  * validated so a crafted package name or key can never select a different destination.
@@ -32,4 +34,11 @@ object ApkGuardRoutes {
         require(isPackageName(pkg)) { "A valid package name is required" }
         return "$AUDIT_PICKER?q=$pkg"
     }
+
+    /**
+     * A quarantine run is offered for an installed app only (a not-installed APK file has nothing to run), and never
+     * for TraceVeil itself.
+     */
+    fun quarantineOffered(installed: Boolean, packageName: String, ownPackage: String): Boolean =
+        installed && packageName != ownPackage && isPackageName(packageName) && QuarantineRoutes.isValidPackage(packageName)
 }

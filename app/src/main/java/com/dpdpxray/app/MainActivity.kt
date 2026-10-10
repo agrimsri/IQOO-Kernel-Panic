@@ -206,6 +206,7 @@ class MainActivity : ComponentActivity() {
                                 onBack = { nav.popBackStack() },
                                 onAudit = { nav.navigate(ApkGuardRoutes.auditPicker(it)) },
                                 onOpenInstalled = { nav.navigate(ApkGuardRoutes.app(it)) },
+                                onQuarantine = { nav.navigateToQuarantine(it) },
                             )
                         }
                         composable(ApkGuardRoutes.FILE) { e ->

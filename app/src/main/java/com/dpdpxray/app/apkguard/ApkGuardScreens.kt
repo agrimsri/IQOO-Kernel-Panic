@@ -187,6 +187,7 @@ fun ApkGuardResultScreen(
     onBack: () -> Unit,
     onAudit: (String) -> Unit,
     onOpenInstalled: (String) -> Unit,
+    onQuarantine: ((String) -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
     var resumes by remember { mutableIntStateOf(0) }
@@ -207,7 +208,7 @@ fun ApkGuardResultScreen(
                     Spacer(Modifier.height(12.dp))
                     SecondaryAction("Back", onBack, Modifier.fillMaxWidth())
                 }
-                is ResultState.Ready -> ReadyResult(s.app, s.report, hindi, { hindi = it }, onAudit, onOpenInstalled)
+                is ResultState.Ready -> ReadyResult(s.app, s.report, hindi, { hindi = it }, onAudit, onOpenInstalled, onQuarantine)
             }
         }
     }
@@ -232,6 +233,7 @@ private fun ReadyResult(
     onLanguage: (Boolean) -> Unit,
     onAudit: (String) -> Unit,
     onOpenInstalled: (String) -> Unit,
+    onQuarantine: ((String) -> Unit)?,
 ) {
     val ctx = LocalContext.current
     val facts = app.facts
@@ -265,6 +267,13 @@ private fun ReadyResult(
         // Opens the audit picker already searched for this app; the audit is set up and started there.
         PrimaryAction("Run a privacy audit of this app", { onAudit(facts.packageName) }, enabled = launchable)
         if (!launchable) Note("This app has no launcher screen, so TraceVeil cannot start it for an audit.")
+        if (onQuarantine != null && ApkGuardRoutes.quarantineOffered(installed = true, packageName = facts.packageName, ownPackage = ctx.packageName)) {
+            // Opens the quarantine explainer only; nothing is blocked until Start is tapped there.
+            Spacer(Modifier.height(8.dp))
+            SecondaryAction("Run in quarantine (network blocked)", { onQuarantine(facts.packageName) }, Modifier.fillMaxWidth())
+            Spacer(Modifier.height(4.dp))
+            Note("Cuts only this app's internet and records what it tries to reach. Not a malware verdict.")
+        }
         Spacer(Modifier.height(8.dp))
         SecondaryAction("Open Android app settings", { DeviceChecks.openAppInfo(ctx, facts.packageName) }, Modifier.fillMaxWidth())
     } else {
