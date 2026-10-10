@@ -160,6 +160,27 @@ fun GradientAction(text: String, onClick: () -> Unit, modifier: Modifier = Modif
     }
 }
 
+/** A secondary action under a [GradientAction]: same shape and height, outlined, light text, no brand colour. */
+@Composable
+fun OutlineAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, glyph: Glyph? = null) {
+    val shape = RoundedCornerShape(16.dp)
+    val tint = if (enabled) Film.bone else Film.boneDim
+    Row(
+        modifier.fillMaxWidth().heightIn(min = 52.dp).clip(shape)
+            .border(1.dp, Film.boneDim.copy(alpha = 0.55f), shape)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        if (glyph != null) {
+            GlyphIcon(glyph, tint, size = 18.dp)
+            Spacer(Modifier.width(10.dp))
+        }
+        Text(text, style = MaterialTheme.typography.titleMedium, color = tint, textAlign = TextAlign.Center)
+    }
+}
+
 /** A secondary destination with a glyph, a name and one line saying what it is for. */
 @Composable
 fun ActionTile(title: String, detail: String, glyph: Glyph, onClick: () -> Unit, modifier: Modifier = Modifier, accent: Color = Film.scan) {

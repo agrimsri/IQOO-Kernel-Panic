@@ -59,9 +59,11 @@ import com.dpdpxray.app.ui.components.HostText
 import com.dpdpxray.app.ui.components.Note
 import com.dpdpxray.app.ui.components.TopBar
 import com.dpdpxray.app.ui.guide.EmptyState
+import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GradientAction
 import com.dpdpxray.app.ui.guide.GuideBanner
 import com.dpdpxray.app.ui.guide.GuideFlow
+import com.dpdpxray.app.ui.guide.OutlineAction
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
@@ -71,7 +73,13 @@ private val demoPackages = setOf("com.leakyshop.demo", "com.leakyshop.demo.fixed
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppPickerScreen(vm: XrayViewModel, onBack: () -> Unit, onStarted: () -> Unit, initialQuery: String = "") {
+fun AppPickerScreen(
+    vm: XrayViewModel,
+    onBack: () -> Unit,
+    onStarted: () -> Unit,
+    initialQuery: String = "",
+    onQuarantine: (String) -> Unit = {},
+) {
     val apps by vm.apps.collectAsState()
     val pf by vm.preflight.collectAsState()
     val settings by vm.settings.collectAsState()
@@ -121,7 +129,7 @@ fun AppPickerScreen(vm: XrayViewModel, onBack: () -> Unit, onStarted: () -> Unit
 
     selected?.let { app ->
         ModalBottomSheet(onDismissRequest = { selected = null }, containerColor = Film.raised) {
-            AuditSetup(app, shizukuReady = pf.shizukuGranted, preferPreview = settings.fastDemo) { config ->
+            AuditSetup(app, shizukuReady = pf.shizukuGranted, preferPreview = settings.fastDemo, onQuarantine = { selected = null; onQuarantine(app.packageName) }) { config ->
                 selected = null
                 if (vm.startAudit(config)) onStarted()
             }
@@ -153,7 +161,7 @@ private fun AppRow(app: AuditableApp, demo: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, preferPreview: Boolean, onStart: (AuditConfig) -> Unit) {
+private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, preferPreview: Boolean, onQuarantine: () -> Unit = {}, onStart: (AuditConfig) -> Unit) {
     val controlledDemo = app.packageName == "com.leakyshop.demo" || app.packageName == "com.leakyshop.demo.fixed"
     var allowReset by remember { mutableStateOf(controlledDemo) }
     val freshReset = allowReset && shizukuReady
@@ -197,6 +205,10 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, preferPreview: 
                 ),
             )
         })
+        // Quarantine run (separate feature): opens its own explainer; nothing starts until Start is tapped there.
+        Spacer(Modifier.height(4.dp))
+        OutlineAction("Run in quarantine (network blocked)", onQuarantine, glyph = Glyph.LOCK)
+        Note("Cuts only this app's internet and records what it tries to reach and which permissions it asks for. Not a malware verdict.")
     }
 }
 

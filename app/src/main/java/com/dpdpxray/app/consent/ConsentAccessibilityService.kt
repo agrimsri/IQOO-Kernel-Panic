@@ -8,6 +8,8 @@ import android.os.SystemClock
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.dpdpxray.app.quarantine.QuarantineBus
+import com.dpdpxray.app.quarantine.QuarantineUiWatcher
 import com.dpdpxray.core.consent.ConsentLexicon
 import com.dpdpxray.core.model.ConsentEvent
 import com.dpdpxray.core.model.ConsentKind
@@ -30,6 +32,9 @@ class ConsentAccessibilityService : AccessibilityService() {
     private var visibleGeneration = -1L
     private var pendingScreenGeneration: Long? = null
 
+    /** Read-only watcher used only during a quarantine run; it never taps. */
+    private val quarantineWatcher = QuarantineUiWatcher(this, main)
+
     override fun onServiceConnected() {
         instance = this
     }
@@ -37,6 +42,7 @@ class ConsentAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         if (instance === this) instance = null
         main.removeCallbacks(check)
+        quarantineWatcher.cancel()
         io.shutdown()
         super.onDestroy()
     }
@@ -44,6 +50,7 @@ class ConsentAccessibilityService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        if (QuarantineBus.watchedPackage != null) quarantineWatcher.onEvent(event)
         val armed = ConsentBus.armedPackage.value ?: run { consentVisible = false; return }
         if (event.packageName?.toString() != armed) return
         ConsentBus.markTargetSeen()
