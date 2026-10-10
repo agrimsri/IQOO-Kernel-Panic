@@ -271,6 +271,20 @@ object ExportManager {
         context.startActivity(Intent.createChooser(send, "Send report").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
+    /** Shares several files in one go (an export and its signature file); a single file is shared as above. */
+    fun share(context: Context, files: List<File>, mime: String) {
+        if (files.size <= 1) {
+            files.firstOrNull()?.let { share(context, it, mime) }
+            return
+        }
+        val uris = ArrayList(files.map { FileProvider.getUriForFile(context, "${context.packageName}.files", it) })
+        val send = Intent(Intent.ACTION_SEND_MULTIPLE).setType(mime).putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // The read grant covers the URIs in ClipData, so every file is readable by the app the person picks.
+        send.clipData = ClipData.newRawUri(files.first().name, uris.first()).apply { uris.drop(1).forEach { addItem(ClipData.Item(it)) } }
+        context.startActivity(Intent.createChooser(send, "Send report").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
     /** With clipboard sync to a laptop, a copied fix can be pasted straight into Android Studio. */
     fun copy(context: Context, label: String, text: String) {
         context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(label, text))

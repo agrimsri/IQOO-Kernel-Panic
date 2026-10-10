@@ -781,6 +781,10 @@ fun ReportScreen(vm: XrayViewModel, id: String, onBack: () -> Unit) {
                     SecondaryAction("Save interactive report (HTML)", { vm.exportHtml(b, share = false) }, Modifier.fillMaxWidth())
                     Spacer(Modifier.height(10.dp))
                     SecondaryAction("Export audit data (JSON)", { vm.exportAuditJson(b, share = false) }, Modifier.fillMaxWidth())
+                    val evidence by vm.evidenceLine.collectAsState()
+                    evidence?.takeIf { it.first == b.meta.id }?.let { (_, line) ->
+                        Text(line, style = MaterialTheme.typography.labelMedium, color = Film.scan, modifier = Modifier.padding(top = 8.dp))
+                    }
                     Spacer(Modifier.height(10.dp))
                     FoldText("Saved files land in Downloads/TraceVeil, ready to share or move to your laptop. The HTML report opens offline in any browser.")
                 }

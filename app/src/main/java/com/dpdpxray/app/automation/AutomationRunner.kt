@@ -8,6 +8,8 @@ import com.dpdpxray.app.audit.AuditConfig
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.control.DeviceChecks
 import com.dpdpxray.app.control.ShizukuBridge
+import com.dpdpxray.app.evidence.AndroidEvidenceKey
+import com.dpdpxray.app.evidence.EvidenceFiles
 import com.dpdpxray.app.graph
 import com.dpdpxray.app.quarantine.QuarantineController
 import com.dpdpxray.app.report.AuditJsonExport
@@ -219,6 +221,10 @@ object AutomationRunner {
             "Open the audit in TraceVeil (Reports) and use Export audit data (JSON).", System.currentTimeMillis(),
         )
         val written = files.writeBundle(status.runId, AuditBundles.encode(AuditJsonExport.build(bundle, BuildConfig.VERSION_NAME)))
+        // Also sign the exact bytes with the phone's hardware key when it can (traceveil-ci verify reads it); the HMAC
+        // below stays this run's check, and a phone that cannot sign simply writes no signature file.
+        EvidenceFiles.signatureText(written, AutomationContract.BUNDLE_FILE, AndroidEvidenceKey(graph.app), BuildConfig.VERSION_NAME)
+            ?.let { text -> runCatching { files.writeSignature(status.runId, text) } }
         return AutomationStatuses.done(
             status, auditId, bundle.result.score, bundle.result.band.name, bundle.result.findings.size, System.currentTimeMillis(),
             bundleSignature = BundleSignatures.sign(token, written),
