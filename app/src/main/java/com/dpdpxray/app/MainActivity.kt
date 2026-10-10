@@ -29,9 +29,8 @@ import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.AuditRoutes
 import com.dpdpxray.app.ui.guide.GuideLang
-import com.dpdpxray.app.ui.guide.GuideNarrator
 import com.dpdpxray.app.ui.guide.GuideState
-import com.dpdpxray.app.ui.guide.GuideVoice
+import com.dpdpxray.app.ui.guide.GuideViewModel
 import com.dpdpxray.app.ui.guide.LocalGuide
 import com.dpdpxray.app.ui.guide.OnboardingGate
 import com.dpdpxray.app.ui.onboarding.OnboardingScreen
@@ -52,8 +51,10 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val vm: XrayViewModel by viewModels()
-    // Cheap to create: the text-to-speech engine binds only when spoken guidance first speaks.
-    private val guideVoice by lazy { GuideVoice(this) }
+    // Survives rotation; its text-to-speech engine binds only when spoken guidance first speaks. It also runs the
+    // narrator that reads a running check's steps aloud (only when spoken guidance is on).
+    private val guideVm: GuideViewModel by viewModels()
+    private val guideVoice get() = guideVm.voice
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,8 +65,6 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) { vm.refreshPreflight() }
         }
-        // Reads a running check's steps aloud (only when spoken guidance is on), also while the checked app is in front.
-        lifecycleScope.launch { GuideNarrator.run(vm.progress, vm.settings, guideVoice) }
         setContent {
             val settings by vm.settings.collectAsState()
             val toast by vm.toast.collectAsState()
@@ -168,11 +167,5 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    override fun onDestroy() {
-        // The speaker belongs to this activity instance; a recreated activity makes its own.
-        guideVoice.release()
-        super.onDestroy()
     }
 }

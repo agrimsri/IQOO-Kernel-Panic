@@ -1,5 +1,6 @@
 package com.dpdpxray.app.ui.guide
 
+import android.app.Application
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
@@ -9,8 +10,11 @@ import android.os.Looper
 import android.os.SystemClock
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.data.XraySettings
+import com.dpdpxray.app.graph
 import com.dpdpxray.app.voice.LocalVoicePicker
 import com.dpdpxray.app.voice.VoiceInfo
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 /** Something that can read a guide step aloud. */
 interface GuideSpeaker {
@@ -88,6 +93,9 @@ class GuideVoice(context: Context) : GuideSpeaker {
             if (!ready) {
                 _note.value = "The phone's text-to-speech engine is not ready; guidance is shown as text."
                 pending = null
+                // Drop the failed engine so a later step can try again instead of queueing forever.
+                runCatching { tts?.shutdown() }
+                tts = null
                 return@post
             }
             tts?.setAudioAttributes(attributes)
@@ -158,8 +166,32 @@ class GuideVoice(context: Context) : GuideSpeaker {
 /** Reads the running check's steps aloud, also while the checked app is in front of TraceVeil. */
 object GuideNarrator {
     suspend fun run(progress: StateFlow<AuditProgress>, settings: StateFlow<XraySettings>, speaker: GuideSpeaker) {
+        var last: String? = null
         combine(progress, settings) { p, s -> GuideFlow.narration(p, s.spokenGuidance, GuideLang.of(s.guideLanguage)) }
             .distinctUntilChanged()
-            .collect { n -> if (n != null) speaker.say(n.key, n.text, n.lang) }
+            .collect { n ->
+                if (n != null) {
+                    speaker.say(n.key, n.text, n.lang)
+                    last = n.key
+                } else {
+                    // The check ended, was stopped, or guidance was switched off: finish nothing stale.
+                    last?.let { speaker.stop(it) }
+                    last = null
+                }
+            }
     }
+}
+
+/**
+ * Owns the guide speaker and the live narrator for the app's lifetime in this task, so a rotation or theme change
+ * neither cuts a sentence off nor reads the same step again.
+ */
+class GuideViewModel(app: Application) : AndroidViewModel(app) {
+    val voice = GuideVoice(app)
+
+    init {
+        viewModelScope.launch { GuideNarrator.run(app.graph.orchestrator.progress, app.graph.settings.settings, voice) }
+    }
+
+    override fun onCleared() = voice.release()
 }
