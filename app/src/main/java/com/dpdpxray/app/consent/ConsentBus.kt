@@ -49,6 +49,10 @@ object ConsentBus {
     val choiceMade: Boolean
         get() = _events.value.any { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }
 
+    /** Consent screens recorded as shown again after the choice in this plan (see [ConsentReappearance]). */
+    val repromptCount: Int
+        get() = _events.value.count { it.kind == ConsentKind.REPROMPT }
+
     fun arm(pkg: String, dir: java.io.File) = synchronized(lock) {
         armGeneration++
         _events.value = emptyList()

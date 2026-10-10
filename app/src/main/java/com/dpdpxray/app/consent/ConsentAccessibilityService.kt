@@ -110,6 +110,10 @@ class ConsentAccessibilityService : AccessibilityService() {
         ConsentBus.markTargetSeen()
         val isConsent = ConsentLexicon.isConsentScreen(tree.flatten().map { it.label })
         if (isConsent && !ConsentBus.screenSeen) recordScreen(tree)
+        else if (ConsentReappearance.shouldRecord(isConsent, consentVisible, ConsentBus.screenSeen, ConsentBus.choiceMade, ConsentBus.repromptCount)) {
+            // Shown again after the recorded choice (nagging evidence). Recorded only; never tapped, never a choice.
+            ConsentBus.emitForSession(generation, ConsentReappearance.event(SystemClock.elapsedRealtimeNanos(), tree))
+        }
         if (consentVisible && !isConsent) onConsentGone()
         consentVisible = isConsent
     }
