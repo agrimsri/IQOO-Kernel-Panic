@@ -22,14 +22,21 @@ data class QuarantineSummary(
      * Server-type addresses (public or private, not multicast/broadcast) the app tried to reach although no DNS answer
      * given during the run contained them, before the first attempt. In quarantine every answer is NXDOMAIN, so each
      * such address came from somewhere else: built into the app, cached from before the run, or obtained another way.
+     * DNS-transport destinations (port 53 or 853) are reported as DNS attempts instead, because Android's Private DNS
+     * can send those on the app's behalf.
      */
     val addressesWithoutLookup: List<String>,
     /** INFERRED: at least one entry in [addressesWithoutLookup]. A hard-coded-address signal, not proof. */
     val dnsBypassSignal: Boolean,
     /** Resolvers other than the phone's own that the app sent plain DNS to directly. */
     val directResolvers: List<String>,
-    /** Blocked destinations that look like DNS over TLS (port 853) or DNS over TCP (TCP port 53). */
+    /**
+     * App destinations that look like DNS over TLS (port 853) or DNS over TCP (TCP port 53). From the app, or from
+     * Android's Private DNS on its behalf; the run cannot tell which.
+     */
     val encryptedDnsDestinations: List<String>,
+    /** Non-UDP DNS to the phone's own tunnel resolver: usually Android checking for Private DNS, not the app. */
+    val phoneResolverDnsAttempts: List<String>,
     val permissionDialogs: Int,
     val settingsScreens: List<SensitiveSettings>,
     val appCameToScreen: Boolean,
@@ -48,15 +55,16 @@ data class QuarantineSummary(
         ): QuarantineSummary {
             val appRows = observations.blocked.filter { it.role == DestinationRole.APP_DESTINATION }
             val serverScopes = setOf(AddressScope.PUBLIC, AddressScope.PRIVATE)
+            fun dnsTransport(row: BlockedAttempt) = row.port == 53 || row.port == 853
+            fun label(row: BlockedAttempt) = "${row.endpoint} (${row.protocol.label})"
             val withoutLookup = appRows
-                .filter { it.scope in serverScopes }
+                .filter { it.scope in serverScopes && !dnsTransport(it) }
                 .filter { row -> dnsAnswers[row.address]?.let { answeredAt -> answeredAt > row.firstNanos } ?: true }
                 .map { it.address }
                 .distinct()
-            val encrypted = observations.blocked
-                .filter { it.port == 853 || (it.port == 53 && it.protocol != AttemptProtocol.UDP) }
-                .map { "${it.endpoint} (${it.protocol.label})" }
-                .distinct()
+            fun encryptedOrTcp(row: BlockedAttempt) = row.port == 853 || (row.port == 53 && row.protocol != AttemptProtocol.UDP)
+            val encrypted = appRows.filter(::encryptedOrTcp).map(::label).distinct()
+            val viaPhoneResolver = observations.blocked.filter { it.role == DestinationRole.PHONE_RESOLVER }.map(::label).distinct()
             val ips = appRows.map { it.address }.distinct()
             return QuarantineSummary(
                 domainsAttempted = observations.domains.map { it.hostname },
@@ -70,6 +78,7 @@ data class QuarantineSummary(
                 dnsBypassSignal = withoutLookup.isNotEmpty(),
                 directResolvers = observations.domains.flatMap { it.resolvers }.filter { it !in resolverAddresses }.distinct(),
                 encryptedDnsDestinations = encrypted,
+                phoneResolverDnsAttempts = viaPhoneResolver,
                 permissionDialogs = observations.permissionDialogs.size,
                 settingsScreens = observations.settingsScreens.map { it.kind },
                 appCameToScreen = observations.targetOnScreenNanos != null,

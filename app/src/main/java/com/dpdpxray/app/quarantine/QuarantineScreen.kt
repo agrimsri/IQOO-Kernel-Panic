@@ -244,8 +244,9 @@ private fun ReportView(report: QuarantineReport, saved: Boolean, path: String?, 
                     "Instead of the phone's resolver: ${s.directResolvers.joinToString(", ")}. Answered locally; nothing was forwarded.")
             }
             if (s.encryptedDnsDestinations.isNotEmpty()) item {
-                Signal(Film.warn, "Tried encrypted or TCP DNS", QuarantineEvidence.OBSERVED,
-                    "${s.encryptedDnsDestinations.joinToString(", ")}. Names inside such lookups cannot be read; they were blocked.")
+                Signal(Film.warn, "Encrypted or TCP DNS was attempted", QuarantineEvidence.OBSERVED,
+                    "${s.encryptedDnsDestinations.joinToString(", ")}. Names inside such lookups cannot be read; they were blocked. " +
+                        "Sent by the app, or by Android's Private DNS on its behalf; this run cannot tell which.")
             }
             items(report.observations.permissionDialogs) { d ->
                 val times = if (d.timesShown > 1) " Shown ${d.timesShown} times." else ""
@@ -311,7 +312,10 @@ private fun LazyListScope.observationItems(o: QuarantineObservations) {
         items(app, key = { "b-" + it.protocol + it.endpoint }) { BlockedRow(it) }
     }
     if (resolver.isNotEmpty()) {
-        item { SectionTitle("Blocked DNS to the phone's own resolver") }
+        item {
+            SectionTitle("Blocked DNS to the phone's own resolver")
+            Note("Usually Android checking for Private DNS, not necessarily the app.")
+        }
         items(resolver, key = { "r-" + it.protocol + it.endpoint }) { BlockedRow(it) }
     }
 }

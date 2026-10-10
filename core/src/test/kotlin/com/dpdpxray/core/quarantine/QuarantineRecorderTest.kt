@@ -71,7 +71,10 @@ class QuarantineRecorderTest {
         assertEquals(DestinationRole.PHONE_RESOLVER, row.role)
         val s = QuarantineSummary.of(r.snapshot(), resolvers)
         assertTrue(s.ipsAttempted.isEmpty())
-        assertEquals(listOf("10.111.0.53:853 (TCP SYN)"), s.encryptedDnsDestinations)
+        // Usually Android's own Private DNS check, so it is kept apart from what the app itself tried.
+        assertTrue(s.encryptedDnsDestinations.isEmpty())
+        assertEquals(listOf("10.111.0.53:853 (TCP SYN)"), s.phoneResolverDnsAttempts)
+        assertFalse(s.dnsBypassSignal)
         assertFalse(s.nothingObserved) // blocked DNS is still something observed
     }
 
@@ -149,6 +152,10 @@ class QuarantineRecorderTest {
         val s = QuarantineSummary.of(r.snapshot(), resolvers)
         assertEquals(listOf("8.8.8.8"), s.directResolvers)
         assertEquals(listOf("1.1.1.1:853 (TCP SYN)", "9.9.9.9:53 (TCP SYN)"), s.encryptedDnsDestinations)
+        // DNS-transport destinations are reported as DNS attempts (Android's Private DNS may send them for the app),
+        // not as hard-coded server addresses.
+        assertFalse(s.dnsBypassSignal)
+        assertEquals(listOf("1.1.1.1", "9.9.9.9"), s.ipsAttempted)
     }
 
     @Test
