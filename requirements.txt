@@ -1,0 +1,8 @@
+# Traceveil CLI: install the `traceveil` command (and its build tools) from this checkout.
+#   python3 -m pip install -r requirements.txt
+# The CLI itself has no third-party dependencies (Python 3.11+ standard library only); it also needs Android
+# platform-tools (adb). `-e .` keeps the command pointing at this checkout, so `git pull` on the cli branch updates it.
+-e .
+# Release tooling (python3 -m build; twine check / upload)
+build>=1.2
+twine>=5

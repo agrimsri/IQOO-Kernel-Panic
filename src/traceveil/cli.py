@@ -42,15 +42,18 @@ def _parser() -> argparse.ArgumentParser:
     a.add_argument("--resume", metavar="REQUEST_ID", help="fetch the result of an earlier request instead of starting a new audit")
     a.add_argument("--json", action="store_true", help="print the JSON report instead of the summary")
     a.add_argument("--out", help="also write the JSON report to this file")
-    a.add_argument("--jurisdictions", help="laws to read the result under: comma list of in,eu,uk,us-ca,br or 'all' (default: audit.jurisdictions)")
-    a.add_argument("--policy", help="jurisdiction whose score and severities decide the exit code (default: audit.policy = in)")
+    a.add_argument("--lens", "--profile", dest="lenses",
+                   help="legal lenses to read the result under: comma list (INDIA,EU,UK,US_CALIFORNIA,US_CHILDREN,BRAZIL,SINGAPORE,"
+                        "GLOBAL_BASELINE; short: in,eu,us-ca,coppa,br,sg) or 'all' (default: audit.lenses)")
+    a.add_argument("--policy", help="lens whose score decides the exit code (default: audit.policy = INDIA)")
 
-    lw = sub.add_parser("laws", parents=[shared], help="read a saved audit report under several privacy laws (no phone needed)")
+    lw = sub.add_parser("lens", aliases=["laws"], parents=[shared],
+                        help="read a saved audit report under the app's legal lenses (several countries' laws; no phone needed)")
     lw.add_argument("--report", help="audit report: a JSON file, or a request id saved under output.dir (default: the newest)")
-    lw.add_argument("--jurisdictions", help="comma list of in,eu,uk,us-ca,br or 'all' (default: audit.jurisdictions)")
-    lw.add_argument("--policy", help="jurisdiction that decides the exit code (default: audit.policy = in)")
-    lw.add_argument("--detail", action="store_true", help="show each finding with the provisions it maps to")
-    lw.add_argument("--list", action="store_true", help="list the jurisdictions and their laws, then exit")
+    lw.add_argument("--lens", "--profile", dest="lenses", help="comma list of lenses or 'all' (default: audit.lenses)")
+    lw.add_argument("--policy", help="lens that decides the exit code (default: audit.policy = INDIA)")
+    lw.add_argument("--detail", action="store_true", help="show each finding's relation, the law's note and the cited passages")
+    lw.add_argument("--list", action="store_true", help="list the lenses and their laws, then exit")
     lw.add_argument("--json", action="store_true", help="print the JSON assessment instead of the summary")
     lw.add_argument("--out", help="also write the JSON assessment to this file")
 
@@ -138,7 +141,7 @@ def cmd_audit(args, cfg, dev: adb.Device) -> int:
     plans = args.plans or None
     return audit.run_audit(dev, cfg, io, package=args.package or "", plans=plans, auto_drive=args.auto_drive, reset=args.reset,
                            wait_s=args.wait, resume=args.resume, as_json=args.json, out_file=args.out,
-                           jurisdictions=args.jurisdictions, policy=args.policy)
+                           lenses=args.lenses, policy=args.policy)
 
 
 def _load_report(ref: str | None, cfg) -> dict:
@@ -191,12 +194,13 @@ def cmd_laws(args, cfg, dev=None) -> int:
     st = Style(enabled_for(sys.stdout))
     if args.list:
         for p in laws.load_profiles():
-            print(f"  {st.bold(p['id']):<8} {p['name']:<16} {p['law']}")
-            print(f"           {st.dim(p['model'] + '  ' + ' '.join(p['sources']))}")
+            pid = f"{p['id']:<16}"
+            print(f"  {st.bold(pid)} {p['name']:<20} {p['laws']}")
+            print(f"  {'':<16} {st.dim(p.get('status', ''))}")
         return EXIT_PASS
     try:
         rep = _load_report(args.report, cfg)
-        block = laws.assess_all(rep, args.jurisdictions or cfg["audit"]["jurisdictions"], args.policy or cfg["audit"]["policy"])
+        block = laws.assess_all(rep, args.lenses or cfg["audit"]["lenses"], args.policy or cfg["audit"]["policy"])
     except (OSError, ValueError) as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_USAGE
@@ -205,7 +209,7 @@ def cmd_laws(args, cfg, dev=None) -> int:
         print(report.dumps(block))
     else:
         t = rep.get("target", {})
-        print(f"Traceveil laws  {st.bold(t.get('label', '?'))} ({t.get('package', '?')})  report {rep.get('requestId', '?')}")
+        print(f"Traceveil lens  {st.bold(t.get('label', '?'))} ({t.get('package', '?')})  report {rep.get('requestId', '?')}")
         print(laws.detail(block, st) if args.detail else "\n".join(laws.table(block, st)))
         for r in reasons:
             print(f"  {st.warn('policy:')} {r}")
@@ -237,7 +241,7 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_init(args, cfg)
         if args.command == "sdks":
             return cmd_sdks(args, cfg)
-        if args.command == "laws":
+        if args.command in ("lens", "laws"):
             return cmd_laws(args, cfg)
         dev = adb.connect(args.adb or cfg["device"]["adb"] or None, args.serial or cfg["device"]["serial"] or None, args.timeout)
         return {"doctor": cmd_doctor, "env": cmd_env, "audit": cmd_audit}[args.command](args, cfg, dev)
