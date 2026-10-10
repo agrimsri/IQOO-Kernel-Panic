@@ -30,6 +30,20 @@ object UiTreeFormatter {
 /** Facts we can read straight from the accessibility tree, without any AI. These are OBSERVED evidence. */
 object DeterministicScreenAuditor {
     private val WITHDRAW_CUES = listOf("withdraw", "revoke", "opt out", "opt-out", "वापस", "ಹಿಂಪಡೆ")
+
+    /**
+     * Concrete personal-data items a notice can name (English, Hindi, Kannada). Two or more distinct items is an itemised
+     * list, an observed fact. Fewer is NOT read as "not itemised": absence of a match is left to other evidence.
+     */
+    private val DATA_ITEMS = listOf(
+        "email", "e-mail", "phone number", "mobile number", "order history", "purchase history", "location", "contacts",
+        "date of birth", "device id", "advertising id", "ip address", "payment details", "home address", "photos",
+        "ईमेल", "फ़ोन नंबर", "फोन नंबर", "मोबाइल नंबर", "ऑर्डर इतिहास", "खरीद इतिहास", "लोकेशन", "संपर्क",
+        "ಇಮೇಲ್", "ಫೋನ್ ಸಂಖ್ಯೆ", "ಮೊಬೈಲ್ ಸಂಖ್ಯೆ", "ಸ್ಥಳ",
+    ).map { item -> item to Regex("""(^|[^\p{L}])""" + Regex.escape(item) + """($|[^\p{L}])""") }
+
+    /** The distinct data items a notice names; see [DATA_ITEMS]. */
+    fun dataItems(text: String): List<String> = DATA_ITEMS.filter { (_, re) -> re.containsMatchIn(text) }.map { it.first }
     private val LANGUAGES = linkedMapOf(
         "English" to listOf("english"),
         "Hindi" to listOf("hindi", "हिन्दी", "हिंदी"),
@@ -65,6 +79,9 @@ object DeterministicScreenAuditor {
         val withdrawal = if (WITHDRAW_CUES.any { allText.contains(it) }) true else null
         if (withdrawal == true) observed += "withdrawalInfo"
 
+        val itemised = if (dataItems(allText).size >= 2) true else null
+        if (itemised == true) observed += "itemisedData"
+
         val languages = LANGUAGES.filter { (_, cues) -> cues.any { allText.contains(it) } }.keys.toList()
         val languageOptions = languages.takeIf { it.size >= 2 }
         if (languageOptions != null) observed += "languageOptions"
@@ -74,6 +91,7 @@ object DeterministicScreenAuditor {
             preTicked = preTicked,
             rejectOption = rejectOption,
             withdrawalInfo = withdrawal,
+            itemisedData = itemised,
             languageOptions = languageOptions,
             source = AuditSource.DETERMINISTIC,
             observedFields = observed,
@@ -102,6 +120,10 @@ object ScreenAuditMerger {
         } else vlm.rejectOption
 
         val withdrawal = if (det.withdrawalInfo == true) true else vlm.withdrawalInfo
+        val itemised = if ("itemisedData" in obs) {
+            if (vlm.itemisedData == false) conflicts += "itemisedData: tree=true, vlm=false"
+            true
+        } else vlm.itemisedData
         val languages = when {
             det.languageOptions != null -> (det.languageOptions + (vlm.languageOptions ?: emptyList())).distinct()
             else -> vlm.languageOptions
@@ -112,6 +134,7 @@ object ScreenAuditMerger {
             preTicked = preTicked,
             rejectOption = rejectOption,
             withdrawalInfo = withdrawal,
+            itemisedData = itemised,
             languageOptions = languages,
             source = AuditSource.MERGED,
             observedFields = obs,

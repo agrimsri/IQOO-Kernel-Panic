@@ -209,7 +209,9 @@ fun EverydayHomeScreen(
                     modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
                 )
                 todo.forEachIndexed { i, item ->
-                    val plain = item.copy(title = EverydayCopy.setupTitle(item.kind).pick(lang), detail = EverydayCopy.setupDetail(item.kind).pick(lang))
+                    val plain = if (item.kind == SetupKind.VPN && pf.otherVpnActive)
+                        item.copy(title = EverydayCopy.otherVpnTitle.pick(lang), detail = EverydayCopy.otherVpnDetail.pick(lang))
+                    else item.copy(title = EverydayCopy.setupTitle(item.kind).pick(lang), detail = EverydayCopy.setupDetail(item.kind).pick(lang))
                     SetupRow(plain, number = if (item.need == SetupNeed.REQUIRED) i + 1 else null) { fix(item.kind) }
                 }
             }

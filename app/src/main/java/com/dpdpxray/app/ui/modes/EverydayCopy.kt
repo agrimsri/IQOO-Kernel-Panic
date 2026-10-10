@@ -82,6 +82,13 @@ object EverydayCopy {
         "इस जाँच के लिए दो चीज़ें चालू होनी चाहिए: VPN, ताकि TraceVeil देख सके कि ऐप किन पतों तक पहुँचने की कोशिश करता है, और कंसेंट वॉचर, ताकि वह पॉपअप देख सके।",
     )
 
+    /** Another app's VPN is on: TraceVeil never switches it off, so the user turns it off for the check. */
+    val otherVpnTitle = Bi("Turn off your other VPN", "अपना दूसरा VPN बंद करें")
+    val otherVpnDetail = Bi(
+        "Android runs one VPN at a time. TraceVeil never switches yours off; turn it off for the check, then back on.",
+        "Android एक समय में एक ही VPN चलाता है। TraceVeil आपका VPN कभी बंद नहीं करता; जाँच के लिए उसे बंद करें, फिर वापस चालू करें।",
+    )
+
     /** Titles and details for the setup rows inside the "No" card (only steps still to do are shown). */
     fun setupTitle(kind: SetupKind) = when (kind) {
         SetupKind.VPN -> Bi("Allow the VPN", "VPN की अनुमति दें")
@@ -138,6 +145,7 @@ object EverydayCopy {
         listOf(file, apps, alerts, sayNo, trust).flatMap { listOf(it.title, it.body) } +
         listOf(ready, stepsFirst(1), stepsFirst(2), readiness, running, recentTitle, seeAll, emptyTitle, emptyBody, seeSample, sample, partial) +
         listOf(SetupKind.VPN, SetupKind.WATCHER, SetupKind.PRIVATE_DNS).flatMap { listOf(setupTitle(it), setupDetail(it)) } +
+        listOf(otherVpnTitle, otherVpnDetail) +
         AlertStatus.entries.flatMap { listOf(alertLabel(it, false), alertLabel(it, true)) } +
         ScoreBand.entries.map { band(it) } +
         Audience.entries.flatMap { listOf(ModeCopy.name(it), ModeCopy.tagline(it), ModeCopy.title(it)) } +
