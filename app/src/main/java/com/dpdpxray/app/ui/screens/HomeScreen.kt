@@ -1,25 +1,41 @@
 package com.dpdpxray.app.ui.screens
 
-import android.net.VpnService
 import android.database.ContentObserver
+import android.net.VpnService
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,24 +45,46 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.ai.LlmStatus
+import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.control.DeviceChecks
 import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.data.SampleAudit
 import com.dpdpxray.app.ui.XrayViewModel
-import com.dpdpxray.app.ui.components.Note
-import com.dpdpxray.app.ui.components.PrimaryAction
-import com.dpdpxray.app.ui.components.RuleRow
-import com.dpdpxray.app.ui.components.SecondaryAction
-import com.dpdpxray.app.ui.components.SectionTitle
-import com.dpdpxray.app.ui.components.StatusDot
 import com.dpdpxray.app.ui.components.Tag
+import com.dpdpxray.app.ui.guide.ActionTile
+import com.dpdpxray.app.ui.guide.EmptyState
+import com.dpdpxray.app.ui.guide.Glyph
+import com.dpdpxray.app.ui.guide.GlyphIcon
+import com.dpdpxray.app.ui.guide.GradientAction
+import com.dpdpxray.app.ui.guide.GuideBanner
+import com.dpdpxray.app.ui.guide.GuideFlow
+import com.dpdpxray.app.ui.guide.LinkAction
+import com.dpdpxray.app.ui.guide.Panel
+import com.dpdpxray.app.ui.guide.PillButton
+import com.dpdpxray.app.ui.guide.RecentChecks
+import com.dpdpxray.app.ui.guide.ScoreChip
+import com.dpdpxray.app.ui.guide.SetupItem
+import com.dpdpxray.app.ui.guide.SetupKind
+import com.dpdpxray.app.ui.guide.SetupNeed
+import com.dpdpxray.app.ui.guide.SetupSteps
+import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
+import com.dpdpxray.app.ui.theme.FilmExtra
 import com.dpdpxray.app.ui.theme.bandColor
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -61,11 +99,16 @@ fun HomeScreen(
     onCamera: () -> Unit,
     onSettings: () -> Unit,
     onVoice: (String) -> Unit,
+    /** Opens the APK check; null hides the entry when this build has no such screen. */
+    onApk: (() -> Unit)? = null,
+    onHowItWorks: () -> Unit = {},
+    onLive: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val pf by vm.preflight.collectAsState()
     val audits by vm.audits.collectAsState()
     val llm by vm.llmStatus.collectAsState()
+    val progress by vm.progress.collectAsState()
     var showSampleFixtures by remember { mutableStateOf(false) }
     val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { vm.refreshPreflight() }
     LaunchedEffect(vm) { vm.refreshPreflight() }
@@ -77,71 +120,89 @@ fun HomeScreen(
         onDispose { ctx.contentResolver.unregisterContentObserver(observer) }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-        Row(Modifier.fillMaxWidth().padding(top = 28.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("TraceVeil", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-            TextButton(onClick = onLab) { Text("AI lab", color = Film.scan) }
-            TextButton(onClick = onSettings) { Text("Settings", color = Film.boneDim) }
+    val items = SetupSteps.from(pf)
+    val todo = SetupSteps.todo(items)
+    val running = progress as? AuditProgress.Running
+    val fix: (SetupKind) -> Unit = { kind ->
+        when (kind) {
+            SetupKind.VPN -> VpnService.prepare(ctx)?.let { vpnLauncher.launch(it) } ?: vm.refreshPreflight()
+            SetupKind.WATCHER -> DeviceChecks.openAccessibilitySettings(ctx)
+            SetupKind.PRIVATE_DNS -> DeviceChecks.openPrivateDnsSettings(ctx)
+            SetupKind.SHIZUKU -> vm.requestShizuku()
         }
-        Text(
-            "Observe an app's DNS lookups around consent choices, understand the evidence, and find practical fixes. Analysis runs on this phone.",
-            style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 6.dp),
+    }
+    val aiLine = when (val s = llm) {
+        is LlmStatus.Ready -> "${s.model} on ${s.backend.label}"
+        is LlmStatus.Loading -> "Loading on ${s.backend.label}…"
+        LlmStatus.NotLoaded -> "Model found; it loads when an audit starts"
+        LlmStatus.NoModel -> "No model yet. Screen checks use the accessibility tree only"
+        is LlmStatus.Failed -> s.message
+    }
+
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+        Row(Modifier.fillMaxWidth().padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("TraceVeil", style = MaterialTheme.typography.headlineMedium, maxLines = 1, modifier = Modifier.semantics { heading() })
+                Box(Modifier.padding(top = 4.dp).size(width = 44.dp, height = 3.dp).clip(CircleShape).background(Brand.horizontal))
+            }
+            LinkAction("AI lab", onLab)
+            LinkAction("Settings", onSettings, color = Film.boneDim)
+        }
+        Text("Apps promise. TraceVeil checks.", style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 10.dp))
+
+        Spacer(Modifier.height(18.dp))
+        GuideBanner(
+            running?.let { GuideFlow.homeRunning(it.config.targetLabel) } ?: GuideFlow.home(pf),
+            speak = running == null,
+            action = running?.let { "Watch the check" to onLive },
         )
 
-        SectionTitle("Before you audit")
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            CheckLine(
-                "VPN permission", if (pf.vpnReady) "Allowed" else "Needed to watch the app's lookups", pf.vpnReady,
-                action = if (pf.vpnReady) null else "Allow" to {
-                    VpnService.prepare(ctx)?.let { vpnLauncher.launch(it) } ?: vm.refreshPreflight()
-                },
-            )
-            CheckLine(
-                "Consent watcher", if (pf.accessibilityOn) "On" else "Turn on \"TraceVeil consent watcher\" in Accessibility", pf.accessibilityOn,
-                action = if (pf.accessibilityOn) null else "Turn on" to { DeviceChecks.openAccessibilitySettings(ctx) },
-            )
-            CheckLine(
-                "Fresh-install reset", when {
-                    pf.shizukuGranted -> "Shizuku ready: reset is available only when approved in audit setup"
-                    pf.shizukuRunning -> "Shizuku is running; allow TraceVeil to use it"
-                    else -> "Optional. Start Shizuku for full audits (reject + accept)"
-                },
-                if (pf.shizukuGranted) true else null,
-                action = if (pf.shizukuRunning && !pf.shizukuGranted) "Allow" to { vm.requestShizuku() } else null,
-            )
-            CheckLine(
-                "Private DNS", if (pf.privateDnsActive) "On: lookups may be hidden from the audit" else "Off", !pf.privateDnsActive,
-                action = if (pf.privateDnsActive) "Open settings" to { DeviceChecks.openPrivateDnsSettings(ctx) } else null,
-            )
-            CheckLine(
-                "On-device AI", when (val s = llm) {
-                    is LlmStatus.Ready -> "${s.model} on ${s.backend.label}"
-                    is LlmStatus.Loading -> "Loading on ${s.backend.label}…"
-                    LlmStatus.NotLoaded -> "Model found; it loads when an audit starts"
-                    LlmStatus.NoModel -> "No model yet. Screen checks use the accessibility tree only"
-                    is LlmStatus.Failed -> s.message
-                },
-                when (llm) { is LlmStatus.Ready -> true; is LlmStatus.Failed, LlmStatus.NoModel -> null; else -> null },
-                action = "AI lab" to onLab,
-            )
+        if (todo.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            GettingReady(items, todo, aiLine, fix, onLab)
         }
 
-        Spacer(Modifier.height(24.dp))
-        PrimaryAction("Audit an app", { if (vm.prepareAudit()) onAudit() })
-        if (!pf.canAudit) Note("Allow the VPN and turn on the consent watcher to run a live audit.", Film.warn)
-        Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SecondaryAction("Open sample audit", { vm.openSample(onOpen) }, Modifier.weight(1f))
-            SecondaryAction("Camera check", onCamera, Modifier.weight(1f))
+        Spacer(Modifier.height(16.dp))
+        Hero(canAudit = pf.canAudit) { if (vm.prepareAudit()) onAudit() }
+
+        val latest = audits.firstOrNull()
+        val tiles = buildList {
+            if (onApk != null) add(Tile("Check an APK file", "Inspect an app file on this phone", Glyph.APK, onApk))
+            if (latest != null) add(Tile("Ask about my last check", "By voice or tap, about ${latest.targetLabel}", Glyph.ASK) { onVoice(latest.id) })
+            add(Tile("See a sample", "A labelled example result; no setup", Glyph.SAMPLE) { vm.openSample(onOpen) })
+            add(Tile("Camera check", "Review a photo of a consent screen", Glyph.CAMERA, onCamera))
         }
-        TextButton(onClick = { showSampleFixtures = true }) { Text("More sample evidence", color = Film.scan) }
-        audits.firstOrNull()?.let { latest ->
-            TextButton(onClick = { onVoice(latest.id) }) { Text("Ask latest audit", color = Film.scan) }
+        Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            tiles.chunked(2).forEach { row ->
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    row.forEach { t -> ActionTile(t.title, t.detail, t.glyph, t.onClick, Modifier.weight(1f).fillMaxHeight()) }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            LinkAction("How it works", onHowItWorks, glyph = Glyph.BOOK)
+            LinkAction("More samples", { showSampleFixtures = true }, color = Film.boneDim)
         }
 
-        SectionTitle("Recent audits")
-        if (audits.isEmpty()) Note("No audits yet. Run one, or open the sample to see what a report looks like.")
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            audits.forEach { AuditRow(it) { onOpen(it.id) } }
+        if (todo.isEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            ReadyPanel(items, aiLine, fix, onLab)
+        }
+
+        Row(Modifier.fillMaxWidth().padding(top = 26.dp, bottom = 10.dp), verticalAlignment = Alignment.Bottom) {
+            Text("Recent checks", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
+            if (audits.isNotEmpty()) Text("${audits.size}", style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
+        }
+        if (audits.isEmpty()) {
+            EmptyState(
+                "No checks yet",
+                "Your checks will appear here. Start with a sample to see what a result looks like.",
+                action = "See a sample" to { vm.openSample(onOpen) },
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            audits.forEach { RecentCard(it) { onOpen(it.id) } }
         }
         Spacer(Modifier.height(32.dp))
     }
@@ -156,43 +217,178 @@ fun HomeScreen(
                         TextButton(onClick = {
                             showSampleFixtures = false
                             vm.openSample(variant, onOpen)
-                        }) { Text(variant.label) }
+                        }, modifier = Modifier.heightIn(min = 48.dp)) { Text(variant.label) }
                     }
                 }
             },
             confirmButton = { TextButton(onClick = { showSampleFixtures = false }) { Text("Cancel") } },
+            containerColor = Film.raised,
         )
     }
 }
 
+private data class Tile(val title: String, val detail: String, val glyph: Glyph, val onClick: () -> Unit)
+
+/** The lightbox: one question, one sentence, one action. A faint film grid and a consent line sit behind it. */
 @Composable
-private fun CheckLine(title: String, detail: String, ok: Boolean?, action: Pair<String, () -> Unit>?) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        StatusDot(ok)
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(detail, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+private fun Hero(canAudit: Boolean, onCheck: () -> Unit) {
+    val shape = RoundedCornerShape(22.dp)
+    Box(Modifier.fillMaxWidth().clip(shape).background(Film.raised).border(1.dp, FilmExtra.hairline, shape)) {
+        Canvas(Modifier.matchParentSize()) {
+            val step = 22.dp.toPx()
+            var x = step
+            while (x < size.width) { drawLine(FilmExtra.hairline, Offset(x, 0f), Offset(x, size.height), 1f); x += step }
+            var y = step
+            while (y < size.height) { drawLine(FilmExtra.hairline, Offset(0f, y), Offset(size.width, y), 1f); y += step }
+            val line = size.height * 0.30f
+            drawLine(
+                Brush.horizontalGradient(listOf(Color.Transparent, Film.scan.copy(alpha = 0.55f), Color.Transparent)),
+                Offset(0f, line), Offset(size.width, line), 2.dp.toPx(),
+            )
         }
-        if (action != null) TextButton(onClick = action.second) { Text(action.first, color = Film.scan) }
+        Column(Modifier.padding(20.dp)) {
+            Text("Does an app respect your choice?", style = MaterialTheme.typography.headlineMedium, color = Film.bone)
+            Text(
+                "TraceVeil watches one app's lookups while you accept or refuse its consent popup, then explains what it saw.",
+                style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 8.dp, bottom = 18.dp),
+            )
+            GradientAction("Check an app", onCheck, glyph = Glyph.PLAY)
+            if (!canAudit) Text(
+                "Allow the VPN and turn on the consent watcher first (see Getting ready).",
+                style = MaterialTheme.typography.bodyMedium, color = Film.warn, modifier = Modifier.padding(top = 10.dp),
+            )
+        }
+    }
+}
+
+private fun glyphFor(kind: SetupKind) = when (kind) {
+    SetupKind.VPN -> Glyph.VPN
+    SetupKind.WATCHER -> Glyph.WATCHER
+    SetupKind.PRIVATE_DNS -> Glyph.PRIVATE_DNS
+    SetupKind.SHIZUKU -> Glyph.RESET
+}
+
+/** Shown above the main action while something is missing: one numbered step per item, each with a Fix button. */
+@Composable
+private fun GettingReady(items: List<SetupItem>, todo: List<SetupItem>, aiLine: String, fix: (SetupKind) -> Unit, onLab: () -> Unit) {
+    Panel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Getting ready", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
+            Text(if (todo.size == 1) "1 step left" else "${todo.size} steps left", style = MaterialTheme.typography.labelMedium, color = Film.warn)
+        }
+        Spacer(Modifier.height(6.dp))
+        todo.forEachIndexed { i, item -> SetupRow(item, number = i + 1) { fix(item.kind) } }
+        val rest = items.filter { it !in todo }
+        if (rest.isNotEmpty()) {
+            Box(Modifier.padding(vertical = 8.dp).fillMaxWidth().height(1.dp).background(FilmExtra.hairline))
+            rest.forEach { item -> SetupRow(item, number = null) { fix(item.kind) } }
+            AiRow(aiLine, onLab)
+        }
+    }
+}
+
+/** Shown below the main action once everything required is done: one line, details on request. */
+@Composable
+private fun ReadyPanel(items: List<SetupItem>, aiLine: String, fix: (SetupKind) -> Unit, onLab: () -> Unit) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    Panel {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button) { open = !open },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(32.dp).clip(CircleShape).background(Film.clear.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                GlyphIcon(Glyph.CHECK, Film.clear, size = 18.dp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Ready to check", style = MaterialTheme.typography.titleMedium)
+                Text("VPN allowed and consent watcher on", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+            }
+            Text(if (open) "Hide" else "Details", style = MaterialTheme.typography.labelLarge, color = Film.scan)
+        }
+        AnimatedVisibility(open, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+            Column(Modifier.padding(top = 6.dp)) {
+                items.forEach { item -> SetupRow(item, number = null) { fix(item.kind) } }
+                AiRow(aiLine, onLab)
+            }
+        }
     }
 }
 
 @Composable
-private fun AuditRow(meta: AuditMeta, onClick: () -> Unit) {
+private fun SetupRow(item: SetupItem, number: Int?, onFix: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        val accent = when {
+            item.done -> Film.clear
+            item.need == SetupNeed.REQUIRED -> Brand.coral
+            item.need == SetupNeed.RECOMMENDED -> Film.warn
+            else -> Film.boneDim
+        }
+        Box(
+            Modifier.size(32.dp).clip(CircleShape).background(accent.copy(alpha = 0.13f)).border(1.dp, accent.copy(alpha = 0.5f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (number != null) Text("$number", style = MaterialTheme.typography.labelLarge, color = accent)
+            else GlyphIcon(if (item.done) Glyph.CHECK else glyphFor(item.kind), accent, size = 18.dp)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(item.title, style = MaterialTheme.typography.titleMedium)
+            Text(item.detail, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+        }
+        if (item.fixable && !item.done) {
+            Spacer(Modifier.width(8.dp))
+            PillButton(if (item.kind == SetupKind.SHIZUKU) "Allow" else "Fix", onFix)
+        }
+    }
+}
+
+@Composable
+private fun AiRow(line: String, onLab: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(32.dp).clip(CircleShape).background(Film.scan.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
+            GlyphIcon(Glyph.AI, Film.scan, size = 18.dp)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("On-device AI (optional)", style = MaterialTheme.typography.titleMedium)
+            Text(line, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+        }
+        LinkAction("AI lab", onLab)
+    }
+}
+
+@Composable
+private fun RecentCard(meta: AuditMeta, onClick: () -> Unit) {
     val color = bandColor(meta.band)
-    RuleRow(color, onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(meta.targetLabel, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "${meta.findingCount} findings, ${SimpleDateFormat("d MMM, HH:mm", Locale.US).format(Date(meta.createdAtMs))}",
-                    style = MaterialTheme.typography.bodyMedium, color = Film.boneDim,
-                )
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 76.dp).clip(shape).background(Film.raised)
+            .clickable(role = Role.Button, onClick = onClick).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ScoreChip(RecentChecks.scoreText(meta), color)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(meta.targetLabel, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                if (meta.sample) {
+                    Spacer(Modifier.width(8.dp))
+                    Tag("Sample", Film.boneDim)
+                }
             }
-            if (meta.sample) Tag("Sample", Film.boneDim)
-            Spacer(Modifier.width(10.dp))
-            Text(meta.score?.toString() ?: "—", style = MaterialTheme.typography.titleLarge, color = color)
+            Text(
+                "${meta.band.label}, ${if (meta.findingCount == 1) "1 finding" else "${meta.findingCount} findings"}, " +
+                    SimpleDateFormat("d MMM, HH:mm", Locale.US).format(Date(meta.createdAtMs)),
+                style = MaterialTheme.typography.bodyMedium, color = Film.boneDim,
+            )
+            RecentChecks.coverageWarning(meta)?.let { warning ->
+                Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(Film.warn))
+                    Spacer(Modifier.width(6.dp))
+                    Text(warning, style = MaterialTheme.typography.labelMedium, color = Film.warn)
+                }
+            }
         }
     }
 }

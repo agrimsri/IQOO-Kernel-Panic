@@ -221,6 +221,8 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit) {
             SettingToggle("Presentation mode", "Larger text for projectors and screen sharing.", s.stageMode) { v -> vm.updateSettings { it.copy(stageMode = v) } }
             SettingToggle("Prefer Fast Preview", "Defaults single-run checks to the shorter, clearly labelled Preview. Full audits keep normal timing; choose the mode in audit setup.", s.fastDemo) { v -> vm.updateSettings { it.copy(fastDemo = v) } }
             SettingToggle("Load AI when an audit starts", "Loads Gemma automatically if it is installed.", s.autoLoadModel) { v -> vm.updateSettings { it.copy(autoLoadModel = v) } }
+            SettingToggle("Spoken guidance", "Reads each guide step aloud with an installed offline voice. Off by default; nothing leaves the phone.", s.spokenGuidance) { v -> vm.updateSettings { it.copy(spokenGuidance = v) } }
+            SettingToggle("Speak APK Guard alerts", "Reads new-install alerts aloud with an installed offline voice. Off by default.", s.speakApkGuardAlerts) { v -> vm.updateSettings { it.copy(speakApkGuardAlerts = v) } }
 
             SectionTitle("Your own domains")
             if (s.firstPartyDomains.isEmpty()) Note("None yet. Long-press a host on any timeline to add it.")

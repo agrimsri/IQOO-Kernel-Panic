@@ -1,10 +1,26 @@
 package com.dpdpxray.app.ui.screens
 
 import android.graphics.BitmapFactory
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,9 +71,20 @@ import com.dpdpxray.app.ui.components.SecondaryAction
 import com.dpdpxray.app.ui.components.SectionTitle
 import com.dpdpxray.app.ui.components.Tag
 import com.dpdpxray.app.ui.components.TopBar
+import com.dpdpxray.app.ui.guide.Glyph
+import com.dpdpxray.app.ui.guide.GlyphIcon
+import com.dpdpxray.app.ui.guide.GuideBanner
+import com.dpdpxray.app.ui.guide.NextAction
+import com.dpdpxray.app.ui.guide.Panel
+import com.dpdpxray.app.ui.guide.ResultFacts
+import com.dpdpxray.app.ui.guide.ResultGuide
+import com.dpdpxray.app.ui.guide.guideLang
+import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
+import com.dpdpxray.app.ui.theme.FilmExtra
 import com.dpdpxray.app.ui.theme.bandColor
 import com.dpdpxray.app.ui.theme.severityColor
+import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.CheckId
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.EvidenceType
@@ -76,42 +103,39 @@ private fun WithBundle(vm: XrayViewModel, id: String, content: @Composable (Audi
 }
 
 @Composable
-fun ResultsScreen(vm: XrayViewModel, id: String, onBack: () -> Unit, onFinding: (CheckId) -> Unit, onFixes: () -> Unit, onReport: () -> Unit, onAsk: () -> Unit) {
+fun ResultsScreen(
+    vm: XrayViewModel, id: String, onBack: () -> Unit, onFinding: (CheckId) -> Unit, onFixes: () -> Unit, onReport: () -> Unit, onAsk: () -> Unit,
+    /** Starts a new check from the app picker; when null, "Check again" falls back to going back. */
+    onCheckAgain: (() -> Unit)? = null,
+) {
     WithBundle(vm, id) { b ->
         val r = b.result
         Column(Modifier.fillMaxSize()) {
             TopBar(b.meta.targetLabel, onBack)
             Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        if (r.band == ScoreBand.INCONCLUSIVE) "?" else r.score.toString(),
-                        style = MaterialTheme.typography.displayLarge, color = bandColor(r.band),
-                    )
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.padding(bottom = 8.dp)) {
-                        Text(r.band.label, style = MaterialTheme.typography.titleLarge, color = bandColor(r.band))
-                        Text("DPDP readiness out of 100", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
-                    }
-                    Spacer(Modifier.weight(1f))
-                    if (b.meta.sample) Tag("Sample data", Film.boneDim)
-                }
-                if (!b.meta.sample) {
-                    val preview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW
-                    Tag(if (preview) "Fast Preview · limited evidence" else if (b.meta.timingProfile == AuditTimingPolicy.NORMAL) "Normal capture" else "Timing unknown", if (preview) Film.warn else Film.boneDim)
-                    Note(AuditTimingPolicy.coverageHint(b.meta.timingProfile), if (preview) Film.warn else Film.boneDim)
-                }
-                AuditPlanCoverage.gaps(b.sessions).forEach { Note(it, Film.warn) }
+                ScorePanel(b)
+                val gaps = AuditPlanCoverage.gaps(b.sessions)
+                gaps.forEach { Note(it, Film.warn) }
                 AuditPlanCoverage.freshStateHint(b.sessions)?.let { Note(it, Film.warn) }
                 SeverityStrip(r.findings)
                 Text(headline(r.findings), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 12.dp))
 
-                Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    val fixCount = vm.fixesFor(b).size
-                    SecondaryAction("How to fix ($fixCount)", onFixes, Modifier.weight(1f), enabled = fixCount > 0)
-                    SecondaryAction("Report and export", onReport, Modifier.weight(1f))
+                val fixCount = vm.fixesFor(b).size
+                val facts = ResultFacts(
+                    band = r.band, score = r.score, findingCount = r.findings.size, fixCount = fixCount,
+                    coverageGaps = gaps.isNotEmpty(), rejectPlanned = b.sessions.any { it.plan == AuditPlan.REJECT },
+                    fastPreview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW, sample = b.meta.sample,
+                )
+                GuideBanner(ResultGuide.step(facts), Modifier.padding(top = 18.dp))
+                ResultGuidePanel(facts) { action ->
+                    when (action) {
+                        NextAction.SEE_EVIDENCE -> r.findings.firstOrNull()?.let { onFinding(it.checkId) }
+                        NextAction.HOW_TO_FIX -> onFixes()
+                        NextAction.CHECK_AGAIN, NextAction.CHECK_REAL_APP -> onCheckAgain?.invoke() ?: onBack()
+                        NextAction.ASK -> onAsk()
+                        NextAction.REPORT -> onReport()
+                    }
                 }
-
-                SecondaryAction("Ask this audit", onAsk, Modifier.fillMaxWidth().padding(top = 10.dp))
                 SectionTitle("Evidence coverage")
                 if (b.meta.sample) Note("Synthetic sample: capture confidence was not measured.", Film.warn)
                 else Note(ConfidenceGrader.gradeAudit(b.sessions).summary)
@@ -173,6 +197,98 @@ private fun headline(findings: List<Finding>): String {
             "Consent history unknown: this app kept its data, so consent given earlier could not be checked."
         findings.all { it.severity == Severity.INFO } -> "No third-party trackers before consent and no consent-screen problems found. See the information notes."
         else -> "No tracking before consent, but the consent screen needs work."
+    }
+}
+
+/** Score, band and capture profile in one panel. A thin meter fills to the score; inconclusive shows a dashed track. */
+@Composable
+private fun ScorePanel(b: AuditBundle) {
+    val r = b.result
+    val color = bandColor(r.band)
+    val inconclusive = r.band == ScoreBand.INCONCLUSIVE
+    Panel(Modifier.padding(top = 4.dp)) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(if (inconclusive) "?" else r.score.toString(), style = MaterialTheme.typography.displayLarge, color = color)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.padding(bottom = 8.dp).weight(1f)) {
+                Text(r.band.label, style = MaterialTheme.typography.titleLarge, color = color)
+                Text("DPDP readiness out of 100", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+            }
+            if (b.meta.sample) Tag("Sample data", Film.boneDim)
+        }
+        var shown by remember(b.meta.id) { mutableStateOf(false) }
+        LaunchedEffect(b.meta.id) { shown = true }
+        val fill by animateFloatAsState(if (shown && !inconclusive) (r.score ?: 0) / 100f else 0f, tween(700), label = "score-meter")
+        Canvas(Modifier.fillMaxWidth().padding(top = 10.dp).height(6.dp)) {
+            val h = size.height
+            if (inconclusive) {
+                drawLine(Film.line, Offset(0f, h / 2), Offset(size.width, h / 2), h, StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(10.dp.toPx(), 8.dp.toPx())))
+            } else {
+                drawLine(Film.line, Offset(h / 2, h / 2), Offset(size.width - h / 2, h / 2), h, StrokeCap.Round)
+                if (fill > 0f) drawLine(color, Offset(h / 2, h / 2), Offset(h / 2 + (size.width - h) * fill, h / 2), h, StrokeCap.Round)
+            }
+        }
+        if (!b.meta.sample) {
+            val preview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW
+            Row(Modifier.padding(top = 12.dp)) {
+                Tag(if (preview) "Fast Preview · limited evidence" else if (b.meta.timingProfile == AuditTimingPolicy.NORMAL) "Normal capture" else "Timing unknown", if (preview) Film.warn else Film.boneDim)
+            }
+            Spacer(Modifier.height(4.dp))
+            Note(AuditTimingPolicy.coverageHint(b.meta.timingProfile), if (preview) Film.warn else Film.boneDim)
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+}
+
+private fun nextGlyph(a: NextAction) = when (a) {
+    NextAction.SEE_EVIDENCE -> Glyph.WATCHER
+    NextAction.HOW_TO_FIX -> Glyph.BOOK
+    NextAction.CHECK_AGAIN -> Glyph.RESET
+    NextAction.CHECK_REAL_APP -> Glyph.PLAY
+    NextAction.ASK -> Glyph.ASK
+    NextAction.REPORT -> Glyph.SAMPLE
+}
+
+/** "What this means" in plain language, then "What you can do next" as tappable rows for the existing actions. */
+@Composable
+private fun ResultGuidePanel(facts: ResultFacts, onAction: (NextAction) -> Unit) {
+    val lang = guideLang()
+    val e = remember(facts) { ResultGuide.explain(facts) }
+    Panel(Modifier.padding(top = 12.dp)) {
+        Text(ResultGuide.meaningTitle.pick(lang), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+        e.meaning.forEach { line ->
+            Row(Modifier.padding(top = 8.dp)) {
+                Box(Modifier.padding(top = 9.dp).size(6.dp).clip(CircleShape).background(Film.scan))
+                Spacer(Modifier.width(10.dp))
+                Text(line.pick(lang), style = MaterialTheme.typography.bodyLarge, color = Film.bone)
+            }
+        }
+    }
+    Text(
+        ResultGuide.nextTitle.pick(lang), style = MaterialTheme.typography.titleLarge,
+        modifier = Modifier.padding(top = 18.dp, bottom = 8.dp).semantics { heading() },
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        e.next.forEachIndexed { i, step ->
+            val shape = RoundedCornerShape(16.dp)
+            val first = i == 0
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(shape).background(Film.raised)
+                    .border(if (first) 1.5.dp else 1.dp, if (first) Brand.horizontal else SolidColor(FilmExtra.hairline), shape)
+                    .clickable(role = Role.Button) { onAction(step.action) }.padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val accent = if (first) Brand.coral else Film.scan
+                Box(Modifier.size(36.dp).clip(CircleShape).background(accent.copy(alpha = 0.13f)), contentAlignment = Alignment.Center) {
+                    GlyphIcon(nextGlyph(step.action), accent, size = 20.dp)
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(step.title.pick(lang), style = MaterialTheme.typography.titleMedium, color = Film.bone)
+                    Text(step.reason.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                }
+            }
+        }
     }
 }
 

@@ -5,6 +5,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
@@ -31,6 +32,26 @@ object Film {
     val high = Color(0xFFFF8A3D)
     val warn = Color(0xFFF2B544)
     val clear = Color(0xFF5FD49B)
+}
+
+/**
+ * Brand accent: peach to coral to rose. Used sparingly, only where the person should act next (the main action,
+ * the current guide step, the current onboarding page). Dark [Film.base] text on it keeps at least 4.5:1 contrast.
+ */
+object Brand {
+    val peach = Color(0xFFFAA275)
+    val coral = Color(0xFFFF8C61)
+    val rose = Color(0xFFCE6A85)
+    val stops = listOf(peach, coral, rose)
+    val horizontal: Brush get() = Brush.horizontalGradient(stops)
+    val vertical: Brush get() = Brush.verticalGradient(stops)
+}
+
+/** Extra film surfaces for layered panels: one step lighter than [Film.raised], plus a faint scan-coloured wash. */
+object FilmExtra {
+    val raisedHigh = Color(0xFF1D3649)
+    val scanWash = Color(0x1A7FD3E6)
+    val hairline = Color(0xFF223B4D)
 }
 
 fun severityColor(s: Severity) = when (s) {
