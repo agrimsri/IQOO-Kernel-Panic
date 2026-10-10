@@ -36,7 +36,9 @@ class FindingExplainer(private val llm: LlmEngine) {
     suspend fun explain(finding: Finding, passages: List<Passage>, hindi: Boolean): String? {
         val law = passages.joinToString("\n") { "[${it.id}] ${it.text}" }
         val system = "You explain privacy-compliance findings to Android developers in India. Use ONLY the facts and law " +
-            "text given. Never invent section numbers. Be concise and practical."
+            "text given. Never invent section numbers. Be concise and practical. Describe what was observed and what the law " +
+            "requires; do not call the app illegal, a violation, malicious or safe, and do not say data was sent: a DNS " +
+            "lookup is an attempt to contact a host. Plain sentences, no markdown."
         val prompt = buildString {
             appendLine("Finding: ${finding.title}")
             appendLine("Details: ${finding.explanation}")

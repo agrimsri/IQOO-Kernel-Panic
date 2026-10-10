@@ -38,7 +38,7 @@ object Explanations {
 
     /** An AI explanation, kept only when it is non-empty and cites no law it was not given. */
     fun fromModel(text: String?, finding: Finding, passages: List<Passage>, hindi: Boolean, model: String): Explanation {
-        val t = text?.trim().orEmpty()
+        val t = plain(text)
         if (t.isEmpty()) return fallback(finding, hindi, "the on-device AI returned no text")
         if (!groundedIn(t, passages)) return fallback(finding, hindi, "the AI's answer cited law it was not given, so it is not shown")
         return Explanation(t, ResultSource.AI_INFERRED, "Written on this phone by $model from this finding's evidence and the law shown above. It can be wrong.")
@@ -65,6 +65,13 @@ object Explanations {
         }
         return Explanation(text, ResultSource.FALLBACK, "Shown because $reason. Built only from this finding's own text and evidence.")
     }
+
+    /** Model text without markdown emphasis, headings or bullet markers, which the result screen would show literally. */
+    fun plain(text: String?): String = text.orEmpty()
+        .replace("**", "").replace("__", "")
+        .lines().joinToString("
+") { it.trimStart().removePrefix("#").removePrefix("#").removePrefix("* ").removePrefix("- ").trimEnd() }
+        .trim()
 
     private fun firstSentences(s: String, n: Int): String =
         s.split(Regex("(?<=[.!?])\\s+")).take(n).joinToString(" ")

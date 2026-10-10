@@ -63,4 +63,12 @@ class ExplanationTest {
         val c5 = c1.copy(checkId = CheckId.C5, evidenceType = EvidenceType.INFERRED)
         assertEquals(ResultSource.INFERRED, ResultSources.of(c5, listOf(session)))
     }
+
+    @Test
+    fun `markdown markers from the model are not shown literally`() {
+        val e = Explanations.fromModel("**क्या गलत है:** सहमति मना की।
+* **What to change:** delay the SDK.", c1, law, true, "m")
+        assertEquals("क्या गलत है: सहमति मना की।
+What to change: delay the SDK.", e.text)
+    }
 }
