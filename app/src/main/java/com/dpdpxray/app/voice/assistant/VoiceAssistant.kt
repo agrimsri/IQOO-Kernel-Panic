@@ -130,6 +130,11 @@ class VoiceAssistant private constructor(private val app: Application) {
         }
     }
 
+    /** Binds the offline text-to-speech engine ahead of the first reply, so "Yes?" is not delayed. */
+    fun warmUp() {
+        voice
+    }
+
     /** "Yes?" (or a beep) after the wake word. */
     suspend fun cue(hindi: Boolean) = voice.cue(hindi)
 

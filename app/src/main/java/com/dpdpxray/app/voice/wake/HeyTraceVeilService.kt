@@ -126,7 +126,7 @@ class HeyTraceVeilService : Service() {
         WakeRuntime.setEndsAt(endsAt)
         WakeRuntime.setDuration(duration)
         registerBattery()
-        val assistant = VoiceAssistant.get(this)
+        val assistant = VoiceAssistant.get(this).also { it.warmUp() }
         recognizer = OnDeviceRecognizer(this).also { r ->
             // Learn which on-device language packs are installed, so a command uses the right one.
             r.checkLanguageSupport(commandLanguage()) {}
