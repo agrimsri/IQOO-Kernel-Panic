@@ -65,6 +65,10 @@ class GuideState(
 
 val LocalGuide = compositionLocalOf<GuideState?> { null }
 
+/** "More" / "Less" for fold toggles, in the guide language. */
+val GuideLang.moreLabel: String get() = if (this == GuideLang.HI) "और पढ़ें" else "More"
+val GuideLang.lessLabel: String get() = if (this == GuideLang.HI) "कम दिखाएँ" else "Less"
+
 /** The current language for guide copy; English when no guide state is provided. */
 @Composable
 fun guideLang(): GuideLang = LocalGuide.current?.lang ?: GuideLang.EN
@@ -119,9 +123,7 @@ fun GuideBanner(step: GuideStep, modifier: Modifier = Modifier, speak: Boolean =
                 Column {
                     Text(t, style = MaterialTheme.typography.titleLarge, color = Film.bone, modifier = Modifier.padding(top = 6.dp))
                     // Text diet: the first sentence shows; the rest folds behind "More" (the speaker still reads it all).
-                    if (b.isNotBlank()) FoldText(
-                        b, Modifier.padding(top = 4.dp), moreLabel = if (lang == GuideLang.HI) "और" else "More", lessLabel = if (lang == GuideLang.HI) "कम" else "Less",
-                    )
+                    if (b.isNotBlank()) FoldText(b, Modifier.padding(top = 4.dp), moreLabel = lang.moreLabel, lessLabel = lang.lessLabel)
                 }
             }
             if (spokenOn) guide.note?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Film.warn, modifier = Modifier.padding(top = 6.dp)) }
