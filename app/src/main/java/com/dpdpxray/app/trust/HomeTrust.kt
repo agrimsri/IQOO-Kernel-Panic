@@ -59,8 +59,8 @@ object HomeTrust {
         Bi("Results stay here", "नतीजे यहीं रहते हैं"),
         Bi("Your results stay on this phone", "आपके नतीजे इसी फ़ोन पर रहते हैं"),
         Bi(
-            "Checks and screenshots are saved in TraceVeil's private storage, and Android backup is off. They leave the phone only when you share, save or back them up yourself.",
-            "जाँच और स्क्रीनशॉट TraceVeil की निजी स्टोरेज में सेव होते हैं, और Android बैकअप बंद है। ये फ़ोन से तभी बाहर जाते हैं जब आप खुद शेयर, सेव या बैकअप करें।",
+            "Checks and screenshots are saved in TraceVeil's private storage, and Android's cloud backup is off for TraceVeil. They leave the phone only when you share, save or back them up yourself.",
+            "जाँच और स्क्रीनशॉट TraceVeil की निजी स्टोरेज में सेव होते हैं, और TraceVeil के लिए Android का क्लाउड बैकअप बंद है। ये फ़ोन से तभी बाहर जाते हैं जब आप खुद शेयर, सेव या बैकअप करें।",
         ),
     )
     private val voiceOn = TrustFact(
