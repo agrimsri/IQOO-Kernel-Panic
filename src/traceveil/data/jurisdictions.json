@@ -1,0 +1,579 @@
+{
+  "about": "How each Traceveil check (C1-C10, NC) reads under several privacy laws. The checks are the same observations everywhere; only the cited provisions and the risk weight change. Severities are Traceveil's risk weighting for prioritising fixes, not a legal determination. `null` severity means the check has no direct counterpart in that law and is left out of that score. 'IN' uses the severities the app assigned (DPDP), so its score always equals the app's. Checks a profile does not list keep the app's severity and are marked unmapped. Inconclusive evidence (V0, or U1 naming trackers) makes every jurisdiction inconclusive.",
+  "jurisdictions": [
+    {
+      "id": "in",
+      "name": "India",
+      "law": "Digital Personal Data Protection Act 2023 + DPDP Rules 2025",
+      "model": "opt-in consent",
+      "sources": [
+        "https://www.meity.gov.in/data-protection-framework"
+      ],
+      "checks": {
+        "C1": {
+          "severity": "as-reported",
+          "refs": [
+            "DPDP s4(1)",
+            "DPDP s6(1)"
+          ]
+        },
+        "C2": {
+          "severity": "as-reported",
+          "refs": [
+            "DPDP s4(1)",
+            "DPDP s6(1)"
+          ]
+        },
+        "C3": {
+          "severity": "as-reported",
+          "refs": [
+            "DPDP s6(1)"
+          ]
+        },
+        "C4": {
+          "severity": "as-reported",
+          "refs": [
+            "DPDP s6(1)",
+            "DPDP s6(4)"
+          ]
+        },
+        "C5": {
+          "severity": "as-reported",
+          "refs": [
+            "DPDP s6(1)",
+            "DPDP Rules r3(b)"
+          ]
+        },
+        "C6": {
+          "severity": "as-reported",
+          "refs": [
+            "DPDP s5(1)",
+            "DPDP Rules r3(b)"
+          ]
+        },
+        "C7": {
+          "severity": "as-reported",
+          "refs": [
+            "DPDP s5(1)",
+            "DPDP s6(4)",
+            "DPDP Rules r3(c)"
+          ]
+        },
+        "C8": {
+          "severity": "as-reported",
+          "refs": [
+            "DPDP s5(3)",
+            "DPDP s6(3)"
+          ]
+        },
+        "C9": {
+          "severity": "as-reported",
+          "refs": [
+            "DPDP s9(1)",
+            "DPDP s9(3)"
+          ]
+        },
+        "C10": {
+          "severity": "as-reported",
+          "refs": [
+            "DPDP s6(1)"
+          ]
+        },
+        "NC": {
+          "severity": "as-reported",
+          "refs": [
+            "DPDP s5(1)",
+            "DPDP s6(1)",
+            "DPDP s6(10)"
+          ]
+        },
+        "C13": {
+          "severity": "as-reported",
+          "refs": [
+            "DPDP s6(1)"
+          ]
+        },
+        "C14": {
+          "severity": "as-reported",
+          "refs": [
+            "DPDP s5(1)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "eu",
+      "name": "European Union",
+      "law": "GDPR (Regulation 2016/679) + ePrivacy Directive 2002/58/EC",
+      "model": "opt-in consent; prior consent for device access",
+      "sources": [
+        "https://eur-lex.europa.eu/eli/reg/2016/679/oj",
+        "https://eur-lex.europa.eu/eli/dir/2002/58/oj"
+      ],
+      "checks": {
+        "C1": {
+          "severity": "HIGH",
+          "refs": [
+            "ePrivacy Art 5(3)",
+            "GDPR Art 6(1)(a)",
+            "GDPR Art 7(1)"
+          ],
+          "note": "Non-essential trackers need consent before they access the device."
+        },
+        "C2": {
+          "severity": "CRITICAL",
+          "refs": [
+            "GDPR Art 6(1)",
+            "ePrivacy Art 5(3)"
+          ],
+          "note": "Processing continued after consent was refused."
+        },
+        "C3": {
+          "severity": "HIGH",
+          "refs": [
+            "GDPR Art 4(11)",
+            "GDPR Recital 32",
+            "CJEU C-673/17 Planet49"
+          ],
+          "note": "Pre-ticked boxes do not give valid consent."
+        },
+        "C4": {
+          "severity": "HIGH",
+          "refs": [
+            "GDPR Art 4(11)",
+            "GDPR Art 7(4)",
+            "EDPB Guidelines 05/2020"
+          ],
+          "note": "Refusing must be a real, equally available choice."
+        },
+        "C5": {
+          "severity": "MEDIUM",
+          "refs": [
+            "GDPR Art 7(2)",
+            "GDPR Recital 43"
+          ],
+          "note": "Separate purposes need separate consent."
+        },
+        "C6": {
+          "severity": "MEDIUM",
+          "refs": [
+            "GDPR Art 12(1)",
+            "GDPR Art 13"
+          ]
+        },
+        "C7": {
+          "severity": "MEDIUM",
+          "refs": [
+            "GDPR Art 7(3)",
+            "GDPR Art 13(2)(c)"
+          ],
+          "note": "Withdrawing must be as easy as giving consent."
+        },
+        "C8": {
+          "severity": null,
+          "refs": [
+            "GDPR Art 12(1)"
+          ],
+          "note": "GDPR asks for clear and plain language, not a set of languages; not scored."
+        },
+        "C9": {
+          "severity": "HIGH",
+          "refs": [
+            "GDPR Art 8"
+          ],
+          "note": "Children's consent needs parental authorisation below the national age (13-16)."
+        },
+        "C10": {
+          "severity": "HIGH",
+          "refs": [
+            "ePrivacy Art 5(3)",
+            "GDPR Art 4(1)"
+          ],
+          "note": "Reading device identifiers is device access that needs prior consent."
+        },
+        "NC": {
+          "severity": "HIGH",
+          "refs": [
+            "ePrivacy Art 5(3)",
+            "GDPR Art 6(1)",
+            "GDPR Art 13"
+          ]
+        },
+        "C12": {
+          "severity": "INFO",
+          "refs": [
+            "GDPR Art 5(1)(b)",
+            "GDPR Art 5(1)(c)"
+          ],
+          "note": "Context: purpose limitation and data minimisation."
+        },
+        "C13": {
+          "severity": "MEDIUM",
+          "refs": [
+            "GDPR Art 25(2)",
+            "ePrivacy Art 5(3)"
+          ],
+          "note": "Data protection by default: collection should start off."
+        },
+        "C14": {
+          "severity": "LOW",
+          "refs": [
+            "GDPR Art 13(1)"
+          ],
+          "note": "Information is due at the time data is collected."
+        },
+        "C15": {
+          "severity": "LOW",
+          "refs": [
+            "GDPR Art 12(1)",
+            "GDPR Art 13"
+          ]
+        }
+      }
+    },
+    {
+      "id": "uk",
+      "name": "United Kingdom",
+      "law": "UK GDPR + Data Protection Act 2018 + PECR 2003",
+      "model": "opt-in consent; prior consent for storage/access (PECR)",
+      "sources": [
+        "https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/",
+        "https://www.legislation.gov.uk/uksi/2003/2426/regulation/6"
+      ],
+      "checks": {
+        "C1": {
+          "severity": "HIGH",
+          "refs": [
+            "PECR reg 6",
+            "UK GDPR Art 6(1)(a)"
+          ],
+          "note": "Non-essential storage/access needs consent first."
+        },
+        "C2": {
+          "severity": "CRITICAL",
+          "refs": [
+            "PECR reg 6",
+            "UK GDPR Art 6(1)"
+          ]
+        },
+        "C3": {
+          "severity": "HIGH",
+          "refs": [
+            "UK GDPR Art 4(11)",
+            "UK GDPR Recital 32"
+          ]
+        },
+        "C4": {
+          "severity": "HIGH",
+          "refs": [
+            "UK GDPR Art 4(11)",
+            "UK GDPR Art 7(4)"
+          ]
+        },
+        "C5": {
+          "severity": "MEDIUM",
+          "refs": [
+            "UK GDPR Art 7(2)",
+            "UK GDPR Recital 43"
+          ]
+        },
+        "C6": {
+          "severity": "MEDIUM",
+          "refs": [
+            "UK GDPR Art 12(1)",
+            "UK GDPR Art 13"
+          ]
+        },
+        "C7": {
+          "severity": "MEDIUM",
+          "refs": [
+            "UK GDPR Art 7(3)"
+          ]
+        },
+        "C8": {
+          "severity": null,
+          "refs": [
+            "UK GDPR Art 12(1)"
+          ],
+          "note": "No language list in the law; not scored."
+        },
+        "C9": {
+          "severity": "HIGH",
+          "refs": [
+            "UK GDPR Art 8",
+            "DPA 2018 s9",
+            "ICO Age Appropriate Design Code"
+          ],
+          "note": "Parental consent below 13; the Children's Code applies to child-facing services."
+        },
+        "C10": {
+          "severity": "HIGH",
+          "refs": [
+            "PECR reg 6",
+            "UK GDPR Art 4(1)"
+          ]
+        },
+        "NC": {
+          "severity": "HIGH",
+          "refs": [
+            "PECR reg 6",
+            "UK GDPR Art 13"
+          ]
+        },
+        "C12": {
+          "severity": "INFO",
+          "refs": [
+            "UK GDPR Art 5(1)(b)",
+            "UK GDPR Art 5(1)(c)"
+          ]
+        },
+        "C13": {
+          "severity": "MEDIUM",
+          "refs": [
+            "UK GDPR Art 25(2)",
+            "PECR reg 6"
+          ]
+        },
+        "C14": {
+          "severity": "LOW",
+          "refs": [
+            "UK GDPR Art 13(1)"
+          ]
+        },
+        "C15": {
+          "severity": "LOW",
+          "refs": [
+            "UK GDPR Art 12(1)",
+            "UK GDPR Art 13"
+          ]
+        }
+      }
+    },
+    {
+      "id": "us-ca",
+      "name": "California (US)",
+      "law": "CCPA as amended by CPRA (Cal. Civ. Code 1798.100 et seq.) + CCPA Regulations; COPPA for under-13s",
+      "model": "notice at collection + opt-out of sale/sharing (opt-in under 16)",
+      "sources": [
+        "https://cppa.ca.gov/regulations/",
+        "https://oag.ca.gov/privacy/ccpa",
+        "https://www.ftc.gov/legal-library/browse/rules/childrens-online-privacy-protection-rule-coppa"
+      ],
+      "checks": {
+        "C1": {
+          "severity": "MEDIUM",
+          "refs": [
+            "Civ. Code 1798.100",
+            "Civ. Code 1798.120"
+          ],
+          "note": "Opt-out model: tracking before a choice is not banned for adults, but notice must come at or before collection and sharing must be stoppable."
+        },
+        "C2": {
+          "severity": "CRITICAL",
+          "refs": [
+            "Civ. Code 1798.120",
+            "Civ. Code 1798.135"
+          ],
+          "note": "Sharing continued after the user opted out."
+        },
+        "C3": {
+          "severity": "MEDIUM",
+          "refs": [
+            "Civ. Code 1798.140 (consent, dark pattern)",
+            "11 CCR 7004"
+          ],
+          "note": "Agreement obtained through dark patterns is not consent."
+        },
+        "C4": {
+          "severity": "HIGH",
+          "refs": [
+            "Civ. Code 1798.135",
+            "11 CCR 7004",
+            "11 CCR 7013"
+          ],
+          "note": "Opting out must be easy and symmetrical with opting in."
+        },
+        "C5": {
+          "severity": "LOW",
+          "refs": [
+            "11 CCR 7004"
+          ]
+        },
+        "C6": {
+          "severity": "MEDIUM",
+          "refs": [
+            "Civ. Code 1798.100",
+            "11 CCR 7012"
+          ],
+          "note": "Notice at collection lists categories and purposes."
+        },
+        "C7": {
+          "severity": "MEDIUM",
+          "refs": [
+            "Civ. Code 1798.135",
+            "11 CCR 7004"
+          ]
+        },
+        "C8": {
+          "severity": "LOW",
+          "refs": [
+            "11 CCR 7003"
+          ],
+          "note": "Notices in the languages the business ordinarily uses with consumers."
+        },
+        "C9": {
+          "severity": "HIGH",
+          "refs": [
+            "Civ. Code 1798.120(c)",
+            "COPPA 16 CFR Part 312"
+          ],
+          "note": "Selling/sharing data of under-16s needs opt-in; under-13s need verifiable parental consent."
+        },
+        "C10": {
+          "severity": "MEDIUM",
+          "refs": [
+            "Civ. Code 1798.140 (personal information)",
+            "Civ. Code 1798.120"
+          ],
+          "note": "Device identifiers are personal information; sharing them for ads must honour opt-out."
+        },
+        "NC": {
+          "severity": "MEDIUM",
+          "refs": [
+            "Civ. Code 1798.100",
+            "Civ. Code 1798.135"
+          ],
+          "note": "No notice at collection or opt-out mechanism seen."
+        },
+        "C13": {
+          "severity": "LOW",
+          "refs": [
+            "Civ. Code 1798.100"
+          ],
+          "note": "No privacy-by-default rule; notice at collection still applies."
+        },
+        "C14": {
+          "severity": "INFO",
+          "refs": [
+            "Civ. Code 1798.100"
+          ]
+        },
+        "C15": {
+          "severity": "MEDIUM",
+          "refs": [
+            "Bus. & Prof. Code 22575 (CalOPPA)",
+            "Civ. Code 1798.130"
+          ],
+          "note": "Apps collecting personal data must make a privacy policy conspicuously available."
+        }
+      }
+    },
+    {
+      "id": "br",
+      "name": "Brazil",
+      "law": "LGPD (Lei 13.709/2018)",
+      "model": "opt-in consent (or another legal basis)",
+      "sources": [
+        "https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm"
+      ],
+      "checks": {
+        "C1": {
+          "severity": "HIGH",
+          "refs": [
+            "LGPD Art 7 I",
+            "LGPD Art 8"
+          ]
+        },
+        "C2": {
+          "severity": "CRITICAL",
+          "refs": [
+            "LGPD Art 8 §5",
+            "LGPD Art 18 IX"
+          ]
+        },
+        "C3": {
+          "severity": "HIGH",
+          "refs": [
+            "LGPD Art 5 XII",
+            "LGPD Art 8"
+          ],
+          "note": "Consent must be a free, informed and unambiguous expression."
+        },
+        "C4": {
+          "severity": "MEDIUM",
+          "refs": [
+            "LGPD Art 5 XII",
+            "LGPD Art 8"
+          ]
+        },
+        "C5": {
+          "severity": "MEDIUM",
+          "refs": [
+            "LGPD Art 8 §4"
+          ],
+          "note": "Generic authorisations are void; consent must be for specific purposes."
+        },
+        "C6": {
+          "severity": "MEDIUM",
+          "refs": [
+            "LGPD Art 9"
+          ]
+        },
+        "C7": {
+          "severity": "MEDIUM",
+          "refs": [
+            "LGPD Art 8 §5",
+            "LGPD Art 18 IX"
+          ]
+        },
+        "C8": {
+          "severity": null,
+          "refs": [
+            "LGPD Art 9"
+          ],
+          "note": "Information must be clear and accessible; no language list; not scored."
+        },
+        "C9": {
+          "severity": "HIGH",
+          "refs": [
+            "LGPD Art 14 §1"
+          ],
+          "note": "Children's data needs specific consent from a parent or guardian."
+        },
+        "C10": {
+          "severity": "MEDIUM",
+          "refs": [
+            "LGPD Art 5 I",
+            "LGPD Art 7 I"
+          ]
+        },
+        "NC": {
+          "severity": "HIGH",
+          "refs": [
+            "LGPD Art 7 I",
+            "LGPD Art 9"
+          ]
+        },
+        "C13": {
+          "severity": "MEDIUM",
+          "refs": [
+            "LGPD Art 46 §2"
+          ],
+          "note": "Privacy protection from the design phase."
+        },
+        "C14": {
+          "severity": "LOW",
+          "refs": [
+            "LGPD Art 9"
+          ]
+        },
+        "C15": {
+          "severity": "LOW",
+          "refs": [
+            "LGPD Art 9"
+          ]
+        }
+      }
+    }
+  ]
+}

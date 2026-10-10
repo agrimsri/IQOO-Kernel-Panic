@@ -95,6 +95,19 @@ class AuditCommandTests(unittest.TestCase):
         code, _ = self.run_audit(FakePhone(files=self.good_files()))
         self.assertEqual(EXIT_FINDINGS, code)
 
+    def test_jurisdictions_are_saved_and_the_policy_jurisdiction_sets_the_exit_code(self):
+        code, i = self.run_audit(FakePhone(files=self.good_files()))
+        saved = json.loads((Path(self.cfg["output"]["dir"]) / "REQ.json").read_text())
+        block = saved["jurisdictions"]
+        self.assertEqual(block["policy"], "in")
+        self.assertEqual([a["id"] for a in block["assessments"]], ["in", "eu", "uk", "us-ca", "br"])
+        self.assertEqual(block["assessments"][0]["score"], 21)  # India is the app's own score
+        self.assertIn("By jurisdiction", i.out.getvalue())
+        # Under California's opt-out model a lone C1 weighs MEDIUM, so the default fail_on=high passes.
+        code, _ = self.run_audit(FakePhone(files=self.good_files()), policy="us-ca")
+        self.assertEqual(EXIT_PASS, code)
+        self.assertEqual(EXIT_USAGE, self.run_audit(FakePhone(files=self.good_files()), jurisdictions="mars")[0])
+
     def test_min_score_policy(self):
         self.cfg["audit"].update(fail_on="off", min_score=50)
         self.assertEqual(EXIT_FINDINGS, self.run_audit(FakePhone(files=self.good_files()))[0])
