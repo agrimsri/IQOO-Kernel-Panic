@@ -43,6 +43,7 @@ import com.dpdpxray.core.audit.PhaseAssigner
 import com.dpdpxray.core.export.AuditBackups
 import com.dpdpxray.core.export.AuditBundles
 import com.dpdpxray.core.export.BackupFormatException
+import com.dpdpxray.core.darkpattern.DarkPatternExport
 import com.dpdpxray.core.export.SdkAttributionExport
 import com.dpdpxray.core.evidence.EvidenceSignatures
 import com.dpdpxray.core.dpdp.Passage
@@ -442,9 +443,10 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun exportAuditJson(bundle: AuditBundle, share: Boolean) = viewModelScope.launch {
         val groups = withContext(Dispatchers.Default) { sdkGroups(bundle) }
+        val darkPatterns = withContext(Dispatchers.Default) { DarkPatternExport.of(bundle.sessions) }
         val file = runCatching {
             withContext(Dispatchers.IO) {
-                AuditJsonExport.write(bundle, BuildConfig.VERSION_NAME, lensProfile().name, SdkAttributionExport(groups = groups))
+                AuditJsonExport.write(bundle, BuildConfig.VERSION_NAME, lensProfile().name, SdkAttributionExport(groups = groups), darkPatterns)
             }
         }
             .getOrElse { _toast.value = "Could not build the audit data export"; return@launch }

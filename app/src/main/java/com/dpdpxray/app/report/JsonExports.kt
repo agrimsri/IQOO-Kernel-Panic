@@ -3,6 +3,7 @@ package com.dpdpxray.app.report
 import com.dpdpxray.app.data.AuditBundle
 import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.data.SessionNetworkReadings
+import com.dpdpxray.core.darkpattern.DarkPatternExport
 import com.dpdpxray.core.export.AuditBundleV1
 import com.dpdpxray.core.export.AuditBundles
 import com.dpdpxray.core.export.BundleApp
@@ -26,10 +27,12 @@ object AuditJsonExport {
     /**
      * [legalProfile] is the lens selected in Settings (a LegalProfile name); it is recorded, never applied to the evidence.
      * [sdkAttribution] is the optional "Which SDK caused this?" grouping, derived from the same sessions and result.
+     * [darkPatterns] is the optional dark-pattern signals part (India CCPA 2023), derived from the same sessions; it never
+     * changes the result.
      */
     fun build(
         bundle: AuditBundle, versionName: String, exportedAt: String = AuditBundles.now(), legalProfile: String? = null,
-        sdkAttribution: SdkAttributionExport? = null,
+        sdkAttribution: SdkAttributionExport? = null, darkPatterns: DarkPatternExport? = null,
     ): AuditBundleV1 =
         AuditBundles.audit(
             app = BundleApp(bundle.meta.targetPackage, bundle.meta.targetLabel),
@@ -44,14 +47,21 @@ object AuditJsonExport {
             note = SAMPLE_NOTE.takeIf { bundle.meta.sample },
             legalProfile = legalProfile,
             sdkAttribution = sdkAttribution,
+            darkPatterns = darkPatterns,
         )
 
     /** Audit ids already say what they are ("audit-<ms>", "sample-<ms>"): TraceVeil-audit-1791595268053.json. */
     fun fileName(meta: AuditMeta) = "TraceVeil-${safe(meta.id)}.json"
 
-    fun write(bundle: AuditBundle, versionName: String, legalProfile: String? = null, sdkAttribution: SdkAttributionExport? = null): File =
+    fun write(
+        bundle: AuditBundle, versionName: String, legalProfile: String? = null, sdkAttribution: SdkAttributionExport? = null,
+        darkPatterns: DarkPatternExport? = null,
+    ): File =
         File(bundle.dir, fileName(bundle.meta)).apply {
-            writeText(AuditBundles.encode(build(bundle, versionName, legalProfile = legalProfile, sdkAttribution = sdkAttribution)), Charsets.UTF_8)
+            writeText(
+                AuditBundles.encode(build(bundle, versionName, legalProfile = legalProfile, sdkAttribution = sdkAttribution, darkPatterns = darkPatterns)),
+                Charsets.UTF_8,
+            )
         }
 }
 
