@@ -1,6 +1,8 @@
 package com.dpdpxray.app.audit
 
+import com.dpdpxray.app.report.EvidenceReport
 import com.dpdpxray.core.model.AuditPlan
+import com.dpdpxray.core.model.AuditSession
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -47,6 +49,13 @@ class BackgroundStepTest {
         // The existing foreground windows are unchanged: the background step is added after them, never carved out.
         val t = AuditTimingPolicy.forAudit(full)
         assertEquals(listOf(20_000L, 2_500L, 15_000L, 25_000L), listOf(t.waitConsentMs, t.dwellMs, t.observeMs, t.silentMs))
+    }
+
+    @Test fun `report coverage mentions the background window only for plans that recorded one`() {
+        val s = AuditSession("a", "demo.test", "Demo", AuditPlan.REJECT)
+        assertTrue(EvidenceReport.coverageNotes(listOf(s), AuditTimingPolicy.NORMAL, sample = false).none { it.startsWith("Background check") })
+        val notes = EvidenceReport.coverageNotes(listOf(s.copy(backgroundStartedNanos = 30_000_000_000L)), AuditTimingPolicy.NORMAL, sample = false)
+        assertTrue(notes.any { it.startsWith("Background check: after the observation window the app was sent to the background") && it.contains("Plan B · Reject") })
     }
 
     @Test fun `background note states what was confirmed`() {

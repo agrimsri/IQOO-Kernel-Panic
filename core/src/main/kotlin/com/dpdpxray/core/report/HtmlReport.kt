@@ -64,7 +64,7 @@ object HtmlReport {
         "commence on 13 May 2027; read these passages as readiness guidance and confirm applicability with a qualified reviewer."
 
     /** Findings that rest on DNS lookups, where the upload of personal data itself is not established. */
-    private val NETWORK_CHECKS = setOf(CheckId.C1, CheckId.C2, CheckId.C9, CheckId.C10, CheckId.NC)
+    private val NETWORK_CHECKS = setOf(CheckId.C1, CheckId.C2, CheckId.C9, CheckId.C10, CheckId.NC, CheckId.C11, CheckId.C12)
 
     private val css: String by lazy { resource("/report/traceveil-report.css") }
     private val js: String by lazy { resource("/report/traceveil-report.js") }
