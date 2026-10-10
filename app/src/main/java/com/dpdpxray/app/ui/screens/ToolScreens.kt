@@ -65,6 +65,7 @@ import com.dpdpxray.app.ui.components.TopBar
 import com.dpdpxray.app.ui.modes.ModeCopy
 import com.dpdpxray.app.ui.modes.ModeSwitch
 import com.dpdpxray.app.ui.theme.Film
+import com.dpdpxray.app.npu.ConsentLensCard
 import com.dpdpxray.app.voice.ApiEnv
 import com.dpdpxray.app.voice.SpeechOutputChoice
 import com.dpdpxray.app.voice.wake.HeyTraceVeilSection
@@ -144,6 +145,8 @@ fun AiLabScreen(vm: XrayViewModel, onBack: () -> Unit) {
                     Note(String.format(Locale.US, "Thermal headroom: %.2f (1.0 means the phone is about to throttle)", headroom))
                 }
             }
+
+            ConsentLensCard(vm.graph.consentLens)
 
             SectionCard(title = "Answer check", glyph = Glyph.CHECK) {
                 Note("Sends fixed test prompts (no audit data) with the app's current settings and with the old ones, shows what came back, and says which setting breaks answers on this phone. Thinking text is never shown.")

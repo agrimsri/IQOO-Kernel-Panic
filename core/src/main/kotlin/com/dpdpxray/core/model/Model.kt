@@ -160,7 +160,30 @@ data class ScreenAudit(
     val conflicts: List<String> = emptyList(),
     val modelId: String? = null,
     val latencyMs: Long? = null,
+    /** What ConsentLens-1 (on-device string-role model) added; null when it did not run. Its fields are INFERRED. */
+    val consentLens: ConsentLensEvidence? = null,
 )
+
+/**
+ * ConsentLens-1's contribution to a [ScreenAudit]. Every field it set is listed in [inferredFields] (never in
+ * observedFields), with the on-screen strings that support it in [support]. Disagreements with OBSERVED tree facts
+ * are kept in [ScreenAudit.conflicts]; disagreements with the screen-review model are kept in [disagreements].
+ */
+@Serializable
+data class ConsentLensEvidence(
+    val modelId: String,
+    val backend: String? = null,
+    val threshold: Double,
+    val labels: List<ConsentLensLabel> = emptyList(),
+    val inferredFields: List<String> = emptyList(),
+    val support: Map<String, List<String>> = emptyMap(),
+    /** true when a privacy-policy/notice link string was found; null = none found (not proof that none exists). */
+    val privacyLinkFound: Boolean? = null,
+    val disagreements: List<String> = emptyList(),
+)
+
+@Serializable
+data class ConsentLensLabel(val text: String, val role: String, val confidence: Double, val clickable: Boolean)
 
 @Serializable
 data class AuditSession(

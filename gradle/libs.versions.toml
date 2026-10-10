@@ -11,6 +11,9 @@ serialization = "1.11.0"
 shizuku = "13.1.5"
 litertlm = "0.17.1"
 vosk = "0.3.75"
+# ConsentLens on-device NPU path: LiteRT Interpreter API + Qualcomm QNN delegate/runtime (versions must match each other).
+litert = "1.4.2"
+qnn = "2.50.0"
 junit = "4.13.2"
 materialIcons = "1.7.8"
 
@@ -37,6 +40,10 @@ shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizu
 litertlm-android = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litertlm" }
 # Offline keyword spotting for the opt-in "Hey TraceVeil" wake word (Apache-2.0; pulls JNA 5.18.1 as an aar).
 vosk-android = { module = "com.alphacephei:vosk-android", version.ref = "vosk" }
+# ConsentLens: LiteRT (Apache-2.0) and the Qualcomm AI Engine Direct (QNN) delegate + HTP runtime (Qualcomm licence, see ATTRIBUTIONS.md).
+litert = { module = "com.google.ai.edge.litert:litert", version.ref = "litert" }
+qnn-litert-delegate = { module = "com.qualcomm.qti:qnn-litert-delegate", version.ref = "qnn" }
+qnn-runtime = { module = "com.qualcomm.qti:qnn-runtime", version.ref = "qnn" }
 junit = { module = "junit:junit", version.ref = "junit" }
 
 [plugins]
