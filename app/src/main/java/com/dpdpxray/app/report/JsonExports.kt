@@ -22,7 +22,8 @@ object AuditJsonExport {
     const val MIME = "application/json"
     const val SAMPLE_NOTE = "Synthetic sample data from TraceVeil's built-in sample audit; not a device observation."
 
-    fun build(bundle: AuditBundle, versionName: String, exportedAt: String = AuditBundles.now()): AuditBundleV1 =
+    /** [legalProfile] is the lens selected in Settings (a LegalProfile name); it is recorded, never applied to the evidence. */
+    fun build(bundle: AuditBundle, versionName: String, exportedAt: String = AuditBundles.now(), legalProfile: String? = null): AuditBundleV1 =
         AuditBundles.audit(
             app = BundleApp(bundle.meta.targetPackage, bundle.meta.targetLabel),
             meta = AuditJson.json.encodeToJsonElement(AuditMeta.serializer(), bundle.meta).jsonObject,
@@ -34,13 +35,16 @@ object AuditJsonExport {
             toolVersion = versionName,
             exportedAt = exportedAt,
             note = SAMPLE_NOTE.takeIf { bundle.meta.sample },
+            legalProfile = legalProfile,
         )
 
     /** Audit ids already say what they are ("audit-<ms>", "sample-<ms>"): TraceVeil-audit-1791595268053.json. */
     fun fileName(meta: AuditMeta) = "TraceVeil-${safe(meta.id)}.json"
 
-    fun write(bundle: AuditBundle, versionName: String): File =
-        File(bundle.dir, fileName(bundle.meta)).apply { writeText(AuditBundles.encode(build(bundle, versionName)), Charsets.UTF_8) }
+    fun write(bundle: AuditBundle, versionName: String, legalProfile: String? = null): File =
+        File(bundle.dir, fileName(bundle.meta)).apply {
+            writeText(AuditBundles.encode(build(bundle, versionName, legalProfile = legalProfile)), Charsets.UTF_8)
+        }
 }
 
 /** "Export report (JSON)" on the quarantine behaviour report: the saved report wrapped as traceveil.quarantine.v1. */
