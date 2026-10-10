@@ -69,8 +69,8 @@ TraceVeil observes DNS lookups on the phone and relates them to recorded consent
 
 | Check | What it means | DPDP basis | Penalty ceiling |
 |---|---|---|---|
-| **C1** | Trackers contacted **before** any consent choice | s.4(1), s.6(1) | up to ₹50 crore |
-| **C2** | Trackers contacted **after the user refused** | s.4(1), s.6(1) | up to ₹50 crore |
+| **C1** | Tracker hosts looked up **before** any consent choice (catalogue match) | s.4(1), s.6(1) | up to ₹50 crore |
+| **C2** | Tracker hosts looked up **after the user refused** (catalogue match) | s.4(1), s.6(1) | up to ₹50 crore |
 | **C3** | A consent option is pre-ticked | s.6(1), "clear affirmative action" | up to ₹50 crore |
 | **C4** | No way to refuse, or refusal hidden behind "Manage" | s.6(1), s.6(4) | up to ₹50 crore |
 | **C5** | One button bundles several purposes | s.6(1), Rule 3(b) | up to ₹50 crore |
@@ -79,7 +79,7 @@ TraceVeil observes DNS lookups on the phone and relates them to recorded consent
 | **C8** | Notice offered only in English | s.5(3), s.6(3) | up to ₹50 crore |
 | **C9** | Tracking in an app used by children | s.9(1), s.9(3) | **up to ₹200 crore** |
 | **C10** | Ad or device IDs likely shared before consent (*inferred*) | s.6(1) | up to ₹50 crore |
-| **NC** | No consent mechanism at all, yet trackers are contacted | s.5(1), s.6(1), s.6(10) | up to ₹50 crore |
+| **NC** | No consent screen seen during the capture, yet tracker hosts are looked up | s.5(1), s.6(1), s.6(10) | up to ₹50 crore |
 | **V0** | Too few network lookups to judge, so the result is **inconclusive** (never "clean") | — | — |
 
 Each finding is labelled either:
@@ -268,7 +268,7 @@ TraceVeil's home screen lists every item under **Before you audit**, with a butt
    - Turn on **This app is used by children** to add the Section 9 check.
 3. **Watch the live timeline:**
    - Each lookup appears with its time, company and category.
-   - Trackers contacted before a choice, or after a refusal, turn red.
+   - Tracker hosts looked up before a choice, or after a refusal, turn red.
    - **Mark consent now** records a consent moment by hand for screens that expose no text, such as games or canvas-drawn UI.
 4. **Read the result:**
    - The score and its band.

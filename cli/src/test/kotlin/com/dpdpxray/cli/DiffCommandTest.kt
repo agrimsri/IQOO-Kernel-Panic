@@ -29,7 +29,7 @@ class DiffCommandTest {
         assertEquals(r.toString(), Exit.PASS, r.exit)
         assertTrue(r.out, r.out.contains("Score: 21/100 · below 60 → 100/100 · 85–100 band (+79)"))
         assertTrue(r.out, r.out.contains("Resolved (5)"))
-        assertTrue(r.out, r.out.contains("  C2     Critical  OBSERVED  Trackers contacted after the user refused"))
+        assertTrue(r.out, r.out.contains("  C2     Critical  OBSERVED  Tracker hosts looked up after the user refused"))
         assertTrue(r.out, r.out.contains("New (0)\n  none"))
         assertTrue(r.out, r.out.contains("Unchanged (0)\n  none"))
         assertTrue(r.out, r.out.contains("Not established in the new capture (0)\n  none"))
@@ -43,7 +43,7 @@ class DiffCommandTest {
         assertEquals(r.toString(), Exit.VIOLATION, r.exit)
         assertTrue(r.out, r.out.contains("New (5)"))
         assertTrue(r.out, r.out.contains("Result: REGRESSION (exit 1)"))
-        assertTrue(r.out, r.out.contains("  - new finding C2 Trackers contacted after the user refused (Critical)"))
+        assertTrue(r.out, r.out.contains("  - new finding C2 Tracker hosts looked up after the user refused (Critical)"))
         assertTrue(r.out, r.out.contains("  - score fell from 100 to 21"))
     }
 
@@ -63,7 +63,7 @@ class DiffCommandTest {
         write(dir, "quieter.json", quieterReject)
         val r = run(dir, "diff", SampleBundles.LEAKY, "quieter.json")
         assertEquals(r.toString(), Exit.PASS, r.exit)
-        assertTrue(r.out, Regex("C2 .*Trackers contacted after the user refused  \\[no longer AppsFlyer]").containsMatchIn(r.out))
+        assertTrue(r.out, Regex("C2 .*Tracker hosts looked up after the user refused  \\[no longer AppsFlyer]").containsMatchIn(r.out))
     }
 
     @Test
@@ -103,7 +103,7 @@ class DiffCommandTest {
         assertEquals(r.toString(), Exit.VIOLATION, r.exit)
         assertTrue(r.out, r.out.contains("Resolved (0)\n  none"))
         assertTrue(r.out, r.out.contains("Not established in the new capture (1)"))
-        assertTrue(r.out, r.out.contains("  C2     Critical  OBSERVED  Trackers contacted after the user refused  [NOT ESTABLISHED: no Reject choice was recorded"))
+        assertTrue(r.out, r.out.contains("  C2     Critical  OBSERVED  Tracker hosts looked up after the user refused  [NOT ESTABLISHED: no Reject choice was recorded"))
         assertTrue(r.out, r.out.contains("  - C2 NOT ESTABLISHED in the new capture (no Reject choice was recorded"))
 
         val json = Json.parseToJsonElement(run(dir, "diff", SampleBundles.LEAKY, "no-reject.json", "--format", "json").out).jsonObject

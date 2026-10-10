@@ -34,8 +34,8 @@ class CheckCommandTest {
     fun `leaky sample fails the default policy on C2`() {
         val r = run(dir, "check", leaky)
         assertEquals(r.toString(), Exit.VIOLATION, r.exit)
-        assertTrue(r.out, has(r.out, "FAIL\\s+failOn C2\\s+C2 Trackers contacted after the user refused \\(Critical, OBSERVED evidence\\)"))
-        assertTrue(r.out, r.out.contains("C2     Critical  OBSERVED  Trackers contacted after the user refused"))
+        assertTrue(r.out, has(r.out, "FAIL\\s+failOn C2\\s+C2 Tracker hosts looked up after the user refused \\(Critical, OBSERVED evidence\\)"))
+        assertTrue(r.out, r.out.contains("C2     Critical  OBSERVED  Tracker hosts looked up after the user refused"))
         assertTrue(r.out, r.out.contains("first evidence: graph.facebook.com"))
         assertTrue(r.out, r.out.contains("Score:    21/100 · below 60 (re-evaluated; same as stored in the bundle)"))
         assertTrue(r.out, has(r.out, "FAIL\\s+failOn C9\\s+C9 NOT ESTABLISHED"))

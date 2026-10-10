@@ -93,20 +93,20 @@ Fresh:    all 3 plans started from an approved fresh reset
 Score:    21/100 · below 60 (re-evaluated; same as stored in the bundle)
 
 CHECK  SEVERITY  EVIDENCE  FINDING
-C2     Critical  OBSERVED  Trackers contacted after the user refused
-                           first evidence: graph.facebook.com (Meta (Facebook SDK)) — 9.4 s after launch, 1.1 s after the user chose reject [Plan B · Reject]
-C1     High      OBSERVED  Trackers contacted before consent
-                           first evidence: app-measurement.com (Google Analytics for Firebase) — 0.6 s after launch, the user had not chosen yet [Plan C · No interaction]
+C2     Critical  OBSERVED  Tracker hosts looked up after the user refused
+                           first evidence: graph.facebook.com (Meta (Facebook SDK)) — catalogue match: advertising — looked up 9.4 s after launch, 1.1 s after the user chose reject [Plan B · Reject]
+C1     High      OBSERVED  Tracker hosts looked up before consent
+                           first evidence: app-measurement.com (Google Analytics for Firebase) — catalogue match: analytics — looked up 0.6 s after launch, the user had not chosen yet [Plan C · No interaction]
 C3     High      OBSERVED  Pre-ticked consent option
                            first evidence: Consent screen shows a pre-ticked option.
 C4     High      OBSERVED  No clear way to refuse
                            first evidence: Reject option: hidden.
 C10    Medium    INFERRED  Device identifiers likely shared before consent
-                           first evidence: app-measurement.com (Google Analytics for Firebase) — 0.6 s after launch, the user had not chosen yet [Plan C · No interaction]
+                           first evidence: app-measurement.com (Google Analytics for Firebase) — catalogue match: analytics — looked up 0.6 s after launch, the user had not chosen yet [Plan C · No interaction]
 
 Policy
   PASS  allowInconclusive  result is conclusive
-  FAIL  failOn C2          C2 Trackers contacted after the user refused (Critical, OBSERVED evidence)
+  FAIL  failOn C2          C2 Tracker hosts looked up after the user refused (Critical, OBSERVED evidence)
   FAIL  failOn C9          C9 NOT ESTABLISHED: the app was not declared child-facing in this capture and no consent screen was reviewed for child-audience signals; a failOn check that could not be tested fails unless allowNotEstablished is true
   OFF   minScore           not set
   OFF   maxHigh            not set
@@ -156,7 +156,7 @@ Findings come from DNS lookups and consent-screen review on one phone during one
 The example policy (`--policy docs/ci/traceveil-policy.json`) is written for an app that is not directed at children: it gates on C2 only and adds `minScore: 85` and `maxHigh: 0`. With it the fixed sample passes (exit code 0) and the leaky sample has three violations:
 
 ```text
-  FAIL  failOn C2          C2 Trackers contacted after the user refused (Critical, OBSERVED evidence)
+  FAIL  failOn C2          C2 Tracker hosts looked up after the user refused (Critical, OBSERVED evidence)
   FAIL  minScore           score 21 is below the minimum 85
   FAIL  maxHigh            4 findings at High or Critical severity (C2, C1, C3, C4); the policy allows 0
 ```
@@ -188,8 +188,8 @@ Warning: the bundles are for different packages (com.leakyshop.demo → com.leak
 Score: 21/100 · below 60 → 100/100 · 85–100 band (+79)
 
 Resolved (5)
-  C2     Critical  OBSERVED  Trackers contacted after the user refused
-  C1     High      OBSERVED  Trackers contacted before consent
+  C2     Critical  OBSERVED  Tracker hosts looked up after the user refused
+  C1     High      OBSERVED  Tracker hosts looked up before consent
   C3     High      OBSERVED  Pre-ticked consent option
   C4     High      OBSERVED  No clear way to refuse
   C10    Medium    INFERRED  Device identifiers likely shared before consent
