@@ -35,7 +35,7 @@ import java.util.Date
  * the microphone starts only from the Start button, for at most 15 minutes at a time.
  */
 @Composable
-fun HeyTraceVeilSection(optedIn: Boolean, onOptInChange: (Boolean) -> Unit) {
+fun HeyTraceVeilSection(optedIn: Boolean, onOptInChange: (Boolean) -> Unit, showTitle: Boolean = true) {
     val context = LocalContext.current
     val models = remember(context) { WakeModelManager.get(context) }
     val model by models.status.collectAsState()
@@ -55,7 +55,8 @@ fun HeyTraceVeilSection(optedIn: Boolean, onOptInChange: (Boolean) -> Unit) {
         }
     }
 
-    SectionTitle("Hey TraceVeil (experimental)")
+    // Settings shows this section inside a titled card, so it can leave the heading to the card.
+    if (showTitle) SectionTitle("Hey TraceVeil (experimental)")
     Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text("Hands-free wake word", style = MaterialTheme.typography.titleMedium)
