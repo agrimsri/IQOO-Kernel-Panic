@@ -7,7 +7,8 @@ import { fileURLToPath } from "node:url";
 //   npm run build          -> dist/          (normal static site, relative paths, served by `npm run preview`)
 //   npm run build:single   -> dist-single/   (ONE self-contained index.html that opens from file:// with no server)
 // The console reads the tracker catalogue, fix templates and DPDP passages straight from the TraceVeil core
-// resources (../core/src/main/resources) at build time, so it never drifts from what the phone app ships.
+// resources (../core/src/main/resources) at build time, so it never drifts from what the phone app ships, and the
+// CI workflow example from ../docs/ci, so the Release policy page shows the real traceveil-ci usage.
 export default defineConfig(({ mode }) => {
   const single = mode === "single";
   return {
@@ -17,6 +18,8 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@fonts": fileURLToPath(new URL("./node_modules/@fontsource-variable", import.meta.url)),
         "@core-resources": fileURLToPath(new URL("../core/src/main/resources", import.meta.url)),
+        // docs/ci/traceveil-gate.yml is shown verbatim on the Release policy page.
+        "@repo-docs": fileURLToPath(new URL("../docs", import.meta.url)),
       },
     },
     define: { __SINGLE_FILE__: JSON.stringify(single) },

@@ -1,8 +1,9 @@
 // End-to-end smoke test of the single-file build from file:// with the local Chrome (no server, no network).
 //   node scripts/smoke.mjs        (or: npm run smoke)
 // Checks: first visit loads the labelled samples and starts the tour; importing a valid audit, a bare quarantine
-// report and a broken file; same-package compare; the policy preview; deleting all data stays deleted on reload;
-// no console errors and no network requests.
+// report and a broken file; importing the traceveil-ci sample bundles from ../docs/samples (the same files the CLI
+// tests gate); same-package compare; the policy preview with the CLI's defaults and rules; deleting all data stays
+// deleted on reload; no console errors and no network requests.
 import puppeteer from "puppeteer-core";
 import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -29,6 +30,10 @@ writeFileSync(files.later, JSON.stringify(later));
 writeFileSync(files.bare, JSON.stringify(q));
 writeFileSync(files.broken, "{ not json");
 writeFileSync(files.other, JSON.stringify({ hello: "world" }));
+// the CLI's synthetic sample bundles, exactly as committed (traceveil.audit.v1 x3, traceveil.quarantine.v1 x1)
+const cliSamplesDir = join(root, "..", "docs", "samples");
+const cliSamples = ["leakyshop-leaky_sample.json", "leakyshop-fixed_sample.json", "instagram-kept-data_sample.json", "riskdemo-quarantine_sample.json"]
+  .map((f) => join(cliSamplesDir, f));
 
 let failures = 0;
 const check = (ok, msg) => { console.log(`${ok ? "PASS" : "FAIL"}  ${msg}`); if (!ok) failures++; };
@@ -69,6 +74,24 @@ check(t.includes("other.json: not a TraceVeil export"), "a non-TraceVeil JSON fi
 await go("/audits");
 t = await text();
 check(t.includes("3 audits"), "the valid audit export was imported (3 audits)");
+// 2b. the traceveil-ci sample bundles from docs/samples
+const input2 = await page.$("input[type=file]");
+await input2.uploadFile(...cliSamples);
+await sleep(1500);
+t = await text();
+check(!/_sample\.json: /.test(t), "the docs/samples bundles import without errors");
+await go("/audits");
+t = await text();
+check(t.includes("6 audits"), "the three traceveil-ci sample audits were imported (6 audits)");
+await go("/audits/sample-leakyshop-leaky");
+t = await text();
+check(t.includes("LeakyShop (sample)") && /\b21\b/.test(t), "the CLI leaky sample opens with its score of 21");
+await go("/audits/sample-instagram-kept-data");
+t = await text();
+check(t.includes("Instagram (synthetic sample)"), "the CLI kept-data sample opens");
+await go("/quarantine/quarantine-sample");
+t = await text();
+check(t.includes("panel.example.com") && t.includes("203.0.113.9"), "the CLI quarantine sample (traceveil.quarantine.v1) opens with its lookup and blocked address");
 await go("/quarantine/quarantine-smoke-bare");
 t = await text();
 check(t.includes("Possible hard-coded address") && t.includes("203.0.113.10:443"), "a bare quarantine report gets its summary and hard-coded address signal computed");
@@ -80,16 +103,31 @@ t = await text();
 check(t.includes("SAME PACKAGE") || t.includes("Same package"), "compare defaults to two audits of the same package");
 check(/Score change\s*0/i.test(t) || t.includes("\n0\n"), "same findings give a score change of 0");
 
-// 4. policy preview
+// 4. policy preview: the traceveil-ci defaults and rules (cli Policy.kt / Gate.kt)
 await go("/policy");
 t = await text();
-check(t.includes("Blocked checks found: C2"), "default policy blocks C2 for LeakyShop");
-const toggles = await page.$$(".toggle");
-await toggles[0].click();
+check(t.includes("C2 Trackers contacted after the user refused (Critical, OBSERVED evidence)"), "the default policy fails LeakyShop on C2");
+check(t.includes("C9 NOT ESTABLISHED: the app was not declared child-facing"), "a failOn check that could not be tested fails by default (C9 NOT ESTABLISHED)");
+check(t.includes("fresh state NOT ESTABLISHED (not recorded in this audit)"), "requireFreshState is on by default and fails a fresh state that was not recorded");
+check(t.includes("All 3 plans started from an approved fresh reset."), "the CLI fixed sample's recorded fresh resets pass requireFreshState");
+check(t.includes("Plan A · Accept was not captured; Plan B · Reject was not captured."), "requirePlans fails the kept-data sample like the CLI");
+check(/4 findings at High or Critical/.test(t) === false && t.includes("maxHigh not set."), "maxHigh is not set by default, like the CLI");
+const tl = t.toLowerCase(); // status pills are upper-cased by CSS
+check(!tl.includes("cli in development") && tl.includes("cli built") && tl.includes("workflow not yet run on github"), "the CI card states that the CLI is built and the workflow has not run on GitHub");
+check(t.includes("cli/build/install/traceveil-ci/bin/traceveil-ci check") && t.includes("--policy \"$TRACEVEIL_POLICY\" --format sarif --out traceveil.sarif"), "the GitHub Actions snippet is the repository's real workflow");
+check(t.includes('"allowNotEstablished": false') && t.includes('"requirePlans": ['), "policy.json carries allowNotEstablished and requirePlans");
+const fresh = await page.$('button.toggle[aria-label="Require a fresh app state"]');
+await fresh.click();
 await sleep(300);
 t = await text();
-check(t.includes("A fresh app state is required but not established"), "requireFreshState fails audits whose fresh state was not recorded");
-await toggles[0].click();
+check(!t.includes("fresh state NOT ESTABLISHED (not recorded in this audit)") && t.includes("Fresh app state not required."), "switching requireFreshState off removes that failure");
+await fresh.click();
+const allowNe = await page.$('button.toggle[aria-label="Allow checks that could not be tested"]');
+await allowNe.click();
+await sleep(300);
+t = await text();
+check(t.includes("C9 NOT ESTABLISHED") && t.includes("(reported, not failed: allowNotEstablished is on)"), "allowNotEstablished reports NOT ESTABLISHED without failing");
+await allowNe.click();
 
 // 5. audit detail renders the lanes and fixes
 await go("/audits/audit-1791590915883");
