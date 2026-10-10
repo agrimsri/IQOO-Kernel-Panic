@@ -129,7 +129,8 @@ class RulesEngine(private val catalog: TrackerCatalog, owners: AppOwners = AppOw
         fun add(id: CheckId, sev: Severity, field: String, explanation: String, evidence: String, refs: List<String>) {
             out += Finding(
                 checkId = id, severity = sev, evidenceType = ev(field), title = id.title, explanation = explanation,
-                evidence = listOf(evidence) + a.conflicts.filter { it.startsWith(field) }.map { "Note: tree and AI disagree — $it" },
+                evidence = listOf(evidence) + a.conflicts.filter { it.startsWith(field) }.map { "Note: tree and AI disagree — $it" } +
+                    lensSupport(a, field),
                 plans = plans, dpdpRefs = refs, penaltyBand = PenaltyBand.RESIDUAL_50,
                 confidence = if (ev(field) == EvidenceType.OBSERVED) 1.0 else a.confidence,
             )
@@ -170,6 +171,13 @@ class RulesEngine(private val catalog: TrackerCatalog, owners: AppOwners = AppOw
             "Languages offered: ${langs.ifEmpty { listOf("none shown") }.joinToString()}.", listOf("s5(3)", "s6(3)"),
         )
         return out
+    }
+
+    /** Names the on-device model and the on-screen strings behind a field ConsentLens inferred (INFERRED, not observed). */
+    private fun lensSupport(a: ScreenAudit, field: String): List<String> {
+        val lens = a.consentLens ?: return emptyList()
+        if (field !in lens.inferredFields) return emptyList()
+        return listOf("AI-inferred by ${lens.modelId} (on-device model) from: " + lens.support[field].orEmpty().joinToString("; "))
     }
 
     private fun c9Children(ctx: List<Ctx>, screen: ScreenAudit?): Finding? {
