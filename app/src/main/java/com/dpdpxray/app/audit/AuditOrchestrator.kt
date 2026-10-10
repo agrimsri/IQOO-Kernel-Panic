@@ -168,9 +168,10 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         }
 
         step(if (config.resetAppData) "Resetting authorised test app ${config.targetLabel}" else "Keeping ${config.targetLabel}'s current data")
+        var freshState = false // true only when an approved reset actually cleared the app's data
         if (config.resetAppData && ShizukuBridge.hasPermission()) {
             val stopped = ShizukuBridge.forceStop(pkg)
-            if (stopped.isSuccess) ShizukuBridge.clearAppData(pkg).onFailure { notes += "Could not clear app data: ${it.message}" }
+            if (stopped.isSuccess) ShizukuBridge.clearAppData(pkg).onSuccess { freshState = true }.onFailure { notes += "Could not clear app data: ${it.message}" }
             else notes += "Could not clear app data because stopping the test app failed: ${stopped.exceptionOrNull()?.message}"
         } else {
             notes += "App data was not cleared (reset not approved or Shizuku not authorised) — results reflect the app's current state."
@@ -269,6 +270,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             privateDnsActive = DeviceChecks.privateDnsActive(context),
             notes = notes,
             captureHealth = snapshot.health,
+            freshState = freshState,
         )
         CapturedPlan(session, capturedBoundary.reading)
     }
