@@ -277,6 +277,7 @@ TraceVeil's home screen lists every item under **Before you audit**, with a butt
 6. **Report and export:**
    - **Save PDF to Downloads**, **Share PDF**, or **Save Markdown**.
    - Files go to `Downloads/TraceVeil`.
+   - **Export audit data (JSON)** feeds `traceveil-ci`, a laptop/CI release gate: see [CI mode](docs/CI_MODE.md).
 7. **Camera check:** photograph or choose a screenshot of any consent screen, including one on another device, for an instant dark-pattern review.
 
 Other tools:
