@@ -19,6 +19,11 @@ data class TrackerEntry(
     val incorporation: CompanyCountry? = null,
     /** Caveats, or why nothing could be established (e.g. several contracting entities). */
     val note: String? = null,
+    /**
+     * Company group that runs this service (e.g. "Meta", "Google"), matched against the audited app's publisher in
+     * `app_owners.json` to recognise same-company traffic. null = not grouped; never guessed from a domain name.
+     */
+    val company: String? = null,
 ) {
     /** Headquarters country, only when a cited source describes the place as headquarters; never a registration. */
     val hqCountry: String? get() = location?.takeIf { it.basis == CompanyBasis.HEADQUARTERS }?.country
@@ -34,11 +39,14 @@ data class TrackerInfo(
     val collectsAdIdAtInit: Boolean = false,
     /** The observed alias that decided the classification, when the queried name itself did not. */
     val disguisedVia: String? = null,
+    /** Company group of the matched entry; see [TrackerEntry.company]. */
+    val company: String? = null,
 )
 
 /**
  * Suffix-matching hostname classifier. Longest matching domain wins; user first-party marks win for the name they
  * cover. An observed CNAME alias to a catalogue domain wins over the queried name's first-party mark (CNAME cloaking).
+ * An alias to a content-delivery entry is ordinary infrastructure, not cloaking, so it never decides a classification.
  */
 class TrackerCatalog(
     private val entries: List<TrackerEntry>,
@@ -56,7 +64,7 @@ class TrackerCatalog(
         if (!hostFirstParty) entryForHost(host)?.let { return info(it) }
         // Checked before the first-party shortcut: a first-party name can be an alias for a tracker.
         cnameChain.asSequence().map(::normalise).filter { it != host && !isFirstParty(it) }
-            .firstNotNullOfOrNull { alias -> entryForHost(alias)?.let { info(it, alias) } }
+            .firstNotNullOfOrNull { alias -> entryForHost(alias)?.takeIf { it.category != Category.CONTENT_DELIVERY }?.let { info(it, alias) } }
             ?.let { return it }
         return TrackerInfo(null, if (hostFirstParty) Category.FIRST_PARTY else Category.UNKNOWN)
     }
@@ -64,7 +72,7 @@ class TrackerCatalog(
     private fun normalise(name: String) = name.lowercase().trimEnd('.')
     private fun isFirstParty(host: String) = suffixes(host).any { it in firstParty }
     private fun entryForHost(host: String) = suffixes(host).firstNotNullOfOrNull { byDomain[it] }
-    private fun info(e: TrackerEntry, via: String? = null) = TrackerInfo(e.entity, e.category, e.sdkKey, e.collectsAdIdAtInit, via)
+    private fun info(e: TrackerEntry, via: String? = null) = TrackerInfo(e.entity, e.category, e.sdkKey, e.collectsAdIdAtInit, via, e.company)
 
     fun sdkKeyFor(entity: String): String? = entries.firstOrNull { it.entity == entity }?.sdkKey
 

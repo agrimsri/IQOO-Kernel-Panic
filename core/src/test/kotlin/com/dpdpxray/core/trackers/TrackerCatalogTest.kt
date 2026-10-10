@@ -2,6 +2,7 @@ package com.dpdpxray.core.trackers
 
 import com.dpdpxray.core.model.Category
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -56,5 +57,54 @@ class TrackerCatalogTest {
         assertEquals(Category.CRASH_REPORTING, default.classify("firebase-settings.crashlytics.com").category)
         assertEquals(Category.ENGAGEMENT, default.classify("in1.clevertap-prod.com").category)
         assertTrue("catalog should not be tiny", default.size >= 30)
+    }
+
+    @Test
+    fun `meta content delivery is not tracking but meta tracking endpoints still are`() {
+        val default = TrackerCatalog.loadDefault()
+        for (host in listOf("fbcdn.net", "scontent.xx.fbcdn.net", "static.xx.fbcdn.net", "video.fdel1-1.fna.fbcdn.net")) {
+            val info = default.classify(host)
+            assertEquals(host, Category.CONTENT_DELIVERY, info.category)
+            assertFalse(host, info.category.isTracking)
+            assertEquals("Meta", info.company)
+            assertFalse(info.collectsAdIdAtInit)
+        }
+        assertTrue(default.classify("graph.facebook.com").category.isTracking)
+        assertTrue(default.classify("connect.facebook.net").category.isTracking)
+        assertTrue(default.classify("an.facebook.com").category.isTracking)
+        assertEquals(Category.SOCIAL, default.classify("www.facebook.com").category)
+        assertTrue(default.entryFor("Meta CDN")!!.note!!.contains("content"))
+    }
+
+    @Test
+    fun `an alias to a content CDN is not treated as cloaking`() {
+        val default = TrackerCatalog.loadDefault()
+        val cdnOnly = default.classify("img.shop.example", listOf("img.shop.example", "scontent.xx.fbcdn.net"))
+        assertEquals(Category.UNKNOWN, cdnOnly.category)
+        assertNull(cdnOnly.disguisedVia)
+        // A tracker further down the chain is still found.
+        val behind = default.classify("t.shop.example", listOf("t.shop.example", "scontent.xx.fbcdn.net", "graph.facebook.com"))
+        assertEquals("Meta (Facebook SDK)", behind.entity)
+        assertEquals("graph.facebook.com", behind.disguisedVia)
+    }
+
+    @Test
+    fun `catalogue entries carry their company group`() {
+        val default = TrackerCatalog.loadDefault()
+        listOf("Meta (Facebook SDK)", "Meta Audience Network", "Meta", "Meta CDN").forEach { assertEquals(it, "Meta", default.entryFor(it)?.company) }
+        listOf("Google Analytics for Firebase", "Google Analytics", "Firebase Crashlytics", "Google Ads / AdMob").forEach {
+            assertEquals(it, "Google", default.entryFor(it)?.company)
+        }
+        assertNull("unresearched groupings stay unknown", default.entryFor("Kochava")?.company)
+        assertEquals("Meta", default.classify("graph.facebook.com").company)
+        assertEquals("Google", default.classify("googleads.g.doubleclick.net").company)
+        assertNull(default.classify("unknown.example").company)
+    }
+
+    @Test
+    fun `a blank company fails the load`() {
+        val bad = """[{"entity": "X", "category": "ANALYTICS", "domains": ["x.example"], "company": " "}]"""
+        val e = org.junit.Assert.assertThrows(IllegalArgumentException::class.java) { TrackerCatalog.fromJson(bad) }
+        assertTrue(e.message!!.contains("X"))
     }
 }
