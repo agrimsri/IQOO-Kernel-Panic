@@ -20,6 +20,7 @@ const shotDir = process.argv[2] ? resolve(process.argv[2]) : null;
 const leaky = JSON.parse(readFileSync(join(root, "src/data/samples/leakyshop-leaky.audit.json"), "utf8"));
 const later = structuredClone(leaky);
 delete later.sample; later.meta.sample = false; later.meta.id = "audit-smoke-later"; later.meta.createdAtMs += 3_600_000;
+later.legalProfile = "US_CHILDREN"; // the exporting phone's legal lens (core LegalProfile name)
 later.sessions.forEach((s) => { s.id = s.id.replace("audit-1791590915883", "audit-smoke-later"); s.startedAtEpochMs += 3_600_000; });
 const q = JSON.parse(readFileSync(join(root, "src/data/samples/test-challan.quarantine.json"), "utf8")).report;
 q.id = "quarantine-smoke-bare"; delete q.summary; delete q.timeline; // the console must compute both
@@ -136,6 +137,13 @@ const diamonds = await page.$$eval("[data-tour=lanes] path", (ps) => ps.filter((
 check(diamonds === 3, `three after-Reject tracker marks (found ${diamonds})`);
 t = await text();
 check(t.includes("Firebase Analytics: start collection only after consent"), "fix snippets are shown for C2");
+check(t.includes("Legal lens: Global baseline") && t.includes("the export names no lens"), "an export without a lens is read under the global baseline");
+check(t.includes("Global baseline: Good practice") && t.includes("Compare laws") && !t.includes("DPDP-ready"), "findings carry the lens relation and a Compare laws fold");
+await go("/audits/audit-smoke-later");
+t = await text();
+check(t.includes("Legal lens: US children (COPPA)") && t.includes("named in the export") && t.includes("skips C3, C4 (not applicable)"),
+  "an export's legalProfile selects its lens and the lens score skips not-applicable checks");
+check(t.includes("US children (COPPA): Not applicable"), "a not-applicable finding is labelled, not hidden");
 
 // 6. delete everything, reload: samples do not come back
 await go("/settings");

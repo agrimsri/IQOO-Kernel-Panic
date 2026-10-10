@@ -199,6 +199,13 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 
 .refs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .ref { font: 600 11px var(--font-mono); color: var(--text-2); border: 1px solid var(--line-2); border-radius: 7px; padding: 2px 7px; background: transparent; }
 .ref:hover { color: var(--text); border-color: var(--scan); }
+/* legal lens: how a finding relates to the selected law (not a verdict) */
+.lens-rel { font: 600 10.5px var(--font-mono); letter-spacing: .04em; border-radius: 7px; padding: 2px 7px; border: 1px solid var(--line-2); color: var(--text-2); }
+.lens-rel.rel-required { color: var(--scan); border-color: rgba(127, 211, 230, 0.45); }
+.lens-rel.rel-context { color: var(--lav); }
+.lens-rel.rel-not_applicable { color: var(--muted); border-style: dashed; }
+.compare-laws summary { cursor: pointer; }
+.compare-laws ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .fix { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
 .fix-toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 650; font-size: 13px; color: var(--pink-2); }
 .fix-item { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.14); }

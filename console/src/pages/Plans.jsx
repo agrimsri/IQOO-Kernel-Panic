@@ -37,9 +37,7 @@ const PLANS = [
     features: [
       ["CI release gate: traceveil-ci check and diff with your policy.json, SARIF for code scanning", BUILT, "Built · GitHub run pending"],
       ["Opt-in, end-to-end encrypted report sync between teammates (off by default)", SOON],
-      ["Legal-profile pack: India (DPDP Act 2023, readiness)", LIVE],
-      ["Legal-profile pack: EU / UK (GDPR, ePrivacy)", SOON],
-      ["Legal-profile pack: California (CCPA / CPRA)", SOON],
+      ["Legal lenses: India (DPDP, readiness), EU (GDPR, ePrivacy), UK (UK GDPR, PECR), California (CCPA), US children (COPPA), Brazil (LGPD), Singapore (PDPA), global baseline", LIVE],
       [`Signed tracker-catalogue updates (today: ${CATALOGUE_SIZE} sourced entries bundled with the app)`, SOON],
     ],
     cta: "Join the beta",

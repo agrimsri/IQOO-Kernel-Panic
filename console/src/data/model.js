@@ -3,6 +3,8 @@
 import trackers from "@core-resources/trackers/trackers.json";
 import fixTemplates from "@core-resources/fixes/fix_templates.json";
 import passages from "@core-resources/dpdp/passages.json";
+import lensData from "@core-resources/law/profiles.json";
+import lensPassages from "@core-resources/law/passages.json";
 
 export const AUDIT_SCHEMA = "traceveil.audit.v1";
 export const QUARANTINE_SCHEMA = "traceveil.quarantine.v1";
@@ -26,7 +28,7 @@ export const SEVERITY = {
 export const sevInfo = (s) => SEVERITY[s] || { label: String(s || "Unknown"), weight: 0, rank: 5, color: "var(--sev-info)", tone: "muted" };
 
 export const BAND = {
-  READY: { label: "DPDP-ready", short: "Ready", color: "var(--clear)", tone: "green" },
+  READY: { label: "Ready", short: "Ready", color: "var(--clear)", tone: "green" },
   NEEDS_WORK: { label: "Needs work", short: "Needs work", color: "var(--sev-medium)", tone: "amber" },
   AT_RISK: { label: "At risk", short: "At risk", color: "var(--sev-critical)", tone: "rose" },
   INCONCLUSIVE: { label: "Inconclusive", short: "Inconclusive", color: "var(--lav)", tone: "muted" },
@@ -131,6 +133,50 @@ export const refLabel = (ref) => {
   const r = /^r(\d+)\((\w)\)$/.exec(ref);
   return r ? `DPDP Rules r.${r[1]}(${r[2]})` : ref;
 };
+
+// ---------- legal lenses (mirror of core law/LegalLens.kt; data read from core resources/law) ----------
+// The same findings read against one law: REQUIRED, CONTEXT or NOT_APPLICABLE per check, never a verdict.
+export const LENS = Object.fromEntries(lensData.profiles.map((p) => [p.id, p]));
+export const LENS_ORDER = lensData.profiles.map((p) => p.id);
+export const LENS_DEFAULT = "GLOBAL_BASELINE";
+const lensKey = (x) => String(x || "").trim().toUpperCase().replace(/[-\s]/g, "_");
+/** The lens a bundle names (its top-level legalProfile), else the global baseline, as in traceveil-ci. */
+export const lensOf = (bundle) => {
+  const k = lensKey(bundle?.legalProfile);
+  return LENS[k] ? { id: k, source: "bundle" } : { id: LENS_DEFAULT, source: k ? "unknown" : "default", named: bundle?.legalProfile || null };
+};
+export const lensMapping = (id, checkId) => (LENS[id]?.checks?.[checkId]) || LENS[id]?.fallback || { relation: "CONTEXT", note: "", refs: [] };
+const RELATION_LABEL = { REQUIRED: "Required", CONTEXT: "Context", NOT_APPLICABLE: "Not applicable" };
+export const relationLabel = (id, rel) => (LENS[id]?.kind === "GOOD_PRACTICE" && rel === "REQUIRED" ? "Good practice" : RELATION_LABEL[rel] || rel);
+const lensPassageById = new Map(lensPassages.map((p) => [p.id, p]));
+export const lensPassageFor = (ref) => lensPassageById.get(ref) || null;
+export const PASSAGE_KIND = { LAW: "Law", RECITAL: "Recital (guides interpretation)", GUIDANCE: "Regulator guidance, not law", GOOD_PRACTICE: "Good practice, not law" };
+// Same table as core LensText: India's legal sentences in rule explanations, dropped under other lenses.
+const INDIA_SENTENCES = [
+  [" Under the DPDP Act, personal data may be processed only with consent (or a legitimate use), and consent must be given by a clear affirmative action before processing starts.", ""],
+  [" DPDP requires a notice (s.5) and valid consent (s.6) before processing, and the Data Fiduciary must be able to prove both (s.6(10)).", ""],
+  [" Consent must be free and specific; processing based on a refused consent has no lawful ground.", ""],
+  [" DPDP consent needs a clear affirmative action by the user.", ""],
+  [" Consent must be free, and withdrawing it must be as easy as giving it.", ""],
+  [" Consent must be specific to each specified purpose.", ""],
+  [", as Rule 3 requires.", "."],
+  [", or complain to the Board.", ", or complain to a regulator."],
+  [" DPDP requires an option to access it in English or any Eighth Schedule language.", ""],
+  [" DPDP bars tracking, behavioural monitoring and targeted advertising directed at children, and requires verifiable parental consent.", ""],
+];
+const INDIA_MARKERS = ["DPDP", "Data Fiduciary", "Rule 3", "Eighth Schedule", "the Board"];
+export const lensExplanation = (text, id) => {
+  if (id === "INDIA") return { text, citesIndia: false };
+  const t = INDIA_SENTENCES.reduce((acc, [from, to]) => acc.split(from).join(to), String(text || ""));
+  return { text: t, citesIndia: INDIA_MARKERS.some((m) => t.includes(m)) };
+};
+/** Score under a lens: 100 minus severity weights (inferred half) over findings that are not NOT_APPLICABLE; V0 = inconclusive. */
+export function lensScore(findings, id) {
+  if (findings.some((f) => f.checkId === "V0")) return null;
+  const penalty = findings.filter((f) => lensMapping(id, f.checkId).relation !== "NOT_APPLICABLE")
+    .reduce((a, f) => a + sevInfo(f.severity).weight * (f.evidenceType === "INFERRED" ? 0.5 : 1), 0);
+  return Math.max(0, Math.round(100 - penalty));
+}
 
 export const QUERY_TYPE = { 1: "A", 28: "AAAA", 5: "CNAME", 65: "HTTPS", 64: "SVCB", 12: "PTR", 16: "TXT", 15: "MX", 33: "SRV" };
 export const PROTOCOL_LABEL = { TCP_SYN: "TCP SYN", TCP_OTHER: "TCP", UDP: "UDP", ICMP: "ICMP", OTHER: "Other" };
