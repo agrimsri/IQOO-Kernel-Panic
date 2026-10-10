@@ -57,11 +57,12 @@ class AutoGuardStore(context: Context) {
 
     /**
      * Records that this update is being alerted now. Returns false when it was already alerted, by the background check
-     * or by the live receiver. Check and record happen under one process-wide lock.
+     * or by the live receiver, since the audit it is compared with ([lastCheckedAtMs]). Check and record happen under
+     * one process-wide lock.
      */
-    fun claimUpdate(key: UpdateAlertLedger.Key): Boolean = synchronized(LOCK) {
+    fun claimUpdate(key: UpdateAlertLedger.Key, lastCheckedAtMs: Long): Boolean = synchronized(LOCK) {
         val ledger = alertedUpdates()
-        if (!UpdateAlertLedger.isNew(ledger, key)) return false
+        if (!UpdateAlertLedger.isNew(ledger, key, lastCheckedAtMs)) return false
         prefs.edit(commit = true) { putStringSet(K_UPDATE_LEDGER, UpdateAlertLedger.encode(UpdateAlertLedger.record(ledger, key, System.currentTimeMillis()))) }
         true
     }

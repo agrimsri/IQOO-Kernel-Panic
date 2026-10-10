@@ -114,7 +114,7 @@ object ApkInstallWatcher {
         if (settings?.autoCheckNewApps == false || settings?.alertCheckedAppUpdates == false) return
         val item = UpdateWatchSource.updates(context, setOf(pkg)).firstOrNull() ?: return
         val key = UpdateAlertLedger.key(item) ?: return
-        if (!AutoGuardStore(context).claimUpdate(key)) return
+        if (!AutoGuardStore(context).claimUpdate(key, item.lastAuditedAtMs)) return
         postUpdateAlert(context, pkg, UpdateAlertPolicy.alert(item))
     }
 

@@ -85,7 +85,7 @@ object NewAppCheck {
         if (!initialised || plan.seed.isNotEmpty()) store.seedUpdates(plan.seed.mapNotNull(UpdateAlertLedger::key))
         return plan.post.mapNotNull { item ->
             val key = UpdateAlertLedger.key(item) ?: return@mapNotNull null
-            if (!store.claimUpdate(key)) return@mapNotNull null
+            if (!store.claimUpdate(key, item.lastAuditedAtMs)) return@mapNotNull null
             ApkInstallWatcher.postUpdateAlert(context, item.packageName, UpdateAlertPolicy.alert(item))
             item.packageName
         }

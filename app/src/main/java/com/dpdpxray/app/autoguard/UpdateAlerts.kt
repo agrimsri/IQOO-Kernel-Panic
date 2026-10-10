@@ -65,8 +65,10 @@ object UpdateAlertPolicy {
 }
 
 /**
- * Which updates were already alerted: one entry per (package, installed versionCode), shared by the background check
- * and the live receiver, so one update is alerted once. The [LIMIT] most recent entries are kept.
+ * Which updates were already alerted: one entry per (package, installed versionCode) with the time it was alerted,
+ * shared by the background check and the live receiver, so one update is alerted once per check it is compared with.
+ * Checking the app again (a newer audit) makes a later install of that version news again. The [LIMIT] most recent
+ * entries are kept.
  */
 object UpdateAlertLedger {
     const val LIMIT = 300
@@ -76,7 +78,8 @@ object UpdateAlertLedger {
     /** null when Android reported no version code for the installed app; such an item is listed in the app, never alerted. */
     fun key(item: UpdatedApp): Key? = item.newVersion?.code?.let { Key(item.packageName, it) }
 
-    fun isNew(ledger: Map<Key, Long>, key: Key): Boolean = key !in ledger
+    /** [lastCheckedAtMs]: when the audit this update is compared with was made (0 = ignore). */
+    fun isNew(ledger: Map<Key, Long>, key: Key, lastCheckedAtMs: Long = 0): Boolean = ledger[key]?.let { it < lastCheckedAtMs } ?: true
 
     /** [ledger] with [key] recorded at [at] (any increasing number; the oldest entries are dropped first). */
     fun record(ledger: Map<Key, Long>, key: Key, at: Long): Map<Key, Long> {
@@ -113,7 +116,7 @@ object UpdateAlertPlan {
      * after a restart every item not yet alerted is. Each (package, version code) is alerted once.
      */
     fun plan(read: NewAppWatch.Read, items: List<UpdatedApp>, changedNames: Collection<String>, ledger: Map<UpdateAlertLedger.Key, Long>, initialised: Boolean): Plan {
-        val fresh = items.filter { item -> UpdateAlertLedger.key(item)?.let { UpdateAlertLedger.isNew(ledger, it) } == true }
+        val fresh = items.filter { item -> UpdateAlertLedger.key(item)?.let { UpdateAlertLedger.isNew(ledger, it, item.lastAuditedAtMs) } == true }
         if (!initialised || read is NewAppWatch.Read.Baseline) return Plan(emptyList(), fresh)
         val changed = changedNames.toSet()
         val post = if (read is NewAppWatch.Read.Since) fresh.filter { it.packageName in changed } else fresh

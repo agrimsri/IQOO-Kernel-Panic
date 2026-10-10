@@ -87,6 +87,18 @@ class UpdateAlertsTest {
     }
 
     @Test
+    fun `a new check of the app makes the same version news again`() {
+        val key = UpdateAlertLedger.Key("com.leakyshop.demo", 2)
+        val ledger = UpdateAlertLedger.record(emptyMap(), key, at = 5_000)
+        // Alerted at 5 000 against a check made at 1 000: not again.
+        assertFalse(UpdateAlertLedger.isNew(ledger, key, lastCheckedAtMs = 1_000))
+        // The person checked the app again at 6 000 (for example a rehearsal on 1.0) and 1.1 was installed again: news.
+        assertTrue(UpdateAlertLedger.isNew(ledger, key, lastCheckedAtMs = 6_000))
+        val plan = UpdateAlertPlan.plan(NewAppWatch.Read.Since(4), listOf(item().copy(lastAuditedAtMs = 6_000)), listOf("com.leakyshop.demo"), ledger, initialised = true)
+        assertEquals(1, plan.post.size)
+    }
+
+    @Test
     fun `an item without an installed version code has no key`() {
         assertNull(UpdateAlertLedger.key(item(new = AppVersion("1.1", null))))
         assertNull(UpdateAlertLedger.key(item(new = null)))
@@ -123,7 +135,8 @@ class UpdateAlertsTest {
 
     @Test
     fun `after a restart every updated checked app not yet alerted is alerted`() {
-        val ledger = UpdateAlertLedger.record(emptyMap(), UpdateAlertLedger.key(other)!!, 1)
+        // Alerted at 2 000, after the check it was compared with (1 000).
+        val ledger = UpdateAlertLedger.record(emptyMap(), UpdateAlertLedger.key(other)!!, 2_000)
         val plan = UpdateAlertPlan.plan(NewAppWatch.Read.AllInstalled, listOf(leaky, other), changedNames = emptyList(), ledger = ledger, initialised = true)
         assertEquals(listOf(leaky), plan.post)
     }
@@ -141,7 +154,7 @@ class UpdateAlertsTest {
 
     @Test
     fun `an update alerted already is never alerted again`() {
-        val ledger = UpdateAlertLedger.record(emptyMap(), UpdateAlertLedger.key(leaky)!!, 1)
+        val ledger = UpdateAlertLedger.record(emptyMap(), UpdateAlertLedger.key(leaky)!!, 2_000)
         val plan = UpdateAlertPlan.plan(NewAppWatch.Read.Since(4), listOf(leaky), listOf("com.leakyshop.demo"), ledger, initialised = true)
         assertTrue(plan.post.isEmpty())
     }
