@@ -20,9 +20,12 @@ class AutomationFiles(private val root: File) {
 
     fun exists(runId: String): Boolean = runDir(runId).exists()
 
-    fun writeStatus(status: AutomationStatus) = replace(File(runDir(status.runId), AutomationContract.STATUS_FILE), AutomationStatuses.encode(status))
+    fun writeStatus(status: AutomationStatus) {
+        replace(File(runDir(status.runId), AutomationContract.STATUS_FILE), AutomationStatuses.encode(status))
+    }
 
-    fun writeBundle(runId: String, text: String) = replace(File(runDir(runId), AutomationContract.BUNDLE_FILE), text)
+    /** Returns the exact bytes written, which are what the run's bundle signature covers. */
+    fun writeBundle(runId: String, text: String): ByteArray = replace(File(runDir(runId), AutomationContract.BUNDLE_FILE), text)
 
     /** Keeps the [keep] most recent run folders plus [current]; other run folders are deleted. Nothing else is touched. */
     fun prune(keep: Int, current: String) {
@@ -30,16 +33,18 @@ class AutomationFiles(private val root: File) {
         runs.sortedByDescending { it.lastModified() }.drop(keep).forEach { it.deleteRecursively() }
     }
 
-    private fun replace(target: File, text: String) {
+    private fun replace(target: File, text: String): ByteArray {
         val dir = target.parentFile ?: throw IOException("no folder for ${target.name}")
         if (!dir.isDirectory && !dir.mkdirs()) throw IOException("could not create ${dir.name}")
         val tmp = File(dir, target.name + ".tmp")
-        tmp.writeText(if (text.endsWith("\n")) text else text + "\n", Charsets.UTF_8)
+        val bytes = (if (text.endsWith("\n")) text else text + "\n").toByteArray(Charsets.UTF_8)
+        tmp.writeBytes(bytes)
         // rename replaces atomically on Android; the delete fallback is for file systems that refuse to replace.
         if (!tmp.renameTo(target) && !(target.delete() && tmp.renameTo(target))) {
             tmp.delete()
             throw IOException("could not write ${target.name}")
         }
+        return bytes
     }
 
     companion object {

@@ -37,6 +37,14 @@ class AutomationManifestTest {
         assertEquals("true", a.getAttributeNS(android, "noHistory"))
     }
 
+    @Test fun `it runs in its own task, so the live check never inherits its identity`() {
+        // With the app's affinity, a cold-start request would become the root of TraceVeil's task, and Android would only
+        // bring that task to the front for the next request instead of delivering it.
+        val a = activity()
+        assertTrue("taskAffinity must be declared", a.hasAttributeNS(android, "taskAffinity"))
+        assertEquals("", a.getAttributeNS(android, "taskAffinity"))
+    }
+
     @Test fun `TraceVeil does not ask for DUMP itself`() {
         val nodes = doc.documentElement.getElementsByTagName("uses-permission")
         val names = (0 until nodes.length).map { (nodes.item(it) as Element).getAttributeNS(android, "name") }

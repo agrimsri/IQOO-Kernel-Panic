@@ -92,8 +92,9 @@ class AutomationAppTest {
         val done = AutomationStatuses.done(running, "audit-1", 21, "AT_RISK", 5, 1_791_590_470_000L)
         files.writeStatus(done)
         assertEquals(done, AutomationStatuses.decode(status.readText()))
-        files.writeBundle("run-1", "{\"schema\":\"traceveil.audit.v1\"}")
+        val written = files.writeBundle("run-1", "{\"schema\":\"traceveil.audit.v1\"}")
         assertEquals("{\"schema\":\"traceveil.audit.v1\"}\n", File(root, "run-1/bundle.json").readText())
+        assertTrue("the signed bytes are exactly the file's bytes", written.contentEquals(File(root, "run-1/bundle.json").readBytes()))
         assertEquals("no temporary files are left behind", setOf("status.json", "bundle.json"), File(root, "run-1").list()!!.toSet())
         for (bad in listOf("../x", "a/b", "", "x".repeat(41))) {
             assertTrue(bad, runCatching { files.exists(bad) }.exceptionOrNull() is IllegalArgumentException)

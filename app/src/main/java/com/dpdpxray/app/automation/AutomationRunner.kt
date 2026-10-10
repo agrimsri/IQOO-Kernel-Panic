@@ -14,6 +14,7 @@ import com.dpdpxray.app.report.AuditJsonExport
 import com.dpdpxray.core.automation.AutomationContract
 import com.dpdpxray.core.automation.AutomationStatus
 import com.dpdpxray.core.automation.AutomationStatuses
+import com.dpdpxray.core.automation.BundleSignatures
 import com.dpdpxray.core.automation.PhoneReadiness
 import com.dpdpxray.core.automation.RefusalCode
 import com.dpdpxray.core.automation.RunDecision
@@ -22,11 +23,14 @@ import com.dpdpxray.core.automation.RunRequestInput
 import com.dpdpxray.core.automation.RunRequests
 import com.dpdpxray.core.export.AuditBundles
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import rikka.shizuku.Shizuku
 
 /** The audit a runner request starts: the same [AuditConfig] the check setup sheet builds for the same choices. */
 object AutomationAudits {
@@ -76,8 +80,29 @@ object AutomationIntents {
  */
 object AutomationRunner {
     private const val KEEP_RUNS = 20
+    private const val SHIZUKU_WAIT_MS = 3_000L
 
-    fun handle(context: Context, input: RunRequestInput): RunDecision {
+    /** Call on the main thread while the runner screen is in the foreground (the audit starts from there). */
+    suspend fun handle(context: Context, input: RunRequestInput): RunDecision {
+        // Shizuku hands its binder to a newly started process a moment after it starts. Without this short wait, the
+        // first request after a cold start would read as "Shizuku not ready" (a full run refused, a quick run not reset).
+        awaitShizukuBinder(SHIZUKU_WAIT_MS)
+        return decide(context, input)
+    }
+
+    private suspend fun awaitShizukuBinder(timeoutMs: Long) {
+        if (ShizukuBridge.isRunning()) return
+        val received = CompletableDeferred<Unit>()
+        val listener = Shizuku.OnBinderReceivedListener { received.complete(Unit) }
+        try {
+            if (runCatching { Shizuku.addBinderReceivedListenerSticky(listener) }.isFailure) return
+            withTimeoutOrNull(timeoutMs) { received.await() }
+        } finally {
+            runCatching { Shizuku.removeBinderReceivedListener(listener) }
+        }
+    }
+
+    private fun decide(context: Context, input: RunRequestInput): RunDecision {
         val app = context.applicationContext
         val graph = app.graph
         val files = AutomationFiles.forContext(app) ?: return RunDecision.Refused(
@@ -106,7 +131,8 @@ object AutomationRunner {
             is RunDecision.Refused -> decision.also { r ->
                 if (r.runId != null) runCatching { files.writeStatus(AutomationStatuses.refused(r, input, now, BuildConfig.VERSION_NAME)) }
             }
-            is RunDecision.Accepted -> start(app, graph, files, decision, now)
+            // Accepted means the token matched; it also signs this run's bundle.json for the laptop.
+            is RunDecision.Accepted -> start(app, graph, files, decision, now, token = input.token.orEmpty())
         }
     }
 
@@ -115,7 +141,7 @@ object AutomationRunner {
         else -> (graph.orchestrator.progress.value as? AuditProgress.Running)?.let { "a check of ${it.config.targetLabel}" }
     }
 
-    private fun start(app: Context, graph: AppGraph, files: AutomationFiles, accepted: RunDecision.Accepted, now: Long): RunDecision {
+    private fun start(app: Context, graph: AppGraph, files: AutomationFiles, accepted: RunDecision.Accepted, now: Long, token: String): RunDecision {
         val request = accepted.request
         val pm = app.packageManager
         val label = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(request.packageName, 0)).toString() }.getOrDefault(request.packageName)
@@ -133,13 +159,13 @@ object AutomationRunner {
             val reason = "Another check started on this phone at the same moment (${after.config.targetLabel})."
             val fix = "Let it finish or stop it on the phone, then run again."
             runCatching { files.writeStatus(AutomationStatuses.failed(running, RefusalCode.BUSY, reason, fix, System.currentTimeMillis())) }
-            return RunDecision.Refused(null, RefusalCode.BUSY, reason, fix)
+            return RunDecision.Refused(request.runId, RefusalCode.BUSY, reason, fix)
         }
-        graph.scope.launch(Dispatchers.IO) { watch(graph, files, running, config, now) }
+        graph.scope.launch(Dispatchers.IO) { watch(graph, files, running, config, now, token) }
         return accepted
     }
 
-    private suspend fun watch(graph: AppGraph, files: AutomationFiles, initial: AutomationStatus, config: AuditConfig, startedMs: Long) {
+    private suspend fun watch(graph: AppGraph, files: AutomationFiles, initial: AutomationStatus, config: AuditConfig, startedMs: Long, token: String) {
         var status = initial
         try {
             val end = graph.orchestrator.progress
@@ -155,13 +181,13 @@ object AutomationRunner {
                 }
                 .last()
             status = when (end) {
-                is AuditProgress.Done -> finished(graph, files, status, end.auditId)
+                is AuditProgress.Done -> finished(graph, files, status, end.auditId, token)
                 is AuditProgress.Failed -> AutomationStatuses.failed(
                     status, RefusalCode.AUDIT_FAILED, "The check stopped on the phone: ${end.message}",
                     "Read the message on the phone, fix what it names and run again.", System.currentTimeMillis(),
                 )
                 // The live screen acknowledges Done at once, so a saved audit may be all that is left of it.
-                else -> savedSince(graph, config.targetPackage, startedMs)?.let { finished(graph, files, status, it) }
+                else -> savedSince(graph, config.targetPackage, startedMs)?.let { finished(graph, files, status, it, token) }
                     ?: AutomationStatuses.failed(
                         status, RefusalCode.CANCELLED, "The check was stopped on the phone before it finished.",
                         "Run again and leave the phone untouched until the check finishes.", System.currentTimeMillis(),
@@ -183,13 +209,19 @@ object AutomationRunner {
         return graph.repository.audits.value.firstOrNull { !it.sample && it.targetPackage == pkg && it.createdAtMs >= startedMs }?.id
     }
 
-    /** bundle.json first, then the "done" status, so "done" always means the bundle is there. */
-    private suspend fun finished(graph: AppGraph, files: AutomationFiles, status: AutomationStatus, auditId: String): AutomationStatus {
+    /**
+     * bundle.json first, then the "done" status carrying its signature (HMAC with the run's token), so "done" always
+     * means the bundle is there and the laptop can tell it was written by TraceVeil for this run.
+     */
+    private suspend fun finished(graph: AppGraph, files: AutomationFiles, status: AutomationStatus, auditId: String, token: String): AutomationStatus {
         val bundle = graph.repository.load(auditId) ?: return AutomationStatuses.failed(
             status, RefusalCode.RESULT_UNREADABLE, "The check finished but its saved files could not be read back.",
             "Open the audit in TraceVeil (Reports) and use Export audit data (JSON).", System.currentTimeMillis(),
         )
-        files.writeBundle(status.runId, AuditBundles.encode(AuditJsonExport.build(bundle, BuildConfig.VERSION_NAME)))
-        return AutomationStatuses.done(status, auditId, bundle.result.score, bundle.result.band.name, bundle.result.findings.size, System.currentTimeMillis())
+        val written = files.writeBundle(status.runId, AuditBundles.encode(AuditJsonExport.build(bundle, BuildConfig.VERSION_NAME)))
+        return AutomationStatuses.done(
+            status, auditId, bundle.result.score, bundle.result.band.name, bundle.result.findings.size, System.currentTimeMillis(),
+            bundleSignature = BundleSignatures.sign(token, written),
+        )
     }
 }

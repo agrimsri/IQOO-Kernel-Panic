@@ -63,11 +63,13 @@
 
         <!-- Developer automation (TraceVeil Runner, off by default in Settings): `traceveil-ci run` starts a check from a
              laptop over adb. Only callers holding DUMP (the adb shell and the system) can open it, by explicit
-             component; it then checks that automation is on and the pairing token matches. -->
+             component; it then checks that automation is on and the pairing token matches. Its own task (empty
+             affinity) keeps TraceVeil's main task, and the live check in it, independent of runner requests. -->
         <activity
             android:name=".automation.AutomationActivity"
             android:exported="true"
             android:permission="android.permission.DUMP"
+            android:taskAffinity=""
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:launchMode="standard" />
