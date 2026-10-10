@@ -384,7 +384,9 @@ fun ReportScreen(vm: XrayViewModel, id: String, onBack: () -> Unit) {
                     SecondaryAction("Share PDF", { vm.exportPdf(b, share = true) }, Modifier.weight(1f))
                     SecondaryAction("Save Markdown", { vm.saveMarkdown(b) }, Modifier.weight(1f))
                 }
-                Note("Saved files land in Downloads/TraceVeil, ready to share or move to your laptop.")
+                SecondaryAction("Save interactive report (HTML)", { vm.exportHtml(b, share = false) }, Modifier.fillMaxWidth().padding(top = 10.dp))
+                TextButton(onClick = { vm.exportHtml(b, share = true) }) { Text("Share interactive report", color = Film.scan) }
+                Note("Saved files land in Downloads/TraceVeil, ready to share or move to your laptop. The HTML report opens offline in any browser.")
             }
             Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp)) {
                 Text(vm.markdown(b), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
