@@ -30,7 +30,8 @@ class AuditComparisonTest {
         val current = bundle("now", 2000, 100).copy(result = AuditResult(emptyList(), 100, ScoreBand.READY))
         val comparison = AuditComparison.compare(current, old) as AuditComparisonResult.Available
         assertEquals(79, comparison.scoreDelta)
-        assertEquals(setOf(CheckId.C1, CheckId.C2, CheckId.C3, CheckId.C4, CheckId.C5, CheckId.C6, CheckId.C7, CheckId.C8, CheckId.C10), comparison.noLongerRecorded)
+        // C15 (info): the sample's saved consent tree, like LeakyShop's dialog, names no privacy policy.
+        assertEquals(setOf(CheckId.C1, CheckId.C2, CheckId.C3, CheckId.C4, CheckId.C5, CheckId.C6, CheckId.C7, CheckId.C8, CheckId.C10, CheckId.C15), comparison.noLongerRecorded)
         assertTrue(comparison.newlyRecorded.isEmpty())
     }
 

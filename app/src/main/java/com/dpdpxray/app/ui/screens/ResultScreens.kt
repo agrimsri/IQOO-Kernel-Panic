@@ -248,6 +248,8 @@ fun ResultsScreen(
     }
 }
 
+private val SCREEN_CHECKS = setOf(CheckId.C3, CheckId.C4, CheckId.C5, CheckId.C6, CheckId.C7, CheckId.C8)
+
 private fun headline(findings: List<Finding>): String {
     val c1 = findings.firstOrNull { it.checkId == CheckId.C1 }
     val c2 = findings.firstOrNull { it.checkId == CheckId.C2 }
@@ -259,7 +261,9 @@ private fun headline(findings: List<Finding>): String {
         findings.isEmpty() -> "No tracker lookups before consent and no consent-screen problems in this capture."
         findings.all { it.severity == Severity.INFO } && findings.any { it.checkId == CheckId.U1 } ->
             "Consent history unknown: this app kept its data, so consent given earlier could not be checked."
-        findings.all { it.severity == Severity.INFO } -> "No third-party tracker lookups before consent and no consent-screen problems in this capture. See the information notes."
+        findings.all { it.severity == Severity.INFO } -> "No third-party tracker lookups before consent and no scored consent-screen problems in this capture. See the information notes."
+        // Scored findings outside the consent screen (C9, C13 manifest defaults, C14 permission before notice).
+        findings.none { it.severity != Severity.INFO && it.checkId in SCREEN_CHECKS } -> "No tracker lookups before consent, but other checks found issues. See the findings below."
         else -> "No tracker lookups before consent, but the consent screen needs work."
     }
 }

@@ -669,6 +669,7 @@ object HtmlReport {
             when (f.checkId) {
                 CheckId.C1, CheckId.C10 -> it.phase == Phase.BEFORE_CONSENT || it.phase == Phase.NO_CONSENT_SEEN
                 CheckId.C2 -> it.phase == Phase.AFTER_REJECT
+                CheckId.C11 -> it.phase != Phase.AFTER_ACCEPT
                 else -> true
             }
         }
