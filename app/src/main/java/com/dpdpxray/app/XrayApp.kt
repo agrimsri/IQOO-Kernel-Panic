@@ -27,6 +27,8 @@ class XrayApp : Application() {
     override fun onCreate() {
         super.onCreate()
         graph = AppGraph(this)
+        // APK Guard new-install alerts; lives only while this process lives.
+        com.dpdpxray.app.apkguard.ApkInstallWatcher.register(this)
     }
 }
 

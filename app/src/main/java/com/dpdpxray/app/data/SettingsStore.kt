@@ -11,6 +11,8 @@ data class XraySettings(
     val stageMode: Boolean = false,
     val fastDemo: Boolean = false,
     val autoLoadModel: Boolean = true,
+    /** Read APK Guard new-install alerts aloud with an offline voice. Off unless the user switches it on. */
+    val speakApkGuardAlerts: Boolean = false,
 )
 
 class SettingsStore(context: Context) {
@@ -23,6 +25,7 @@ class SettingsStore(context: Context) {
         stageMode = prefs.getBoolean("stage_mode", false),
         fastDemo = prefs.getBoolean("fast_demo", false),
         autoLoadModel = prefs.getBoolean("auto_load_model", true),
+        speakApkGuardAlerts = prefs.getBoolean("speak_apk_guard_alerts", false),
     )
 
     fun update(transform: (XraySettings) -> XraySettings) {
@@ -32,6 +35,7 @@ class SettingsStore(context: Context) {
             putBoolean("stage_mode", next.stageMode)
             putBoolean("fast_demo", next.fastDemo)
             putBoolean("auto_load_model", next.autoLoadModel)
+            putBoolean("speak_apk_guard_alerts", next.speakApkGuardAlerts)
         }
         _settings.value = next
     }
