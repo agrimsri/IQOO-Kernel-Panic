@@ -59,11 +59,18 @@ console never drifts from the app.
   timing profiles, sample/live mixes and inconclusive scores are labelled, never passed off as a before-and-after.
 - **Quarantine**: blocked names and addresses, the inferred hard-coded-address signal, permission dialogs, sensitive
   settings screens, the behaviour timeline and the run's own limits.
-- **Release policy**: edit `failOn`, `minScore`, `maxHigh`, `requireFreshState`, `allowInconclusive`; see which loaded
-  audits would pass; download `traceveil-policy.json`; copy the intended `traceveil-ci check` command and a GitHub
-  Actions job. (`maxHigh` counts High and Critical findings. "Not recorded" fresh state fails `requireFreshState`.)
-- **Plans**: Free, Pro team, Enterprise, with "Available", "In development" and "Coming soon" labels. No prices
-  beyond "Free during beta" and "Contact", no customer names.
+- **Release policy**: edit every `traceveil-ci` policy key (`failOn`, `allowNotEstablished`, `minScore`, `maxHigh`,
+  `requireFreshState`, `allowInconclusive`, `requirePlans`) with the CLI's defaults; see which loaded audits would
+  pass under the CLI's rules (a `failOn` check the plans could not test is NOT ESTABLISHED and fails unless
+  `allowNotEstablished`; `maxHigh` counts High and Critical findings; a fresh state that was not recorded fails
+  `requireFreshState`; Accept and Reject plans count only with their choice recorded); download a
+  `traceveil-policy.json` the CLI accepts; copy the real `traceveil-ci` commands and the repository's GitHub Actions
+  example (`docs/ci/traceveil-gate.yml`, read at build time). The preview uses the findings stored in each export;
+  the CLI re-scores the sessions first, so an export scored by an older app version can differ.
+- **Plans**: Free, Pro team, Enterprise. "Available" only for phone-verified features (consent audit, timeline,
+  fixes, voice copilot, Network Proof, map, notice) and this console; "Built · phone check pending" for APK Guard,
+  Quarantine, Hey TraceVeil, the guided UI, the HTML report and AI explanations; the CI gate is "Built · GitHub run
+  pending"; the rest "Coming soon". No prices beyond "Free during beta" and "Contact", no customer names.
 - **Settings & privacy**: storage location and size, download all data, load or remove samples, delete everything,
   theme, guided tour.
 
@@ -94,9 +101,9 @@ commence on 13 May 2027, so findings describe readiness. Penalty bands present i
 - Timestamps above about 104 days of phone uptime exceed JavaScript's exact integer range (nanosecond precision is
   lost, sub-microsecond only; displayed times are unaffected).
 - Comparison matches findings by check id; it does not diff individual evidence lines.
-- The `traceveil-ci` command and encrypted team sync are not built yet; the policy page shows intended usage.
-- The audit exporter in the phone app is being added separately; the console follows the agreed schema and the core
-  data classes, and tolerates extra fields.
+- `traceveil-ci` is built and tested in `cli/`, but the example GitHub workflow has not been run on GitHub yet.
+  Encrypted team sync is not built.
+- `npm run smoke` imports the CLI's own sample bundles from `../docs/samples` to check that both read the same files.
 
 ## Credits
 
