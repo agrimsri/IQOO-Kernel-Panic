@@ -34,6 +34,14 @@ from keras import layers  # noqa: E402
 import train_consentlens as T  # noqa: E402
 from consentlens_text import MAX_BYTES, ROLES, VOCAB, encode, normalize  # noqa: E402
 
+# TFLite conversion writes a temporary SavedModel; if that fails (for example a full system drive) the converter silently
+# falls back to a legacy path that crashes on Keras 3 models. Keep temporary files on a drive with space.
+import tempfile  # noqa: E402
+
+_TMP = os.environ.get("CONSENTLENS_TMP", "D:/DevTools/tmp/tftmp")
+if os.path.isdir(os.path.dirname(_TMP)):
+    os.makedirs(_TMP, exist_ok=True)
+    tempfile.tempdir = _TMP
 REPORT_DIR = os.path.join(HERE, "reports", "v2")
 DEFAULT_WORK = os.environ.get("CONSENTLENS_WORK", os.path.join("D:/DevTools/tmp", "consentlens-v2-work"))
 SPLIT_SEED = 42  # fold assignment is ConsentLens-1's and never changes
@@ -346,6 +354,17 @@ def adjust_bias(model, y_train, tau):
 
 
 # ---------------------------------------------------------------- runs
+def to_int8_retry(model, rep_X, tries=3):
+    for k in range(tries):
+        try:
+            return T.to_int8(model, rep_X)
+        except Exception as ex:  # noqa: BLE001 (logged and retried; the last failure is raised)
+            print("INT8 conversion failed, retrying:", repr(ex)[:200], flush=True)
+            if k == tries - 1:
+                raise
+            time.sleep(10)
+
+
 def run_outer(name, seed, work, protocols, folds_only=None):
     r = RECIPES[name]
     rows, X, y = T.load()
@@ -367,7 +386,7 @@ def run_outer(name, seed, work, protocols, folds_only=None):
             model, _ = train_any(name, r, rows, tr_idx, X, y, seed)
             probs_f = model.predict(X[te], batch_size=512, verbose=0)
             T.SEED = seed
-            q = T.to_int8(model, X[~te])
+            q = to_int8_retry(model, X[~te])
             probs_q, _, _ = T.tflite_probs(q, X[te])
             ops = T.tflite_ops(q)
             fp, qp = probs_f.argmax(1), probs_q.argmax(1)
