@@ -1,0 +1,139 @@
+"""traceveil command line: doctor, env, init, audit."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+from pathlib import Path
+
+from . import (audit, EXIT_DEVICE, EXIT_PASS, EXIT_POLICY, EXIT_USAGE, __version__, adb, config, egress, netenv, report, shizuku)
+
+
+def _parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="traceveil", description="Traceveil developer CLI (iQOO/Android over adb).")
+    p.add_argument("--version", action="version", version=f"traceveil {__version__}")
+    p.add_argument("--config", help="path to traceveil.toml / traceveil.json")
+    p.add_argument("--serial", help="device serial (default: the only attached device, or $SERIAL)")
+    p.add_argument("--adb", help="adb binary (default: $ADB, PATH, then Windows adb.exe under WSL)")
+    p.add_argument("--timeout", type=float, default=20.0, help="seconds per adb command")
+    sub = p.add_subparsers(dest="command", required=True)
+
+    d = sub.add_parser("doctor", help="check adb, device and Traceveil readiness (starts Shizuku over adb if it is down)")
+    d.add_argument("--no-start-shizuku", action="store_true", help="only report the Shizuku server state; do not start it")
+    sub.add_parser("init", help="write a traceveil.toml with defaults").add_argument("--force", action="store_true")
+
+    a = sub.add_parser("audit", help="run an audit on the phone (debug build), wait, and save its JSON report")
+    a.add_argument("--package", help="app to audit (default: target.package)")
+    a.add_argument("--plans", help="comma list of silent,reject,accept (default: all three)")
+    a.add_argument("--auto-drive", action="store_true", help="let Traceveil tap Accept/Reject itself (default: you tap on the phone)")
+    a.add_argument("--reset", action="store_true", help="clear the app's data first; only for developer-owned test apps; needs Shizuku")
+    a.add_argument("--wait", type=float, default=900.0, help="seconds to wait for the audit (default 900)")
+    a.add_argument("--resume", metavar="REQUEST_ID", help="fetch the result of an earlier request instead of starting a new audit")
+    a.add_argument("--json", action="store_true", help="print the JSON report instead of the summary")
+    a.add_argument("--out", help="also write the JSON report to this file")
+
+    e = sub.add_parser("env", help="network-environment snapshot (VPN/proxy/geography signals)")
+    e.add_argument("--check-vpn", choices=config.CHECK_VPN_MODES, help="off | warn | fail (exit 5 on a likely VPN/proxy)")
+    e.add_argument("--online-ip", action="store_true", help="one cached lookup to network.endpoint; sends the public IP to that service")
+    e.add_argument("--egress-from", choices=("phone", "host"), default="phone",
+                   help="where the lookup runs: phone (device curl, default) or host (this machine's network)")
+    e.add_argument("--keep-ip", action="store_true", help="store the full public IP instead of a redacted prefix")
+    e.add_argument("--include-own-vpn", action="store_true", help="count Traceveil's own capture VPN (debugging aid)")
+    e.add_argument("--json", action="store_true", help="print the JSON report instead of the summary")
+    e.add_argument("--out", help="also write the JSON report to this file")
+    return p
+
+
+def _device_info(dev: adb.Device) -> dict:
+    return {"model": dev.getprop("ro.product.model"), "androidVersion": dev.getprop("ro.build.version.release"),
+            "serialHash": report.serial_hash(dev.serial)}
+
+
+def cmd_doctor(args, cfg, dev: adb.Device) -> int:
+    pkgs = dev.shell("pm list packages").replace("package:", "")
+    installed = lambda name: f"\n{name}\n" in f"\n{pkgs}\n"  # noqa: E731
+    rows = [("adb", True, dev.adb), ("device", True, f"{dev.getprop('ro.product.brand')} {dev.getprop('ro.product.model')}, Android {dev.getprop('ro.build.version.release')}"),
+            ("Traceveil installed", installed(netenv.OWN_PACKAGE), netenv.OWN_PACKAGE),
+            ("Shizuku installed", installed(shizuku.PACKAGE), "needed for fresh-install resets"),
+            ("USB install allowed", (dev.setting("secure", "install_non_market_apps") or "") == "1", "Developer options > Install via USB")]
+    if installed(shizuku.PACKAGE):
+        if args.no_start_shizuku:
+            running, note = shizuku.is_running(dev), "not started (--no-start-shizuku)"
+        else:
+            running, note = shizuku.start(dev)
+        rows.append(("Shizuku server running", running, note))
+    pdns = dev.setting("global", "private_dns_mode")
+    # An unset mode is Android's "Automatic": encrypted DNS can be used, which hides lookups from capture.
+    rows.append(("Private DNS off", pdns == "off", f"mode={pdns or 'unset (Automatic)'}; set Private DNS to Off so lookups stay visible"))
+    bad = 0
+    for name, ok, note in rows:
+        bad += 0 if ok else 1
+        print(f"  [{'ok' if ok else '!!'}] {name:<22} {note}")
+    print("  note: VPN permission, accessibility service and Shizuku grant are app-side and are checked from the Traceveil home screen.")
+    return EXIT_PASS if bad == 0 else EXIT_DEVICE
+
+
+def cmd_env(args, cfg, dev: adb.Device) -> int:
+    net = cfg["network"]
+    mode = args.check_vpn or net["check_vpn"]
+    snap = netenv.collect(dev)
+    signals = netenv.derive_signals(snap, exclude_own_vpn=not args.include_own_vpn)
+    vpn = netenv.check_vpn_proxy(snap, signals)
+    eg = None
+    if args.online_ip or net["online_ip"]:
+        if not net["endpoint"]:
+            print("error: --online-ip needs network.endpoint in traceveil.toml (no default service is baked in)", file=sys.stderr)
+            return EXIT_USAGE
+        redact = net["redact_ip"] and not args.keep_ip
+        fetch = (lambda url, t: egress.phone_fetch(dev, url, t)) if args.egress_from == "phone" else None
+        eg = egress.lookup(net["endpoint"], Path(".traceveil/cache.json"), net["cache_ttl_hours"], redact,
+                           fetch=fetch, vantage=args.egress_from)
+    geo = netenv.check_geo(snap, eg["country"] if eg else None, vpn, args.egress_from)
+    policy_hit = mode == "fail" and vpn.status == "likely"
+    verdict = {"status": "fail" if policy_hit else "pass",
+               "reasons": ["VPN/proxy signal present and --check-vpn=fail"] if policy_hit else [],
+               "exitCode": EXIT_POLICY if policy_hit else EXIT_PASS}
+    rep = report.build_env_report(_device_info(dev), snap, signals, [vpn, geo], eg, verdict)
+    print(report.dumps(rep) if args.json else report.summary(rep))
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(report.dumps(rep), encoding="utf-8")
+    return verdict["exitCode"]
+
+
+def cmd_audit(args, cfg, dev: adb.Device) -> int:
+    io = audit.Io(interactive=sys.stdin.isatty() and sys.stdout.isatty(), color=sys.stderr.isatty() and not os.environ.get("NO_COLOR"))
+    plans = args.plans or None
+    return audit.run_audit(dev, cfg, io, package=args.package or "", plans=plans, auto_drive=args.auto_drive, reset=args.reset,
+                           wait_s=args.wait, resume=args.resume, as_json=args.json, out_file=args.out)
+
+
+def cmd_init(args, cfg, dev=None) -> int:
+    target = Path("traceveil.toml")
+    if target.exists() and not args.force:
+        print("traceveil.toml already exists; use --force to overwrite", file=sys.stderr)
+        return EXIT_USAGE
+    target.write_text(config.TEMPLATE, encoding="utf-8")
+    gi = Path(".gitignore")
+    existing = gi.read_text(encoding="utf-8") if gi.exists() else ""
+    if ".traceveil/" not in existing.splitlines():
+        gi.write_text(existing + ("" if existing.endswith("\n") or not existing else "\n") + ".traceveil/\n", encoding="utf-8")
+    print("wrote traceveil.toml and ignored .traceveil/")
+    return EXIT_PASS
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    try:
+        cfg = config.load(args.config)
+        if args.command == "init":
+            return cmd_init(args, cfg)
+        dev = adb.connect(args.adb or cfg["device"]["adb"] or None, args.serial or cfg["device"]["serial"] or None, args.timeout)
+        return {"doctor": cmd_doctor, "env": cmd_env, "audit": cmd_audit}[args.command](args, cfg, dev)
+    except config.ConfigError as e:
+        print(f"config error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    except adb.AdbError as e:
+        print(f"device error: {e}", file=sys.stderr)
+        return EXIT_DEVICE

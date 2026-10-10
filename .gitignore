@@ -21,3 +21,9 @@ google-services.json
 *.key
 
 /tools/tests/__pycache__/
+.traceveil/
+
+/dist/
+*.egg-info/
+/.venv/
+__pycache__/
