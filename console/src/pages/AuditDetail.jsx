@@ -112,10 +112,10 @@ function Coverage({ a }) {
                 <span>Launch</span>
                 {s.consent.map((c, i) => (
                   <span key={i} className="row" style={{ gap: 6 }}><span className="arrow">→</span>
-                    <span>{c.kind === "SCREEN_APPEARED" ? "Consent screen" : c.kind === "SETTINGS" ? `"${c.nodeText || "Settings"}"` : c.kind === "MANUAL_MARK" ? "Marked" : `"${c.nodeText || c.kind}" tapped`} <span className="mono-s muted">{fmtS(c.t)}</span></span>
+                    <span>{c.kind === "SCREEN_APPEARED" ? "Consent screen" : c.kind === "SETTINGS" ? `"${c.nodeText || "Settings"}"` : c.kind === "MANUAL_MARK" ? "Marked" : c.kind === "PERMISSION_DIALOG" ? "Android permission dialog" : `"${c.nodeText || c.kind}" tapped`} <span className="mono-s muted">{fmtS(c.t)}</span></span>
                   </span>
                 ))}
-                {!s.consent.length && <span><span className="arrow">→ </span>No consent screen seen</span>}
+                {!s.screenSeen && <span><span className="arrow">→ </span>No consent screen seen</span>}
                 {!s.completed && <span style={{ color: "var(--sev-medium)" }}>· planned {s.expects === "ACCEPT" ? "Accept" : "Reject"} not recorded</span>}
                 {s.unexpectedChoice && <span style={{ color: "var(--sev-medium)" }}>· a choice was recorded in the no-interaction plan</span>}
               </div>

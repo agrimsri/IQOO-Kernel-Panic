@@ -81,6 +81,16 @@ TraceVeil observes DNS lookups on the phone and relates them to recorded consent
 | **C10** | Ad or device IDs likely shared before consent (*inferred*) | s.6(1) | up to ₹50 crore |
 | **NC** | No consent screen seen during the capture, yet tracker hosts are looked up | s.5(1), s.6(1), s.6(10) | up to ₹50 crore |
 | **V0** | Too few network lookups to judge, so the result is **inconclusive** (never "clean") | — | — |
+| **U1** | The app kept its data and showed no consent screen, so consent history is unknown (*info*) | — | — |
+| **S1** | Servers of the app's own publisher contacted: first-party collection, not third-party tracking (*info*) | — | — |
+| **C11** | A tracker reached only through a CNAME alias of another name, before consent or after refusal (*info*: the lookup is already scored in C1/C2) | — | — |
+| **C12** | Tracker hosts looked up after the app was confirmed in the background (*info*: lookups before consent or after refusal are already scored) | — | — |
+| **C13** | A bundled SDK (Firebase Analytics, Crashlytics, Facebook SDK) whose documented manifest switches leave collection on by default (*low, inferred*) | s.6(1) | — |
+| **C14** | Android permission dialog naming the app before any consent screen or notice (*low*; notification-only prompts are *info*) | s.5(1), as context | — |
+| **C15** | The captured consent screen names no privacy policy or notice (*info*) | — | — |
+| **V1** | Capture health shows lookups TraceVeil could not see: encrypted or TCP DNS, Private DNS on, dropped or unreadable lookups (*info*) | — | — |
+
+The checks from C11 on use evidence the phone records since this version: DNS replies (alias chains), a 10-second background window after each plan's observation (Home pressed, app confirmed off screen), Android's own permission dialogs, the installed manifest's documented SDK switches (only allow-listed names are read; vendor sources are cited in `core/src/main/resources/sdk/manifest_flags.json`), the consent screen's accessibility tree and capture-health counters. When that evidence was not recorded, the check is *not established*, never passed. A DNS lookup is scored once, so C11 and C12 add context without moving the score.
 
 Each finding is labelled either:
 - **observed**: seen on the device during the audit;
@@ -128,7 +138,7 @@ All findings combine into a **DPDP readiness score** out of 100, with bands from
  │ • taps Reject / Accept       │                     │
  └──────────────┬───────────────┘                     ▼
                 │ screenshot          ┌──────────────────────────────┐
-                ▼                     │ Rules engine C1–C10, NC, V0  │
+                ▼                     │ Rules engine C1–C15, NC, V0–1│
  ┌──────────────────────────────┐     │ + readiness score            │
  │ On-device Gemma (optional)   │───▶ └────────────┬─────────────────┘
  │ constrained-JSON screen review│                 ▼
@@ -186,7 +196,8 @@ kernel-panic/
 | `consent` | Consent-screen lexicon in English, Hindi and Kannada |
 | `audit` | Phase assigner: places each lookup before the choice, after accept, or after refusal |
 | `screen` | UI-tree formatter, deterministic screen auditor, AI response parser, merge logic, the constrained-JSON prompt and schema |
-| `rules` | Rules engine C1–C10, NC, V0 and the score calculator |
+| `rules` | Rules engine C1–C15, NC, V0, V1, U1, S1 and the score calculator |
+| `manifest` | Allow-list of SDK manifest collection switches with their vendor sources (check C13) |
 | `fixes` | Fix catalogue: SDK-specific code and manifest changes plus UI fixes |
 | `dpdp` | Verbatim DPDP corpus, BM25 retriever, citation service |
 | `report` | JSON and Markdown report generation |
@@ -296,6 +307,8 @@ Other tools:
 |---|---|---|
 | **leaky** | Starts the "SDKs" on launch, pre-ticks a sharing box, hides Reject behind "Manage", and keeps tracking after refusal | **21, At risk**: C2 critical, plus C1, C3, C4 and C10 |
 | **fixed** | Waits for consent, uses off-by-default toggles, gives Accept and Reject equal weight, offers three languages, explains withdrawal | **100, DPDP-ready** |
+
+Neither build's consent dialog links a privacy policy, so a live audit that captures the dialog's tree also lists C15 (*info*, no score change) for both. LeakyShop bundles no real SDK and asks for no Android permission, so C13 and C14 do not fire for it.
 
 It is a safe, repeatable way to see each finding fire, and to check that the suggested fixes make them go away.
 

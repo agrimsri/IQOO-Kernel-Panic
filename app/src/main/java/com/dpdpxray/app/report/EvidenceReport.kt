@@ -12,7 +12,16 @@ internal object EvidenceReport {
     /** Coverage statements shown before any score: missing choices, fresh-state hint and capture timing (live audits only). */
     fun coverageNotes(sessions: List<AuditSession>, timingProfile: String?, sample: Boolean): List<String> =
         AuditPlanCoverage.gaps(sessions) + listOfNotNull(AuditPlanCoverage.freshStateHint(sessions)) +
-            listOfNotNull(if (sample) null else AuditTimingPolicy.coverageHint(timingProfile))
+            listOfNotNull(if (sample) null else AuditTimingPolicy.coverageHint(timingProfile)) +
+            listOfNotNull(backgroundHint(sessions))
+
+    /** Only for plans that recorded a confirmed background moment; older audits and Fast Preview have none. */
+    fun backgroundHint(sessions: List<AuditSession>): String? {
+        val plans = sessions.filter { it.backgroundStartedNanos != null }.map { it.plan.label }.distinct()
+        if (plans.isEmpty()) return null
+        return "Background check: after the observation window the app was sent to the background and capture continued " +
+            "(${plans.joinToString()}). Lookups in that window are marked in the network timeline."
+    }
 
     fun annotate(markdown: String, sessions: List<AuditSession>, timingProfile: String? = null, sample: Boolean = false): String {
         val sanitized = markdown.replace(MarkdownReport.PRIVACY_LINE, LOCAL_SCOPE)

@@ -4,6 +4,7 @@ import com.dpdpxray.core.export.AuditBundleV1
 import com.dpdpxray.core.export.AuditBundles
 import com.dpdpxray.core.export.BundleFormatException
 import com.dpdpxray.core.export.BundleMeta
+import com.dpdpxray.core.model.AppManifestFacts
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
@@ -84,6 +85,19 @@ object Coverage {
                 .takeIf { sessions.none { it.screenAudit?.isConsentScreen == true } }
             CheckId.C9 -> "the app was not declared child-facing in this capture and no consent screen was reviewed for child-audience signals"
                 .takeIf { sessions.none { it.childFacing } && reviewedScreen(sessions)?.childAudienceSignals == null }
+            // C11–C15 and V1 need evidence that older builds did not record (see core ExtendedChecks).
+            CheckId.C11 -> "no DNS replies were recorded, so aliases (CNAME chains) could not be read"
+                .takeIf { sessions.all { s -> s.netEvents.all { it.answerStatus == null && it.rcode == null && it.cnameChain.isEmpty() } } }
+            CheckId.C12 -> "no background step was recorded (older build, Fast Preview, or the app was not confirmed off screen)"
+                .takeIf { sessions.none { it.backgroundStartedNanos != null } }
+            CheckId.C13 -> "the app's installed manifest was not read in this capture"
+                .takeIf { sessions.none { it.manifestFacts?.read(AppManifestFacts.PART_META_DATA) == true } }
+            CheckId.C14 -> "Android permission dialogs were not watched in this capture (older build)"
+                .takeIf { sessions.none { it.permissionDialogsWatched == true } }
+            CheckId.C15 -> "no consent-screen accessibility tree was captured"
+                .takeIf { sessions.none { s -> s.consentEvents.any { it.tree != null && (it.kind == ConsentKind.SCREEN_APPEARED || it.kind == ConsentKind.MANUAL_MARK) } } }
+            CheckId.V1 -> "capture health and the Private DNS setting were not recorded"
+                .takeIf { sessions.all { it.captureHealth == null && it.privateDnsActive == null } }
             else -> null
         }
     }

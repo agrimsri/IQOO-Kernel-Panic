@@ -1,0 +1,75 @@
+[
+  {
+    "sdkKey": "firebase-analytics",
+    "entity": "Google Analytics for Firebase",
+    "collection": "Analytics data collection",
+    "components": [
+      "com.google.android.gms.measurement.AppMeasurementService",
+      "com.google.android.gms.measurement.AppMeasurementJobService",
+      "com.google.android.gms.measurement.AppMeasurementReceiver"
+    ],
+    "componentPrefixes": ["com.google.firebase.components:com.google.firebase.analytics."],
+    "componentSource": "https://firebase.google.com/docs/reference/android/com/google/android/gms/measurement/AppMeasurementService",
+    "gates": [
+      {"key": "firebase_analytics_collection_enabled", "offWhen": "false",
+       "absentMeans": "not declared, so Analytics collection is on from launch",
+       "source": "https://firebase.google.com/docs/analytics/android/configure-data-collection"},
+      {"key": "firebase_analytics_collection_deactivated", "offWhen": "true",
+       "absentMeans": "not declared, so collection is not permanently deactivated",
+       "source": "https://firebase.google.com/docs/analytics/android/configure-data-collection"},
+      {"key": "google_analytics_default_allow_analytics_storage", "offWhen": "false",
+       "absentMeans": "not declared, so no consent-mode default denies analytics storage",
+       "source": "https://developers.google.com/tag-platform/security/guides/app-consent?platform=android"}
+    ],
+    "identifiers": [
+      {"key": "google_analytics_adid_collection_enabled", "offWhen": "false",
+       "absentMeans": "not declared, so Advertising ID collection is not switched off",
+       "source": "https://firebase.google.com/docs/analytics/android/configure-data-collection"}
+    ],
+    "source": "https://firebase.google.com/docs/analytics/android/configure-data-collection",
+    "note": "Firebase documents these manifest switches for disabling collection, for example to collect end-user consent first, and re-enabling it at runtime with setAnalyticsCollectionEnabled(true)."
+  },
+  {
+    "sdkKey": "crashlytics",
+    "entity": "Firebase Crashlytics",
+    "collection": "Automatic crash-report collection",
+    "components": [],
+    "componentPrefixes": ["com.google.firebase.components:com.google.firebase.crashlytics."],
+    "componentSource": "https://github.com/firebase/firebase-android-sdk/blob/main/firebase-crashlytics/src/main/AndroidManifest.xml",
+    "gates": [
+      {"key": "firebase_crashlytics_collection_enabled", "offWhen": "false",
+       "absentMeans": "not declared, so crash reports are collected automatically for all users",
+       "source": "https://firebase.google.com/docs/crashlytics/android/customize-crash-reports"}
+    ],
+    "identifiers": [],
+    "source": "https://firebase.google.com/docs/crashlytics/android/customize-crash-reports",
+    "note": "Firebase: \"By default, Crashlytics automatically collects crash reports for all your app's users.\" The manifest switch turns this off; setCrashlyticsCollectionEnabled(true) turns it on for users who opt in."
+  },
+  {
+    "sdkKey": "facebook",
+    "entity": "Meta (Facebook SDK)",
+    "collection": "Automatic SDK start-up and app-event logging",
+    "components": [
+      "com.facebook.internal.FacebookInitProvider",
+      "com.facebook.CurrentAccessTokenExpirationBroadcastReceiver",
+      "com.facebook.AuthenticationTokenManager$CurrentAuthenticationTokenChangedBroadcastReceiver"
+    ],
+    "componentPrefixes": [],
+    "componentSource": "https://github.com/facebook/facebook-android-sdk/blob/main/facebook-core/src/main/AndroidManifest.xml",
+    "gates": [
+      {"key": "com.facebook.sdk.AutoInitEnabled", "offWhen": "false",
+       "absentMeans": "not declared, so the SDK initialises automatically when the app opens",
+       "source": "https://developers.facebook.com/docs/app-events/gdpr-compliance/"},
+      {"key": "com.facebook.sdk.AutoLogAppEventsEnabled", "offWhen": "false",
+       "absentMeans": "not declared, so app installs and app launches are logged automatically",
+       "source": "https://developers.facebook.com/docs/app-events/gdpr-compliance/"}
+    ],
+    "identifiers": [
+      {"key": "com.facebook.sdk.AdvertiserIDCollectionEnabled", "offWhen": "false",
+       "absentMeans": "not declared, so advertiser ID collection is not switched off",
+       "source": "https://developers.facebook.com/docs/app-events/getting-started-app-events-android/"}
+    ],
+    "source": "https://developers.facebook.com/docs/app-events/gdpr-compliance/",
+    "note": "Meta: \"The SDK by default automatically logs common mobile events from your app like app installs and app launches.\" Its docs describe these manifest switches to delay initialisation and collection until the user consents."
+  }
+]

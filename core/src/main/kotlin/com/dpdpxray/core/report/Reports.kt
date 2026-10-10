@@ -4,6 +4,7 @@ import com.dpdpxray.core.dpdp.CitationService
 import com.dpdpxray.core.fixes.FixTemplate
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
+import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.ScoreBand
 import kotlinx.serialization.json.Json
 import java.time.Instant
@@ -92,12 +93,20 @@ object MarkdownReport {
         appendLine()
         appendLine("## Network timeline")
         for (s in sessions) {
+            val bg = s.backgroundStartedNanos
             appendLine()
-            appendLine("**${s.plan.label}** — ${s.netEvents.size} lookups${s.consentChoice?.let { c -> ", user chose ${c.kind.name.lowercase()} at ${secs(c.tNanos - s.startedAtNanos)} s" } ?: ""}")
+            appendLine("**${s.plan.label}** — ${s.netEvents.size} lookups${s.consentChoice?.let { c -> ", user chose ${c.kind.name.lowercase()} at ${secs(c.tNanos - s.startedAtNanos)} s" } ?: ""}" +
+                (bg?.let { ", app in the background from ${secs(it - s.startedAtNanos)} s" } ?: ""))
+            s.consentEvents.filter { it.kind == ConsentKind.PERMISSION_DIALOG }.forEach {
+                appendLine()
+                appendLine("- Android permission dialog at ${secs(it.tNanos - s.startedAtNanos)} s: \"${it.nodeText.orEmpty()}\"")
+            }
             appendLine()
             appendLine("| t (s) | Host |")
             appendLine("|---|---|")
-            s.netEvents.sortedBy { it.tNanos }.take(60).forEach { appendLine("| ${secs(it.tNanos - s.startedAtNanos)} | ${it.hostname} |") }
+            s.netEvents.sortedBy { it.tNanos }.take(60).forEach {
+                appendLine("| ${secs(it.tNanos - s.startedAtNanos)} | ${it.hostname}${if (bg != null && it.tNanos >= bg) " (app in background)" else ""} |")
+            }
         }
 
         appendLine()

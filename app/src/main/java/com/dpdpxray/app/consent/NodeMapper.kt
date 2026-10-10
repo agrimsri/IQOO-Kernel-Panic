@@ -4,11 +4,13 @@ import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import com.dpdpxray.core.model.Bounds
 import com.dpdpxray.core.model.UiNode
+import com.dpdpxray.core.screen.UiTreeLimits
 
 /** Copies a live accessibility tree into the pure-Kotlin [UiNode] model, with depth and size limits. */
 object NodeMapper {
-    private const val MAX_DEPTH = 30
-    private const val MAX_NODES = 600
+    // Shared with core so a tree at a limit is known to be possibly cut off (C15 is then not established).
+    private const val MAX_DEPTH = UiTreeLimits.MAX_DEPTH
+    private const val MAX_NODES = UiTreeLimits.MAX_NODES
 
     fun map(root: AccessibilityNodeInfo?): UiNode? {
         root ?: return null

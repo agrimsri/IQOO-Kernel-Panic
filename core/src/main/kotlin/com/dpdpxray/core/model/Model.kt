@@ -39,8 +39,17 @@ enum class Category {
 @Serializable
 enum class Phase { BEFORE_CONSENT, AFTER_ACCEPT, AFTER_REJECT, NO_CONSENT_SEEN }
 
+/** Saved audits store these by name: add new values at the end and never rename one. */
 @Serializable
-enum class ConsentKind { SCREEN_APPEARED, ACCEPT, REJECT, SETTINGS, MANUAL_MARK }
+enum class ConsentKind {
+    SCREEN_APPEARED, ACCEPT, REJECT, SETTINGS, MANUAL_MARK,
+
+    /**
+     * Android's own runtime-permission dialog (the system permission controller) appeared while the audited app was
+     * armed; [ConsentEvent.nodeText] holds its visible text. Never a consent choice and never a consent screen.
+     */
+    PERMISSION_DIALOG,
+}
 
 /** The three audit plans: accept the consent, reject it, or never touch the app. */
 @Serializable
@@ -177,6 +186,20 @@ data class AuditSession(
      * data (reset not approved, not possible, or failed). null = not recorded (audits saved before this field existed).
      */
     val freshState: Boolean? = null,
+    // --- Evidence for checks C12–C14 (all null on audits saved before they existed: not recorded, never "none") ---
+    /**
+     * When the audited app was confirmed off screen after TraceVeil pressed Home at the end of the plan's observation
+     * window (same clock as [NetEvent.tNanos]); capture continued until [endedAtNanos]. null = no background step ran
+     * or the app could not be confirmed off screen, so background behaviour is not established.
+     */
+    val backgroundStartedNanos: Long? = null,
+    /**
+     * true = the consent watcher also recorded Android's permission dialogs ([ConsentKind.PERMISSION_DIALOG]) in this
+     * plan. null = not watched (older build), so the absence of such events says nothing.
+     */
+    val permissionDialogsWatched: Boolean? = null,
+    /** Allow-listed facts read from the audited app's installed manifest at audit start. null = not read. */
+    val manifestFacts: AppManifestFacts? = null,
 ) {
     val consentChoice: ConsentEvent?
         get() = consentEvents.firstOrNull { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }
@@ -216,6 +239,51 @@ enum class CheckId(val code: String, val title: String) {
     V0("V0", "Low network visibility — result inconclusive"),
     U1("U1", "Consent history unknown — app kept its data"),
     S1("S1", "Same-company servers contacted (first-party data collection)"),
+
+    // Checks below were added after C1–C10. Each KDoc ends with a "Legal note" for the jurisdiction layer to map; the
+    // DPDP references the rules engine attaches are only those that clearly apply (see RulesEngine).
+
+    /**
+     * A tracker lookup before consent or after Reject whose queried name is not a catalogued tracker but whose
+     * observed DNS reply aliased it (CNAME) to one. INFO: the lookup itself is already scored under C1 or C2.
+     * Legal note: no DPDP provision on aliasing as such; relevant where a law treats circumventing user controls
+     * (blockers, opt-outs) as an aggravating factor.
+     */
+    C11("C11", "Tracker reached through an alias name (CNAME cloaking pattern)"),
+
+    /**
+     * Tracker lookups after the app was confirmed in the background (Home pressed, app off screen). INFO: lookups
+     * before consent or after Reject are already scored under C1 or C2. Legal note: purpose limitation and
+     * data-minimisation rules (where a law has them) are the closest fit; DPDP has no background-specific provision.
+     */
+    C12("C12", "Tracker hosts looked up while the app was in the background"),
+
+    /**
+     * An SDK declared in the installed manifest whose documented data-collection switches are left at their
+     * default-on setting (absent or true), per the vendor's own documentation. Legal note: DPDP s.6(1) (consent before
+     * processing); also maps to consent-before-collection and privacy-by-default rules elsewhere.
+     */
+    C13("C13", "SDK data collection on by default in the app's manifest"),
+
+    /**
+     * Android's runtime-permission dialog naming the app appeared before any consent screen or notice in the plan.
+     * Legal note: DPDP s.5(1) (notice accompanies or precedes a request for consent) is context, not a verdict;
+     * Google Play's User Data policy says not to request permissions before the user has seen the disclosure.
+     */
+    C14("C14", "Android permission requested before any consent screen or notice"),
+
+    /**
+     * The captured consent-screen accessibility tree has no privacy-policy link or text (English, Hindi, Kannada).
+     * Legal note: not a stated DPDP requirement for the consent screen; Google Play requires a privacy policy link or
+     * text within the app, and several laws require a notice or policy link at the point of collection.
+     */
+    C15("C15", "Consent screen shows no privacy-policy link or text"),
+
+    /**
+     * Capture health shows lookups TraceVeil could not see (encrypted or TCP DNS, Private DNS on, dropped or unreadable
+     * lookups). INFO, no score impact: unknown stays unknown. Legal note: none; it qualifies every other finding.
+     */
+    V1("V1", "Some lookups may be hidden from TraceVeil"),
 }
 
 @Serializable

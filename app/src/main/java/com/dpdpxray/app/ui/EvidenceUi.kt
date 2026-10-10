@@ -35,6 +35,7 @@ internal class EvidenceUi(private val catalog: TrackerCatalog, private val corpu
         .filter { when (finding.checkId) {
             CheckId.C1, CheckId.C10 -> it.phase == Phase.BEFORE_CONSENT || it.phase == Phase.NO_CONSENT_SEEN
             CheckId.C2 -> it.phase == Phase.AFTER_REJECT
+            CheckId.C11 -> it.phase != Phase.AFTER_ACCEPT
             else -> true
         } }
         .mapNotNull(::aliasLabel).distinct()
