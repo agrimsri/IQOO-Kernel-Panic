@@ -34,8 +34,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,13 +47,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.dpdpxray.app.audit.AuditConfig
 import com.dpdpxray.app.control.AuditableApp
 import com.dpdpxray.app.ui.XrayViewModel
+import com.dpdpxray.app.ui.components.Callout
 import com.dpdpxray.app.ui.components.HostText
+import com.dpdpxray.app.ui.components.SwitchRow
+import com.dpdpxray.app.ui.components.Tag
 import com.dpdpxray.app.ui.components.Note
 import com.dpdpxray.app.ui.components.TopBar
 import com.dpdpxray.app.ui.guide.EmptyState
@@ -156,7 +159,7 @@ private fun AppRow(app: AuditableApp, demo: Boolean, onClick: () -> Unit) {
             Text(app.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             HostText(app.packageName, Film.boneDim)
         }
-        if (demo) Text("Demo", style = MaterialTheme.typography.labelMedium, color = Brand.peach)
+        if (demo) Tag("Demo", Brand.peach)
     }
 }
 
@@ -178,19 +181,19 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, preferPreview: 
             allowReset = it
             if (!it) full = false
         }
-        Text("How to check", style = MaterialTheme.typography.titleMedium, color = Film.bone, modifier = Modifier.padding(top = 6.dp))
+        Text("How to check", style = MaterialTheme.typography.titleMedium, color = Film.bone, modifier = Modifier.padding(top = 8.dp).semantics { heading() })
         PlanOption(
             "Full audit · normal timing",
             "Three fresh-state runs: Silent, Reject, Accept. Observes Silent for 25 seconds and each choice for 15 seconds; launch, consent and AI review add time.",
             full, enabled = freshReset,
         ) { full = true; preview = false }
-        if (!freshReset) Note("Full audits need Shizuku and explicit approval to reset a test app between runs.", Film.warn)
+        if (!freshReset) Callout("Full audits need Shizuku and explicit approval to reset a test app between runs.")
         PlanOption("Quick audit · normal timing", "One Accept-plan run with 15 seconds of observation. No Silent or Reject comparison.", !full && !preview, enabled = true) { full = false; preview = false }
         PlanOption("Fast Preview · limited evidence", "One Accept-plan run with 8 seconds of observation and a shorter consent-screen wait. Delayed traffic may be missed; not a Full audit.", preview, enabled = true) { full = false; preview = true }
-        if (!freshReset) Note("Quick keeps the app's data. An already-opened app may keep its consent choice and not repeat launch-time DNS lookups. A missing dialog or quiet run is not a privacy pass.", Film.warn)
-        else Note("Starting an audit clears this selected app's local data before each plan. Use a test app or a backed-up development build; do not use a personal app with data you need.", Film.warn)
+        if (!freshReset) Callout("Quick keeps the app's data. An already-opened app may keep its consent choice and not repeat launch-time DNS lookups. A missing dialog or quiet run is not a privacy pass.")
+        else Callout("Starting an audit clears this selected app's local data before each plan. Use a test app or a backed-up development build; do not use a personal app with data you need.")
 
-        Text("Options", style = MaterialTheme.typography.titleMedium, color = Film.bone, modifier = Modifier.padding(top = 10.dp))
+        Text("Options", style = MaterialTheme.typography.titleMedium, color = Film.bone, modifier = Modifier.padding(top = 12.dp).semantics { heading() })
         Toggle("Let the agent tap Accept and Reject", "Off: you tap them yourself when asked.", agent) { agent = it }
         Toggle("This app is used by children", "Adds the DPDP section 9 check: no tracking or targeted ads for children.", child) { child = it }
         Toggle("Include Google Play services lookups", "Some SDKs upload through Play services. Those lookups may include other apps' traffic.", gms) { gms = it }
@@ -234,13 +237,4 @@ private fun PlanOption(title: String, detail: String, selected: Boolean, enabled
 }
 
 @Composable
-private fun Toggle(title: String, detail: String, value: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(detail, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
-        }
-        Spacer(Modifier.width(12.dp))
-        Switch(checked = value, onCheckedChange = onChange, colors = SwitchDefaults.colors(checkedTrackColor = Film.scan, checkedThumbColor = Film.base))
-    }
-}
+private fun Toggle(title: String, detail: String, value: Boolean, onChange: (Boolean) -> Unit) = SwitchRow(title, detail, value, onChange)

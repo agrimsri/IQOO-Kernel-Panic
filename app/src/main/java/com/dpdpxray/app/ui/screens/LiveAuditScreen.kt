@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.observedAliasLabel
+import com.dpdpxray.app.ui.components.Callout
 import com.dpdpxray.app.ui.components.ConsentLine
 import com.dpdpxray.app.ui.components.HostText
 import com.dpdpxray.app.ui.components.Note
@@ -90,7 +92,7 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
         when (val p = progress) {
             is AuditProgress.Failed -> {
                 Text("The check stopped", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 32.dp).semantics { heading() })
-                Text(p.message, style = MaterialTheme.typography.bodyLarge, color = Film.leak, modifier = Modifier.padding(vertical = 12.dp))
+                Callout(p.message, Modifier.padding(vertical = 12.dp), color = Film.leak)
                 GuideBanner(
                     GuideStep(
                         "live.failed.screen", 1, GuideFlow.TOTAL, GuideTone.CAUTION,
@@ -113,7 +115,7 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
                     Spacer(Modifier.width(8.dp))
                     Tag(if (p.config.fastPreview) "Fast Preview · limited evidence" else "Normal capture", if (p.config.fastPreview) Film.warn else Film.boneDim)
                 }
-                if (p.config.fastPreview) Note("8-second observation; delayed traffic may be missed. Silent and Reject are not tested.", Film.warn)
+                if (p.config.fastPreview) Callout("8-second observation; delayed traffic may be missed. Silent and Reject are not tested.", Modifier.padding(top = 8.dp))
                 // The plans really are a sequence, so they are shown as numbered frames.
                 RunFrames(p.config.plans, p.planIndex, Modifier.padding(top = 12.dp))
                 // Narrated in the background by GuideNarrator, so this banner only shows the step.
@@ -131,14 +133,22 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
                 if (LivePhase.of(p.step) != LivePhase.OTHER) {
                     Text("Status: ${p.step}", style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.padding(top = 10.dp))
                 }
+                Text(
+                    "Live lookups", style = MaterialTheme.typography.labelLarge, color = Film.boneDim,
+                    modifier = Modifier.padding(top = 14.dp).semantics { heading() },
+                )
                 Timeline(classified, consent, p.sessionStartNanos, Modifier.weight(1f))
-                Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     SecondaryAction("Mark consent now", { vm.markConsentNow() }, Modifier.weight(1f))
                     SecondaryAction("Stop check", { vm.cancelAudit(); onBack() }, Modifier.weight(1f))
                 }
             }
             else -> {
-                Text("Getting ready…", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 32.dp))
+                Row(Modifier.padding(top = 32.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(22.dp), color = Film.scan, strokeWidth = 2.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Getting ready…", style = MaterialTheme.typography.titleMedium)
+                }
             }
         }
     }
@@ -181,7 +191,8 @@ private fun RunFrames(plans: List<AuditPlan>, current: Int, modifier: Modifier =
 
 @Composable
 private fun Counter(value: Int, label: String, color: Color, modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxHeight().clip(RoundedCornerShape(14.dp)).background(Film.raised).padding(horizontal = 12.dp, vertical = 10.dp)) {
+    val shape = RoundedCornerShape(14.dp)
+    Column(modifier.fillMaxHeight().clip(shape).background(Film.raised).border(1.dp, FilmExtra.hairline, shape).padding(horizontal = 12.dp, vertical = 10.dp)) {
         Text("$value", style = MaterialTheme.typography.headlineMedium, color = color)
         Text(label, style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
     }
