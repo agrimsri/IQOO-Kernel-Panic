@@ -7,6 +7,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dpdpxray.app.ai.BackendKind
 import com.dpdpxray.app.ai.BenchResult
+import com.dpdpxray.app.ai.Explanation
+import com.dpdpxray.app.ai.Explanations
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.audit.AuditConfig
 import com.dpdpxray.app.capture.CaptureBus
@@ -69,7 +71,7 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     private val _bundle = MutableStateFlow<AuditBundle?>(null)
     val bundle = _bundle.asStateFlow()
 
-    private val _explanations = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val _explanations = MutableStateFlow<Map<String, Explanation>>(emptyMap())
     val explanations = _explanations.asStateFlow()
     private val _explaining = MutableStateFlow<String?>(null)
     val explaining = _explaining.asStateFlow()
@@ -189,19 +191,23 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
             .onFailure { _toast.value = "No sharing app is available. You can copy the draft instead." }
     }
 
+    /** Always ends with an explanation: the AI's (labelled AI-inferred) or a rules-based fallback that says why. */
     fun explain(finding: Finding, hindi: Boolean) = viewModelScope.launch {
         val key = "${finding.checkId}-${if (hindi) "hi" else "en"}"
-        if (!graph.llm.isReady) {
-            _explaining.value = key
-            if (!graph.llm.load(BackendKind.GPU)) {
-                _explaining.value = null
-                _toast.value = "On-device model not available — see AI lab"
-                return@launch
-            }
-        }
         _explaining.value = key
-        val text = graph.explainer.explain(finding, citationsFor(finding), hindi)
-        _explanations.update { it + (key to (text ?: "The model returned no text. Try again.")) }
+        val passages = citationsFor(finding)
+        val explanation = if (!graph.llm.isReady && !graph.llm.load(BackendKind.GPU)) {
+            val reason = when (val s = graph.llm.status.value) {
+                LlmStatus.NoModel -> "no on-device model is installed (see AI lab)"
+                is LlmStatus.Failed -> "the on-device model could not load (${s.message.take(80)})"
+                else -> "the on-device model is not available (see AI lab)"
+            }
+            Explanations.fallback(finding, hindi, reason)
+        } else {
+            val model = (graph.llm.status.value as? LlmStatus.Ready)?.let { "${it.model} on ${it.backend.label}" } ?: "the on-device model"
+            Explanations.fromModel(graph.explainer.explain(finding, passages, hindi), finding, passages, hindi, model)
+        }
+        _explanations.update { it + (key to explanation) }
         _explaining.value = null
     }
 

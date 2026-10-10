@@ -1,5 +1,7 @@
 package com.dpdpxray.app.ui.screens
 
+import com.dpdpxray.app.ai.ResultSource
+import com.dpdpxray.app.ai.ResultSources
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -309,7 +311,7 @@ private fun FindingRow(f: Finding, onClick: () -> Unit) {
     RuleRow(severityColor(f.severity), onClick = onClick) {
         Text(f.title, style = MaterialTheme.typography.titleMedium)
         Text(
-            "${f.severity.label}, ${if (f.evidenceType == EvidenceType.OBSERVED) "observed on device" else "inferred"}" +
+            "${f.severity.label}, ${if (f.evidenceType == EvidenceType.OBSERVED) "observed on device" else "inferred (see source)"}" +
                 (if (f.penaltyBand.name != "NONE") ", ${f.penaltyBand.label.substringBefore(" (")}" else ""),
             style = MaterialTheme.typography.bodyMedium, color = Film.boneDim,
         )
@@ -374,7 +376,7 @@ fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: ()
                 Text(f.title, style = MaterialTheme.typography.headlineMedium, color = severityColor(f.severity))
                 Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Tag(f.severity.label, severityColor(f.severity))
-                    Tag(if (f.evidenceType == EvidenceType.OBSERVED) "Observed" else "Inferred", Film.boneDim)
+                    Tag(ResultSources.of(f, b.sessions).label, sourceColor(ResultSources.of(f, b.sessions)))
                     if (f.penaltyBand.name != "NONE") Tag(f.penaltyBand.label.substringBefore(" ("), Film.boneDim)
                 }
                 Text(f.explanation, style = MaterialTheme.typography.bodyLarge)
@@ -443,7 +445,14 @@ fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: ()
                 listOf("en", "hi").forEach { lang ->
                     val key = "${f.checkId}-$lang"
                     if (explaining == key) Note("Gemma is writing on this phone…", Film.scan)
-                    explanations[key]?.let { Text(it, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 10.dp)) }
+                    explanations[key]?.let { e ->
+                        Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Tag(e.source.label, sourceColor(e.source))
+                            Text(if (lang == "hi") "हिन्दी" else "English", style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
+                        }
+                        Text(e.text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 6.dp))
+                        Text(e.detail, style = MaterialTheme.typography.bodySmall, color = Film.boneDim, modifier = Modifier.padding(top = 4.dp))
+                    }
                 }
                 Spacer(Modifier.height(16.dp))
                 PrimaryAction("See how to fix", onFixes)
@@ -451,6 +460,14 @@ fun FindingDetailScreen(vm: XrayViewModel, id: String, check: String, onBack: ()
             }
         }
     }
+}
+
+/** Observed, AI-inferred, documentation-inferred and fallback text each keep one colour everywhere. */
+private fun sourceColor(s: ResultSource) = when (s) {
+    ResultSource.OBSERVED -> Film.clear
+    ResultSource.AI_INFERRED -> Film.scan
+    ResultSource.INFERRED -> Film.warn
+    ResultSource.FALLBACK -> Film.boneDim
 }
 
 private fun screenshotFor(b: AuditBundle, f: Finding): String? {
