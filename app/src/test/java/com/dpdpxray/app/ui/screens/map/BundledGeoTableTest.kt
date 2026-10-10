@@ -28,7 +28,7 @@ import java.util.zip.GZIPInputStream
 /** The DB-IP Lite table actually shipped in the APK: the documented file, readable, and placing well-known addresses. */
 class BundledGeoTableTest {
     private companion object {
-        val asset: File = listOf("src/main/assets", "app/src/main/assets").map { File(it, GeoTableLoader.BUNDLED_ASSET) }.first { it.isFile }
+        val asset: File = listOf("src/main/assets", "app/src/main/assets").map { File(it, GeoTableLoader.BUNDLED_SOURCE) }.first { it.isFile }
         val bytes: ByteArray = GZIPInputStream(asset.inputStream()).use { BundledGeoTable.readFully(it) }
         val reader: MmdbReader = MmdbReader.open(bytes)
         val lookup = IpCountryLookup(reader)
@@ -44,6 +44,8 @@ class BundledGeoTableTest {
         assertEquals(6, reader.ipVersion)
         // Compressed size, so the APK impact stated in docs/ATTRIBUTION.md stays true.
         assertTrue("asset is ${asset.length()} bytes", asset.length() in 4_000_000L..4_500_000L)
+        // The asset merge gunzips *.gz, so the loader opens the name without .gz first (see GeoTableLoader).
+        assertEquals(GeoTableLoader.BUNDLED_SOURCE.removeSuffix(".gz"), GeoTableLoader.BUNDLED_ASSET)
     }
 
     @Test
