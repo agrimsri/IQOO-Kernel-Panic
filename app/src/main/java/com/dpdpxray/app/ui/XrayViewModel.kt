@@ -25,6 +25,7 @@ import com.dpdpxray.app.data.AuditComparisonResult
 import com.dpdpxray.app.data.LegalLensSetting
 import com.dpdpxray.app.data.LensChoice
 import com.dpdpxray.app.data.SampleAudit
+import com.dpdpxray.app.data.CheckBackups
 import com.dpdpxray.app.BuildConfig
 import com.dpdpxray.app.graph
 import com.dpdpxray.app.report.AuditJsonExport
@@ -36,6 +37,9 @@ import com.dpdpxray.app.report.SampleReport
 import com.dpdpxray.core.attribution.SdkAttribution
 import com.dpdpxray.core.attribution.SdkGroup
 import com.dpdpxray.core.audit.PhaseAssigner
+import com.dpdpxray.core.export.AuditBackups
+import com.dpdpxray.core.export.AuditBundles
+import com.dpdpxray.core.export.BackupFormatException
 import com.dpdpxray.core.export.SdkAttributionExport
 import com.dpdpxray.core.dpdp.Passage
 import com.dpdpxray.core.fixes.FixTemplate
@@ -170,6 +174,75 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { SdkAttribution(graph.catalog(), graph.fixCatalog).groups(bundle.result, bundle.sessions) }.getOrDefault(emptyList())
 
     fun fixTemplate(id: String): FixTemplate? = graph.fixCatalog.template(id)
+
+    private val _backup = MutableStateFlow<BackupUi>(BackupUi.Idle)
+    /** Progress and outcome of the last "Back up my checks" or "Restore from a backup". */
+    val backup = _backup.asStateFlow()
+
+    /** Writes every saved check into the file the person created with Android's file picker. Never uploads anything. */
+    fun backupTo(uri: android.net.Uri) = viewModelScope.launch {
+        if (_backup.value is BackupUi.Working) return@launch
+        _backup.value = BackupUi.Working("Backing up your checks…")
+        graph.repository.refresh()
+        val ids = audits.value.map { it.id }
+        val outcome = withContext(Dispatchers.IO) {
+            runCatching {
+                val stream = runCatching { ctx.contentResolver.openOutputStream(uri, "wt") }.getOrNull()
+                    ?: ctx.contentResolver.openOutputStream(uri, "w")
+                    ?: error("no output stream")
+                stream.use { out -> CheckBackups.write(graph.repository, ids, out, BuildConfig.VERSION_NAME, AuditBundles.now()) }
+            }
+        }
+        _backup.value = outcome.fold(
+            { BackupUi.Done(it.message) },
+            { BackupUi.Failed("Could not write the backup file. Nothing on this phone was changed.") },
+        )
+        _toast.value = (_backup.value as? BackupUi.Done)?.message ?: (_backup.value as BackupUi.Failed).message
+    }
+
+    /** Checks a backup the person picked, then adds the checks that are not on this phone yet. */
+    fun restoreFrom(uri: android.net.Uri) = viewModelScope.launch {
+        if (_backup.value is BackupUi.Working) return@launch
+        _backup.value = BackupUi.Working("Checking the backup…")
+        val read: Result<com.dpdpxray.core.export.BackupContents> = withContext(Dispatchers.IO) { readBackup(uri) }
+        val contents = read.getOrElse {
+            _backup.value = BackupUi.Failed(it.message ?: "Could not read this file. Nothing was restored.")
+            _toast.value = (_backup.value as BackupUi.Failed).message
+            return@launch
+        }
+        graph.repository.refresh()
+        val plan = AuditBackups.plan(contents, audits.value.map { it.id }.toSet())
+        _backup.value = BackupUi.Working("Restoring ${plan.toRestore.size} checks…")
+        val outcome = withContext(Dispatchers.IO) { CheckBackups.restore(graph.repository, plan, ::restoredReport) }
+        _backup.value = BackupUi.Done(outcome.message)
+        _toast.value = outcome.message
+    }
+
+    /** Size limit, then the bounded read, then core's schema, hash and audit checks. Never throws. */
+    private fun readBackup(uri: android.net.Uri): Result<com.dpdpxray.core.export.BackupContents> = try {
+        val size = runCatching {
+            ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+                if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null
+            }
+        }.getOrNull()
+        AuditBackups.sizeProblem(size)?.let { throw BackupFormatException(it) }
+        val bytes = ctx.contentResolver.openInputStream(uri)?.use { CheckBackups.readBounded(it, AuditBackups.MAX_BYTES) }
+            ?: throw BackupFormatException(AuditBackups.sizeProblem(AuditBackups.MAX_BYTES + 1)!!)
+        Result.success(AuditBackups.read(bytes.toString(Charsets.UTF_8)))
+    } catch (e: BackupFormatException) {
+        Result.failure(e)
+    } catch (e: OutOfMemoryError) {
+        Result.failure(BackupFormatException("This backup is too large to check on this phone. Nothing was restored."))
+    } catch (e: Exception) {
+        Result.failure(BackupFormatException("Could not read this file. Nothing was restored."))
+    }
+
+    /** The saved report for a restored audit, built the same way as when an audit is saved; empty if that fails. */
+    private fun restoredReport(meta: AuditMeta, sessions: List<AuditSession>, result: com.dpdpxray.core.model.AuditResult): String =
+        runCatching {
+            val built = MarkdownReport.build(result, sessions, graph.fixCatalog.fixesFor(result, graph.catalog()), graph.citations())
+            EvidenceReport.annotate(if (meta.sample) SampleReport.annotate(built, sessions) else built, sessions, meta.timingProfile, sample = meta.sample)
+        }.getOrDefault("")
 
     suspend fun previousComparison(bundle: AuditBundle): AuditComparisonResult {
         val previousId = AuditComparison.previousId(bundle.meta, audits.value)
@@ -353,6 +426,14 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateSettings(transform: (com.dpdpxray.app.data.XraySettings) -> com.dpdpxray.app.data.XraySettings) = graph.settings.update(transform)
+}
+
+/** "Back up my checks" / "Restore from a backup" progress, shown on the card that started it. */
+sealed interface BackupUi {
+    data object Idle : BackupUi
+    data class Working(val message: String) : BackupUi
+    data class Done(val message: String) : BackupUi
+    data class Failed(val message: String) : BackupUi
 }
 
 sealed interface CameraCheckState {
