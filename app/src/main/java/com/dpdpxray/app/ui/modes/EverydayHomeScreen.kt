@@ -188,7 +188,7 @@ fun EverydayHomeScreen(
                 icon = { GlyphIcon(Glyph.BELL, it, size = 28.dp) },
                 onClick = onAlerts,
                 status = {
-                    val color = when (alertStatus) { AlertStatus.ON -> Film.clear; AlertStatus.WHILE_OPEN -> Film.warn; AlertStatus.BLOCKED -> Film.leak }
+                    val color = when (alertStatus) { AlertStatus.ON -> Film.clear; AlertStatus.WHILE_OPEN -> Film.warn; AlertStatus.BLOCKED -> Film.high }
                     StatusPill(EverydayCopy.alertLabel(alertStatus, settings.speakApkGuardAlerts).pick(lang), color)
                 },
             )

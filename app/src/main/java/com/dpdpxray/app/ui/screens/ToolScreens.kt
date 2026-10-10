@@ -280,7 +280,7 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit) {
                 SwitchRow("Presentation mode", "Larger text for projectors and screen sharing.", s.stageMode, { v -> vm.updateSettings { it.copy(stageMode = v) } })
             }
             SectionCard(title = "Checks", glyph = Glyph.SEARCH) {
-                SwitchRow("Prefer Fast Preview", "Defaults single-run checks to the shorter, clearly labelled Preview. Full audits keep normal timing; choose the mode in audit setup.", s.fastDemo, { v -> vm.updateSettings { it.copy(fastDemo = v) } })
+                SwitchRow("Prefer Fast Preview", "Developer mode: defaults single-run checks to the shorter, clearly labelled Preview. Full audits keep normal timing; choose the mode in audit setup.", s.fastDemo, { v -> vm.updateSettings { it.copy(fastDemo = v) } })
                 Hairline()
                 SwitchRow("Load AI when an audit starts", "Loads Gemma automatically if it is installed.", s.autoLoadModel, { v -> vm.updateSettings { it.copy(autoLoadModel = v) } })
             }

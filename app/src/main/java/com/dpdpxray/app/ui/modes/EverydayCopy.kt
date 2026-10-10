@@ -78,8 +78,8 @@ object EverydayCopy {
     val ready = Bi("Ready", "तैयार")
     fun stepsFirst(n: Int) = if (n == 1) Bi("1 step first", "पहले 1 कदम") else Bi("$n steps first", "पहले $n कदम")
     val readiness = Bi(
-        "First switch on two things: the VPN, so TraceVeil can see which addresses the app tries to reach, and the consent watcher, so it can see the popup.",
-        "पहले दो चीज़ें चालू करें: VPN, ताकि TraceVeil देख सके कि ऐप किन पतों तक पहुँचने की कोशिश करता है, और कंसेंट वॉचर, ताकि वह पॉपअप देख सके।",
+        "This check needs two switches on: the VPN, so TraceVeil can see which addresses the app tries to reach, and the consent watcher, so it can see the popup.",
+        "इस जाँच के लिए दो चीज़ें चालू होनी चाहिए: VPN, ताकि TraceVeil देख सके कि ऐप किन पतों तक पहुँचने की कोशिश करता है, और कंसेंट वॉचर, ताकि वह पॉपअप देख सके।",
     )
 
     /** Titles and details for the setup rows inside the "No" card (only steps still to do are shown). */
