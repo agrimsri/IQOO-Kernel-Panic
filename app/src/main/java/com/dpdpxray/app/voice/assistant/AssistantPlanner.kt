@@ -50,6 +50,8 @@ data class AssistantContext(
     /** The audit "what did you find" refers to: the copilot's own audit, otherwise the newest saved one. */
     val audit: SavedAudit? = null,
     val auditRunning: Boolean = false,
+    /** The running check's app label, when [auditRunning]. */
+    val runningLabel: String? = null,
     val quarantineActive: Boolean = false,
     /** Optional routes present in this build (for example "checkup", "trust", "apkguard"). */
     val routes: Set<String> = emptySet(),
@@ -139,7 +141,7 @@ object AssistantPlanner {
     }
 
     private fun busy(ctx: AssistantContext): AssistantStep? = when {
-        ctx.auditRunning -> AssistantStep(AssistantCopy.alreadyRunning)
+        ctx.auditRunning -> AssistantStep(AssistantCopy.alreadyRunning(ctx.runningLabel))
         ctx.quarantineActive -> AssistantStep(AssistantCopy.quarantineActive)
         else -> null
     }

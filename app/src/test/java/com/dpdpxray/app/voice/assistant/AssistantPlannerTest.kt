@@ -91,6 +91,19 @@ class AssistantPlannerTest {
         assertNull(AssistantPlanner.checkPicked(instagram, ctx.copy(auditRunning = true)).action)
     }
 
+    @Test fun `a running check is named and nothing is promised about it`() {
+        val running = ctx.copy(auditRunning = true, runningLabel = "LeakyShop")
+        val step = plan("check Instagram", running)
+        assertEquals("A check of LeakyShop is already running. Wait for it to finish, then ask me again.", step.reply.en)
+        assertTrue(step.reply.hi, step.reply.hi.contains("LeakyShop"))
+        assertEquals(step.reply, AssistantPlanner.checkPicked(instagram, running).reply)
+        // Started from the app picker, nothing follows that check, so the reply must not promise to report on it.
+        listOf(step.reply, plan("check Instagram", ctx.copy(auditRunning = true)).reply).forEach { r ->
+            assertFalse(r.en, r.en.contains("I'll tell you"))
+            assertFalse(r.hi, r.hi.contains("बताऊँगा"))
+        }
+    }
+
     @Test fun `a voice command never starts a Full audit, Fast Preview or a reset`() {
         listOf("check Instagram", "check leaky shop", "audit spotify", "run a full audit of instagram", "reset and check instagram").forEach { text ->
             val action = plan(text).action

@@ -54,7 +54,14 @@ object AssistantCopy {
 
     val cancelled = Said("Okay, I won't check anything.", "ठीक है, मैं कोई जाँच नहीं करूँगा।")
 
-    val alreadyRunning = Said("A check is already running. I'll tell you when it finishes.", "एक जाँच पहले से चल रही है। पूरी होने पर मैं बताऊँगा।")
+    /**
+     * Another check is running ([app] is its label when known). Nothing promises to report on it: a check started from
+     * the app picker has no voice follow-up.
+     */
+    fun alreadyRunning(app: String?) = Said(
+        (app?.let { "A check of $it is already running." } ?: "A check is already running.") + " Wait for it to finish, then ask me again.",
+        (app?.let { "$it की एक जाँच पहले से चल रही है।" } ?: "एक जाँच पहले से चल रही है।") + " उसके पूरा होने तक रुकिए, फिर दोबारा कहिए।",
+    )
     val quarantineActive = Said("Stop the quarantine run first, then ask me again.", "पहले क्वारंटीन रन बंद कीजिए, फिर दोबारा कहिए।")
 
     fun fixVpn(app: String) = Said(

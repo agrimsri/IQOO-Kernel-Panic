@@ -166,6 +166,7 @@ class VoiceAssistant private constructor(private val app: Application) {
         repository.refresh()
         val id = focusAuditId ?: repository.audits.value.firstOrNull()?.id
         val audit = id?.let { repository.load(it) }?.let { b -> SavedAudit(b.meta.id, copilotEvidence(b.meta, b.sessions, b.result)) }
+        val running = graph.orchestrator.progress.value as? AuditProgress.Running
         AssistantContext(
             source = source,
             apps = if (needsApps) runCatching { InstalledApps.load(app) }.getOrDefault(emptyList()) else emptyList(),
@@ -175,7 +176,8 @@ class VoiceAssistant private constructor(private val app: Application) {
                 privateDnsActive = DeviceChecks.privateDnsActive(app),
             ),
             audit = audit,
-            auditRunning = graph.orchestrator.progress.value is AuditProgress.Running,
+            auditRunning = running != null,
+            runningLabel = running?.config?.targetLabel,
             quarantineActive = QuarantineController.isActive,
             routes = AssistantBus.routes.value,
             wakeListening = WakeRuntime.state.value.active,
