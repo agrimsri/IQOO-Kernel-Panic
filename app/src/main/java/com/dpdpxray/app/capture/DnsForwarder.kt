@@ -50,6 +50,7 @@ class DnsForwarder(private val context: Context, private val protect: (DatagramS
 
     companion object {
         private const val TIMEOUT_MS = 2500
-        private val FALLBACKS = listOf("8.8.8.8", "1.1.1.1")
+        /** Public resolvers tried after the network's own; named on the map and trust screens. */
+        internal val FALLBACKS = listOf("8.8.8.8", "1.1.1.1")
     }
 }
