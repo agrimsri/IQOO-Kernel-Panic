@@ -21,8 +21,9 @@ import java.io.IOException
  * `SpeechService` is not used because its recording thread throws an uncaught exception when a read fails, which would
  * crash the app; here every failure becomes [Listener.onError].
  *
- * Callbacks arrive on the main thread. [stop] returns immediately; the worker releases the microphone, the recogniser
- * and the model when its current read finishes.
+ * [setMicrophone] (false) closes the microphone while the model stays loaded, so the phone's speech recogniser can
+ * take one command or the voice copilot can listen; (true) reopens it. Callbacks arrive on the main thread. [stop]
+ * returns immediately; the worker releases the microphone, the recogniser and the model when its current read ends.
  */
 internal class VoskWakeEngine(
     private val modelDir: File,
@@ -39,6 +40,7 @@ internal class VoskWakeEngine(
     @Volatile private var running = false
     @Volatile private var paused = false
     @Volatile private var resetRequested = false
+    @Volatile private var micWanted = true
     private var worker: Thread? = null
 
     fun start() {
@@ -51,6 +53,11 @@ internal class VoskWakeEngine(
     fun setPaused(value: Boolean) {
         if (paused && !value) resetRequested = true
         paused = value
+    }
+
+    /** False closes the microphone (the model stays loaded); true reopens it. */
+    fun setMicrophone(open: Boolean) {
+        micWanted = open
     }
 
     fun stop() {
@@ -72,18 +79,27 @@ internal class VoskWakeEngine(
             val minBuffer = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
             if (minBuffer <= 0) throw IOException("this phone cannot record 16 kHz mono audio")
             val chunk = SAMPLE_RATE / 10
-            record = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT, maxOf(minBuffer, chunk * 2 * 2),
-            )
-            if (record.state != AudioRecord.STATE_INITIALIZED) throw IOException("the microphone could not be opened; another app may be using it")
-            record.startRecording()
-            if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) throw IOException("the microphone did not start recording")
-            if (!running) return
-            main.post { if (running) listener.onReady() }
-
             val buffer = ShortArray(chunk)
+            var announced = false
+
             while (running && !Thread.currentThread().isInterrupted) {
+                if (!micWanted) {
+                    if (record != null) {
+                        close(record)
+                        record = null
+                        recognizer.reset()
+                    }
+                    Thread.sleep(IDLE_POLL_MS)
+                    continue
+                }
+                if (record == null) {
+                    record = open(maxOf(minBuffer, chunk * 2 * 2))
+                    if (!running) return
+                    if (!announced) {
+                        announced = true
+                        main.post { if (running) listener.onReady() }
+                    }
+                }
                 val n = record.read(buffer, 0, buffer.size)
                 if (n < 0) throw IOException("microphone read failed (code $n)")
                 if (n == 0 || paused) continue
@@ -103,14 +119,42 @@ internal class VoskWakeEngine(
                 main.post { if (running) listener.onError(detail) }
             }
         } finally {
-            runCatching { record?.stop() }
-            runCatching { record?.release() }
+            record?.let(::close)
             runCatching { recognizer?.close() }
             runCatching { model?.close() }
         }
     }
 
+    /**
+     * Opens the microphone. Reopening right after another recogniser let go of it can fail for a moment, so a few
+     * short retries are made before giving up.
+     */
+    @SuppressLint("MissingPermission")
+    private fun open(bufferBytes: Int): AudioRecord {
+        var problem = "the microphone could not be opened; another app may be using it"
+        repeat(OPEN_ATTEMPTS) { attempt ->
+            if (!running) throw IOException("stopped")
+            val r = AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferBytes)
+            if (r.state == AudioRecord.STATE_INITIALIZED) {
+                r.startRecording()
+                if (r.recordingState == AudioRecord.RECORDSTATE_RECORDING) return r
+                problem = "the microphone did not start recording"
+            }
+            close(r)
+            if (attempt < OPEN_ATTEMPTS - 1) Thread.sleep(OPEN_RETRY_MS)
+        }
+        throw IOException(problem)
+    }
+
+    private fun close(r: AudioRecord) {
+        runCatching { r.stop() }
+        runCatching { r.release() }
+    }
+
     private companion object {
         const val SAMPLE_RATE = 16_000
+        const val IDLE_POLL_MS = 100L
+        const val OPEN_ATTEMPTS = 6
+        const val OPEN_RETRY_MS = 400L
     }
 }

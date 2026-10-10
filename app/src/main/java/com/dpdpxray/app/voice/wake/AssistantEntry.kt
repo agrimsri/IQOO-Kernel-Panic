@@ -40,18 +40,16 @@ object AssistantEntry {
 }
 
 /**
- * Mounted once in MainActivity. Stops the wake word when the voice copilot opens (only one recogniser may use the
- * microphone) and tells the service whether TraceVeil is on screen, so it opens the copilot directly only when
- * Android allows it.
+ * Mounted once in MainActivity. Tells the wake word when the voice copilot is open, so it lets go of the microphone
+ * (only one recogniser may use it) and resumes when the copilot closes, and whether TraceVeil is on screen, so it
+ * changes screens directly only when Android allows it.
  */
 @Composable
 fun HeyTraceVeilHooks(nav: NavController) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(nav, lifecycle) {
         val destinations = NavController.OnDestinationChangedListener { _, destination, _ ->
-            val copilot = destination.route == AuditRoutes.VOICE
-            WakeRuntime.copilotOpen = copilot
-            if (copilot) WakeController.stop(WakeStopReason.COPILOT_MIC)
+            WakeRuntime.copilotOpen = destination.route == AuditRoutes.VOICE
         }
         val visibility = LifecycleEventObserver { _, event ->
             when (event) {
@@ -66,6 +64,7 @@ fun HeyTraceVeilHooks(nav: NavController) {
             nav.removeOnDestinationChangedListener(destinations)
             lifecycle.removeObserver(visibility)
             WakeRuntime.uiVisible = false
+            WakeRuntime.copilotOpen = false
         }
     }
 }
