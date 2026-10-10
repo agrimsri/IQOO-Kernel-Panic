@@ -353,7 +353,8 @@ class RulesEngine(
 
 object ScoreCalculator {
     /**
-     * 100 minus severity weights (inferred findings count half). The result is inconclusive, with no score, when too few
+     * 100 minus severity weights (inferred findings count half). Ready needs 85 or more and no High or Critical problem
+     * seen on the phone; Needs work is 60 to 84; At risk is below 60. The result is inconclusive, with no score, when too few
      * lookups were captured (V0) or when third-party trackers were looked up but consent history is unknown (U1 with
      * entities): a kept-data run cannot tell whether consent came first, so it must never read as "Ready".
      */
@@ -361,8 +362,11 @@ object ScoreCalculator {
         if (Inconclusive.reason(findings) != null) return null to ScoreBand.INCONCLUSIVE
         val penalty = findings.sumOf { f -> f.severity.weight * if (f.evidenceType == EvidenceType.INFERRED) 0.5 else 1.0 }
         val score = (100 - penalty).coerceAtLeast(0.0).roundToInt()
+        // One High alone leaves exactly 85, so points cannot keep a serious problem out of Ready; this gate does.
+        // Only problems seen on the phone close the gate: an AI-inferred finding costs points but never decides alone.
+        val seriousSeen = findings.any { it.evidenceType == EvidenceType.OBSERVED && it.severity.weight >= Severity.HIGH.weight }
         val band = when {
-            score >= 85 -> ScoreBand.READY
+            score >= 85 && !seriousSeen -> ScoreBand.READY
             score >= 60 -> ScoreBand.NEEDS_WORK
             else -> ScoreBand.AT_RISK
         }
