@@ -115,6 +115,15 @@ class AssistantPlannerTest {
         assertEquals(AssistantCopy.couldNotStart("no VPN"), AssistantPlanner.afterScreenWork(planned, start, UiOutcome.Failed("no VPN")))
     }
 
+    @Test fun `the end of a voice-started check is spoken only when answers are spoken`() {
+        val evidence = saved.evidence
+        assertNull(AssistantPlanner.checkEnded(evidence, failure = null, speak = false))
+        assertNull(AssistantPlanner.checkEnded(null, failure = "VPN lost", speak = false))
+        assertTrue(AssistantPlanner.checkEnded(evidence, failure = null, speak = true)!!.en.startsWith("In this check, LeakyShop scored 100 out of 100"))
+        assertEquals(AssistantCopy.checkStopped("VPN lost"), AssistantPlanner.checkEnded(null, failure = "VPN lost", speak = true))
+        assertEquals(AssistantCopy.checkCancelled, AssistantPlanner.checkEnded(null, failure = null, speak = true))
+    }
+
     @Test fun `a voice command never starts a Full audit, Fast Preview or a reset`() {
         listOf("check Instagram", "check leaky shop", "audit spotify", "run a full audit of instagram", "reset and check instagram").forEach { text ->
             val action = plan(text).action

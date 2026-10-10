@@ -48,7 +48,7 @@ fun VoiceAssistantHost(nav: NavController, vm: XrayViewModel) {
                                 VoiceAuditStart.start(action.config, { vm.progress.value }, vm::startAudit, { vm.toast.value }).also {
                                     if (it == UiOutcome.Done) {
                                         nav.navigate("live") { popUpTo("home") }
-                                        VoiceAssistant.get(context).followUp(action.config, req.hindi)
+                                        VoiceAssistant.get(context).followUp(action.config, req.hindi, req.speak)
                                     }
                                 }
                             is AssistantAction.Navigate -> navigate(nav, action.route)

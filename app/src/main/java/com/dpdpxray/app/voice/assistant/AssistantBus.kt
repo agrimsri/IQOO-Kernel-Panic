@@ -26,8 +26,11 @@ sealed interface UiOutcome {
     data class CheckRunning(val app: String) : UiOutcome
 }
 
-/** One piece of screen work; [hindi] is the language the user spoke, for the follow-up reply. */
-class UiRequest internal constructor(val action: AssistantAction, val hindi: Boolean, val createdAtMs: Long) {
+/**
+ * One piece of screen work; [hindi] is the language the user spoke and [speak] whether replies are spoken, both for
+ * the follow-up when a check this starts ends.
+ */
+class UiRequest internal constructor(val action: AssistantAction, val hindi: Boolean, val speak: Boolean, val createdAtMs: Long) {
     internal val result = CompletableDeferred<UiOutcome>()
 }
 
@@ -55,14 +58,20 @@ object AssistantBus {
     }
 
     /** Queues [action] and waits up to [waitMs] for the host to perform it. On a timeout the request stays queued. */
-    suspend fun request(action: AssistantAction, hindi: Boolean, waitMs: Long): UiOutcome {
-        val req = enqueue(action, hindi)
+    suspend fun request(
+        action: AssistantAction,
+        hindi: Boolean,
+        speak: Boolean,
+        waitMs: Long,
+        nowMs: Long = SystemClock.elapsedRealtime(),
+    ): UiOutcome {
+        val req = enqueue(action, hindi, speak, nowMs)
         return withTimeoutOrNull(waitMs) { req.result.await() } ?: UiOutcome.NotReached()
     }
 
     /** Queues [action] without waiting, replacing any older request. */
-    fun enqueue(action: AssistantAction, hindi: Boolean): UiRequest {
-        val req = UiRequest(action, hindi, SystemClock.elapsedRealtime())
+    fun enqueue(action: AssistantAction, hindi: Boolean, speak: Boolean, nowMs: Long = SystemClock.elapsedRealtime()): UiRequest {
+        val req = UiRequest(action, hindi, speak, nowMs)
         _pending.getAndUpdate { req }?.result?.complete(UiOutcome.NotReached())
         return req
     }

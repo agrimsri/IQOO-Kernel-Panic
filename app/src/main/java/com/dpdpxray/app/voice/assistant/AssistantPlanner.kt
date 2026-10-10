@@ -118,15 +118,27 @@ object AssistantPlanner {
         is UiOutcome.NotReached -> if (outcome.locked) AssistantCopy.unlockFirst else AssistantCopy.tapNotification
     }
 
+    /**
+     * What a voice-started check says when it ends: the saved [result], or why there is none ([failure], else
+     * cancelled). Null when spoken answers are off.
+     */
+    fun checkEnded(result: AuditEvidence?, failure: String?, speak: Boolean): Said? = when {
+        !speak -> null
+        result != null -> summary(result)
+        failure != null -> AssistantCopy.checkStopped(failure)
+        else -> AssistantCopy.checkCancelled
+    }
+
+    private fun summary(e: AuditEvidence) = Said(
+        AuditSpokenSummary.summarize(e, CopilotLanguage.EN),
+        AuditSpokenSummary.summarize(e, CopilotLanguage.HI),
+    )
+
     private fun lastResult(ctx: AssistantContext): AssistantStep {
         val audit = ctx.audit ?: return AssistantStep(AssistantCopy.noSavedChecks)
-        val summary = Said(
-            AuditSpokenSummary.summarize(audit.evidence, CopilotLanguage.EN),
-            AuditSpokenSummary.summarize(audit.evidence, CopilotLanguage.HI),
-        )
         // The copilot already shows this audit; elsewhere its result screen opens if TraceVeil is on screen.
         val show = if (ctx.source == AssistantSource.COPILOT) null else AssistantAction.Navigate(resultRoute(audit.id), optional = true)
-        return AssistantStep(summary, show)
+        return AssistantStep(summary(audit.evidence), show)
     }
 
     private fun open(target: OpenTarget?, ctx: AssistantContext): AssistantStep = when (target) {
