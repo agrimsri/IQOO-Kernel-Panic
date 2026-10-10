@@ -1,5 +1,10 @@
 package com.dpdpxray.cli
 
+import com.dpdpxray.core.datasafety.DataSafetyLabel
+import com.dpdpxray.core.datasafety.DataSafetyParser
+import com.dpdpxray.core.datasafety.PlayLabelCheck
+import com.dpdpxray.core.datasafety.PlayLabelComparator
+import com.dpdpxray.core.datasafety.PlayLabelReport
 import com.dpdpxray.core.evidence.EvidenceSignatures
 import com.dpdpxray.core.evidence.EvidenceVerifier
 import com.dpdpxray.core.evidence.GoogleAttestationRoots
@@ -7,7 +12,9 @@ import com.dpdpxray.core.evidence.TrustedRoot
 import com.dpdpxray.core.automation.AutomationContract
 import com.dpdpxray.core.law.LegalProfile
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
 import java.io.FileDescriptor
 import java.io.FileOutputStream
@@ -41,7 +48,7 @@ fun main(args: Array<String>) {
 }
 
 /**
- * `traceveil-ci check <bundle.json>... [--policy policy.json] [--format text|json|sarif] [--out file]`
+ * `traceveil-ci check <bundle.json>... [--policy policy.json] [--format text|json|sarif] [--out file] [--play-label label.txt]`
  * `traceveil-ci diff <old.json> <new.json> [--format text|json] [--out file]`
  *
  * `traceveil-ci run --package <pkg> [options]` (see [RunCommand]): runs the audit on a USB-connected phone first.
@@ -72,7 +79,7 @@ class TraceVeilCi(
             null -> throw UsageException("no command given")
             "-h", "--help", "help" -> { out.print(USAGE); Exit.PASS }
             "-V", "--version", "version" -> { out.println("${CliInfo.NAME} ${CliInfo.version}"); Exit.PASS }
-            "check" -> check(Args.parse(args.drop(1), setOf("--policy", "--format", "--out", "--profile")))
+            "check" -> check(Args.parse(args.drop(1), setOf("--policy", "--format", "--out", "--profile", "--play-label")))
             "diff" -> diff(Args.parse(args.drop(1), setOf("--format", "--out")))
             "verify" -> verify(Args.parse(args.drop(1), setOf("--sig", "--format", "--package", "--signer-sha256")))
             "run" -> RunCommand(out, err, cwd, { gate }, env, adbFactory, clock, newRunId).run(args.drop(1))
@@ -100,12 +107,20 @@ class TraceVeilCi(
         val profile = a.options["--profile"]?.let { id ->
             LegalProfile.parse(id) ?: throw UsageException("unknown legal profile \"$id\" (use ${LegalProfile.entries.joinToString("|") { it.name }})")
         }
+        val label = a.options["--play-label"]?.let { readPlayLabel(it) }
         val bundles = load(a.positional)
         val checks = bundles.map { gate.check(it, policy, profile) }
-        val text = CheckText.render(checks, policy, policySource)
+        // "Play label vs what this check saw": its own section, separate from the policy result and the exit code.
+        val labelChecks = label?.let { (_, parsed) -> bundles.map { it to PlayLabelComparator(catalog).compare(parsed, it.bundle.sessions) } }
+        val text = CheckText.render(checks, policy, policySource) + (label?.let { (file, _) -> playLabelText(file, labelChecks!!) } ?: "")
         emit(a, format, text) {
             when (format) {
-                "json" -> pretty.encodeToString(JsonObject.serializer(), CheckJson.render(checks, policy, policySource))
+                "json" -> pretty.encodeToString(
+                    JsonObject.serializer(),
+                    CheckJson.render(checks, policy, policySource).let { root ->
+                        if (label == null) root else JsonObject(root + ("playLabel" to playLabelJson(label.first, labelChecks!!)))
+                    },
+                )
                 "sarif" -> pretty.encodeToString(JsonObject.serializer(), CheckSarif.render(checks))
                 else -> text
             }
@@ -149,6 +164,37 @@ class TraceVeilCi(
         else out.print(VerifyText.render(outcome))
         return if (outcome.verified) Exit.PASS else Exit.VIOLATION
     }
+
+    private val catalog by lazy { com.dpdpxray.core.trackers.TrackerCatalog.loadDefault() }
+
+    /** The label text file named by --play-label, read and parsed; its display path first. */
+    private fun readPlayLabel(path: String): Pair<String, DataSafetyLabel> {
+        val f = resolve(path)
+        if (!f.isFile) throw UsageException("Play label file not found: $path")
+        val text = runCatching { f.readText(Charsets.UTF_8).removePrefix("﻿") }
+            .getOrElse { throw UsageException("$path: could not read the file (${it.message})") }
+        return LoadedBundle.displayPath(f, cwd) to DataSafetyParser.parse(text)
+    }
+
+    private fun playLabelText(file: String, checks: List<Pair<LoadedBundle, PlayLabelCheck>>): String = buildString {
+        checks.forEach { (b, c) ->
+            appendLine()
+            if (checks.size > 1) appendLine("Bundle: ${b.displayPath}")
+            append(PlayLabelReport.text(c, file))
+        }
+    }
+
+    private fun playLabelJson(file: String, checks: List<Pair<LoadedBundle, PlayLabelCheck>>): JsonObject = JsonObject(
+        mapOf(
+            "file" to JsonPrimitive(file),
+            "basis" to JsonPrimitive(PlayLabelComparator.ABOUT),
+            "bundles" to JsonArray(
+                checks.map { (b, c) ->
+                    JsonObject(mapOf("path" to JsonPrimitive(b.displayPath), "check" to pretty.encodeToJsonElement(PlayLabelCheck.serializer(), c)))
+                },
+            ),
+        ),
+    )
 
     /** Reads every file first so all unreadable inputs are reported together. */
     private fun load(paths: List<String>): List<LoadedBundle> {
@@ -220,6 +266,7 @@ class TraceVeilCi(
             |
             |Usage:
             |  traceveil-ci check <bundle.json>... [--policy policy.json] [--profile id] [--format text|json|sarif] [--out file]
+            |                     [--play-label label.txt]
             |  traceveil-ci diff <old.json> <new.json> [--format text|json] [--out file]
             |  traceveil-ci run --package <pkg> [--device SERIAL] [--apk file.apk] [--mode full|quick] [--token T]
             |                   [--policy policy.json] [--timeout 300] [--out traceveil-out] [--adb path]
@@ -261,6 +308,9 @@ class TraceVeilCi(
             |       GLOBAL_BASELINE. The lens shows which findings each law requires, treats as context or does not
             |       cover, and a score without the not-applicable ones. It never changes the policy result.
             |--out writes the chosen format to a file; the text report still goes to stdout.
+            |--play-label label.txt sets the app's Google Play Data safety text (copied from its listing) against each
+            |       bundle's lookups and prints points to review (text and json formats). Separate from the policy: it
+            |       never changes the result or the exit code, and nothing is fetched. Method: docs/PLAY_LABEL_CHECK.md.
             |Exit codes: 0 pass (diff: no regression), 1 policy violation (diff: regression), 2 usage or unreadable input
             |(run: also no device, a refusal or failure on the phone, or a timeout).
             |A DNS lookup is an attempt to contact a host, not proof that personal data was sent.
