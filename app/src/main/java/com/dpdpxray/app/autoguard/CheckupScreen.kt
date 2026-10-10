@@ -6,7 +6,6 @@ import android.provider.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,9 +20,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,10 +38,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,20 +55,30 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.dpdpxray.app.graph
+import com.dpdpxray.app.ui.components.BreathingDot
 import com.dpdpxray.app.ui.components.Callout
 import com.dpdpxray.app.ui.components.ChipFlow
+import com.dpdpxray.app.ui.components.CollapsibleCard
+import com.dpdpxray.app.ui.components.FoldText
 import com.dpdpxray.app.ui.components.Hairline
 import com.dpdpxray.app.ui.components.IconBadge
+import com.dpdpxray.app.ui.components.KeyCaveat
+import com.dpdpxray.app.ui.components.LearnMore
 import com.dpdpxray.app.ui.components.Note
-import com.dpdpxray.app.ui.components.PrimaryAction
-import com.dpdpxray.app.ui.components.SecondaryAction
 import com.dpdpxray.app.ui.components.SectionCard
+import com.dpdpxray.app.ui.components.SkeletonCard
 import com.dpdpxray.app.ui.components.SwitchRow
 import com.dpdpxray.app.ui.components.Tag
 import com.dpdpxray.app.ui.components.TopBar
+import com.dpdpxray.app.ui.components.cardSurface
+import com.dpdpxray.app.ui.components.pressClickable
+import com.dpdpxray.app.ui.components.reveal
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
+import com.dpdpxray.app.ui.guide.GradientAction
+import com.dpdpxray.app.ui.guide.OutlineAction
 import com.dpdpxray.app.ui.theme.Film
+import com.dpdpxray.app.ui.theme.FilmExtra
 import com.dpdpxray.app.ui.theme.Mono
 import com.dpdpxray.app.ui.theme.Radii
 import com.dpdpxray.core.apk.Bilingual
@@ -149,65 +162,90 @@ fun CheckupScreen(onBack: () -> Unit, onOpenApp: (String) -> Unit) {
         Column(Modifier.fillMaxSize()) {
             TopBar(TITLE.pick(hindi), onBack)
             Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                SectionCard {
+                val r = reading
+                val result = r?.result
+                // Amber glow only when there is something to review; never green, because a quiet checkup is not a safety verdict.
+                val toReview = (result?.appsToReview ?: 0) > 0
+                val tone = if (toReview) Film.warn else Film.scan
+                val wash = remember(tone) { tintWash(tone) }
+                Column(Modifier.reveal(0).fillMaxWidth().cardSurface(glow = if (toReview) Film.warn else null).background(wash).padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconBadge(Glyph.CHECK, Film.scan, size = 44.dp)
+                        IconBadge(Glyph.CHECK, tone, size = 48.dp)
                         Spacer(Modifier.width(14.dp))
                         Text(
-                            reading?.result?.headline?.pick(hindi) ?: INTRO.pick(hindi),
-                            style = MaterialTheme.typography.titleMedium,
+                            result?.headline?.pick(hindi) ?: INTRO.pick(hindi),
+                            style = if (result != null) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                            color = Film.bone,
                             modifier = Modifier.weight(1f).semantics { heading() },
                         )
                     }
-                    Spacer(Modifier.height(10.dp))
-                    val r = reading
+                    Spacer(Modifier.height(12.dp))
                     when {
                         busy -> Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(Modifier.size(18.dp), color = Film.scan, strokeWidth = 2.dp)
+                            BreathingDot(Film.scan)
                             Spacer(Modifier.width(10.dp))
                             Note(CHECKING.pick(hindi))
                         }
                         r?.result == null -> Callout(FAILED.pick(hindi))
-                        else -> Note(CHECKED.pick(hindi).replace("{time}", time(r.at, hindi)).replace("{n}", r.result.appsChecked.toString()))
+                        else -> Text(
+                            CHECKED.pick(hindi).replace("{time}", time(r.at, hindi)).replace("{n}", r.result.appsChecked.toString()),
+                            style = MaterialTheme.typography.labelMedium, color = Film.boneDim,
+                        )
                     }
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(12.dp))
                     ChipFlow {
                         Tag(NOT_ANTIVIRUS.pick(hindi), Film.warn)
                         Tag(ON_PHONE.pick(hindi), Film.clear)
                     }
-                    Spacer(Modifier.height(12.dp))
-                    PrimaryAction(RUN_NOW.pick(hindi), { runs++ }, enabled = !busy)
-                    Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        LanguageChip("English", !hindi) { hindi = false }
-                        LanguageChip("हिंदी", hindi) { hindi = true }
+                    Spacer(Modifier.height(16.dp))
+                    GradientAction(RUN_NOW.pick(hindi), { runs++ }, enabled = !busy, glyph = Glyph.SEARCH)
+                    Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
+                        LanguageToggle(hindi) { hindi = it }
                     }
                 }
 
-                val result = reading?.result
+                // First reading: placeholders shaped like the area cards, instead of blank space.
+                if (busy && r == null) {
+                    SkeletonCard(label = CHECKING.pick(hindi))
+                    SkeletonCard()
+                }
+
+                var order = 1
                 if (result != null) {
                     val found = result.sections.filter { it.count > 0 }
-                    if (found.isNotEmpty()) Note(TAP_APP.pick(hindi))
-                    found.forEach { AreaCard(it, hindi, onOpenApp) }
+                    if (found.isNotEmpty()) Row(verticalAlignment = Alignment.CenterVertically) {
+                        GlyphIcon(Glyph.CHEVRON_RIGHT, Film.scan, size = 16.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(TAP_APP.pick(hindi), style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
+                    }
+                    found.forEach { AreaCard(it, hindi, onOpenApp, Modifier.reveal(order++)) }
                     val quiet = result.sections.filter { it.count == 0 && it.readable }
-                    if (quiet.isNotEmpty()) SectionCard(title = NOT_FOUND.pick(hindi), glyph = Glyph.INFO, accent = Film.boneDim) {
-                        quiet.forEach { s ->
-                            Text("• ${s.area.title.pick(hindi)}", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(vertical = 2.dp))
-                            if (s.unknown > 0) Note(UNKNOWN_FOR.pick(hindi).replace("{n}", s.unknown.toString()))
+                    if (quiet.isNotEmpty()) SectionCard(Modifier.reveal(order++), title = NOT_FOUND.pick(hindi), glyph = Glyph.INFO, accent = Film.boneDim) {
+                        ChipFlow { quiet.forEach { s -> Tag(s.area.title.pick(hindi), Film.boneDim) } }
+                        // Unknown is never zero: each area Android did not fully report keeps its own visible line.
+                        quiet.filter { it.unknown > 0 }.forEach { s ->
+                            KeyCaveat("${s.area.title.pick(hindi)}: " + UNKNOWN_FOR.pick(hindi).replace("{n}", s.unknown.toString()), Modifier.padding(top = 8.dp), color = Film.boneDim)
                         }
                     }
                     result.notRead?.let { Callout(it.pick(hindi)) }
                 }
 
-                SectionCard(title = SCOPE_LABEL.pick(hindi), glyph = Glyph.INFO) {
+                CollapsibleCard(SCOPE_LABEL.pick(hindi), Modifier.reveal(order++), glyph = Glyph.INFO) {
                     Note((result?.scope ?: PhoneCheckup.SCOPE).pick(hindi))
                 }
 
-                SectionCard(title = WEEKLY.pick(hindi), glyph = Glyph.CLOCK) {
-                    SwitchRow(WEEKLY.pick(hindi), WEEKLY_DETAIL.pick(hindi), settings.weeklyCheckup, { v -> store.update { it.copy(weeklyCheckup = v) } })
-                    Hairline()
-                    Spacer(Modifier.height(8.dp))
-                    Note(lastWeekly?.let { LAST_WEEKLY.pick(hindi).replace("{time}", time(it, hindi)) } ?: NO_WEEKLY_YET.pick(hindi))
-                    Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                SectionCard(Modifier.reveal(order)) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        IconBadge(Glyph.CLOCK, Film.scan, size = 36.dp)
+                        Spacer(Modifier.width(12.dp))
+                        SwitchRow(WEEKLY.pick(hindi), WEEKLY_DETAIL.pick(hindi), settings.weeklyCheckup, { v -> store.update { it.copy(weeklyCheckup = v) } }, Modifier.weight(1f))
+                    }
+                    Hairline(Modifier.padding(vertical = 8.dp))
+                    FoldText(
+                        lastWeekly?.let { LAST_WEEKLY.pick(hindi).replace("{time}", time(it, hindi)) } ?: NO_WEEKLY_YET.pick(hindi),
+                        moreLabel = if (hindi) "और पढ़ें" else "More", lessLabel = if (hindi) "कम दिखाएँ" else "Less",
+                    )
+                    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         GlyphIcon(Glyph.LOCK, Film.clear, size = 18.dp)
                         Spacer(Modifier.width(8.dp))
                         Note(PRIVACY.pick(hindi), Film.clear)
@@ -218,23 +256,41 @@ fun CheckupScreen(onBack: () -> Unit, onOpenApp: (String) -> Unit) {
     }
 }
 
+/**
+ * One area with apps that hold it: what was counted (one line), the apps (tap to open APK Guard), the unknown count
+ * if any, and what to review behind one disclosure.
+ */
 @Composable
-private fun AreaCard(section: CheckupSection, hindi: Boolean, onOpenApp: (String) -> Unit) {
+private fun AreaCard(section: CheckupSection, hindi: Boolean, onOpenApp: (String) -> Unit, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     with(CheckupText) {
-        SectionCard(title = "${section.area.title.pick(hindi)} · ${section.count}", glyph = glyph(section.area), accent = Film.warn) {
-            Note(section.area.checks.pick(hindi))
-            Spacer(Modifier.height(6.dp))
+        SectionCard(
+            modifier, title = section.area.title.pick(hindi), glyph = glyph(section.area), accent = Film.warn,
+            trailing = { CountBubble(section.count, hindi) },
+        ) {
+            Text(section.area.checks.pick(hindi), style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
+            Spacer(Modifier.height(4.dp))
             section.apps.forEach { app -> AppRow(app) { onOpenApp(app.packageName) } }
-            if (section.unknown > 0) Note(UNKNOWN_FOR.pick(hindi).replace("{n}", section.unknown.toString()))
-            Spacer(Modifier.height(8.dp))
-            Text(WHAT_YOU_CAN_DO.pick(hindi), style = MaterialTheme.typography.labelLarge, color = Film.scan)
-            Text(section.area.review.pick(hindi), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 2.dp))
+            if (section.unknown > 0) KeyCaveat(UNKNOWN_FOR.pick(hindi).replace("{n}", section.unknown.toString()), color = Film.boneDim)
+            LearnMore(label = WHAT_YOU_CAN_DO.pick(hindi), openLabel = if (hindi) "कम दिखाएँ" else "Show less") {
+                Text(section.area.review.pick(hindi), style = MaterialTheme.typography.bodyMedium, color = Film.bone)
+            }
             AutoGuardRoutes.settingsAction(section.area)?.let { action ->
-                Spacer(Modifier.height(10.dp))
-                SecondaryAction(OPEN_SETTINGS.pick(hindi), { openSettings(ctx, action) }, Modifier.fillMaxWidth())
+                OutlineAction(OPEN_SETTINGS.pick(hindi), { openSettings(ctx, action) }, glyph = Glyph.SETTINGS)
             }
         }
+    }
+}
+
+/** The area's count in a tinted circle; TalkBack hears "N apps". */
+@Composable
+private fun CountBubble(n: Int, hindi: Boolean) {
+    Box(
+        Modifier.size(36.dp).clip(CircleShape).background(Film.warn.copy(alpha = 0.16f)).border(1.dp, Film.warn.copy(alpha = 0.5f), CircleShape)
+            .clearAndSetSemantics { contentDescription = if (hindi) "$n ऐप" else if (n == 1) "1 app" else "$n apps" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("$n", style = MaterialTheme.typography.titleMedium, color = Film.warn)
     }
 }
 
@@ -247,12 +303,12 @@ private fun AppRow(app: CheckupApp, onClick: () -> Unit) {
         }
     }
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(Radii.small)).clickable(role = Role.Button, onClick = onClick)
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).pressClickable(shape = RoundedCornerShape(Radii.small), onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         icon?.let { Image(it, contentDescription = null, modifier = Modifier.size(36.dp).clip(RoundedCornerShape(Radii.small))) }
-            ?: Spacer(Modifier.size(36.dp).clip(RoundedCornerShape(Radii.small)).background(Film.base))
+            ?: Spacer(Modifier.size(36.dp).clip(RoundedCornerShape(Radii.small)).background(FilmExtra.raisedHigh))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(app.label, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -262,19 +318,31 @@ private fun AppRow(app: CheckupApp, onClick: () -> Unit) {
     }
 }
 
+/** English / Hindi as one segmented pill; each half is a radio button for TalkBack. */
+@Composable
+private fun LanguageToggle(hindi: Boolean, onChange: (Boolean) -> Unit) {
+    val shape = RoundedCornerShape(24.dp)
+    Row(Modifier.clip(shape).background(Film.base.copy(alpha = 0.5f)).border(1.dp, Film.line, shape)) {
+        LanguageChip("English", !hindi) { onChange(false) }
+        LanguageChip("हिंदी", hindi) { onChange(true) }
+    }
+}
+
 @Composable
 private fun LanguageChip(text: String, selected: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(24.dp)
     Box(
-        Modifier.heightIn(min = 48.dp).clip(shape).background(if (selected) Film.scan else Film.base)
-            .border(1.dp, if (selected) Film.scan else Film.line, shape)
+        Modifier.heightIn(min = 48.dp).clip(shape).background(if (selected) Film.scan else Color.Transparent)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, style = MaterialTheme.typography.labelLarge, color = if (selected) Film.base else Film.bone)
     }
 }
+
+/** A faint wash of [c] from the top-left corner, fading into the card. */
+private fun tintWash(c: Color): Brush = Brush.linearGradient(listOf(c.copy(alpha = 0.20f), c.copy(alpha = 0.06f), Color.Transparent))
 
 private fun glyph(area: CheckupArea): Glyph = when (area) {
     CheckupArea.SMS -> Glyph.ASK
