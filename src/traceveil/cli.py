@@ -10,20 +10,27 @@ from pathlib import Path
 from . import (audit, EXIT_DEVICE, EXIT_PASS, EXIT_POLICY, EXIT_USAGE, __version__, adb, config, egress, netenv, report, shizuku)
 
 
+def _common(default) -> argparse.ArgumentParser:
+    """Options valid before or after the subcommand (`traceveil --adb X audit` and `traceveil audit --adb X`)."""
+    c = argparse.ArgumentParser(add_help=False)
+    c.add_argument("--config", default=default, help="path to traceveil.toml / traceveil.json")
+    c.add_argument("--serial", default=default, help="device serial (default: the only attached device, or $SERIAL)")
+    c.add_argument("--adb", default=default, help="adb binary (default: $ADB, PATH, then Windows adb.exe under WSL)")
+    c.add_argument("--timeout", type=float, default=20.0 if default is None else default, help="seconds per adb command")
+    return c
+
+
 def _parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="traceveil", description="Traceveil developer CLI (iQOO/Android over adb).")
+    p = argparse.ArgumentParser(prog="traceveil", description="Traceveil developer CLI (iQOO/Android over adb).", parents=[_common(None)])
     p.add_argument("--version", action="version", version=f"traceveil {__version__}")
-    p.add_argument("--config", help="path to traceveil.toml / traceveil.json")
-    p.add_argument("--serial", help="device serial (default: the only attached device, or $SERIAL)")
-    p.add_argument("--adb", help="adb binary (default: $ADB, PATH, then Windows adb.exe under WSL)")
-    p.add_argument("--timeout", type=float, default=20.0, help="seconds per adb command")
+    shared = _common(argparse.SUPPRESS)   # SUPPRESS: a subcommand only overrides the value when the flag is actually given
     sub = p.add_subparsers(dest="command", required=True)
 
-    d = sub.add_parser("doctor", help="check adb, device and Traceveil readiness (starts Shizuku over adb if it is down)")
+    d = sub.add_parser("doctor", parents=[shared], help="check adb, device and Traceveil readiness (starts Shizuku over adb if it is down)")
     d.add_argument("--no-start-shizuku", action="store_true", help="only report the Shizuku server state; do not start it")
-    sub.add_parser("init", help="write a traceveil.toml with defaults").add_argument("--force", action="store_true")
+    sub.add_parser("init", parents=[shared], help="write a traceveil.toml with defaults").add_argument("--force", action="store_true")
 
-    a = sub.add_parser("audit", help="run an audit on the phone (debug build), wait, and save its JSON report")
+    a = sub.add_parser("audit", parents=[shared], help="run an audit on the phone (debug build), wait, and save its JSON report")
     a.add_argument("--package", help="app to audit (default: target.package)")
     a.add_argument("--plans", help="comma list of silent,reject,accept (default: all three)")
     a.add_argument("--auto-drive", action="store_true", help="let Traceveil tap Accept/Reject itself (default: you tap on the phone)")
@@ -33,7 +40,7 @@ def _parser() -> argparse.ArgumentParser:
     a.add_argument("--json", action="store_true", help="print the JSON report instead of the summary")
     a.add_argument("--out", help="also write the JSON report to this file")
 
-    e = sub.add_parser("env", help="network-environment snapshot (VPN/proxy/geography signals)")
+    e = sub.add_parser("env", parents=[shared], help="network-environment snapshot (VPN/proxy/geography signals)")
     e.add_argument("--check-vpn", choices=config.CHECK_VPN_MODES, help="off | warn | fail (exit 5 on a likely VPN/proxy)")
     e.add_argument("--online-ip", action="store_true", help="one cached lookup to network.endpoint; sends the public IP to that service")
     e.add_argument("--egress-from", choices=("phone", "host"), default="phone",

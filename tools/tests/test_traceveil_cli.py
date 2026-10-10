@@ -560,5 +560,18 @@ class CliTests(unittest.TestCase):
             self.assertEqual(cli.main(["env"]), EXIT_DEVICE)
 
 
+class GlobalOptionPlacementTests(unittest.TestCase):
+    def test_device_options_work_before_or_after_the_subcommand(self):
+        p = cli._parser()
+        before = p.parse_args(["--adb", "X", "--serial", "S", "--timeout", "5", "audit", "--package", "a.b"])
+        after = p.parse_args(["audit", "--package", "a.b", "--adb", "X", "--serial", "S", "--timeout", "5"])
+        for a in (before, after):
+            self.assertEqual((a.adb, a.serial, a.timeout), ("X", "S", 5.0))
+
+    def test_unset_options_keep_their_defaults(self):
+        a = cli._parser().parse_args(["doctor"])
+        self.assertEqual((a.adb, a.serial, a.config, a.timeout), (None, None, None, 20.0))
+
+
 if __name__ == "__main__":
     unittest.main()
