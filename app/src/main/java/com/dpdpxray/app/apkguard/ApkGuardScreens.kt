@@ -4,8 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,6 +30,7 @@ import com.dpdpxray.app.ui.components.GroupHeader
 import com.dpdpxray.app.ui.components.Hairline
 import com.dpdpxray.app.ui.components.IconBadge
 import com.dpdpxray.app.ui.components.LearnMore
+import com.dpdpxray.app.ui.components.NavRow
 import com.dpdpxray.app.ui.components.SectionCard
 import com.dpdpxray.app.ui.components.SwitchRow
 import com.dpdpxray.app.ui.guide.Glyph
@@ -109,7 +108,7 @@ import java.util.Locale
 // --- hub ------------------------------------------------------------------------------------------------------------
 
 @Composable
-fun ApkGuardHubScreen(onBack: (() -> Unit)?, onOpenApp: (String) -> Unit, onOpenFile: (String) -> Unit) {
+fun ApkGuardHubScreen(onBack: (() -> Unit)?, onOpenApp: (String) -> Unit, onOpenFile: (String) -> Unit, onCheckup: (() -> Unit)? = null) {
     val ctx = LocalContext.current
     val store = remember(ctx) { ctx.graph.settings }
     val settings by store.settings.collectAsState()
@@ -155,11 +154,25 @@ fun ApkGuardHubScreen(onBack: (() -> Unit)?, onOpenApp: (String) -> Unit, onOpen
                     Note("Got an app file on WhatsApp or in Files? Tap it and choose TraceVeil, or share it to TraceVeil. TraceVeil only reads the file; it never installs it.")
                 }
             }
+            if (onCheckup != null) item(key = "checkup") {
+                SectionCard(Modifier.padding(top = 16.dp)) {
+                    NavRow(
+                        "My phone checkup",
+                        "Which installed apps can read SMS, control your screen, read notifications and more.",
+                        onCheckup,
+                        glyph = Glyph.CHECK,
+                    )
+                }
+            }
             item(key = "alerts") {
                 SectionCard(Modifier.padding(top = 16.dp), title = "New-install alerts", glyph = Glyph.BELL) {
-                    Note("While TraceVeil is running, it shows a notification asking you to check each newly installed app before you open it.")
+                    if (settings.autoCheckNewApps) {
+                        Note("TraceVeil looks for newly installed apps in the background, even when it is closed, and shows a notification asking you to check each one before you open it.")
+                    } else {
+                        Callout("Automatic new-app checks are off. Switch them on in Settings › Auto-guard.", Modifier.padding(bottom = 8.dp))
+                    }
                     LearnMore {
-                        Note("While TraceVeil is running, Android tells it when a new app is installed, and TraceVeil shows a notification asking you to check that app before you open it. Android keeps TraceVeil running in the background only while its consent watcher (accessibility service) is switched on; otherwise alerts appear only while TraceVeil is still open or recently used. TraceVeil never starts an audit, a VPN or anything else by itself.")
+                        Note("While TraceVeil is open, Android tells it at once when a new app is installed, and opening TraceVeil checks at once for apps installed while it was closed. When TraceVeil is closed, Android runs its background check about every 15 minutes; Android decides the exact time, and battery saving can delay it, more so if TraceVeil has not been opened for a while. If TraceVeil is force-stopped (by you or by the phone's battery manager), Android pauses the check until TraceVeil is opened again. Each install is alerted once, never for updates or apps that came with the phone. The check reads only what Android shows about the app, on this phone. TraceVeil never starts an audit, a VPN or anything else by itself.")
                     }
                     if (!notificationsAllowed) {
                         Callout("Notifications are off for TraceVeil, so new-install alerts cannot appear.", Modifier.padding(bottom = 8.dp))
@@ -515,12 +528,7 @@ private fun copy(ctx: Context, label: String, text: String) {
     Toast.makeText(ctx, "$label copied", Toast.LENGTH_SHORT).show()
 }
 
-private fun notificationsAllowed(ctx: Context): Boolean {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-        ctx.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-    ) return false
-    return ctx.getSystemService(android.app.NotificationManager::class.java)?.areNotificationsEnabled() != false
-}
+private fun notificationsAllowed(ctx: Context): Boolean = ApkInstallWatcher.notificationsAllowed(ctx)
 
 private fun openAlertSettings(ctx: Context) {
     ApkInstallWatcher.ensureChannel(ctx)

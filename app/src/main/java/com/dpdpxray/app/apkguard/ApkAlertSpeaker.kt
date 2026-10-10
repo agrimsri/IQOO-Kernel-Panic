@@ -22,8 +22,13 @@ object ApkAlertSpeaker {
     private val main = Handler(Looper.getMainLooper())
     private var current: TextToSpeech? = null
 
-    fun speak(context: Context, english: String, hindi: String) {
+    /**
+     * [onDone] runs once when speaking ends, fails or is skipped (no offline voice), so a background job can wait for
+     * the alert to finish before it lets Android stop TraceVeil. It may not run if a newer alert replaces this one.
+     */
+    fun speak(context: Context, english: String, hindi: String, onDone: (() -> Unit)? = null) {
         val app = context.applicationContext
+        val done = java.util.concurrent.atomic.AtomicBoolean(false)
         main.post {
             runCatching { current?.shutdown() }
             val audio = app.getSystemService(AudioManager::class.java)
@@ -39,6 +44,7 @@ object ApkAlertSpeaker {
                     runCatching { engine?.shutdown() }
                     if (current === engine) current = null
                 }
+                if (done.compareAndSet(false, true)) onDone?.invoke()
             }
             engine = TextToSpeech(app) { status ->
                 val tts = engine ?: return@TextToSpeech

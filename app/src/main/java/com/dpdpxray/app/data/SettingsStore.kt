@@ -24,6 +24,10 @@ data class XraySettings(
     val guideLanguage: String = "en",
     /** Everyday (USER) or Developer Home; a missing value reads as DEVELOPER so existing installs see no change. */
     val audience: Audience = Audience.DEFAULT,
+    /** Auto-guard: check newly installed apps in the background, even when TraceVeil is closed. On by default. */
+    val autoCheckNewApps: Boolean = true,
+    /** Auto-guard: weekly phone checkup notification. On by default. */
+    val weeklyCheckup: Boolean = true,
 )
 
 /** Read side of the stored settings, so the mapping can be tested without Android. */
@@ -55,6 +59,8 @@ internal object SettingsCodec {
         spokenGuidance = kv.getBoolean("spoken_guidance", defaults.spokenGuidance),
         guideLanguage = kv.getString("guide_language", defaults.guideLanguage),
         audience = Audience.of(kv.getString("audience", defaults.audience.code)),
+        autoCheckNewApps = kv.getBoolean("auto_check_new_apps", defaults.autoCheckNewApps),
+        weeklyCheckup = kv.getBoolean("weekly_checkup", defaults.weeklyCheckup),
     )
 
     fun write(s: XraySettings, sink: SettingsSink) {
@@ -68,6 +74,8 @@ internal object SettingsCodec {
         sink.putBoolean("spoken_guidance", s.spokenGuidance)
         sink.putString("guide_language", s.guideLanguage)
         sink.putString("audience", s.audience.code)
+        sink.putBoolean("auto_check_new_apps", s.autoCheckNewApps)
+        sink.putBoolean("weekly_checkup", s.weeklyCheckup)
     }
 }
 

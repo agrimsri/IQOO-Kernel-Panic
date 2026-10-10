@@ -40,6 +40,8 @@ import androidx.navigation.navArgument
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.automation.AutomationIntents
+import com.dpdpxray.app.autoguard.AutoGuardRoutes
+import com.dpdpxray.app.autoguard.CheckupScreen
 import com.dpdpxray.app.quarantine.QuarantineRoutes
 import com.dpdpxray.app.quarantine.QuarantineScreen
 import com.dpdpxray.app.quarantine.navigateToQuarantine
@@ -105,6 +107,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        graph.warmUpSemanticSearch()
+        // Auto-guard: alert at once for apps installed while TraceVeil was closed (once per process).
+        com.dpdpxray.app.autoguard.AutoGuard.onAppOpened(this)
         if (savedInstanceState == null) apkGuardRoute.value = ApkGuardIntents.route(this, intent)
         if (savedInstanceState == null && AutomationIntents.opensLive(intent)) openLiveCheck.value = true
         if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -265,13 +270,20 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("lab") { AiLabScreen(vm, onBack = { nav.popBackStack() }) }
                         composable("camera") { CameraCheckScreen(vm, onBack = { nav.popBackStack() }) }
-                        composable("settings") { SettingsScreen(vm, onBack = { nav.popBackStack() }) }
+                        composable("settings") {
+                            SettingsScreen(vm, onBack = { nav.popBackStack() }, onCheckup = { nav.navigate(AutoGuardRoutes.CHECKUP) })
+                        }
                         composable(ApkGuardRoutes.HUB) {
                             ApkGuardHubScreen(
                                 onBack = null,
                                 onOpenApp = { nav.navigate(ApkGuardRoutes.app(it)) },
                                 onOpenFile = { nav.navigate(ApkGuardRoutes.file(it)) },
+                                onCheckup = { nav.navigate(AutoGuardRoutes.CHECKUP) },
                             )
+                        }
+                        // Auto-guard "My phone checkup"; also opened by its weekly notification.
+                        composable(AutoGuardRoutes.CHECKUP) {
+                            CheckupScreen(onBack = { nav.popBackStack() }, onOpenApp = { nav.navigate(ApkGuardRoutes.app(it)) })
                         }
                         composable(ApkGuardRoutes.APP) { e ->
                             ApkGuardResultScreen(

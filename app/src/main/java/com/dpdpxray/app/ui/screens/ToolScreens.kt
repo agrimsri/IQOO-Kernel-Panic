@@ -269,7 +269,7 @@ private fun VerdictLine(text: String, problem: Boolean, known: Any?, inverted: B
 }
 
 @Composable
-fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit) {
+fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit, onCheckup: (() -> Unit)? = null) {
     val s by vm.settings.collectAsState()
     Column(Modifier.fillMaxSize()) {
         TopBar("Settings", onBack)
@@ -290,6 +290,8 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit) {
                 Hairline()
                 SwitchRow("Speak APK Guard alerts", "Reads new-install alerts aloud with an installed offline voice. Off by default.", s.speakApkGuardAlerts, { v -> vm.updateSettings { it.copy(speakApkGuardAlerts = v) } })
             }
+            // Auto-guard: background new-app check and weekly phone checkup (switches, status, disclosure).
+            com.dpdpxray.app.autoguard.AutoGuardSettingsCard(onCheckup)
 
             SectionCard(title = "Your own domains", glyph = Glyph.PRIVATE_DNS) {
                 if (s.firstPartyDomains.isEmpty()) Note("None yet. Long-press a host on any timeline to add it.")
