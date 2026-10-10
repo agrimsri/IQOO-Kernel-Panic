@@ -278,7 +278,11 @@ fun Callout(
     title: String? = null,
     glyph: Glyph = Glyph.WARN,
     detail: String? = null,
+    /** Show only [text]'s first sentence and fold the rest behind More (ignored when [detail] is given). */
+    fold: Boolean = false,
 ) {
+    val lead = if (fold && detail == null) remember(text) { leadSentence(text) } else text
+    val more = detail ?: if (fold && lead.length < text.trim().length) text.trim().substring(lead.length).trim() else null
     val shape = RoundedCornerShape(Radii.row)
     Row(
         modifier.fillMaxWidth().clip(shape)
@@ -292,11 +296,11 @@ fun Callout(
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             if (title != null) Text(title, style = MaterialTheme.typography.titleSmall, color = color)
-            Text(text, style = MaterialTheme.typography.bodyMedium, color = Film.bone)
-            if (detail != null) {
-                var open by rememberSaveable(detail) { mutableStateOf(false) }
+            Text(lead, style = MaterialTheme.typography.bodyMedium, color = Film.bone)
+            if (more != null) {
+                var open by rememberSaveable(more) { mutableStateOf(false) }
                 Column(Modifier.animateContentSize(foldSpec())) {
-                    if (open) Text(detail, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 6.dp))
+                    if (open) Text(more, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 6.dp))
                     DisclosureRow(open, "More", "Less", { open = !open }, color = color, glyph = null)
                 }
             }
