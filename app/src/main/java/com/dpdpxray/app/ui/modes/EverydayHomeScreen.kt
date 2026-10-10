@@ -64,6 +64,7 @@ import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.control.DeviceChecks
 import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.data.AuditMeta
+import com.dpdpxray.app.trust.HomeTrustCard
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.ChipFlow
 import com.dpdpxray.app.ui.components.DisclosureRow
@@ -231,11 +232,8 @@ fun EverydayHomeScreen(
                     StatusPill(EverydayCopy.alertLabel(alertStatus, settings.speakApkGuardAlerts).pick(lang), color)
                 },
             )
-            if (onTrust != null) FrontCard(
-                EverydayCopy.trust, lang, accent = Film.clear, modifier = Modifier.reveal(4),
-                icon = { GlyphIcon(Glyph.LOCK, it, size = 24.dp) },
-                onClick = onTrust,
-            )
+            // The trust card: four code-checked facts and the live permission line; it opens the full trust page.
+            if (onTrust != null) HomeTrustCard(lang, onTrust, Modifier.reveal(4))
         }
 
         GroupHeader(EverydayCopy.recentTitle.pick(lang)) {
