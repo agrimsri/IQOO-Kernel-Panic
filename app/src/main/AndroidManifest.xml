@@ -46,10 +46,17 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- APK Guard: offered when the user opens or shares an .apk file (WhatsApp, Files).
-                 TraceVeil only reads the file to explain it; it never installs anything. -->
+            <!-- APK Guard "check before install": offered when the user opens or shares an .apk file (Chrome downloads,
+                 Files, WhatsApp). TraceVeil reads the file and explains it; it installs it only if the person taps
+                 "Install anyway" and then confirms in Android's own installer. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/vnd.android.package-archive" />
+            </intent-filter>
+            <!-- Some file managers still send the deprecated INSTALL_PACKAGE action when an APK is tapped. -->
+            <intent-filter>
+                <action android:name="android.intent.action.INSTALL_PACKAGE" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="content" android:mimeType="application/vnd.android.package-archive" />
             </intent-filter>
