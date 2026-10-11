@@ -49,4 +49,4 @@ On Linux/macOS, the wrapper now has Git executable mode `100755`:
 
 CI runs the full `:core:test` suite, not an APK/device acceptance test. It downloads the pinned build dependencies; `--offline` is only appropriate for a populated local cache. Teammates keep their existing feature branches and ownership. Once N2 is reviewed and merged, pull `main` and preserve published history when updating branches.
 
-See [device verification](VERIFICATION.md) for actual phone evidence and known failures, [attributions](../ATTRIBUTIONS.md) for dependency decisions, and [provenance](../PROVENANCE.md) for the pending organiser ruling. Local passing commands are not a claim that hosted GitHub Actions or either teammate's phone has passed.
+See [attributions](../ATTRIBUTIONS.md) for dependency decisions, and [provenance](../PROVENANCE.md) for the pending organiser ruling. Local passing commands are not a claim that hosted GitHub Actions or either teammate's phone has passed.

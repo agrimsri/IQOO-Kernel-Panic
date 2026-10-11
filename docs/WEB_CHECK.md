@@ -174,5 +174,5 @@ Use a phone with this build installed; no VPN or consent-watcher setup is needed
 5. Trust screen: "Website check, only when you start one" and "Server addresses for the map, after a website check"
    appear under TraceVeil's own network use; Permissions & background lists "Website check browser" as information.
 
-Record the build hash, the sites, the date and what each result showed in docs/VERIFICATION.md; do not call a site
+Record the build hash, the sites, the date and what each result showed in your test notes; do not call a site
 safe or compliant from a result.

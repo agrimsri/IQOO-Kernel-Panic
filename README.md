@@ -6,8 +6,6 @@ This repository starts from the existing DPDP X-Ray baseline, developed before t
 
 Screenshots below show the original baseline and may display its former product name.
 
-Current team setup and work split: [teammate handoff](docs/TEAM_HANDOFF.md), [active milestones](docs/planning/IMPLEMENTATION_MILESTONES.md), and [device verification](docs/VERIFICATION.md). Agrim starts the evidence contracts; Yashvi starts Voice Copilot; Nitya integrates their tested components. The handoff documents known AI failures and unfinished features.
-
 **Testing safety:** audit configuration defaults to keeping data and manual consent choices. The setup screen presets automation/reset only for the two controlled demo apps. Clearing another test app's data requires an explicit reset choice and Shizuku; keep that choice off for personal apps. Real-app observation is limited: it does not inspect encrypted payloads or provide comprehensive fraud protection, automatic permission interception or a background wake word. DNS observations and scores are not legal certification.
 
 **An on-device privacy auditor for Android apps. It checks consent first, then reads the evidence through a legal lens: India's DPDP Act 2023 (its first and deepest corpus), the EU, the UK, California, US children's law, Brazil, Singapore, or a global good-practice baseline.**

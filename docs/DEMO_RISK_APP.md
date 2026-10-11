@@ -18,7 +18,6 @@
 1. **Send the APK to the phone with Office Kit.**
    - Use Office Kit's file transfer to send `riskdemo-debug.apk` from the laptop.
    - Point out that this is how the lures arrive: an APK file in a message or a shared folder, not from Google Play.
-   - Office Kit file-transfer acceptance is still an open item in `docs/NEXT_WORK.md`. Confirm it works on the demo phone during rehearsal.
 
 2. **Open it with TraceVeil before installing (APK Guard).**
    - From the received file, choose **Open with** or **Share** and pick TraceVeil.

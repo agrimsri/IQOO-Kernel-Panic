@@ -50,4 +50,3 @@ The app-owned `SampleReport` prefix preserves the synthetic notes through the sa
 gradlew.bat --offline :core:test :app:testDebugUnitTest :app:assembleDebug :leakyshop:assembleLeakyDebug :leakyshop:assembleFixedDebug --rerun-tasks --console=plain
 ```
 
-The dated phone checks and remaining acceptance checks are recorded in [VERIFICATION.md](VERIFICATION.md). Merge this branch into `main` before teammates pull the shared checkpoint; do not reset a teammate's uncommitted work to adopt these fixtures.

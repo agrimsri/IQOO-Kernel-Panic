@@ -7,7 +7,7 @@ Written 10 October 2026. Labels: **MEASURED** means observed on Nitya's iQOO 15 
 - **Findings and scores** come from fixed Kotlin rules in `:core` (`RulesEngine`, `ScoreCalculator`). Network evidence (DNS lookups, timing, UID bytes) never goes through a model.
 - **Consent screens:** the accessibility-tree auditor (`DeterministicScreenAuditor`) runs first. `ScreenAuditMerger` keeps every field the tree OBSERVED. The model's opinion is used only for fields the tree did not observe. A finding built on such a field is labelled INFERRED, counts half in the score, and any tree/model disagreement is shown in the evidence.
 - **Explanations and Hindi summaries** are generated only from the finding and its cited DPDP passages. When the model is missing or silent, the app says so ("The model returned no text"). It never makes up a substitute.
-- **Why:** an auditor's verdict must be repeatable and explainable. A 2B on-device model is not reliable enough to decide compliance, and the model was not answering at all on the test phone (see [AI_EMPTY_REPLY_DIAGNOSIS.md](AI_EMPTY_REPLY_DIAGNOSIS.md)). The rules keep working with no model installed.
+- **Why:** an auditor's verdict must be repeatable and explainable. A 2B on-device model is not reliable enough to decide compliance. The rules keep working with no model installed.
 - **Demo consequence:** now that the model may start answering, it can add INFERRED screen findings that move a live score. Measure this on the controlled demo apps before relying on 21/100 and 100/100 with AI loaded.
 
 ## 2. Current model: Gemma 4 E2B on LiteRT-LM
@@ -40,7 +40,7 @@ The costs:
 | Option | What it is | Possible use in TraceVeil | Why not now | Status |
 | --- | --- | --- | --- | --- |
 | **Gemini Nano via the ML Kit GenAI Prompt API** | Closed model managed and updated by Android AICore. Google's device table lists **iQOO 15 under nano-v3** (SOURCE: [ML Kit GenAI overview](https://developers.google.com/ml-kit/genai), read 10 Oct 2026). Inference only while the app is in the foreground; AICore enforces per-app and battery quotas. The Prompt API was announced as alpha ([Android Developers Blog, Oct 2025](https://android-developers.googleblog.com/2025/10/ml-kit-genai-prompt-api-alpha-release.html)). | Optional second engine for text explanations on listed phones, with no model download by the user. | Weights are closed and their version is chosen by AICore, so answers cannot be pinned or reproduced. It covers only listed phones. It would add a new dependency and terms review. | UNVERIFIED on the team's phones: whether AICore has the model ready, image input on nano-v3, latency. |
-| **Gemma 3 1B IT, SM8850 NPU bundle** (`Gemma3-1B-IT_q4_ekv1280_sm8850.litertlm`, about 694 MB) | Text-only model compiled for the Hexagon NPU of this exact chip | Isolated text-explanation experiment and an NPU speed comparison | Needs the Gemma Terms accepted by a team member, Qualcomm dispatch/QNN V81 libraries that our APK does not package, and a check of its 1280-token context. Text-only, so it must never get screenshots. | Candidate only; see [NPU_RECOMMENDATION.md](NPU_RECOMMENDATION.md). Not downloaded or tested. |
+| **Gemma 3 1B IT, SM8850 NPU bundle** (`Gemma3-1B-IT_q4_ekv1280_sm8850.litertlm`, about 694 MB) | Text-only model compiled for the Hexagon NPU of this exact chip | Isolated text-explanation experiment and an NPU speed comparison | Needs the Gemma Terms accepted by a team member, Qualcomm dispatch/QNN V81 libraries that our APK does not package, and a check of its 1280-token context. Text-only, so it must never get screenshots. | Candidate only. Not downloaded or tested. |
 | **Qwen3 0.6B via Qualcomm AI Hub / Genie** | Small multilingual text model on Qualcomm's own runtime | Possible small multilingual text helper | Not a `.litertlm` bundle: it needs a second runtime (Genie/QAIRT), its own licence review and device validation | UNVERIFIED; licence not re-read today |
 | **EmbeddingGemma** (about 308M) | Text embedding model, Gemma Terms | Semantic retrieval of DPDP passages (`EmbeddingRetriever` already loads any `*embed*` bundle) | Optional: BM25 keyword search works offline without it. On the phone, retrieval used the BM25 fallback. | Wired, not installed or measured |
 
@@ -73,4 +73,4 @@ The costs:
   - EmbeddingGemma retrieval quality
   - behaviour on Agrim's and Yashvi's phones
 
-Record each of these in VERIFICATION.md as it is measured, including failures.
+Record each of these as it is measured, including failures.
