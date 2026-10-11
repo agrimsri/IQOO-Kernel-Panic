@@ -130,6 +130,12 @@
             android:name=".autoguard.PhoneCheckupJobService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+        <!-- Auto-guard downloads watcher: a content-URI job on MediaStore Downloads. It asks Android only for the
+             type of each new download and never reads files. -->
+        <service
+            android:name=".autoguard.DownloadsJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
         <!-- APK Guard "Install anyway": Android's installer reports the session result here, only through
              TraceVeil's own PendingIntent (no intent filter). -->
         <receiver

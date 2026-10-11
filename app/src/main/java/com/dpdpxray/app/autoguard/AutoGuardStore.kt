@@ -7,7 +7,8 @@ import androidx.core.content.edit
  * Auto-guard's own small state, kept apart from the user settings: where the new-app check left off (the change
  * sequence and the apps installed at the last check, as package names and install times), which installs
  * were already alerted (shared with the live install receiver, so one install is never alerted twice), which updates
- * of checked apps were alerted (package and version code, likewise shared), and when each
+ * of checked apps were alerted (package and version code, likewise shared), which new APK downloads were alerted
+ * (MediaStore ids only, never file names), and when each
  * background job last ran (shown in Settings so a person can see the checks are running). Stays on the phone.
  */
 class AutoGuardStore(context: Context) {
@@ -75,6 +76,16 @@ class AutoGuardStore(context: Context) {
         prefs.edit(commit = true) { putStringSet(K_UPDATE_LEDGER, UpdateAlertLedger.encode(ledger)) }
     }
 
+    // --- downloads watcher: which new APK downloads were alerted (MediaStore ids) ------------------------------------
+
+    fun alertedDownloads(): Set<String> = DownloadsWatch.decode(prefs.getString(K_DOWNLOADS, null)).toSet()
+
+    /** Records alerted downloads, keeping the most recent [DownloadsWatch.LEDGER_LIMIT]. */
+    fun recordDownloads(keys: List<String>) = synchronized(LOCK) {
+        val next = DownloadsWatch.record(DownloadsWatch.decode(prefs.getString(K_DOWNLOADS, null)), keys)
+        prefs.edit(commit = true) { putString(K_DOWNLOADS, DownloadsWatch.encode(next)) }
+    }
+
     /** When the background job (not an in-app check) last finished a new-app check. */
     val newAppsLastRunAt: Long? get() = prefs.getLong(K_NEW_APPS_LAST_RUN, 0L).takeIf { it > 0L }
     val checkupLastRunAt: Long? get() = prefs.getLong(K_CHECKUP_LAST_RUN, 0L).takeIf { it > 0L }
@@ -96,5 +107,6 @@ class AutoGuardStore(context: Context) {
         const val K_NEW_APPS_LAST_RUN = "new_apps_last_run"
         const val K_CHECKUP_LAST_RUN = "checkup_last_run"
         const val K_CHECKUP_TO_REVIEW = "checkup_last_to_review"
+        const val K_DOWNLOADS = "alerted_downloads"
     }
 }

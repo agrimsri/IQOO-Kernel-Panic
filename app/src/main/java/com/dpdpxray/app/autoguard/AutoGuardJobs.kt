@@ -4,6 +4,7 @@ import android.app.job.JobInfo
 import android.app.job.JobScheduler
 import android.content.ComponentName
 import android.content.Context
+import android.provider.MediaStore
 
 /**
  * The platform JobScheduler jobs behind Auto-guard (no extra library). Job ids are fixed so a tester can force one:
@@ -19,6 +20,15 @@ object AutoGuardJobs {
     const val NEW_APPS_NOW = 4102
     /** Weekly phone checkup. */
     const val WEEKLY_CHECKUP = 4103
+    /**
+     * Downloads watcher: a one-shot content-URI job that Android runs when something changes in MediaStore Downloads.
+     * It is scheduled again after every run. Content-URI jobs cannot be persisted, so a restart, an update of TraceVeil
+     * and every app start schedule it again ([AutoGuardBootReceiver], [AutoGuard.start]).
+     */
+    const val DOWNLOADS_TRIGGER = 4104
+    /** Wait this long after the last change before running, so a download that finishes in a burst is seen once. */
+    const val DOWNLOADS_UPDATE_DELAY_MS = 3_000L
+    const val DOWNLOADS_MAX_DELAY_MS = 30_000L
 
     const val NEW_APPS_INTERVAL_MS = 15 * 60_000L
     const val NEW_APPS_FLEX_MS = 5 * 60_000L
@@ -68,6 +78,25 @@ object AutoGuardJobs {
         if (NEW_APPS_PERIODIC in plan.keep) ensurePeriodic(js, context, NEW_APPS_PERIODIC, NewAppCheckJobService::class.java, NEW_APPS_INTERVAL_MS, NEW_APPS_FLEX_MS, batteryNotLow = true)
         if (WEEKLY_CHECKUP in plan.keep) ensurePeriodic(js, context, WEEKLY_CHECKUP, PhoneCheckupJobService::class.java, CHECKUP_INTERVAL_MS, CHECKUP_FLEX_MS, batteryNotLow = true)
         if (newApps && runNewAppCheckNow) runNewAppCheckSoon(context)
+    }
+
+    /**
+     * Schedules (or cancels) the downloads watcher. [again] forces a new schedule after a run, because a content-URI job
+     * fires once. It needs no storage permission and asks Android only for the type of each changed Downloads item.
+     */
+    fun syncDownloads(context: Context, enabled: Boolean, again: Boolean = false) {
+        val js = context.getSystemService(JobScheduler::class.java) ?: return
+        if (!enabled) {
+            runCatching { js.cancel(DOWNLOADS_TRIGGER) }
+            return
+        }
+        if (!again && runCatching { js.getPendingJob(DOWNLOADS_TRIGGER) }.getOrNull() != null) return
+        val job = JobInfo.Builder(DOWNLOADS_TRIGGER, ComponentName(context, DownloadsJobService::class.java))
+            .addTriggerContentUri(JobInfo.TriggerContentUri(MediaStore.Downloads.EXTERNAL_CONTENT_URI, JobInfo.TriggerContentUri.FLAG_NOTIFY_FOR_DESCENDANTS))
+            .setTriggerContentUpdateDelay(DOWNLOADS_UPDATE_DELAY_MS)
+            .setTriggerContentMaxDelay(DOWNLOADS_MAX_DELAY_MS)
+            .build()
+        runCatching { js.schedule(job) }
     }
 
     /** Queues one new-app check to run within seconds (Android may delay it, for example in battery saver). */

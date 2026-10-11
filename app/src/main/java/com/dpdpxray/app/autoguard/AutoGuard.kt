@@ -12,8 +12,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Auto-guard keeps TraceVeil's checks going without the person opening the app: a new-app check about every
- * 15 minutes and a weekly phone checkup, both through Android's JobScheduler, both switchable in Settings and both
- * on by default. Everything runs on this phone; nothing is sent anywhere.
+ * 15 minutes, a weekly phone checkup and a watcher for new APK files in Downloads, all through Android's JobScheduler,
+ * all switchable in Settings and all on by default. Everything runs on this phone; nothing is sent anywhere.
  */
 object AutoGuard {
     @Volatile private var started = false
@@ -37,6 +37,12 @@ object AutoGuard {
                 val runNow = AutoGuardJobs.runNewAppCheckNow(previous, newApps, lastRun, System.currentTimeMillis())
                 runCatching { AutoGuardJobs.sync(app, newApps, weekly, runNewAppCheckNow = runNow) }
                 previous = newApps
+            }
+        }
+        // The downloads watcher is a one-shot content-URI job that cannot be persisted: every app start schedules it.
+        graph.scope.launch {
+            graph.settings.settings.map { it.checkApkDownloads }.distinctUntilChanged().collect { on ->
+                runCatching { AutoGuardJobs.syncDownloads(app, on) }
             }
         }
     }
@@ -66,5 +72,6 @@ class AutoGuardBootReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
         val settings = runCatching { context.graph.settings.settings.value }.getOrNull() ?: return
         runCatching { AutoGuardJobs.sync(context, settings.autoCheckNewApps, settings.weeklyCheckup, runNewAppCheckNow = true) }
+        runCatching { AutoGuardJobs.syncDownloads(context, settings.checkApkDownloads) }
     }
 }

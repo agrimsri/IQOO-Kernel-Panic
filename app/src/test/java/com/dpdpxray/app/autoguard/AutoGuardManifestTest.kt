@@ -21,8 +21,8 @@ class AutoGuardManifestTest {
     private fun Element.children(tag: String): List<Element> =
         (0 until childNodes.length).map { childNodes.item(it) }.filterIsInstance<Element>().filter { it.tagName == tag }
 
-    @Test fun `both job services are private and bindable only by the job scheduler`() {
-        listOf(".autoguard.NewAppCheckJobService", ".autoguard.PhoneCheckupJobService").forEach { name ->
+    @Test fun `all job services are private and bindable only by the job scheduler`() {
+        listOf(".autoguard.NewAppCheckJobService", ".autoguard.PhoneCheckupJobService", ".autoguard.DownloadsJobService").forEach { name ->
             val service = elements("service").single { it.a("name") == name }
             assertEquals(name, "false", service.a("exported"))
             assertEquals(name, "android.permission.BIND_JOB_SERVICE", service.a("permission"))
@@ -47,6 +47,19 @@ class AutoGuardManifestTest {
             "android.permission.BIND_DEVICE_ADMIN",
             "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
             "android.permission.SCHEDULE_EXACT_ALARM",
+        ).forEach { assertFalse("$it must not be requested", it in permissions) }
+    }
+
+    @Test fun `the downloads watcher needs no storage permission`() {
+        val permissions = elements("uses-permission").map { it.a("name") }.toSet()
+        listOf(
+            "android.permission.READ_EXTERNAL_STORAGE",
+            "android.permission.WRITE_EXTERNAL_STORAGE",
+            "android.permission.MANAGE_EXTERNAL_STORAGE",
+            "android.permission.READ_MEDIA_IMAGES",
+            "android.permission.READ_MEDIA_VIDEO",
+            "android.permission.READ_MEDIA_AUDIO",
+            "android.permission.ACCESS_MEDIA_LOCATION",
         ).forEach { assertFalse("$it must not be requested", it in permissions) }
     }
 }
