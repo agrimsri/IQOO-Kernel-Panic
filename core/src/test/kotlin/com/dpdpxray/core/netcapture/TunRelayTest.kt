@@ -171,7 +171,8 @@ class TunRelayTest {
         send(isn + 1, iss + 2, TcpFlags.FIN or TcpFlags.ACK)
         assertEquals(isn + 2, next()!!.tcp!!.ack)
         val deadline = System.currentTimeMillis() + 2000
-        while (relay.activeTcp() > 0 && System.currentTimeMillis() < deadline) Thread.sleep(20)
+        // The flow is freed on the tunnel thread; the half-close reaches the server on the writer thread a moment later.
+        while ((relay.activeTcp() > 0 || !server.outputShut) && System.currentTimeMillis() < deadline) Thread.sleep(20)
         assertEquals(0, relay.activeTcp()); assertTrue(server.outputShut)
     }
 
