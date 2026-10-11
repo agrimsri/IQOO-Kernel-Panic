@@ -27,3 +27,12 @@ traceveil --adb "$ADB" audit \
   --auto-drive \
   --reset
 # Expected: exit code 0 according to demo.sh; this result has not yet been verified via the installed pip package.
+
+# 6. Audit any app straight from its file (.apk, or .xapk/.apks/.apkm split bundle):
+#    Traceveil reads the package name, installs it (skipped if that version is already there) and audits it.
+#    The report also lists the SDKs bundled in the APK next to what the audit saw live. No --reset for apps you do not own.
+traceveil --adb "$ADB" audit \
+  --path "/home/yashvi/codes/ideation/dpdp-xray/My+Talking+Tom+2_0.7_APKPure.xapk" \
+  --auto-drive \
+  --out talking-tom-report.json
+traceveil fix --report talking-tom-report.json --out talking-tom-fixes.md
