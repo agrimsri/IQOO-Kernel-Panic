@@ -285,6 +285,8 @@ class MainActivity : ComponentActivity() {
                                 onReport = { nav.navigate("report/$id") },
                                 onAsk = { nav.navigate(AuditRoutes.voice(id)) },
                                 onCheckAgain = { if (vm.prepareAudit { nav.navigate("pick") { popUpTo("home") } }) nav.navigate("pick") { popUpTo("home") } },
+                                onLive = { nav.navigate("live") { popUpTo("home") } },
+                                onQuarantine = { nav.navigateToQuarantine(it) },
                             )
                         }
                         composable("finding/{id}/{check}") { e ->

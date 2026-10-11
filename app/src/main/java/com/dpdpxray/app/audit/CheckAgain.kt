@@ -9,7 +9,7 @@ import com.dpdpxray.core.model.AuditSession
  * is offered for every app; a reset clears it and is offered only for an app the person develops (a debuggable build,
  * the LeakyShop demo, or one on the developer-runner reset list), never for a system app, and only after they confirm.
  */
-internal object CheckAgain {
+object CheckAgain {
     enum class Mode { RESTART, RESET }
 
     val CONTROLLED_DEMOS = setOf("com.leakyshop.demo", "com.leakyshop.demo.fixed")

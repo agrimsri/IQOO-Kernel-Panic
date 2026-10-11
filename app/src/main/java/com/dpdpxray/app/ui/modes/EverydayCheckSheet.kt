@@ -92,7 +92,7 @@ internal fun EverydayCheckSetup(
         Text(step.body.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
         Column(Modifier.padding(top = 4.dp).reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             PlanOption(
-                c.quickTitle.pick(lang), (if (freshReset) c.quickDetailFresh else c.quickDetail).pick(lang),
+                c.quickTitle.pick(lang), (if (freshReset) c.quickDetailFresh else if (shizukuReady) c.quickDetailRestart else c.quickDetail).pick(lang),
                 selected = choice == CheckChoice.QUICK, enabled = true, lang = lang,
             ) { choice = CheckChoice.QUICK }
             SwitchRow(c.agentTitle.pick(lang), c.agentDetail.pick(lang), agent, { agent = it })

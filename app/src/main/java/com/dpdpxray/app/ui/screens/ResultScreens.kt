@@ -167,6 +167,10 @@ fun ResultsScreen(
     vm: XrayViewModel, id: String, onBack: () -> Unit, onFinding: (CheckId) -> Unit, onFixes: () -> Unit, onReport: () -> Unit, onAsk: () -> Unit,
     /** Starts a new check from the app picker; when null, "Check again" falls back to going back. */
     onCheckAgain: (() -> Unit)? = null,
+    /** Shows the live check started by a one-tap "Check again with a restart" (or a confirmed reset). */
+    onLive: () -> Unit = {},
+    /** Opens the internet-cut-off run for this app, which lists the addresses it tries. */
+    onQuarantine: (String) -> Unit = {},
 ) {
     WithBundle(vm, id) { b ->
         val r = b.result
@@ -228,6 +232,11 @@ fun ResultsScreen(
                     freshHint?.let { Notice(it, kind = NoticeKind.CAUTION) }
                 }
 
+                // Why there is no score and what one tap can try next; then which steps needed the person.
+                NoScoreSection(vm, b, lang, onLive, onQuarantine, Modifier.padding(top = 20.dp))
+                BlockedStepsSection(b, lang, Modifier.padding(top = 20.dp))
+                val noScorePrimary = remember(b.meta.id) { NoScoreHelp.hasPrimary(b) }
+
                 val act: (NextAction) -> Unit = { action ->
                     when (action) {
                         NextAction.SEE_EVIDENCE -> r.findings.firstOrNull()?.let { onFinding(it.checkId) }
@@ -237,7 +246,11 @@ fun ResultsScreen(
                         NextAction.REPORT -> onReport()
                     }
                 }
-                ResultActions(explanation.next, lang, act, Modifier.padding(top = 20.dp).reveal(2))
+                ResultActions(
+                    // The section above already offers checking again, as the one filled button.
+                    if (noScorePrimary) explanation.next.filterNot { it.action == NextAction.CHECK_AGAIN } else explanation.next,
+                    lang, act, Modifier.padding(top = 20.dp).reveal(2), primary = !noScorePrimary,
+                )
 
                 GroupHeader(ResultCopy.findings.pick(lang)) {
                     if (r.findings.isNotEmpty()) Text("${r.findings.size}", style = MaterialTheme.typography.labelLarge, color = Film.boneDim)
@@ -410,7 +423,7 @@ private fun headline(findings: List<Finding>): String {
     val c2 = findings.firstOrNull { it.checkId == CheckId.C2 }
     val v0 = findings.any { it.checkId == CheckId.V0 }
     return when {
-        v0 -> "Too few lookups were captured to judge this app. See the first finding for how to re-run."
+        v0 -> "Too few lookups were captured to judge this app. Why, and what to try next, is just below."
         com.dpdpxray.core.rules.Inconclusive.reason(findings) == com.dpdpxray.core.rules.Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN ->
             "No score: this app kept its data, so whether consent came before its tracker lookups is unknown " +
                 "(${findings.first { it.checkId == CheckId.U1 }.entities.joinToString()}). Run a Full check on a test install."
@@ -496,8 +509,18 @@ private fun nextGlyph(a: NextAction) = when (a) {
  * first, recommended step is the one filled button; the rest are plain rows in one group.
  */
 @Composable
-private fun ResultActions(next: List<NextStep>, lang: GuideLang, onAction: (NextAction) -> Unit, modifier: Modifier = Modifier) {
+private fun ResultActions(next: List<NextStep>, lang: GuideLang, onAction: (NextAction) -> Unit, modifier: Modifier = Modifier, primary: Boolean = true) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (!primary) {
+            // Another section holds the screen's one filled action: every step is a plain row.
+            if (next.isNotEmpty()) Group {
+                next.forEachIndexed { i, step ->
+                    if (i > 0) GroupDivider()
+                    ListRow(step.title.pick(lang), subtitle = step.reason.pick(lang), onClick = { onAction(step.action) })
+                }
+            }
+            return@Column
+        }
         next.firstOrNull()?.let {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 PrimaryButton(it.title.pick(lang), { onAction(it.action) })
