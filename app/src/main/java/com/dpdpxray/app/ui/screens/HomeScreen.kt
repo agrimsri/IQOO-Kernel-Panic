@@ -105,6 +105,8 @@ object HomeCopy {
     fun checking(app: String) = Bi("Checking $app", "$app की जाँच हो रही है")
     val fix = Bi("Fix", "ठीक करें")
     val allow = Bi("Allow", "अनुमति दें")
+    val manage = Bi("Manage", "प्रबंधित करें")
+    val readyManage = Bi("Manage setup", "सेटअप प्रबंधित करें")
 }
 
 private const val RECENT_ON_HOME = 3
@@ -170,6 +172,15 @@ fun HomeScreen(
             SetupKind.SHIZUKU -> vm.requestShizuku()
         }
     }
+    // Everything on is not the end of it: each item stays reachable here so it can be turned off again (the system screen does the revoking).
+    val manage: (SetupKind) -> Unit = { kind ->
+        when (kind) {
+            SetupKind.VPN -> DeviceChecks.openVpnSettings(ctx)
+            SetupKind.WATCHER -> DeviceChecks.openAccessibilitySettings(ctx)
+            SetupKind.PRIVATE_DNS -> DeviceChecks.openPrivateDnsSettings(ctx)
+            SetupKind.SHIZUKU -> DeviceChecks.openShizuku(ctx)
+        }
+    }
     // Same gate as before; when it is not met the sheet explains what is missing instead of a dead button.
     val startCheck = { if (pf.canAudit && vm.prepareAudit()) onAudit() else showSetup = true }
 
@@ -207,6 +218,8 @@ fun HomeScreen(
                         com.dpdpxray.app.ui.system.StatusDot(Film.clear)
                         Spacer(Modifier.size(8.dp))
                         Text(EverydayCopy.ready.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                        Spacer(Modifier.size(12.dp))
+                        TextAction(HomeCopy.readyManage.pick(lang) + "  ›", { showSetup = true })
                     } else {
                         TextAction(HomeCopy.stepsToFinish(todo.size).pick(lang) + "  ›", { showSetup = true }, color = Film.warn)
                     }
@@ -287,7 +300,7 @@ fun HomeScreen(
     if (showSetup) {
         val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(onDismissRequest = { showSetup = false }, sheetState = sheet, containerColor = Film.base) {
-            SetupSheetContent(items, todo, lang, aiLine = aiStatusLine(llm), fix = fix, onLab = { showSetup = false; onLab() })
+            SetupSheetContent(items, todo, lang, aiLine = aiStatusLine(llm), fix = fix, manage = manage, onLab = { showSetup = false; onLab() })
         }
     }
     if (showSamples) SampleFixturesDialog(vm, onOpen) { showSamples = false }
@@ -316,7 +329,7 @@ internal fun CheckRow(meta: AuditMeta, lang: GuideLang, onClick: () -> Unit) {
 /** The Setup sheet: what still needs doing first, then what is already in place, then the optional on-device AI. */
 @Composable
 private fun SetupSheetContent(
-    items: List<SetupItem>, todo: List<SetupItem>, lang: GuideLang, aiLine: String, fix: (SetupKind) -> Unit, onLab: () -> Unit,
+    items: List<SetupItem>, todo: List<SetupItem>, lang: GuideLang, aiLine: String, fix: (SetupKind) -> Unit, manage: (SetupKind) -> Unit, onLab: () -> Unit,
 ) {
     val done = items.filter { it !in todo && it.need != SetupNeed.OPTIONAL }
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).navigationBarsPadding().padding(bottom = 24.dp)) {
@@ -338,11 +351,25 @@ private fun SetupSheetContent(
         Group(title = HomeCopy.allSet.pick(lang).takeIf { done.isNotEmpty() }) {
             done.forEachIndexed { i, item ->
                 if (i > 0) GroupDivider()
-                ListRow(item.title, subtitle = item.detail, trailing = { GlyphIcon(Glyph.CHECK, Film.clear, size = 20.dp) })
+                ListRow(
+                    item.title, subtitle = item.detail,
+                    trailing = { Row(verticalAlignment = Alignment.CenterVertically) {
+                        GlyphIcon(Glyph.CHECK, Film.clear, size = 20.dp)
+                        Spacer(Modifier.size(12.dp))
+                        TextAction(HomeCopy.manage.pick(lang), { manage(item.kind) })
+                    } },
+                )
             }
         }
         Spacer(Modifier.height(20.dp))
         Group(title = HomeCopy.optional.pick(lang)) {
+            items.filter { it.need == SetupNeed.OPTIONAL }.forEach { item ->
+                ListRow(
+                    item.title, subtitle = item.detail, subtitleMaxLines = 4,
+                    trailing = { TextAction((if (item.fixable) HomeCopy.allow else HomeCopy.manage).pick(lang), { if (item.fixable) fix(item.kind) else manage(item.kind) }) },
+                )
+                GroupDivider()
+            }
             ListRow(
                 HomeCopy.aiTitle.pick(lang), subtitle = aiLine,
                 trailing = { TextAction(HomeCopy.aiAction.pick(lang), onLab) },
