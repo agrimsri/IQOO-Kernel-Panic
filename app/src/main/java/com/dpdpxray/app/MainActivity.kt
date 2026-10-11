@@ -61,7 +61,6 @@ import com.dpdpxray.app.ui.guide.GuideViewModel
 import com.dpdpxray.app.ui.guide.LocalGuide
 import com.dpdpxray.app.ui.guide.OnboardingGate
 import com.dpdpxray.app.ui.onboarding.OnboardingScreen
-import com.dpdpxray.app.ui.modes.EverydayHomeScreen
 import com.dpdpxray.app.ui.modes.ModeRoutes
 import com.dpdpxray.app.voice.VoiceCopilotScreen
 import com.dpdpxray.app.voice.wake.AssistantEntry
@@ -80,6 +79,7 @@ import com.dpdpxray.app.ui.screens.ReportsScreen
 import com.dpdpxray.app.ui.screens.ReportScreen
 import com.dpdpxray.app.ui.screens.ResultsScreen
 import com.dpdpxray.app.ui.screens.SettingsScreen
+import com.dpdpxray.app.ui.system.AccessPromptHost
 import com.dpdpxray.app.ui.shell.AppBottomBar
 import com.dpdpxray.app.ui.shell.AppTab
 import com.dpdpxray.app.ui.shell.AppTabs
@@ -134,7 +134,8 @@ class MainActivity : ComponentActivity() {
             val settings by vm.settings.collectAsState()
             val toast by vm.toast.collectAsState()
             LaunchedEffect(toast) {
-                toast?.let { Toast.makeText(this@MainActivity, it, Toast.LENGTH_LONG).show(); vm.toastShown() }
+                // A permission dialog already says it; the toast stays for everything else.
+                toast?.let { if (vm.access.value == null) Toast.makeText(this@MainActivity, it, Toast.LENGTH_LONG).show(); vm.toastShown() }
             }
             val guideNote by guideVoice.note.collectAsState()
             val guide = GuideState(
@@ -148,17 +149,21 @@ class MainActivity : ComponentActivity() {
                     vm.updateSettings { it.copy(guideLanguage = lang.code) }
                 },
             )
-            XrayTheme(stageMode = settings.stageMode) {
+            XrayTheme(stageMode = settings.stageMode, themeMode = settings.themeMode) {
                 CompositionLocalProvider(LocalGuide provides guide) {
                 val nav = rememberNavController()
+                AccessPromptHost(vm)
                 val entry by nav.currentBackStackEntryAsState()
                 val route = entry?.destination?.route
                 // The bar belongs to the five top-level screens only, and steps aside while the keyboard is open.
                 val tab = AppTabs.tabOf(route)
                 val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
                 val selectTab: (AppTab) -> Unit = { target ->
-                    // Same gate as Home's "Check an app": without the VPN and watcher, Home shows what is missing.
-                    if (target == AppTab.CHECK && !vm.prepareAudit()) nav.openTab(AppTab.HOME) else nav.openTab(target)
+                    // Check opens the live check when the VPN and consent watcher are ready; otherwise it opens APK Guard,
+                    // which needs neither, and its Live check segment sends the person Home to finish setup.
+                    if (target == AppTab.CHECK && !(vm.preflight.value.canAudit && vm.prepareAudit())) {
+                        if (tab != AppTab.CHECK) nav.navigate(ApkGuardRoutes.HUB) { popUpTo(AppTab.HOME.route); launchSingleTop = true }
+                    } else nav.openTab(target)
                 }
                 val reduceMotion = LocalReduceMotion.current
                 Scaffold(
@@ -198,7 +203,7 @@ class MainActivity : ComponentActivity() {
                             OnboardingScreen(
                                 onDone = leaveOnboarding,
                                 onSample = { leaveOnboarding(); vm.openSample { nav.navigate("results/$it") } },
-                                onDemo = { leaveOnboarding(); if (vm.prepareAudit()) nav.navigate("pick?q=LeakyShop") },
+                                onDemo = { leaveOnboarding(); if (vm.prepareAudit { nav.navigate("pick?q=LeakyShop") }) nav.navigate("pick?q=LeakyShop") },
                                 onApk = apkCheck()?.let { open -> { leaveOnboarding(); open() } },
                                 // Mode choice: nothing pre-picked on first run; a replay shows the current mode.
                                 audience = settings.audience.takeIf { settings.onboardingDone },
@@ -206,22 +211,9 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("home") {
-                            // Everyday mode gets its own front door; both doors open the same screens and engine.
-                            if (settings.audience == Audience.USER) {
-                                val routeIfPresent: (String) -> (() -> Unit)? = { r -> if (nav.graph.findNode(r) != null) { { nav.navigate(r) } } else null }
-                                EverydayHomeScreen(
-                                    vm,
-                                    onCheckApp = { nav.navigate("pick") },
-                                    onApkFile = { nav.navigate(ApkGuardRoutes.file(it)) },
-                                    onAlerts = { nav.openTab(AppTab.APK) },
-                                    onOpen = { nav.navigate("results/$it") },
-                                    onAllReports = { nav.openTab(AppTab.REPORTS) },
-                                    onLive = { nav.navigate("live") },
-                                    onSettings = { nav.navigate("settings") },
-                                    onCheckup = routeIfPresent(ModeRoutes.CHECKUP),
-                                    onTrust = routeIfPresent(ModeRoutes.TRUST),
-                                )
-                            } else HomeScreen(
+                            // One Home for both modes; developer mode adds a few rows. Everything opens the same screens and engine.
+                            val routeIfPresent: (String) -> (() -> Unit)? = { r -> if (nav.graph.findNode(r) != null) { { nav.navigate(r) } } else null }
+                            HomeScreen(
                                 vm,
                                 onAudit = { nav.navigate("pick") },
                                 onOpen = { nav.navigate("results/$it") },
@@ -229,8 +221,8 @@ class MainActivity : ComponentActivity() {
                                 onCamera = { nav.navigate("camera") },
                                 onSettings = { nav.navigate("settings") },
                                 onVoice = { nav.navigate(AuditRoutes.voice(it)) },
-                                onApk = apkCheck(),
-                                onHowItWorks = { nav.navigate(OnboardingGate.ONBOARDING) },
+                                onApkFile = { nav.navigate(ApkGuardRoutes.file(it)) },
+                                onCheckup = routeIfPresent(ModeRoutes.CHECKUP),
                                 onLive = { nav.navigate("live") },
                                 onAllReports = { nav.openTab(AppTab.REPORTS) },
                                 onAutomation = { nav.navigate("settings") },
@@ -257,6 +249,7 @@ class MainActivity : ComponentActivity() {
                                 vm, onBack = { nav.popBackStack() }, onStarted = { nav.navigate("live") { popUpTo("home") } },
                                 initialQuery = e.arguments?.getString("q").orEmpty(),
                                 onQuarantine = { nav.navigateToQuarantine(it) },
+                                onSwitchToApk = { nav.navigate(ApkGuardRoutes.HUB) { popUpTo(AppTab.HOME.route); launchSingleTop = true } },
                             )
                         }
                         composable(QuarantineRoutes.ROUTE) { e ->
@@ -277,7 +270,7 @@ class MainActivity : ComponentActivity() {
                                 onFixes = { nav.navigate("fixes/$id") },
                                 onReport = { nav.navigate("report/$id") },
                                 onAsk = { nav.navigate(AuditRoutes.voice(id)) },
-                                onCheckAgain = { if (vm.prepareAudit()) nav.navigate("pick") { popUpTo("home") } },
+                                onCheckAgain = { if (vm.prepareAudit { nav.navigate("pick") { popUpTo("home") } }) nav.navigate("pick") { popUpTo("home") } },
                             )
                         }
                         composable("finding/{id}/{check}") { e ->
@@ -300,6 +293,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenApp = { nav.navigate(ApkGuardRoutes.app(it)) },
                                 onOpenFile = { nav.navigate(ApkGuardRoutes.file(it)) },
                                 onCheckup = { nav.navigate(AutoGuardRoutes.CHECKUP) },
+                                onSwitchToLive = { if (vm.preflight.value.canAudit && vm.prepareAudit()) nav.navigate("pick") { popUpTo(AppTab.HOME.route); launchSingleTop = true } else nav.openTab(AppTab.HOME) },
                             )
                         }
                         // Auto-guard "My phone checkup"; also opened by its weekly notification.

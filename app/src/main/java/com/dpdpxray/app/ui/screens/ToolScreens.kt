@@ -394,6 +394,13 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit, onCheckup: (() -> Unit
                 ModeSwitch(s.audience, { a -> vm.updateSettings { it.copy(audience = a) } })
             }
             SectionCard(Modifier.reveal(1), title = "Display", glyph = Glyph.WATCHER) {
+                Text("Appearance", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+                val modes = listOf("system", "light", "dark")
+                com.dpdpxray.app.ui.system.SegmentedControl(
+                    listOf("System", "Light", "Dark"), modes.indexOf(s.themeMode).coerceAtLeast(0),
+                    { i -> vm.updateSettings { it.copy(themeMode = modes[i]) } },
+                )
+                Hairline(Modifier.padding(top = 12.dp))
                 SwitchRow("Presentation mode", "Larger text for projectors and screen sharing.", s.stageMode, { v -> vm.updateSettings { it.copy(stageMode = v) } })
             }
             SectionCard(Modifier.reveal(2), title = "Checks", glyph = Glyph.SEARCH) {

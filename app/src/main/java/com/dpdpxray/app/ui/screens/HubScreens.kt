@@ -56,6 +56,14 @@ import com.dpdpxray.app.ui.components.SectionCard
 import com.dpdpxray.app.ui.components.Tag
 import com.dpdpxray.app.ui.components.TopBar
 import com.dpdpxray.app.ui.guide.EmptyState
+import com.dpdpxray.app.ui.guide.guideLang
+import com.dpdpxray.app.ui.system.Group
+import com.dpdpxray.app.ui.system.GroupDivider
+import com.dpdpxray.app.ui.system.ListRow
+import com.dpdpxray.app.ui.system.SegmentedControl
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.layout.Box
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.guide.RecentChecks
@@ -71,22 +79,22 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** The Reports tab: every saved check, newest first, with a one-line count per score band. */
+/** The Reports tab: every saved check, newest first, with a band filter. */
 @Composable
 fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit) {
     val audits by vm.audits.collectAsState()
+    val lang = guideLang()
+    var filter by rememberSaveable { mutableIntStateOf(0) }
+    val bands = listOf(null, ScoreBand.AT_RISK, ScoreBand.NEEDS_WORK, ScoreBand.READY)
+    val shown = remember(audits, filter) { bands[filter].let { b -> if (b == null) audits else audits.filter { it.band == b } } }
     Column(Modifier.fillMaxSize()) {
         TopBar("Reports", onBack = null)
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            item(key = "intro") {
-                Column(Modifier.reveal(0), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    FoldText("Checks saved on this phone, newest first. Open one for its findings, evidence and exports.")
-                    val bands = ScoreBand.entries.mapNotNull { b -> audits.count { it.band == b }.takeIf { it > 0 }?.let { b to it } }
-                    if (bands.isNotEmpty()) ChipFlow {
-                        bands.forEach { (band, n) -> Tag("$n ${band.label}", bandColor(band)) }
-                    }
-                    Spacer(Modifier.height(2.dp))
-                }
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (audits.isNotEmpty()) item(key = "filter") {
+                SegmentedControl(
+                    listOf("All", ScoreBand.AT_RISK.label, ScoreBand.NEEDS_WORK.label, ScoreBand.READY.label), filter, { filter = it },
+                    Modifier.padding(bottom = 8.dp),
+                )
             }
             if (audits.isEmpty()) item(key = "empty") {
                 EmptyState(
@@ -95,13 +103,17 @@ fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit) {
                     Modifier.reveal(1),
                     action = "See a sample" to { vm.openSample(onOpen) },
                 )
+            } else if (shown.isEmpty()) item(key = "none") {
+                EmptyState("Nothing here", "No saved check is ${ScoreBand.entries.first { it == bands[filter] }.label.lowercase()}.")
             }
-            itemsIndexed(audits, key = { _, a -> a.id }) { i, a -> RecentCheckCard(a, Modifier.reveal(1 + i).animateItem()) { onOpen(a.id) } }
+            itemsIndexed(shown, key = { _, a -> a.id }) { _, a ->
+                Box(Modifier.animateItem().cardSurface(Radii.row)) { CheckRow(a, lang) { onOpen(a.id) } }
+            }
         }
     }
 }
 
-/** The More tab: tools that are not on Home, app settings and the AI lab, and what TraceVeil is. */
+/** The More tab: tools, app settings, help and what TraceVeil is, as plain grouped lists. */
 @Composable
 fun MoreScreen(
     vm: XrayViewModel,
@@ -115,44 +127,49 @@ fun MoreScreen(
 ) {
     val audits by vm.audits.collectAsState()
     val llm by vm.llmStatus.collectAsState()
-    val settings by vm.settings.collectAsState()
     var showSamples by remember { mutableStateOf(false) }
     val latest = audits.firstOrNull()
     Column(Modifier.fillMaxSize()) {
         TopBar("More", onBack = null)
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            SectionCard(Modifier.reveal(0), title = ModeCopy.title(settings.audience).en, glyph = Glyph.HOME) {
-                ModeSwitch(settings.audience, { a -> vm.updateSettings { it.copy(audience = a) } })
-            }
-            SectionCard(Modifier.reveal(1), title = "Tools") {
-                NavRow("Camera check", "Review a photo of a consent screen", onCamera, glyph = Glyph.CAMERA)
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
+            Group(Modifier.reveal(0), title = "Tools") {
+                MoreRow("Camera check", "Review a photo of a consent screen", Glyph.CAMERA, onCamera)
                 if (latest != null) {
-                    Hairline()
-                    NavRow("Ask about my last check", "By voice or tap, about ${latest.targetLabel}", { onVoice(latest.id) }, glyph = Glyph.ASK)
+                    GroupDivider(54.dp)
+                    MoreRow("Ask about my last check", latest.targetLabel, Glyph.ASK, { onVoice(latest.id) })
                 }
-                Hairline()
-                NavRow("See a sample", "A labelled example result; no setup", { vm.openSample(onOpen) }, glyph = Glyph.SAMPLE)
-                Hairline()
-                NavRow("More samples", "Synthetic examples, not a live audit", { showSamples = true }, glyph = Glyph.REPORTS)
-                Hairline()
-                NavRow("How it works", "Replay the short introduction", onHowItWorks, glyph = Glyph.BOOK)
+                GroupDivider(54.dp)
+                MoreRow("See a sample", "A labelled example result", Glyph.SAMPLE, { vm.openSample(onOpen) })
+                GroupDivider(54.dp)
+                MoreRow("More samples", "Synthetic examples, not a live audit", Glyph.REPORTS, { showSamples = true })
             }
-            SectionCard(Modifier.reveal(2), title = "App") {
-                NavRow("Settings", "Text size, check timing, voice, your domains and privacy", onSettings, glyph = Glyph.SETTINGS)
-                Hairline()
-                NavRow("AI lab", aiStatusLine(llm), onLab, glyph = Glyph.AI)
+            Group(Modifier.reveal(1), title = "App") {
+                MoreRow("Settings", "Mode, text size, voice, your domains and privacy", Glyph.SETTINGS, onSettings)
+                GroupDivider(54.dp)
+                MoreRow("AI lab", aiStatusLine(llm), Glyph.AI, onLab)
             }
-            SectionCard(Modifier.reveal(3), title = "About TraceVeil", glyph = Glyph.INFO) {
-                Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium, color = Film.bone)
-                Note("Checks run on this phone. Results are an automated technical assessment, not legal advice.")
+            Group(Modifier.reveal(2), title = "Help") {
+                MoreRow("How it works", "Replay the short introduction", Glyph.BOOK, onHowItWorks)
+            }
+            Group(
+                Modifier.reveal(3), title = "About TraceVeil",
+                footer = "Checks run on this phone. Results are an automated technical assessment, not legal advice.",
+            ) {
                 if (onTrust != null) {
-                    Hairline(Modifier.padding(vertical = 8.dp))
-                    NavRow("Why you can trust TraceVeil", "What stays on the phone, its permissions, network use and identity", onTrust, glyph = Glyph.LOCK, accent = Film.clear)
+                    MoreRow("Why you can trust TraceVeil", "What stays on the phone, its permissions and network use", Glyph.LOCK, onTrust)
+                    GroupDivider(54.dp)
                 }
+                ListRow("Version", trailing = { Text(BuildConfig.VERSION_NAME, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim) })
             }
         }
     }
     if (showSamples) SampleFixturesDialog(vm, onOpen) { showSamples = false }
+}
+
+/** A More row: a quiet glyph, a title with one line under it, and a chevron. */
+@Composable
+private fun MoreRow(title: String, subtitle: String?, glyph: Glyph, onClick: () -> Unit) {
+    ListRow(title, subtitle = subtitle, leading = { GlyphIcon(glyph, Film.boneDim, size = 24.dp) }, onClick = onClick)
 }
 
 /** One line on the optional on-device model, shared by Home's readiness panel and the More tab. */

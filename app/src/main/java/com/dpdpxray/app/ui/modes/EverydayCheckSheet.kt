@@ -44,7 +44,9 @@ import com.dpdpxray.app.ui.components.reveal
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.guide.GradientAction
-import com.dpdpxray.app.ui.guide.GuideBanner
+import com.dpdpxray.app.ui.guide.SpeakStep
+import com.dpdpxray.app.ui.system.ShizukuAccessNotice
+import com.dpdpxray.app.ui.system.ShizukuHelp
 import com.dpdpxray.app.ui.guide.GuideLang
 import com.dpdpxray.app.ui.guide.OutlineAction
 import com.dpdpxray.app.ui.guide.guideLang
@@ -68,6 +70,7 @@ internal fun EverydayCheckSetup(
     app: AuditableApp,
     controlledDemo: Boolean,
     shizukuReady: Boolean,
+    shizukuHelp: ShizukuHelp,
     onQuarantine: () -> Unit,
     onStart: (AuditConfig) -> Unit,
 ) {
@@ -83,7 +86,7 @@ internal fun EverydayCheckSetup(
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CheckSheetTitle(c.title(app.label).pick(lang))
-        GuideBanner(c.guide(app.label), Modifier.reveal(0))
+        SpeakStep(c.guide(app.label))
         Column(Modifier.padding(top = 4.dp).reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             PlanOption(
                 c.quickTitle.pick(lang), (if (freshReset) c.quickDetailFresh else c.quickDetail).pick(lang),
@@ -97,8 +100,8 @@ internal fun EverydayCheckSetup(
             c.advanced.pick(lang), Modifier.padding(top = 8.dp).reveal(2),
             summary = c.advancedSummary.pick(lang), glyph = Glyph.SETTINGS, initiallyOpen = choice == CheckChoice.FULL,
         ) {
-            PlanOption(c.fullTitle.pick(lang), c.fullDetail.pick(lang), selected = choice == CheckChoice.FULL, enabled = freshReset, lang = lang) { choice = CheckChoice.FULL }
-            if (!freshReset) FoldText(c.fullNeeds.pick(lang), moreLabel = lang.moreLabel, lessLabel = lang.lessLabel)
+            PlanOption(c.fullTitle.pick(lang), c.fullDetail.pick(lang), selected = choice == CheckChoice.FULL, enabled = shizukuReady, lang = lang) { choice = CheckChoice.FULL; allowReset = true }
+            if (!shizukuReady) ShizukuAccessNotice(shizukuHelp.running, shizukuHelp.onAllow, shizukuHelp.onOpenShizuku)
             if (shizukuReady) SwitchRow(c.resetTitle.pick(lang), c.resetDetail.pick(lang), allowReset, { on ->
                 allowReset = on
                 if (!on && choice == CheckChoice.FULL) choice = CheckChoice.QUICK

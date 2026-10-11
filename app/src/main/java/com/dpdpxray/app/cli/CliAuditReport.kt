@@ -1,8 +1,11 @@
 package com.dpdpxray.app.cli
 
+import com.dpdpxray.app.ai.NetIntelligence
 import com.dpdpxray.app.data.AuditBundle
 import com.dpdpxray.core.audit.PhaseAssigner
+import com.dpdpxray.core.model.Category
 import com.dpdpxray.core.model.ConsentKind
+import com.dpdpxray.core.model.Phase
 import com.dpdpxray.core.trackers.TrackerCatalog
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -23,8 +26,14 @@ object CliAuditReport {
 
     private fun strings(items: Iterable<String>): JsonElement = JsonArray(items.map { JsonPrimitive(it) })
 
-    /** [catalog] adds `observedTrackers` (every catalogue entity looked up, by consent phase); omitted when null. */
-    fun build(requestId: String, bundle: AuditBundle, catalog: TrackerCatalog? = null): String {
+    /** One moment read on both clocks, so a lookup's monotonic time (`tNanos`) can be dated on the phone's wall clock. */
+    data class ClockAnchor(val wallMs: Long, val elapsedNanos: Long) {
+        fun wallMsOf(tNanos: Long): Long = wallMs - (elapsedNanos - tNanos) / 1_000_000
+    }
+
+    /** [catalog] adds `observedTrackers` (every catalogue entity looked up, by consent phase); omitted when null.
+     *  [anchor] also dates each lookup (`lookupEvents`) so the CLI can line them up with Android's data-access log. */
+    fun build(requestId: String, bundle: AuditBundle, catalog: TrackerCatalog? = null, anchor: ClockAnchor? = null): String {
         val first = bundle.sessions.firstOrNull()
         val obj = buildJsonObject {
             put("schemaVersion", SCHEMA_VERSION)
@@ -57,28 +66,79 @@ object CliAuditReport {
                     put("notes", strings(s.notes))
                 }
             }))
-            if (catalog != null) put("observedTrackers", observedTrackers(bundle, catalog))
+            if (catalog != null) put("observedTrackers", observedTrackers(bundle, catalog, anchor))
+            if (catalog != null) put("network", network(bundle, catalog))
             if (catalog != null) put("dnsAnswers", dnsAnswers(bundle, catalog))
         }
         return pretty.encodeToString(JsonObject.serializer(), obj)
     }
 
     /** Hostname lookups only: an entry says the app looked the tracker up, not what data was sent. */
-    private fun observedTrackers(bundle: AuditBundle, catalog: TrackerCatalog): JsonArray {
+    private fun observedTrackers(bundle: AuditBundle, catalog: TrackerCatalog, anchor: ClockAnchor?): JsonArray {
         val hits = bundle.sessions.flatMap { s ->
             PhaseAssigner.assign(s.netEvents, s.consentEvents).mapNotNull { e ->
                 val info = catalog.classify(e.hostname, e.cnameChain)
-                info.entity?.let { Triple(it, info.category, e.phase) }
+                info.entity?.let { Hit(it, info.category, e.phase, e.tNanos) }
             }
         }
-        return JsonArray(hits.groupBy { it.first }.toSortedMap().map { (entity, rows) ->
+        return JsonArray(hits.groupBy { it.entity }.toSortedMap().map { (entity, rows) ->
             buildJsonObject {
                 put("entity", entity)
-                put("category", rows.first().second.name)
+                put("category", rows.first().category.name)
                 put("lookups", rows.size)
-                put("phases", strings(rows.map { it.third.name }.distinct().sorted()))
+                put("phases", strings(rows.map { it.phase.name }.distinct().sorted()))
+                if (anchor != null) put("lookupEvents", JsonArray(rows.sortedBy { it.tNanos }.map {
+                    buildJsonObject { put("atMs", anchor.wallMsOf(it.tNanos)); put("phase", it.phase.name) }
+                }))
             }
         })
+    }
+
+    private const val MAX_CONNECTIONS = 200
+
+    /**
+     * What the connection-level capture saw: findings (rules only, no model), traffic per consent phase, and the
+     * connections themselves with their redacted HTTP request lines. `depth` says whether the audit ran DNS-only, in
+     * which case no connection was observed (empty lists mean "not captured", never "none").
+     */
+    private fun network(bundle: AuditBundle, catalog: TrackerCatalog): JsonObject {
+        val a = NetIntelligence.rules(bundle.sessions, catalog)
+        val flows = bundle.sessions.flatMap { it.flows }
+        val depth = if (bundle.sessions.any { it.captureDepth == "full-relay" }) "full-relay" else "dns-only"
+        return buildJsonObject {
+            put("depth", depth)
+            put("level", a.level.name)
+            put("findings", JsonArray(a.findings.map { f ->
+                buildJsonObject {
+                    put("id", f.id); put("kind", f.kind.name); put("severity", f.severity.name); put("confidence", f.confidence.name)
+                    put("title", f.title); put("destination", f.destination); f.entity?.let { put("entity", it) }
+                    put("phase", f.phase.name); put("bytesUp", f.bytesUp); put("bytesDown", f.bytesDown)
+                    put("whatHappened", f.whatHappened); put("whyItMatters", f.whyItMatters)
+                    put("evidence", strings(f.evidence)); put("limitation", f.limitation); put("action", f.action.name)
+                }
+            }))
+            put("traffic", JsonArray(a.traffic.map { t ->
+                buildJsonObject { put("phase", t.phase.name); put("connections", t.connections); put("bytesUp", t.bytesUp); put("bytesDown", t.bytesDown) }
+            }))
+            put("limitations", strings(a.limitations))
+            put("connectionCount", flows.size)
+            put("httpRequestCount", flows.sumOf { it.http.size })
+            put("connections", JsonArray(flows.sortedBy { it.startNanos }.take(MAX_CONNECTIONS).map { f ->
+                buildJsonObject {
+                    put("protocol", f.protocol.name); put("host", f.host ?: ""); put("ip", f.dstIp); put("port", f.dstPort)
+                    put("tls", f.tls.name); put("phase", f.phase.name); put("bytesUp", f.bytesUp); put("bytesDown", f.bytesDown)
+                    put("noLookup", f.noLookup); put("failed", f.failed)
+                    if (f.alpn.isNotEmpty()) put("alpn", strings(f.alpn))
+                    if (f.http.isNotEmpty()) put("http", JsonArray(f.http.map { h ->
+                        buildJsonObject {
+                            put("method", h.method); put("host", h.host ?: ""); put("target", h.target)
+                            h.status?.let { put("status", it) }; put("phase", h.phase.name)
+                            if (h.sensitive.isNotEmpty()) put("sensitive", strings(h.sensitive.map { it.name }))
+                        }
+                    }))
+                }
+            }))
+        }
     }
 
     /**
@@ -96,6 +156,8 @@ object CliAuditReport {
             }
         })
     }
+
+    private data class Hit(val entity: String, val category: Category, val phase: Phase, val tNanos: Long)
 
     fun status(requestId: String, state: String, step: String? = null, auditId: String? = null, error: String? = null, now: Long = System.currentTimeMillis()): String =
         pretty.encodeToString(JsonObject.serializer(), buildJsonObject {

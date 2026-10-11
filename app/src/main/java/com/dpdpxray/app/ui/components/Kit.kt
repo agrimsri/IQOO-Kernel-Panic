@@ -87,11 +87,14 @@ internal fun chevronTurn(open: Boolean): Float {
     return turn
 }
 
-/** The raised card surface every card shares: lit slightly from the top, with a brighter rim. */
+/**
+ * The one surface every card shares: a flat fill one step above the screen, no border, no shadow. [glow] is accepted so
+ * older call sites compile; status colour is never used as a halo now.
+ */
+@Suppress("UNUSED_PARAMETER")
 fun Modifier.cardSurface(radius: Dp = Radii.card, glow: Color? = null): Modifier {
     val shape = RoundedCornerShape(radius)
-    val lifted = if (glow != null) this.shadow(14.dp, shape, ambientColor = glow.copy(alpha = 0.35f), spotColor = glow.copy(alpha = 0.55f)) else this
-    return lifted.clip(shape).background(FilmExtra.card).border(1.dp, FilmExtra.cardEdge, shape)
+    return clip(shape).background(Film.raised, shape)
 }
 
 /** A raised card that groups one idea, with an optional glyph + title header. */
@@ -120,13 +123,11 @@ fun SectionCard(
     }
 }
 
-/** A glyph centred in a softly tinted circle, with a faint ring of the same colour. */
+/** A glyph on a quiet rounded square. The glyph carries the colour it is given; the square is a neutral fill. */
 @Composable
 fun IconBadge(glyph: Glyph, accent: Color, size: Dp = 40.dp) {
     Box(
-        Modifier.size(size).clip(CircleShape)
-            .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.24f), accent.copy(alpha = 0.08f))))
-            .border(1.dp, accent.copy(alpha = 0.22f), CircleShape),
+        Modifier.size(size).clip(RoundedCornerShape(size * 0.28f)).background(Film.fill),
         contentAlignment = Alignment.Center,
     ) {
         GlyphIcon(glyph, accent, size = size * 0.55f)
@@ -208,7 +209,8 @@ fun FoldText(
     lessLabel: String = "Less",
 ) {
     val lead = remember(text) { leadSentence(text) }
-    val multi = lead.length < text.trim().length
+    // Short text is shown in full; only text longer than FOLD_ABOVE characters folds behind More.
+    val multi = text.trim().length > FOLD_ABOVE && lead.length < text.trim().length
     var clipped by remember(text) { mutableStateOf(false) }
     var open by rememberSaveable(text) { mutableStateOf(false) }
     Column(modifier.fillMaxWidth().animateContentSize(foldSpec())) {
@@ -216,7 +218,7 @@ fun FoldText(
             Text(text, style = style, color = color)
         } else {
             Text(
-                if (multi) lead else text, style = style, color = color, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
+                if (multi) lead else text, style = style, color = color, maxLines = if (multi) maxLines else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis,
                 onTextLayout = { if (it.hasVisualOverflow && !clipped) clipped = true },
             )
         }
@@ -288,10 +290,8 @@ fun Callout(
     val shape = RoundedCornerShape(Radii.row)
     Row(
         modifier.fillMaxWidth().clip(shape)
-            .background(Brush.horizontalGradient(listOf(color.copy(alpha = 0.16f), color.copy(alpha = 0.06f))))
-            .drawBehind { drawRect(color, size = Size(4.dp.toPx(), size.height)) }
-            .border(1.dp, color.copy(alpha = 0.32f), shape)
-            .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+            .background(color.copy(alpha = 0.10f), shape)
+            .padding(start = 14.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.Top,
     ) {
         GlyphIcon(glyph, color, Modifier.padding(top = 2.dp), size = 18.dp)
@@ -358,7 +358,7 @@ fun NavRow(
 /** A thin divider between rows inside a card. */
 @Composable
 fun Hairline(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(1.dp).background(FilmExtra.hairline))
+    Box(modifier.fillMaxWidth().height(0.5.dp).background(FilmExtra.hairline))
 }
 
 /**
@@ -370,7 +370,7 @@ fun Hairline(modifier: Modifier = Modifier) {
 fun SwitchRow(title: String, detail: String?, checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val full = detail?.trim()
     val lead = full?.let { remember(it) { leadSentence(it) } }
-    val multi = full != null && lead != null && lead.length < full.length
+    val multi = full != null && lead != null && full.length > FOLD_ABOVE && lead.length < full.length
     var clipped by remember(full) { mutableStateOf(false) }
     var open by rememberSaveable(title) { mutableStateOf(false) }
     Column(modifier.fillMaxWidth().animateContentSize(foldSpec())) {
@@ -385,7 +385,7 @@ fun SwitchRow(title: String, detail: String?, checked: Boolean, onChange: (Boole
                 if (full != null && lead != null) {
                     if (open) Text(full, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
                     else Text(
-                        lead, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        if (multi) lead else full, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, maxLines = if (multi) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis,
                         onTextLayout = { if (it.hasVisualOverflow && !clipped) clipped = true },
                     )
                 }
@@ -393,7 +393,10 @@ fun SwitchRow(title: String, detail: String?, checked: Boolean, onChange: (Boole
             Spacer(Modifier.width(12.dp))
             Switch(
                 checked = checked, onCheckedChange = null, enabled = enabled,
-                colors = SwitchDefaults.colors(checkedTrackColor = Film.scan, checkedThumbColor = Film.base, uncheckedTrackColor = FilmExtra.raisedHigh),
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = Film.scan, checkedThumbColor = Film.onAccent, checkedBorderColor = Color.Transparent,
+                    uncheckedTrackColor = Film.fill, uncheckedThumbColor = Film.graphic, uncheckedBorderColor = Color.Transparent,
+                ),
             )
         }
         if (multi || clipped) DisclosureRow(open, "More", "Less", { open = !open }, glyph = null)
@@ -407,20 +410,16 @@ fun ChipFlow(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
 }
 
-/** The short brand rule under a heading: 28dp of peach-to-rose. */
+/** Retired: headings no longer carry a decorative rule. Kept so older call sites compile; it draws nothing. */
+@Suppress("UNUSED_PARAMETER")
 @Composable
-fun GradientRule(modifier: Modifier = Modifier, width: Dp = 28.dp) {
-    Box(modifier.size(width = width, height = 3.dp).clip(CircleShape).background(Brand.underline))
-}
+fun GradientRule(modifier: Modifier = Modifier, width: Dp = 28.dp) = Unit
 
-/** A heading above a group of cards, with a thin gradient rule and an optional trailing link (for example "See all"). */
+/** A heading above a group of rows, with an optional trailing link (for example "See all"). */
 @Composable
 fun GroupHeader(text: String, modifier: Modifier = Modifier, trailing: (@Composable () -> Unit)? = null) {
-    Row(modifier.fillMaxWidth().padding(top = 24.dp, bottom = 10.dp).heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(text, style = MaterialTheme.typography.titleLarge, color = Film.bone, modifier = Modifier.semantics { heading() })
-            GradientRule(Modifier.padding(top = 6.dp))
-        }
+    Row(modifier.fillMaxWidth().padding(top = 32.dp, bottom = 10.dp).heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(text, style = MaterialTheme.typography.titleLarge, color = Film.bone, modifier = Modifier.weight(1f).semantics { heading() })
         trailing?.invoke()
     }
 }
@@ -434,3 +433,6 @@ fun EmptyHint(text: String, modifier: Modifier = Modifier, glyph: Glyph = Glyph.
         Text(text, style = MaterialTheme.typography.bodyMedium, color = color)
     }
 }
+
+/** Text up to this many characters is shown in full; longer text shows its first sentence and folds the rest behind More. */
+internal const val FOLD_ABOVE = 220

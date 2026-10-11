@@ -41,6 +41,11 @@ object AuditNetworkReadings {
     fun proof(sessions: List<AuditSession>, readings: List<SessionNetworkReadings>): NetworkProof {
         fun unavailable(reason: String) = NetworkProof.Unavailable(reason)
         if (sessions.isEmpty()) return unavailable("No capture sessions were recorded")
+        // A deep check forwards the checked app's own connections through TraceVeil's sockets, which Android counts as
+        // TraceVeil's upload. The zero-upload check would then be wrong, so it is not claimed.
+        if (sessions.any { it.captureDepth == "full-relay" }) {
+            return unavailable("This was a deep check: the checked app's own connections were forwarded through TraceVeil, so TraceVeil's upload cannot be told apart from them. The upload check applies to DNS-only checks.")
+        }
         if (readings.size != sessions.size || readings.map { it.sessionId }.distinct().size != readings.size ||
             sessions.map { it.id }.distinct().size != sessions.size) {
             return unavailable("A unique upload reading was not recorded for every plan")

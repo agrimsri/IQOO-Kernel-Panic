@@ -116,6 +116,12 @@ data class UiNode(
     val isClickable: Boolean = false,
     val bounds: Bounds? = null,
     val children: List<UiNode> = emptyList(),
+    /** A text field whose content is hidden (a password or PIN box). Older saved audits read as false. */
+    val isPassword: Boolean = false,
+    /** A field the person types into. Older saved audits read as false. */
+    val isEditable: Boolean = false,
+    /** The placeholder shown inside an empty field ("Phone number"). Older saved audits read as null. */
+    val hint: String? = null,
 ) {
     val label: String get() = listOfNotNull(text, contentDescription).joinToString(" ").trim()
 
@@ -223,6 +229,13 @@ data class AuditSession(
     val permissionDialogsWatched: Boolean? = null,
     /** Allow-listed facts read from the audited app's installed manifest at audit start. null = not read. */
     val manifestFacts: AppManifestFacts? = null,
+    /**
+     * Connections seen by the full-relay capture, labelled with their consent phase. Empty when the audit ran DNS-only
+     * or was saved before this existed: see [captureDepth]; empty never means "no connections".
+     */
+    val flows: List<com.dpdpxray.core.netcapture.FlowRecord> = emptyList(),
+    /** "dns-only" or "full-relay"; null = not recorded (older audits, DNS-only). */
+    val captureDepth: String? = null,
 ) {
     val consentChoice: ConsentEvent?
         get() = consentEvents.firstOrNull { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }

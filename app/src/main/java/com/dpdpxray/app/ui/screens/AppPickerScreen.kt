@@ -77,8 +77,12 @@ import com.dpdpxray.app.ui.components.reveal
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.guide.GradientAction
-import com.dpdpxray.app.ui.guide.GuideBanner
 import com.dpdpxray.app.ui.guide.GuideFlow
+import com.dpdpxray.app.ui.guide.SpeakStep
+import com.dpdpxray.app.ui.system.SearchField
+import com.dpdpxray.app.ui.system.ShizukuAccessNotice
+import com.dpdpxray.app.ui.system.ShizukuHelp
+import com.dpdpxray.app.ui.system.SegmentedControl
 import com.dpdpxray.app.ui.guide.GuideLang
 import com.dpdpxray.app.ui.guide.LinkAction
 import com.dpdpxray.app.ui.guide.OutlineAction
@@ -107,6 +111,8 @@ fun AppPickerScreen(
     onStarted: () -> Unit,
     initialQuery: String = "",
     onQuarantine: (String) -> Unit = {},
+    /** Shows the Live check / APK Guard switch under the title; null hides it. */
+    onSwitchToApk: (() -> Unit)? = null,
 ) {
     val apps by vm.apps.collectAsState()
     val pf by vm.preflight.collectAsState()
@@ -118,21 +124,11 @@ fun AppPickerScreen(
     val demos = apps.filter { it.packageName in demoPackages }
     Column(Modifier.fillMaxSize()) {
         TopBar("Choose an app", onBack)
-        GuideBanner(GuideFlow.picker(demoInstalled = demos.isNotEmpty()), Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-        OutlinedTextField(
-            value = query, onValueChange = { query = it }, singleLine = true,
-            placeholder = { Text("Search apps", color = Film.boneDim) },
-            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = Film.boneDim) },
-            trailingIcon = {
-                if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, contentDescription = "Clear search", tint = Film.boneDim) }
-            },
-            shape = RoundedCornerShape(Radii.button),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Film.scan, unfocusedBorderColor = Film.line, cursorColor = Film.scan,
-                focusedContainerColor = Film.raised, unfocusedContainerColor = Film.raised.copy(alpha = 0.6f),
-            ),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        )
+        SpeakStep(GuideFlow.picker(demoInstalled = demos.isNotEmpty()))
+        if (onSwitchToApk != null) {
+            SegmentedControl(listOf("Live check", "APK Guard"), 0, { if (it == 1) onSwitchToApk() }, Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+        }
+        SearchField(query, { query = it }, "Search apps", Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
         val q = query.trim()
         val shown = apps.filter { q.isBlank() || it.label.contains(q, true) || it.packageName.contains(q, true) }
         val showDemoSection = q.isBlank() && demos.isNotEmpty()
@@ -149,14 +145,14 @@ fun AppPickerScreen(
             if (showDemoSection) {
                 item(key = "demo-header") { ListHeader("Demo apps, made for testing") }
                 itemsIndexed(demos, key = { _, app -> "demo-" + app.packageName }) { i, app ->
-                    AppRow(app, demo = true, Modifier.reveal(i)) { selected = app }
+                    AppRow(app, demo = true, showPackage = q.isNotBlank(), Modifier.reveal(i)) { selected = app }
                 }
                 item(key = "all-header") { ListHeader("All apps") }
             }
             itemsIndexed(rest, key = { _, app -> app.packageName }) { i, app ->
                 val order = i + (if (showDemoSection) demos.size else 0)
                 AppRow(
-                    app, demo = app.packageName in demoPackages,
+                    app, demo = app.packageName in demoPackages, showPackage = q.isNotBlank(),
                     if (q.isBlank() && order < REVEALED_ROWS) Modifier.reveal(order) else Modifier,
                 ) { selected = app }
             }
@@ -168,13 +164,24 @@ fun AppPickerScreen(
             val quarantine = { selected = null; onQuarantine(app.packageName) }
             val start: (AuditConfig) -> Unit = { config ->
                 selected = null
-                if (vm.startAudit(config)) onStarted()
+                if (vm.startAudit(config, onStarted)) onStarted()
+            }
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val help = ShizukuHelp(
+                running = pf.shizukuRunning,
+                onAllow = { vm.requestShizuku() },
+                onOpenShizuku = { com.dpdpxray.app.control.DeviceChecks.launch(ctx, "moe.shizuku.privileged.api") },
+            )
+            // Full check needs Shizuku's permission; while the sheet is open and it is missing, look again each second
+            // so Full becomes selectable the moment the person allows it.
+            LaunchedEffect(app.packageName, pf.shizukuGranted) {
+                while (!pf.shizukuGranted) { kotlinx.coroutines.delay(1_000); vm.refreshPreflight() }
             }
             // Everyday mode: one Quick check that says No; Full and clearing data fold under Advanced.
             if (settings.audience == Audience.USER) {
-                EverydayCheckSetup(app, controlledDemo = app.packageName in demoPackages, shizukuReady = pf.shizukuGranted, onQuarantine = quarantine, onStart = start)
+                EverydayCheckSetup(app, controlledDemo = app.packageName in demoPackages, shizukuReady = pf.shizukuGranted, shizukuHelp = help, onQuarantine = quarantine, onStart = start)
             } else {
-                AuditSetup(app, shizukuReady = pf.shizukuGranted, preferPreview = settings.fastDemo, onQuarantine = quarantine, onStart = start)
+                AuditSetup(app, shizukuReady = pf.shizukuGranted, shizukuHelp = help, preferPreview = settings.fastDemo, onQuarantine = quarantine, onStart = start)
             }
         }
     }
@@ -206,12 +213,11 @@ private fun ListHeader(text: String) {
  * every row shrinks slightly while pressed.
  */
 @Composable
-private fun AppRow(app: AuditableApp, demo: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun AppRow(app: AuditableApp, demo: Boolean, showPackage: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(Radii.row)
     Row(
         modifier.fillMaxWidth().padding(vertical = 2.dp)
             .pressClickable(shape = shape, onClick = onClick)
-            .then(if (demo) Modifier.cardSurface(Radii.row).border(1.dp, Brand.horizontal, shape) else Modifier)
             .heightIn(min = 64.dp).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -222,11 +228,11 @@ private fun AppRow(app: AuditableApp, demo: Boolean, modifier: Modifier = Modifi
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(app.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            HostText(app.packageName, Film.boneDim)
+            if (showPackage) HostText(app.packageName, Film.boneDim)
         }
         if (demo) {
             Spacer(Modifier.width(8.dp))
-            Tag("Demo", Brand.peach)
+            Tag("Demo", Film.boneDim)
         }
         Spacer(Modifier.width(8.dp))
         GlyphIcon(Glyph.CHEVRON_RIGHT, Film.boneDim.copy(alpha = 0.7f), size = 16.dp)
@@ -254,7 +260,7 @@ private fun leadAndRest(text: String): Pair<String, String?> {
 }
 
 @Composable
-private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, preferPreview: Boolean, onQuarantine: () -> Unit = {}, onStart: (AuditConfig) -> Unit) {
+private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, shizukuHelp: ShizukuHelp, preferPreview: Boolean, onQuarantine: () -> Unit = {}, onStart: (AuditConfig) -> Unit) {
     val controlledDemo = app.packageName == "com.leakyshop.demo" || app.packageName == "com.leakyshop.demo.fixed"
     val initial = remember { CheckSheet.defaults(Audience.DEVELOPER, controlledDemo, shizukuReady, preferPreview) }
     var allowReset by remember { mutableStateOf(initial.allowReset) }
@@ -267,7 +273,7 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, preferPreview: 
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CheckSheetTitle("Check ${app.label}")
-        GuideBanner(GuideFlow.pickerSetup(fullAvailable = freshReset), Modifier.reveal(0))
+        SpeakStep(GuideFlow.pickerSetup(fullAvailable = freshReset))
         if (shizukuReady) Toggle("Allow clearing this test app's local data", "Developer testing only. Removes its saved state, accounts and settings before each run. Leave off for personal apps.", allowReset) {
             allowReset = it
             if (!it) full = false
@@ -277,9 +283,9 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, preferPreview: 
             PlanOption(
                 "Full audit · normal timing",
                 "Three fresh-state runs: Silent, Reject, Accept. Observes Silent for 25 seconds and each choice for 15 seconds; launch, consent and AI review add time.",
-                full, enabled = freshReset,
-            ) { full = true; preview = false }
-            if (!freshReset) Callout("Full audits need Shizuku and explicit approval to reset a test app between runs.")
+                full, enabled = shizukuReady,
+            ) { full = true; preview = false; allowReset = true }
+            if (!shizukuReady) ShizukuAccessNotice(shizukuHelp.running, shizukuHelp.onAllow, shizukuHelp.onOpenShizuku)
             PlanOption("Quick audit · normal timing", "One Accept-plan run with 15 seconds of observation. No Silent or Reject comparison.", !full && !preview, enabled = true) { full = false; preview = false }
             PlanOption("Fast Preview · limited evidence", "One Accept-plan run with 8 seconds of observation and a shorter consent-screen wait. Delayed traffic may be missed; not a Full audit.", preview, enabled = true) { full = false; preview = true }
             // The caveat's first sentence stays in view; the rest folds behind More.

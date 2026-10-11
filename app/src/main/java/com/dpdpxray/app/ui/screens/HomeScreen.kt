@@ -7,35 +7,25 @@ import android.os.Looper
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -43,54 +33,89 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import com.dpdpxray.app.apkguard.ApkFileChecks
+import com.dpdpxray.app.apkguard.IncomingApk
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.control.DeviceChecks
+import com.dpdpxray.app.data.Audience
+import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.ui.XrayViewModel
-import com.dpdpxray.app.ui.components.FoldText
-import com.dpdpxray.app.ui.components.GroupHeader
 import com.dpdpxray.app.ui.components.cardSurface
-import com.dpdpxray.app.ui.components.gradientSweep
-import com.dpdpxray.app.ui.components.pressClickable
 import com.dpdpxray.app.ui.components.reveal
-import com.dpdpxray.app.ui.guide.ActionTile
-import com.dpdpxray.app.ui.guide.EmptyState
+import com.dpdpxray.app.ui.guide.Bi
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
-import com.dpdpxray.app.ui.guide.GradientAction
-import com.dpdpxray.app.ui.guide.GuideBanner
-import com.dpdpxray.app.ui.guide.GuideFlow
-import com.dpdpxray.app.ui.guide.LinkAction
-import com.dpdpxray.app.ui.guide.OutlineAction
-import com.dpdpxray.app.ui.guide.Panel
-import com.dpdpxray.app.ui.guide.PillButton
+import com.dpdpxray.app.ui.guide.GuideLang
+import com.dpdpxray.app.ui.guide.RecentChecks
 import com.dpdpxray.app.ui.guide.SetupItem
 import com.dpdpxray.app.ui.guide.SetupKind
 import com.dpdpxray.app.ui.guide.SetupNeed
 import com.dpdpxray.app.ui.guide.SetupSteps
-import com.dpdpxray.app.ui.modes.ModeGlyph
-import com.dpdpxray.app.ui.modes.ModeGlyphIcon
-import com.dpdpxray.app.ui.theme.Brand
+import com.dpdpxray.app.ui.guide.SpeakStep
+import com.dpdpxray.app.ui.guide.guideLang
+import com.dpdpxray.app.ui.modes.EverydayCopy
+import com.dpdpxray.app.ui.system.Group
+import com.dpdpxray.app.ui.system.GroupDivider
+import com.dpdpxray.app.ui.system.LangVoiceButton
+import com.dpdpxray.app.ui.system.ListRow
+import com.dpdpxray.app.ui.system.PrimaryButton
+import com.dpdpxray.app.ui.system.TextAction
 import com.dpdpxray.app.ui.theme.Film
-import com.dpdpxray.app.ui.theme.FilmExtra
-import com.dpdpxray.app.ui.theme.LocalReduceMotion
-import com.dpdpxray.app.ui.theme.Motion
+import com.dpdpxray.app.ui.theme.bandColor
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
+/** Every word that is new on the redesigned Home, in both guidance languages. Older words come from [EverydayCopy]. */
+object HomeCopy {
+    val heroTitle = Bi("Does an app respect your choice?", "क्या कोई ऐप आपकी पसंद का सम्मान करता है?")
+    val heroBody = Bi(
+        "Check one app while you accept or refuse its consent popup.",
+        "किसी एक ऐप को जाँचें, जब आप उसके कंसेंट पॉपअप को स्वीकार या अस्वीकार करते हैं।",
+    )
+    val checkApp = Bi("Check an app", "ऐप जाँचें")
+    fun stepsToFinish(n: Int) = if (n == 1) Bi("1 step to finish setup", "सेटअप पूरा करने के लिए 1 कदम")
+    else Bi("$n steps to finish setup", "सेटअप पूरा करने के लिए $n कदम")
+    val setupTitle = Bi("Setup", "सेटअप")
+    val toDo = Bi("To do", "करने के लिए")
+    val allSet = Bi("All set", "सब तैयार")
+    val optional = Bi("Optional", "वैकल्पिक")
+    val moreWays = Bi("More ways to check", "जाँचने के और तरीके")
+    val fileTitle = Bi("An app file (APK)", "ऐप फ़ाइल (APK)")
+    val fileBody = Bi("See what it could do before you install it", "इंस्टॉल करने से पहले देखें कि यह क्या कर सकती है")
+    val appsTitle = Bi("Apps on this phone", "इस फ़ोन के ऐप")
+    val appsBody = Bi("What each one is allowed to do", "हर ऐप को क्या करने की अनुमति है")
+    val cameraTitle = Bi("Camera check", "कैमरा जाँच")
+    val cameraBody = Bi("Review a photo of a consent screen", "कंसेंट स्क्रीन की फ़ोटो जाँचें")
+    val askTitle = Bi("Ask about my last check", "मेरी पिछली जाँच के बारे में पूछें")
+    val samplesTitle = Bi("More samples", "और नमूने")
+    val samplesBody = Bi("Synthetic examples, not a live audit", "बनावटी उदाहरण, असली जाँच नहीं")
+    val automateTitle = Bi("Automate it", "ऑटोमेट करें")
+    val automateBody = Bi("Run checks from your laptop or CI", "लैपटॉप या CI से जाँच चलाएँ")
+    val aiTitle = Bi("On-device AI", "डिवाइस पर AI")
+    val aiAction = Bi("AI lab", "AI लैब")
+    fun checking(app: String) = Bi("Checking $app", "$app की जाँच हो रही है")
+    val fix = Bi("Fix", "ठीक करें")
+    val allow = Bi("Allow", "अनुमति दें")
+    val openShizuku = Bi("Open Shizuku", "Shizuku खोलें")
+}
+
+private const val RECENT_ON_HOME = 3
+
+/**
+ * Home, redesigned: one hero with the one main action, one readiness line, three recent checks and a short list of other
+ * ways to check. Developer mode shows the same Home with a few more rows. Everything here opens an existing screen; the
+ * readiness gate is unchanged (`prepareAudit`): when the check cannot start yet, the Setup sheet opens and says why.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     vm: XrayViewModel,
@@ -100,22 +125,30 @@ fun HomeScreen(
     onCamera: () -> Unit,
     onSettings: () -> Unit,
     onVoice: (String) -> Unit,
-    /** Opens the APK check; null hides the entry when this build has no such screen. */
-    onApk: (() -> Unit)? = null,
-    onHowItWorks: () -> Unit = {},
+    /** Opens the APK result for a file-check key from [ApkFileChecks.start]. */
+    onApkFile: (String) -> Unit,
+    /** "Apps on this phone" (the phone checkup); null hides the row when this build has no such screen. */
+    onCheckup: (() -> Unit)? = null,
     onLive: () -> Unit = {},
-    /** Opens the Reports tab with every saved check. */
     onAllReports: () -> Unit = {},
-    /** Opens Settings, where developer automation (laptop and CI runs) lives; null hides the card. */
+    /** Developer mode only: the laptop and CI automation settings; null hides the row. */
     onAutomation: (() -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
+    val lang = guideLang()
     val pf by vm.preflight.collectAsState()
     val audits by vm.audits.collectAsState()
     val llm by vm.llmStatus.collectAsState()
     val progress by vm.progress.collectAsState()
-    var showSampleFixtures by remember { mutableStateOf(false) }
+    val settings by vm.settings.collectAsState()
+    var showSetup by remember { mutableStateOf(false) }
+    var showSamples by remember { mutableStateOf(false) }
+    val developer = settings.audience == Audience.DEVELOPER
+
     val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { vm.refreshPreflight() }
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) onApkFile(ApkFileChecks.start(ctx, uri))
+    }
     LaunchedEffect(vm) { vm.refreshPreflight() }
     DisposableEffect(ctx, vm) {
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
@@ -128,6 +161,8 @@ fun HomeScreen(
     val items = SetupSteps.from(pf)
     val todo = SetupSteps.todo(items)
     val running = progress as? AuditProgress.Running
+    // The visible guide banner is gone from Home; read-aloud still speaks the same step.
+    if (running == null) SpeakStep(com.dpdpxray.app.ui.guide.GuideFlow.home(pf))
     val fix: (SetupKind) -> Unit = { kind ->
         when (kind) {
             SetupKind.VPN -> if (DeviceChecks.otherVpnActive(ctx)) DeviceChecks.openVpnSettings(ctx) else VpnService.prepare(ctx)?.let { vpnLauncher.launch(it) } ?: vm.refreshPreflight()
@@ -136,293 +171,198 @@ fun HomeScreen(
             SetupKind.SHIZUKU -> vm.requestShizuku()
         }
     }
-    val aiLine = aiStatusLine(llm)
+    // Same gate as before; when it is not met the sheet explains what is missing instead of a dead button.
+    val startCheck = { if (pf.canAudit && vm.prepareAudit()) onAudit() else showSetup = true }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-        HomeHeader(onSettings, mark = { com.dpdpxray.app.ui.components.BrandMark(size = 40.dp) })
-        val modeSettings by vm.settings.collectAsState()
-        com.dpdpxray.app.ui.modes.ModePill(
-            modeSettings.audience, { a -> vm.updateSettings { it.copy(audience = a) } },
-            Modifier.fillMaxWidth().padding(top = 12.dp),
-        )
-        Text("Apps promise. TraceVeil checks.", style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 8.dp))
-
+        Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            com.dpdpxray.app.ui.components.BrandMark(size = 40.dp, contentDescription = null)
+            Spacer(Modifier.size(12.dp))
+            Text("TraceVeil", style = MaterialTheme.typography.headlineMedium, maxLines = 1, modifier = Modifier.weight(1f).semantics { heading() })
+            LangVoiceButton()
+            IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).semantics { contentDescription = "Settings" }) {
+                GlyphIcon(Glyph.SETTINGS, Film.boneDim, size = 24.dp)
+            }
+        }
         Spacer(Modifier.height(16.dp))
-        GuideBanner(
-            running?.let { GuideFlow.homeRunning(it.config.targetLabel) } ?: GuideFlow.home(pf),
-            Modifier.reveal(0),
-            speak = running == null,
-            action = running?.let { "Watch the check" to onLive },
-        )
 
-        if (todo.isNotEmpty()) {
-            Spacer(Modifier.height(16.dp))
-            Box(Modifier.reveal(1)) { GettingReady(items, todo, aiLine, fix, onLab) }
-        }
-
-        Spacer(Modifier.height(16.dp))
-        Hero(canAudit = pf.canAudit, stepsLeft = todo.size, Modifier.reveal(2)) { if (vm.prepareAudit()) onAudit() }
-
-        if (todo.isEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            Box(Modifier.reveal(3)) { ReadyPanel(items, aiLine, fix, onLab) }
-        }
-
-        val latest = audits.firstOrNull()
-        val tiles = buildList {
-            if (onApk != null) add(Tile("Check an APK file", "Inspect an app file on this phone", Glyph.APK, onApk))
-            if (latest != null) add(Tile("Ask about my last check", "By voice or tap, about ${latest.targetLabel}", Glyph.ASK) { onVoice(latest.id) })
-            add(Tile("See a sample", "A labelled example result; no setup", Glyph.SAMPLE) { vm.openSample(onOpen) })
-            add(Tile("Camera check", "Review a photo of a consent screen", Glyph.CAMERA, onCamera))
-        }
-        GroupHeader("Quick actions", Modifier.reveal(4))
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            tiles.chunked(2).forEachIndexed { r, row ->
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).reveal(5 + r), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { t -> ActionTile(t.title, t.detail, t.glyph, t.onClick, Modifier.weight(1f).fillMaxHeight()) }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
+        // The one hero: a promise, one sentence, one action, one readiness line.
+        Column(
+            Modifier.fillMaxWidth().reveal(0).cardSurface().padding(24.dp),
+        ) {
+            if (running != null) {
+                Text(HomeCopy.checking(running.config.targetLabel).pick(lang), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+                Spacer(Modifier.height(20.dp))
+                PrimaryButton(EverydayCopy.running.pick(lang), onLive)
+            } else {
+                Text(HomeCopy.heroTitle.pick(lang), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+                Text(HomeCopy.heroBody.pick(lang), style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 8.dp))
+                Spacer(Modifier.height(20.dp))
+                PrimaryButton(HomeCopy.checkApp.pick(lang), startCheck)
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    if (todo.isEmpty()) {
+                        com.dpdpxray.app.ui.system.StatusDot(Film.clear)
+                        Spacer(Modifier.size(8.dp))
+                        Text(EverydayCopy.ready.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                    } else {
+                        TextAction(HomeCopy.stepsToFinish(todo.size).pick(lang) + "  ›", { showSetup = true }, color = Film.warn)
+                    }
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            LinkAction("How it works", onHowItWorks, glyph = Glyph.BOOK)
-            LinkAction("More samples", { showSampleFixtures = true }, color = Film.boneDim, glyph = Glyph.REPORTS)
-        }
-        if (onAutomation != null) {
-            Spacer(Modifier.height(8.dp))
-            AutomateCard(onAutomation)
-        }
 
-        GroupHeader("Recent checks") {
-            if (audits.size > RECENT_ON_HOME) LinkAction("See all ${audits.size}", onAllReports)
-            else if (audits.isNotEmpty()) Text("${audits.size}", style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
+        // Recent checks: three rows, the rest in Reports.
+        SectionHeader(EverydayCopy.recentTitle.pick(lang)) {
+            if (audits.size > RECENT_ON_HOME) TextAction(EverydayCopy.seeAll.pick(lang), onAllReports)
         }
         if (audits.isEmpty()) {
-            EmptyState(
-                "No checks yet",
-                "Your checks will appear here.",
-                action = "See a sample" to { vm.openSample(onOpen) },
-            )
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            audits.take(RECENT_ON_HOME).forEachIndexed { i, a -> RecentCheckCard(a, Modifier.reveal(7 + i)) { onOpen(a.id) } }
-        }
-        if (audits.size > RECENT_ON_HOME) {
-            OutlineAction("See all ${audits.size} checks in Reports", onAllReports, Modifier.padding(top = 12.dp), glyph = Glyph.REPORTS)
-        }
-        Spacer(Modifier.height(24.dp))
-    }
-    if (showSampleFixtures) SampleFixturesDialog(vm, onOpen) { showSampleFixtures = false }
-}
-
-/**
- * The Home title row: an optional brand [mark] before the name, the name with its short brand rule, and Settings.
- * The mark slot is empty for now; pass a composable to show a logo there.
- */
-@Composable
-internal fun HomeHeader(onSettings: () -> Unit, mark: (@Composable () -> Unit)? = null) {
-    Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (mark != null) {
-            mark()
-            Spacer(Modifier.width(12.dp))
-        }
-        Column(Modifier.weight(1f)) {
-            Text("TraceVeil", style = MaterialTheme.typography.headlineMedium, maxLines = 1, modifier = Modifier.semantics { heading() })
-            Box(Modifier.padding(top = 4.dp).size(width = 44.dp, height = 3.dp).clip(CircleShape).background(Brand.horizontal))
-        }
-        IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).semantics { contentDescription = "Settings" }) {
-            GlyphIcon(Glyph.SETTINGS, Film.boneDim, size = 24.dp)
-        }
-    }
-}
-
-/** Home shows the newest few; the Reports tab lists them all. */
-private const val RECENT_ON_HOME = 3
-
-private data class Tile(val title: String, val detail: String, val glyph: Glyph, val onClick: () -> Unit)
-
-/**
- * The lightbox: a readiness chip, one question, one sentence, one action. A faint film grid and a consent line sit
- * behind it.
- */
-@Composable
-private fun Hero(canAudit: Boolean, stepsLeft: Int, modifier: Modifier = Modifier, onCheck: () -> Unit) {
-    val shape = RoundedCornerShape(22.dp)
-    Box(modifier.fillMaxWidth().cardSurface(22.dp, glow = Brand.coral).background(Brand.heroWash)) {
-        // The film grid sits in its own layer, so the slow sweep above it never redraws the grid.
-        Canvas(Modifier.matchParentSize().graphicsLayer()) {
-            val step = 22.dp.toPx()
-            var x = step
-            while (x < size.width) { drawLine(FilmExtra.hairline, Offset(x, 0f), Offset(x, size.height), 1f); x += step }
-            var y = step
-            while (y < size.height) { drawLine(FilmExtra.hairline, Offset(0f, y), Offset(size.width, y), 1f); y += step }
-            val line = size.height * 0.36f
-            drawLine(
-                Brush.horizontalGradient(listOf(Color.Transparent, Film.scan.copy(alpha = 0.55f), Color.Transparent)),
-                Offset(0f, line), Offset(size.width, line), 2.dp.toPx(),
-            )
-        }
-        Box(Modifier.matchParentSize().graphicsLayer().gradientSweep(color = Brand.peach, alpha = 0.06f, periodMs = 9000))
-        Column(Modifier.padding(20.dp)) {
-            ReadinessChip(canAudit, stepsLeft)
-            Text(
-                "Does an app respect your choice?", style = MaterialTheme.typography.headlineMedium, color = Film.bone,
-                modifier = Modifier.padding(top = 14.dp).semantics { heading() },
-            )
-            Text(
-                "TraceVeil watches one app's lookups while you accept or refuse its consent popup, then explains what it saw.",
-                style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 8.dp, bottom = 18.dp),
-            )
-            GradientAction("Check an app", onCheck, glyph = Glyph.PLAY, sweep = true)
-            if (!canAudit) Text(
-                "Allow the VPN and turn on the consent watcher first (see Getting ready).",
-                style = MaterialTheme.typography.bodyMedium, color = Film.warn, modifier = Modifier.padding(top = 10.dp),
-            )
-        }
-    }
-}
-
-/** "Ready to check" in green once nothing is left to do; otherwise what is left, in amber. Same checks as Getting ready. */
-@Composable
-private fun ReadinessChip(canAudit: Boolean, stepsLeft: Int) {
-    val color = if (canAudit && stepsLeft == 0) Film.clear else Film.warn
-    val text = when {
-        canAudit && stepsLeft == 0 -> "Ready to check"
-        canAudit -> "Ready · see the tip above"
-        stepsLeft == 1 -> "1 setup step left"
-        else -> "$stepsLeft setup steps left"
-    }
-    Row(
-        Modifier.clip(CircleShape).background(color.copy(alpha = 0.12f)).border(1.dp, color.copy(alpha = 0.4f), CircleShape)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
-        Spacer(Modifier.width(8.dp))
-        Text(text, style = MaterialTheme.typography.labelMedium, color = color)
-    }
-}
-
-/** Developer mode only: the same audits, run from a laptop or CI. Opens Settings › Developer automation. */
-@Composable
-private fun AutomateCard(onClick: () -> Unit) {
-    val shape = RoundedCornerShape(18.dp)
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 84.dp).pressClickable(shape = shape, onClick = onClick).cardSurface(18.dp).padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(44.dp).clip(CircleShape).background(Film.scan.copy(alpha = 0.13f)), contentAlignment = Alignment.Center) {
-            ModeGlyphIcon(ModeGlyph.CODE, Film.scan, size = 24.dp)
-        }
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text("Automate it", style = MaterialTheme.typography.titleMedium, color = Film.bone)
-            Text("Run audits from your laptop or CI on every alpha/beta build.", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
-        }
-        Spacer(Modifier.width(8.dp))
-        GlyphIcon(Glyph.CHEVRON_RIGHT, Film.boneDim, size = 18.dp)
-    }
-}
-
-private fun glyphFor(kind: SetupKind) = when (kind) {
-    SetupKind.VPN -> Glyph.VPN
-    SetupKind.WATCHER -> Glyph.WATCHER
-    SetupKind.PRIVATE_DNS -> Glyph.PRIVATE_DNS
-    SetupKind.SHIZUKU -> Glyph.RESET
-}
-
-/** Shown above the main action while something is missing: one numbered step per item, each with a Fix button. */
-@Composable
-private fun GettingReady(items: List<SetupItem>, todo: List<SetupItem>, aiLine: String, fix: (SetupKind) -> Unit, onLab: () -> Unit) {
-    Panel {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Getting ready", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
-            Text(if (todo.size == 1) "1 step left" else "${todo.size} steps left", style = MaterialTheme.typography.labelMedium, color = Film.warn)
-        }
-        Spacer(Modifier.height(6.dp))
-        todo.forEachIndexed { i, item -> SetupRow(item, number = i + 1) { fix(item.kind) } }
-        val rest = items.filter { it !in todo }
-        if (rest.isNotEmpty()) {
-            Box(Modifier.padding(vertical = 8.dp).fillMaxWidth().height(1.dp).background(FilmExtra.hairline))
-            rest.forEach { item -> SetupRow(item, number = null) { fix(item.kind) } }
-            AiRow(aiLine, onLab)
-        }
-    }
-}
-
-/** Shown below the main action once everything required is done: one line, details on request. */
-@Composable
-private fun ReadyPanel(items: List<SetupItem>, aiLine: String, fix: (SetupKind) -> Unit, onLab: () -> Unit) {
-    var open by rememberSaveable { mutableStateOf(false) }
-    Panel(Modifier.animateContentSize(if (LocalReduceMotion.current) snap() else tween(Motion.MEDIUM, easing = Motion.emphasized))) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                .clickable(role = Role.Button, onClickLabel = if (open) "Hide details" else "Show details") { open = !open }
-                .semantics { stateDescription = if (open) "Expanded" else "Collapsed" },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(32.dp).clip(CircleShape).background(Film.clear.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                GlyphIcon(Glyph.CHECK, Film.clear, size = 18.dp)
+            Group {
+                ListRow(
+                    EverydayCopy.emptyTitle.pick(lang), subtitle = null, titleColor = Film.boneDim,
+                    trailing = { TextAction(EverydayCopy.seeSample.pick(lang), { vm.openSample(onOpen) }) },
+                )
             }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Setup", style = MaterialTheme.typography.titleMedium)
-                Text("VPN allowed and consent watcher on", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
-            }
-            Text(if (open) "Hide" else "Details", style = MaterialTheme.typography.labelLarge, color = Film.scan)
-            Spacer(Modifier.width(4.dp))
-            val turn by animateFloatAsState(if (open) 180f else 0f, if (LocalReduceMotion.current) snap() else tween(Motion.MEDIUM, easing = Motion.emphasized), label = "ready-chevron")
-            GlyphIcon(Glyph.CHEVRON_DOWN, Film.scan, Modifier.graphicsLayer { rotationZ = turn }, size = 16.dp)
-        }
-        if (open) {
-            Column(Modifier.padding(top = 6.dp)) {
-                items.forEach { item -> SetupRow(item, number = null) { fix(item.kind) } }
-                AiRow(aiLine, onLab)
+        } else {
+            Group {
+                audits.take(RECENT_ON_HOME).forEachIndexed { i, meta ->
+                    if (i > 0) GroupDivider()
+                    CheckRow(meta, lang) { onOpen(meta.id) }
+                }
             }
         }
+
+        // Other ways to check; developer mode adds the tools that used to sit in Quick actions.
+        SectionHeader(HomeCopy.moreWays.pick(lang))
+        Group {
+            ListRow(
+                HomeCopy.fileTitle.pick(lang), subtitle = HomeCopy.fileBody.pick(lang),
+                leading = { GlyphIcon(Glyph.APK, Film.boneDim, size = 24.dp) },
+                onClick = { filePicker.launch(arrayOf(IncomingApk.APK_MIME, "application/octet-stream")) },
+            )
+            if (onCheckup != null) {
+                GroupDivider(54.dp)
+                ListRow(
+                    HomeCopy.appsTitle.pick(lang), subtitle = HomeCopy.appsBody.pick(lang),
+                    leading = { GlyphIcon(Glyph.SEARCH, Film.boneDim, size = 24.dp) }, onClick = onCheckup,
+                )
+            }
+            if (developer) {
+                GroupDivider(54.dp)
+                ListRow(
+                    HomeCopy.cameraTitle.pick(lang), subtitle = HomeCopy.cameraBody.pick(lang),
+                    leading = { GlyphIcon(Glyph.CAMERA, Film.boneDim, size = 24.dp) }, onClick = onCamera,
+                )
+                audits.firstOrNull()?.let { latest ->
+                    GroupDivider(54.dp)
+                    ListRow(
+                        HomeCopy.askTitle.pick(lang), subtitle = latest.targetLabel,
+                        leading = { GlyphIcon(Glyph.ASK, Film.boneDim, size = 24.dp) }, onClick = { onVoice(latest.id) },
+                    )
+                }
+                GroupDivider(54.dp)
+                ListRow(
+                    EverydayCopy.seeSample.pick(lang), subtitle = null,
+                    leading = { GlyphIcon(Glyph.SAMPLE, Film.boneDim, size = 24.dp) }, onClick = { vm.openSample(onOpen) },
+                )
+                GroupDivider(54.dp)
+                ListRow(
+                    HomeCopy.samplesTitle.pick(lang), subtitle = HomeCopy.samplesBody.pick(lang),
+                    leading = { GlyphIcon(Glyph.REPORTS, Film.boneDim, size = 24.dp) }, onClick = { showSamples = true },
+                )
+                if (onAutomation != null) {
+                    GroupDivider(54.dp)
+                    ListRow(
+                        HomeCopy.automateTitle.pick(lang), subtitle = HomeCopy.automateBody.pick(lang),
+                        leading = { GlyphIcon(Glyph.PLAY, Film.boneDim, size = 24.dp) }, onClick = onAutomation,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(32.dp))
+    }
+
+    if (showSetup) {
+        val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(onDismissRequest = { showSetup = false }, sheetState = sheet, containerColor = Film.base) {
+            SetupSheetContent(items, todo, lang, aiLine = aiStatusLine(llm), fix = fix, onLab = { showSetup = false; onLab() })
+        }
+    }
+    if (showSamples) SampleFixturesDialog(vm, onOpen) { showSamples = false }
+}
+
+@Composable
+private fun SectionHeader(text: String, trailing: (@Composable () -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().padding(top = 32.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
+        trailing?.invoke()
     }
 }
 
-/** One setup step with its Fix button; also used inside the everyday Home's "No" card. */
+/** A saved check: name, plain result and date on the left, the score tinted by its band on the right. */
 @Composable
-internal fun SetupRow(item: SetupItem, number: Int?, onFix: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        val accent = when {
-            item.done -> Film.clear
-            item.need == SetupNeed.REQUIRED -> Brand.coral
-            item.need == SetupNeed.RECOMMENDED -> Film.warn
-            else -> Film.boneDim
-        }
-        Box(
-            Modifier.size(32.dp).clip(CircleShape).background(accent.copy(alpha = 0.13f)).border(1.dp, accent.copy(alpha = 0.5f), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (number != null) Text("$number", style = MaterialTheme.typography.labelLarge, color = accent)
-            else GlyphIcon(if (item.done) Glyph.CHECK else glyphFor(item.kind), accent, size = 18.dp)
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(item.title, style = MaterialTheme.typography.titleMedium)
-            FoldText(item.detail)
-        }
-        if (item.fixable && !item.done) {
-            Spacer(Modifier.width(8.dp))
-            PillButton(if (item.kind == SetupKind.SHIZUKU) "Allow" else "Fix", onFix)
-        }
-    }
+internal fun CheckRow(meta: AuditMeta, lang: GuideLang, onClick: () -> Unit) {
+    val partial = RecentChecks.coverageWarning(meta) != null
+    val subtitle = (if (partial) EverydayCopy.partial.pick(lang) + " · " else "") +
+        EverydayCopy.band(meta.band).pick(lang) + " · " + SimpleDateFormat("d MMM", Locale.US).format(Date(meta.createdAtMs))
+    ListRow(
+        title = meta.targetLabel, subtitle = subtitle, onClick = onClick,
+        trailing = { Text(RecentChecks.scoreText(meta), style = MaterialTheme.typography.titleLarge, color = bandColor(meta.band)) },
+    )
 }
 
+/** The Setup sheet: what still needs doing first, then what is already in place, then the optional on-device AI. */
 @Composable
-private fun AiRow(line: String, onLab: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(32.dp).clip(CircleShape).background(Film.scan.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
-            GlyphIcon(Glyph.AI, Film.scan, size = 18.dp)
+private fun SetupSheetContent(
+    items: List<SetupItem>, todo: List<SetupItem>, lang: GuideLang, aiLine: String, fix: (SetupKind) -> Unit, onLab: () -> Unit,
+) {
+    val done = items.filter { it !in todo && it.need != SetupNeed.OPTIONAL }
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).navigationBarsPadding().padding(bottom = 24.dp)) {
+        Text(HomeCopy.setupTitle.pick(lang), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp).semantics { heading() })
+        if (todo.isNotEmpty()) {
+            Group(title = HomeCopy.toDo.pick(lang)) {
+                todo.forEachIndexed { i, item ->
+                    if (i > 0) GroupDivider()
+                    val plain = EverydayCopy.setupTitle(item.kind).pick(lang)
+                    val detail = EverydayCopy.setupDetail(item.kind).pick(lang)
+                    ListRow(
+                        plain, subtitle = detail, subtitleMaxLines = 4,
+                        trailing = if (item.fixable) { { TextAction((if (item.kind == SetupKind.SHIZUKU) HomeCopy.allow else HomeCopy.fix).pick(lang), { fix(item.kind) }) } } else null,
+                    )
+                }
+            }
+            Spacer(Modifier.height(20.dp))
         }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text("On-device AI (optional)", style = MaterialTheme.typography.titleMedium)
-            Text(line, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+        Group(title = HomeCopy.allSet.pick(lang).takeIf { done.isNotEmpty() }) {
+            done.forEachIndexed { i, item ->
+                if (i > 0) GroupDivider()
+                ListRow(item.title, subtitle = item.detail, trailing = { GlyphIcon(Glyph.CHECK, Film.clear, size = 20.dp) })
+            }
         }
-        LinkAction("AI lab", onLab)
+        Spacer(Modifier.height(20.dp))
+        Group(title = HomeCopy.optional.pick(lang)) {
+            // Full check needs Shizuku; this is where it is allowed (or opened, when it is not running yet).
+            items.firstOrNull { it.kind == SetupKind.SHIZUKU }?.let { s ->
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                ListRow(
+                    s.title, subtitle = s.detail, subtitleMaxLines = 4,
+                    trailing = {
+                        when {
+                            s.done -> GlyphIcon(Glyph.CHECK, Film.clear, size = 20.dp)
+                            s.fixable -> TextAction(HomeCopy.allow.pick(lang), { fix(SetupKind.SHIZUKU) })
+                            else -> TextAction(HomeCopy.openShizuku.pick(lang), { com.dpdpxray.app.control.DeviceChecks.launch(ctx, "moe.shizuku.privileged.api") })
+                        }
+                    },
+                )
+                GroupDivider()
+            }
+            ListRow(
+                HomeCopy.aiTitle.pick(lang), subtitle = aiLine,
+                trailing = { TextAction(HomeCopy.aiAction.pick(lang), onLab) },
+            )
+        }
     }
 }

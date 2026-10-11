@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, adb, fixes, laws, netwatch
+from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, access, adb, fixes, laws, netwatch
 from .colors import PLAIN, Style
 from .netenv import OWN_PACKAGE
 
@@ -127,6 +127,32 @@ def _names(entities: list, style: Style) -> str:
     return shown + (style.dim(f" (+{len(entities) - MAX_NAMES} more)") if len(entities) > MAX_NAMES else "")
 
 
+def network_lines(net: dict, style: Style = PLAIN) -> list[str]:
+    """Connection-level capture: risk, findings, traffic per consent phase, and the connections seen."""
+    if net.get("depth") != "full-relay":
+        return ["  Network (connections)  not captured: this audit ran DNS-only"]
+    lines = [f"  Network (connections)  risk {net.get('level', '?')}  "
+             f"{net.get('connectionCount', 0)} connections, {net.get('httpRequestCount', 0)} plain-HTTP requests read"]
+    for f in net.get("findings", []):
+        lines.append(f"    {style.severity(str(f.get('severity', '?')), 8)} {f.get('title', '')}: {f.get('destination', '')} "
+                     f"[{str(f.get('phase', '')).lower()}, confidence {str(f.get('confidence', '')).lower()}]")
+        for e in f.get("evidence", [])[:2]:
+            lines.append(f"       {style.dim(e)}")
+    for t in net.get("traffic", []):
+        lines.append(f"    {t.get('phase', '?'):<16} {t.get('connections', 0)} conn, {t.get('bytesUp', 0)} B up, {t.get('bytesDown', 0)} B down")
+    shown = net.get("connections", [])[:10]
+    for c in shown:
+        reqs = c.get("http") or []
+        tail = f"  {len(reqs)} HTTP request(s): " + "; ".join(f"{r.get('method')} {r.get('host')}{r.get('target')}" for r in reqs[:2]) if reqs else ""
+        lines.append(f"      {c.get('protocol', '?'):<4} {(c.get('host') or c.get('ip', '')):<34} :{c.get('port')} {c.get('tls', ''):<10} "
+                     f"{c.get('phase', '').lower():<14} {c.get('bytesUp', 0)}/{c.get('bytesDown', 0)} B{tail}")
+    if len(net.get("connections", [])) > len(shown):
+        lines.append(f"      ... {len(net['connections']) - len(shown)} more in the saved JSON")
+    for lim in net.get("limitations", [])[:3]:
+        lines.append(f"    {style.dim('limit: ' + lim)}")
+    return lines
+
+
 def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) -> str:
     t = rep["target"]
     lines = [f"Traceveil audit  {style.bold(t.get('label', '?'))} ({t.get('package', '?')})  "
@@ -140,10 +166,14 @@ def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) ->
             lines.append(f"       {style.dim('trackers:')} {_names(f['entities'], style)}")
         if f.get("check") in plan:
             lines += fixes.summary_lines({**rep["fixPlan"], "issues": [plan[f["check"]]]}, style, compact=True)
+    if rep.get("network") is not None:
+        lines += network_lines(rep["network"], style)
+    if rep.get("dataAccess") is not None:
+        lines += access.lines(rep["dataAccess"], style)
     if rep.get("lenses"):
         lines += laws.table(rep["lenses"], style)
-    if rep.get("network"):
-        lines += netwatch.summary_lines(rep["network"], style)
+    if rep.get("socketWatch"):
+        lines += netwatch.summary_lines(rep["socketWatch"], style)
     for r in reasons:
         lines.append(f"  {style.warn('policy:')} {r}")
     lines.append(f"  report saved: {saved}")
@@ -237,6 +267,9 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
     if rep is None:
         return _fail(io, problem, EXIT_INCONCLUSIVE)
 
+    data_access = access.collect(dev, rep["target"].get("package") or package, rep)
+    if data_access is not None:
+        rep["dataAccess"] = data_access
     try:
         policy = policy or cfg["audit"]["policy"]
         rep["lenses"] = laws.assess_all(rep, lenses or cfg["audit"]["lenses"], policy)
@@ -248,7 +281,7 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
             vpn = netwatch.declares_vpn_service(dev.shell_checked(f"dumpsys package {shlex.quote(package)}"))
         except adb.AdbError:
             vpn = None
-        rep["network"] = netwatch.analyze(sampler.seen, rep, sampler.as_dict(poll_s), vpn)
+        rep["socketWatch"] = netwatch.analyze(sampler.seen, rep, sampler.as_dict(poll_s), vpn)
     out_dir = Path(cfg["output"]["dir"])
     out_dir.mkdir(parents=True, exist_ok=True)
     saved = out_dir / f"{request_id}.json"
@@ -259,7 +292,7 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
                                   encoding="utf-8")
     code, reasons = exit_for_report(laws.policy_view(rep["lenses"]), fail_on_override or cfg["audit"]["fail_on"],
                                     int(cfg["audit"]["min_score"]))
-    if fail_on_hidden and rep.get("network") and netwatch.hidden(rep["network"]):
+    if fail_on_hidden and rep.get("socketWatch") and netwatch.hidden(rep["socketWatch"]):
         reasons.append("the app made connections the DNS capture could not see (--fail-on-hidden)")
         code = code if code != EXIT_PASS else EXIT_FINDINGS
     text = (json.dumps(rep, indent=2) if as_json else fixes.markdown(rep["fixPlan"]) if as_md

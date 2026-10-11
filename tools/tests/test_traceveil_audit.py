@@ -52,6 +52,8 @@ class FakePhone:
             return self.dumpsys
         if command.startswith("am broadcast"):
             return self.broadcast
+        if command.startswith(("date", "appops")):
+            return ""
         if command == "echo ok" or command.startswith("cat "):
             self.reads += 1
             if self.reads in self.gone_at:
@@ -122,7 +124,7 @@ class AuditCommandTests(unittest.TestCase):
         self.cfg["audit"]["fail_on"] = "off"
         code, i = self.run_audit(phone)
         self.assertEqual(EXIT_PASS, code)
-        net = json.loads((Path(self.cfg["output"]["dir"]) / "REQ.json").read_text())["network"]
+        net = json.loads((Path(self.cfg["output"]["dir"]) / "REQ.json").read_text())["socketWatch"]
         self.assertEqual(net["sampling"]["uid"], 10349)
         self.assertGreaterEqual(net["sampling"]["samples"], 1)
         self.assertEqual([(c["ip"], c["kind"]) for c in net["connections"]], [("1.1.1.1", "encrypted-dns")])  # other app ignored
@@ -130,7 +132,7 @@ class AuditCommandTests(unittest.TestCase):
         code, i = self.run_audit(phone, fail_on_hidden=True)
         self.assertEqual(EXIT_FINDINGS, code)
         self.assertIn("--fail-on-hidden", i.out.getvalue())
-        self.assertNotIn("network", json.loads(self.run_audit(phone, watch_network=False, as_json=True)[1].out.getvalue()))
+        self.assertNotIn("socketWatch", json.loads(self.run_audit(phone, watch_network=False, as_json=True)[1].out.getvalue()))
 
     def test_min_score_policy(self):
         self.cfg["audit"].update(fail_on="off", min_score=50)

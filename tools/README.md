@@ -21,7 +21,7 @@ This is what `final.bash` does, as plain commands. You need Python 3.11+ and `ad
 # 1. Install the CLI in a clean virtual environment
 python3 -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install --upgrade traceveil==0.3.0   # or: pipx install traceveil
+pip install --upgrade traceveil==0.4.0   # or: pipx install traceveil
 traceveil --version
 
 # 2. Check the phone (USB debugging on, Traceveil debug APK installed)
@@ -184,7 +184,7 @@ Colours: severities (CRITICAL, HIGH, MEDIUM, LOW), scores, bands and tracker nam
 
 ## 3c. Network beyond DNS: traffic the DNS capture cannot see
 
-TraceVeil captures plain DNS lookups. An SDK that uses **encrypted DNS** (DNS-over-HTTPS or -TLS), connects to a **hardcoded IP**, or sends DNS **straight to an outside resolver** makes no lookup the capture can read. It still has to open a socket, and `adb shell` can read every socket on the phone with its owner app from `/proc/net/{tcp,tcp6,udp,udp6}`. While an audit runs, the CLI samples the audited app's sockets once a second and matches each remote address against the addresses its visible lookups returned (`dnsAnswers` in the report):
+TraceVeil captures plain DNS lookups. An SDK that uses **encrypted DNS** (DNS-over-HTTPS or -TLS), connects to a **hardcoded IP**, or sends DNS **straight to an outside resolver** makes no lookup the capture can read. It still has to open a socket, and `adb shell` can read every socket on the phone with its owner app from `/proc/net/{tcp,tcp6,udp,udp6}`. While an audit runs, the CLI samples the audited app's sockets once a second and matches each remote address against the addresses its visible lookups returned (`dnsAnswers` in the report). The result is saved under `socketWatch`; `network` is the app's own connection capture and `dataAccess` its app-ops timeline, the same logs the app shows:
 
 | Label | Meaning |
 |---|---|

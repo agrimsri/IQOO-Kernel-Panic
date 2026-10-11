@@ -65,7 +65,7 @@ import com.dpdpxray.app.ui.theme.Motion
  */
 
 /** How much a card or button shrinks while pressed. */
-const val PRESSED_SCALE = 0.97f
+const val PRESSED_SCALE = 0.98f
 
 /**
  * [clickable] with a gentle press: the element scales to [PRESSED_SCALE] while a finger is down. Ripple and
@@ -83,7 +83,7 @@ fun Modifier.pressClickable(
     val pressed by source.collectIsPressedAsState()
     val reduce = LocalReduceMotion.current
     val scale by animateFloatAsState(
-        if (pressed && enabled && !reduce) PRESSED_SCALE else 1f, tween(if (pressed) 100 else Motion.SHORT, easing = Motion.emphasized),
+        if (pressed && enabled && !reduce) PRESSED_SCALE else 1f, tween(if (pressed) 80 else Motion.SHORT, easing = Motion.emphasized),
         label = "press",
     )
     this
@@ -93,24 +93,20 @@ fun Modifier.pressClickable(
 }
 
 /**
- * Staggered fade-up as a screen opens: element [index] waits index x 45 ms (capped), then rises 16 dp while fading in.
- * Plays once per screen visit; a list item scrolled back into view does not replay. Instant with reduced motion.
+ * One short fade as a screen opens: no stagger, no rise. Plays once per screen visit; a list item scrolled back into
+ * view does not replay. [index] is accepted so older call sites compile. Instant with reduced motion.
  */
+@Suppress("UNUSED_PARAMETER")
 fun Modifier.reveal(index: Int = 0): Modifier = composed {
     val reduce = LocalReduceMotion.current
     var played by rememberSaveable { mutableStateOf(reduce) }
     if (played) return@composed this
     val progress = remember { Animatable(0f) }
-    val rise = with(LocalDensity.current) { 16.dp.toPx() }
     LaunchedEffect(Unit) {
-        progress.animateTo(1f, tween(Motion.LONG, delayMillis = index.coerceIn(0, 8) * 45, easing = Motion.enter))
+        progress.animateTo(1f, tween(Motion.SHORT, easing = Motion.enter))
         played = true
     }
-    this.graphicsLayer {
-        val p = progress.value
-        alpha = p
-        translationY = (1f - p) * rise
-    }
+    this.graphicsLayer { alpha = progress.value }
 }
 
 /**
@@ -129,55 +125,14 @@ fun rememberOnScreen(): Pair<State<Boolean>, Modifier> {
 }
 
 /**
- * A very slow, low-contrast light band drifting across the element (about one pass every [periodMs] ms). Used on
- * the main "Check an app" action and the Home hero. Still when motion is reduced or the element is off screen.
+ * Retired: nothing sweeps across buttons or cards any more. Kept so older call sites compile; it changes nothing.
  */
-fun Modifier.gradientSweep(color: Color = Color.White, alpha: Float = 0.10f, periodMs: Int = 5200): Modifier = composed {
-    val reduce = LocalReduceMotion.current
-    val (onScreen, track) = rememberOnScreen()
-    val moving = !reduce && onScreen.value
-    val phase: State<Float> = if (moving) {
-        rememberInfiniteTransition(label = "sweep").animateFloat(
-            0f, 1f, infiniteRepeatable(tween(periodMs, easing = LinearEasing), RepeatMode.Restart), label = "sweep-phase",
-        )
-    } else remember { mutableStateOf(0.35f) }
-    this.then(track).drawWithCache {
-        val band = size.width * 0.55f
-        val brush = Brush.linearGradient(
-            listOf(Color.Transparent, color.copy(alpha = alpha), Color.Transparent),
-            start = Offset(0f, 0f), end = Offset(band, size.height * 0.6f),
-        )
-        onDrawWithContent {
-            drawContent()
-            val x = -band + (size.width + band) * phase.value
-            clipRect { translate(left = x) { drawRect(brush, size = Size(band, size.height)) } }
-        }
-    }
-}
+@Suppress("UNUSED_PARAMETER")
+fun Modifier.gradientSweep(color: Color = Color.White, alpha: Float = 0.10f, periodMs: Int = 5200): Modifier = this
 
-/** Shimmer for placeholders while something loads. Still (a flat placeholder) when motion is reduced. */
-fun Modifier.shimmer(): Modifier = composed {
-    val reduce = LocalReduceMotion.current
-    val phase: State<Float> = if (!reduce) {
-        rememberInfiniteTransition(label = "shimmer").animateFloat(
-            0f, 1f, infiniteRepeatable(tween(1300, easing = LinearEasing), RepeatMode.Restart), label = "shimmer-phase",
-        )
-    } else remember { mutableStateOf(-1f) }
-    this.drawWithCache {
-        val band = size.width * 0.45f
-        val brush = Brush.horizontalGradient(
-            listOf(Color.Transparent, Film.bone.copy(alpha = 0.07f), Color.Transparent), startX = 0f, endX = band,
-        )
-        onDrawWithContent {
-            drawContent()
-            val p = phase.value
-            if (p >= 0f) {
-                val x = -band + (size.width + band) * p
-                clipRect { translate(left = x) { drawRect(brush, size = Size(band, size.height)) } }
-            }
-        }
-    }
-}
+/** Placeholders are flat and still; they do not shimmer. Kept so older call sites compile. */
+fun Modifier.shimmer(): Modifier = this
+
 
 /** One placeholder bar. */
 @Composable
@@ -234,12 +189,8 @@ fun RecordingDot(color: Color = Film.leak, modifier: Modifier = Modifier, dot: D
     )
 }
 
-/** A dot that fades in and out (used for "waiting" states). */
+/** A small steady dot for "waiting" states. It no longer pulses; [BreathingDot] keeps its name for older call sites. */
 @Composable
 fun BreathingDot(color: Color, modifier: Modifier = Modifier, size: Dp = 8.dp) {
-    val reduce = LocalReduceMotion.current
-    val a: State<Float> = if (!reduce) {
-        rememberInfiniteTransition(label = "breath").animateFloat(0.35f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "breath-a")
-    } else remember { mutableStateOf(1f) }
-    Box(modifier.size(size).graphicsLayer { alpha = a.value }.clip(CircleShape).background(color))
+    Box(modifier.size(size).clip(CircleShape).background(color))
 }

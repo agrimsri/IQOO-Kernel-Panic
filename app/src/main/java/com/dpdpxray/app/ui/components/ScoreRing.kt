@@ -60,7 +60,7 @@ fun ScoreRing(score: Int?, band: ScoreBand, modifier: Modifier = Modifier, ringS
         if (reduce) progress.snapTo(target) else progress.animateTo(target, tween(1100, delayMillis = 120, easing = Motion.enter))
     }
     val shown by remember(progress) { derivedStateOf { (progress.value * 100f).roundToInt() } }
-    val breath: State<Float> = if (inconclusive && !reduce) {
+    val breath: State<Float> = if (false) {
         rememberInfiniteTransition(label = "ring-breath").animateFloat(
             0.45f, 1f, infiniteRepeatable(tween(1400, easing = Motion.emphasized), RepeatMode.Reverse), label = "ring-alpha",
         )
@@ -70,7 +70,7 @@ fun ScoreRing(score: Int?, band: ScoreBand, modifier: Modifier = Modifier, ringS
 
     Box(
         modifier.size(ringSize).clearAndSetSemantics { contentDescription = label }.drawWithCache {
-            val stroke = 12.dp.toPx()
+            val stroke = 8.dp.toPx()
             val inset = stroke / 2f + 6.dp.toPx()
             val arcSize = Size(size.width - inset * 2, size.height - inset * 2)
             val topLeft = Offset(inset, inset)
@@ -83,12 +83,10 @@ fun ScoreRing(score: Int?, band: ScoreBand, modifier: Modifier = Modifier, ringS
             val butt = Stroke(stroke, cap = StrokeCap.Butt)
             onDrawBehind {
                 if (inconclusive) {
-                    drawCircle(Film.boneDim.copy(alpha = 0.10f * breath.value), radius = radius + stroke)
                     drawCircle(Film.boneDim.copy(alpha = breath.value), radius = radius, center = c, style = dashed)
                     return@onDrawBehind
                 }
-                drawCircle(glow, radius = size.minDimension / 2f)
-                drawCircle(Film.line.copy(alpha = 0.55f), radius = radius, center = c, style = track)
+                drawCircle(Film.fill, radius = radius, center = c, style = track)
                 val p = progress.value
                 if (p > 0f) {
                     // The sweep gradient starts at 3 o'clock; turning the canvas puts its start at 12 o'clock.

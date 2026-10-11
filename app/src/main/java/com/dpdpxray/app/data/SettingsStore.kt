@@ -33,6 +33,8 @@ data class XraySettings(
      * the global baseline. It changes which law results quote, never the evidence or the consent-first score.
      */
     val legalProfile: String = "",
+    /** Appearance: "system" follows the phone, "light" or "dark" forces that theme. */
+    val themeMode: String = "system",
 )
 
 /** Read side of the stored settings, so the mapping can be tested without Android. */
@@ -67,6 +69,7 @@ internal object SettingsCodec {
         autoCheckNewApps = kv.getBoolean("auto_check_new_apps", defaults.autoCheckNewApps),
         weeklyCheckup = kv.getBoolean("weekly_checkup", defaults.weeklyCheckup),
         legalProfile = kv.getString("legal_profile", defaults.legalProfile),
+        themeMode = kv.getString("theme_mode", defaults.themeMode),
     )
 
     fun write(s: XraySettings, sink: SettingsSink) {
@@ -83,6 +86,7 @@ internal object SettingsCodec {
         sink.putBoolean("auto_check_new_apps", s.autoCheckNewApps)
         sink.putBoolean("weekly_checkup", s.weeklyCheckup)
         sink.putString("legal_profile", s.legalProfile)
+        sink.putString("theme_mode", s.themeMode)
     }
 }
 

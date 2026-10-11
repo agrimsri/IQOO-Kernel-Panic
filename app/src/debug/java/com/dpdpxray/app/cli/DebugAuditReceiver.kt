@@ -3,6 +3,7 @@ package com.dpdpxray.app.cli
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import com.dpdpxray.app.audit.AuditConfig
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.control.DeviceChecks
@@ -67,7 +68,8 @@ class DebugAuditReceiver : BroadcastReceiver() {
                         if (bundle == null) {
                             store.write(request.requestId, CliAuditReport.STATUS_FILE, CliAuditReport.status(request.requestId, "failed", auditId = end.auditId, error = "saved audit could not be read"))
                         } else {
-                            store.write(request.requestId, CliAuditReport.REPORT_FILE, CliAuditReport.build(request.requestId, bundle, g.catalog()))
+                            store.write(request.requestId, CliAuditReport.REPORT_FILE, CliAuditReport.build(request.requestId, bundle, g.catalog(),
+                                CliAuditReport.ClockAnchor(System.currentTimeMillis(), SystemClock.elapsedRealtimeNanos())))
                             store.write(request.requestId, CliAuditReport.STATUS_FILE, CliAuditReport.status(request.requestId, "done", auditId = end.auditId))
                         }
                     }

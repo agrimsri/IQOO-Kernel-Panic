@@ -71,7 +71,12 @@ import com.dpdpxray.app.ui.guide.Bi
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.guide.GradientAction
-import com.dpdpxray.app.ui.guide.GuideBanner
+import com.dpdpxray.app.ui.guide.guideLang
+import com.dpdpxray.app.audit.AccessCopy
+import com.dpdpxray.app.ui.system.Notice
+import com.dpdpxray.app.ui.system.NoticeKind
+import com.dpdpxray.app.ui.system.WatchAccess
+import com.dpdpxray.app.ui.system.rememberAccessAction
 import com.dpdpxray.app.ui.guide.GuideFlow
 import com.dpdpxray.app.ui.guide.GuideStep
 import com.dpdpxray.app.ui.guide.GuideTone
@@ -98,6 +103,7 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
     val progress by vm.progress.collectAsState()
     val net by vm.liveNet.collectAsState()
     val consent by vm.liveConsent.collectAsState()
+    val developer = vm.settings.collectAsState().value.audience == com.dpdpxray.app.data.Audience.DEVELOPER
 
     LaunchedEffect(progress) {
         (progress as? AuditProgress.Done)?.let {
@@ -111,16 +117,17 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
             is AuditProgress.Failed -> {
                 Text("The check stopped", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 32.dp).semantics { heading() })
                 Callout(p.message, Modifier.padding(vertical = 12.dp), color = Film.leak)
-                GuideBanner(
-                    GuideStep(
-                        "live.failed.screen", 1, GuideFlow.TOTAL, GuideTone.CAUTION,
-                        Bi("Fix the setup, then try again", "सेटअप ठीक करें, फिर दोबारा कोशिश करें"),
-                        Bi("Go back to Home and follow the Getting ready steps. Then tap Check an app again.",
-                            "होम पर जाएँ और Getting ready के चरण पूरे करें। फिर Check an app दोबारा दबाएँ।"),
-                        Bi("", ""),
-                    ),
-                    speak = false,
-                )
+                // A missing permission is named with the button that opens its page; once it is on, the check starts again.
+                p.need?.let { need ->
+                    val lang = guideLang()
+                    val act = rememberAccessAction(vm)
+                    WatchAccess(vm, need) { p.config?.let { if (!vm.retryAudit(it)) onBack() } }
+                    Notice(
+                        AccessCopy.reason(need).pick(lang), Modifier.padding(bottom = 8.dp), kind = NoticeKind.CAUTION,
+                        action = AccessCopy.button(need).pick(lang) to { act(need) },
+                    )
+                }
+                Notice(GuideCopy.failed.pick(guideLang()), Modifier.padding(bottom = 8.dp), kind = NoticeKind.CAUTION)
                 GradientAction("Back to Home", { vm.acknowledgeProgress(); onBack() }, Modifier.padding(top = 20.dp))
                 return@Column
             }
@@ -134,15 +141,16 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
                         modifier = Modifier.weight(1f).semantics { heading() },
                     )
                 }
-                ChipFlow(Modifier.padding(top = 8.dp)) {
-                    Tag("Live", Brand.coral)
-                    Tag(if (p.config.fastPreview) "Fast Preview · limited evidence" else "Normal capture", if (p.config.fastPreview) Film.warn else Film.boneDim)
-                }
                 if (p.config.fastPreview) Callout("8-second observation; delayed traffic may be missed. Silent and Reject are not tested.", Modifier.padding(top = 8.dp), fold = true)
                 // The plans really are a sequence, so they are shown as numbered frames.
                 RunFrames(p.config.plans, p.planIndex, Modifier.padding(top = 12.dp))
                 // Narrated in the background by GuideNarrator, so this banner only shows the step.
-                GuideBanner(GuideFlow.live(p), Modifier.padding(top = 12.dp), speak = false)
+                run {
+                    val lang = guideLang()
+                    val step = GuideFlow.live(p)
+                    Text(step.title.pick(lang), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
+                    if (step.body.pick(lang).isNotBlank()) Text(step.body.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 2.dp))
+                }
                 val classified = net.map(vm::classify)
                 val choice = consent.firstOrNull { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }
                 val trackers = classified.filter { it.category.isTracking }
@@ -155,7 +163,7 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
                 // The key caveat stays in view while numbers climb.
                 KeyCaveat("A lookup is an attempt to contact an address, not proof data was sent.", Modifier.padding(top = 6.dp), color = Film.boneDim)
                 // The orchestrator's own wording stays visible for developers; the banner above is the plain version.
-                if (LivePhase.of(p.step) != LivePhase.OTHER) {
+                if (developer && LivePhase.of(p.step) != LivePhase.OTHER) {
                     Text("Status: ${p.step}", style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.padding(top = 10.dp))
                 }
                 Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -202,12 +210,11 @@ private fun RunFrames(plans: List<AuditPlan>, current: Int, modifier: Modifier =
             val done = i < current
             val now = i == current
             val fill by animateColorAsState(
-                when { now -> Brand.coral.copy(alpha = 0.12f); done -> Film.clear.copy(alpha = 0.10f); else -> Color.Transparent }, tween(300), label = "frame",
+                when { now -> Film.fill; else -> Color.Transparent }, tween(300), label = "frame",
             )
             val weight by animateFloatAsState(if (now) 1.4f else 1f, tween(300), label = "frame-weight")
-            val border: Brush = when { now -> Brand.horizontal; done -> SolidColor(Film.clear.copy(alpha = 0.6f)); else -> SolidColor(FilmExtra.hairline) }
             Row(
-                Modifier.weight(weight).heightIn(min = 48.dp).clip(shape).background(fill).border(if (now) 1.5.dp else 1.dp, border, shape).padding(horizontal = 10.dp),
+                Modifier.weight(weight).heightIn(min = 48.dp).clip(shape).background(fill).padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (done) GlyphIcon(Glyph.CHECK, Film.clear, size = 16.dp)
@@ -300,3 +307,11 @@ private fun StatusDotColor(color: androidx.compose.ui.graphics.Color) {
 }
 
 fun secs(nanos: Long) = String.format(Locale.US, "%.1f", nanos.coerceAtLeast(0) / 1e9)
+
+/** Words for the live screen's stopped state, in both guidance languages. */
+private object GuideCopy {
+    val failed = Bi(
+        "Fix the setup, then try again. Go back to Home and finish the setup steps, then tap Check an app again.",
+        "सेटअप ठीक करें, फिर दोबारा कोशिश करें। होम पर जाएँ और सेटअप के चरण पूरे करें, फिर ऐप जाँचें दोबारा दबाएँ।",
+    )
+}
