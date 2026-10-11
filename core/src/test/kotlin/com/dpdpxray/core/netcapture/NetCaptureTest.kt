@@ -51,6 +51,14 @@ class PacketCodecTest {
 
 class TlsHelloTest {
     @Test
+    fun `a server name that is not a plausible host name is not kept`() {
+        for (bad in listOf("bad name.example", "ctl.example", "a..b", "-x.example", "1.2.3.4", "x".repeat(64) + ".example")) {
+            assertNull(bad, TlsHello.parse(clientHello(bad))!!.sni)
+        }
+        assertEquals("ok.example", TlsHello.parse(clientHello("OK.Example."))!!.sni)
+    }
+
+    @Test
     fun `reads server name, alpn and tls13 offer`() {
         val h = TlsHello.parse(clientHello("Tracker.Example.com", listOf("h2", "http/1.1")))!!
         assertEquals("tracker.example.com", h.sni); assertEquals(listOf("h2", "http/1.1"), h.alpn)

@@ -44,7 +44,7 @@ object TlsHello {
             when (type) {
                 0 -> if (len >= 5 && u8(b, s + 2) == 0) {
                     val nl = u16(b, s + 3)
-                    if (s + 5 + nl <= s + len) sni = String(b, s + 5, nl, Charsets.US_ASCII).lowercase()
+                    if (s + 5 + nl <= s + len) sni = hostName(String(b, s + 5, nl, Charsets.US_ASCII))
                 }
                 16 -> if (len >= 2) {
                     var j = s + 2
@@ -64,6 +64,21 @@ object TlsHello {
             i = s + len
         }
         return TlsHelloInfo(sni, alpn, ech, tls13)
+    }
+
+    private val LABEL = Regex("[a-z0-9_]([a-z0-9_-]{0,61}[a-z0-9_])?")
+
+    /**
+     * The server name as stored and shown: lower-case, no trailing dot, and only when it is a plausible DNS host name.
+     * Anything else (control characters, spaces, empty labels, an IP literal, which SNI must not carry) gives null, so
+     * odd bytes from a hello never reach a report or the screen.
+     */
+    internal fun hostName(raw: String): String? {
+        val host = raw.lowercase().removeSuffix(".")
+        if (host.isEmpty() || host.length > 253) return null
+        val labels = host.split('.')
+        if (labels.any { !LABEL.matches(it) } || labels.last().all { it.isDigit() }) return null
+        return host
     }
 
     private fun u8(b: ByteArray, i: Int) = b[i].toInt() and 0xff
