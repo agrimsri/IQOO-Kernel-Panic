@@ -21,19 +21,22 @@ This is what `final.bash` does, as plain commands. You need Python 3.11+ and `ad
 # 1. Install the CLI in a clean virtual environment
 python3 -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install --upgrade traceveil==0.4.0   # or: pipx install traceveil
+pip install --upgrade traceveil==0.4.1   # or: pipx install traceveil
 traceveil --version
 
 # 2. Check the phone (USB debugging on, Traceveil debug APK installed)
 traceveil doctor
 
-# 3. (Optional) install the app you want to audit
-adb install -r path/to/your-app-debug.apk
-
-# 4. Audit it and save the JSON report
-traceveil audit --package com.example.yourapp --out report.json
+# 3. Audit an app file: Traceveil reads the package name, installs it and audits it
+traceveil audit --apk path/to/app.apk --auto-drive --out report.json
+traceveil audit --path "My Game.xapk" --auto-drive --out report.json   # split bundles too
 echo $?                              # 0 pass, 1 findings, 2 inconclusive, 3 device/trigger, 6 timeout
+
+# ... or audit an app that is already installed
+traceveil audit --package com.example.yourapp --out report.json
 ```
+
+`--apk` (alias `--path`) takes a plain `.apk` or a split bundle (`.xapk` from APKPure, `.apks` from bundletool/SAI, `.apkm` from APKMirror). Bundles are unpacked once into `.traceveil/apks/` and installed with `adb install-multiple`, OBB expansion files included; the package name and version come from the base APK's manifest. The install is skipped when that version is already on the phone (`--reinstall` forces it, `--no-install` never installs). Under WSL2 the paths are handed to the Windows `adb.exe` in `\\wsl$` form. The report then also has `apk` (file, package, version, split APKs) and `sdkInventory` (SDKs bundled in the APK vs trackers looked up live, the same as `traceveil sdks`), and the summary lists those SDKs. Do not combine `--reset` with an app you do not own.
 
 Useful variations: `--plans silent` (quick, often inconclusive), `--auto-drive` (Traceveil taps Accept/Reject), `--serial <id>` with several phones, `--adb <path>` to choose the adb binary, `traceveil init` to create a `traceveil.toml`. Under WSL2 use the Windows adb (see the WSL2 note in section 1).
 
@@ -123,7 +126,7 @@ Settings you use often can live in `traceveil.toml` (`python3 -m traceveil init`
 
 ## 3a. SDK inventory: "SDK found in APK" vs "tracker observed live"
 
-Lists the tracking SDKs bundled in an APK (from the class names in its `classes*.dex`) and compares them with what an audit actually saw. No phone is needed unless you pass `--package`.
+Lists the tracking SDKs bundled in an APK (from the class names in its `classes*.dex`; `--apk` also takes `.xapk`/`.apks`/`.apkm`, scanning the base APK) and compares them with what an audit actually saw. No phone is needed unless you pass `--package`.
 
 ```bash
 traceveil sdks --apk app/build/outputs/apk/debug/app-debug.apk                                   # static only
