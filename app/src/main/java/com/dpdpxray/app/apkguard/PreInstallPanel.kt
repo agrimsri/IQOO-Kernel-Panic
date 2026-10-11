@@ -72,6 +72,8 @@ internal fun PreInstallPanel(
     checkKey: String,
     report: ApkGuardReport,
     hindi: Boolean,
+    /** Set for a split bundle, which TraceVeil checks but does not hand to Android's installer. */
+    bundle: BundleInfo?,
     onConsentCheck: (String) -> Unit,
     onOpenInstalled: (String) -> Unit,
     onBack: () -> Unit,
@@ -143,6 +145,10 @@ internal fun PreInstallPanel(
                     session is InstallState.Preparing || step == LocalStep.Working -> Notice(PreInstallCopy.preparing.pick(hindi))
                     !BuildConfig.INSTALL_HANDOFF -> {
                         Text(PreInstallCopy.continueWithInstaller.pick(hindi), style = MaterialTheme.typography.bodyMedium, color = Film.bone)
+                        PrimaryButton(PreInstallCopy.dontInstall.pick(hindi), dontInstall)
+                    }
+                    bundle != null -> {
+                        Text(PreInstallCopy.bundle(bundle.apkCount).pick(hindi), style = MaterialTheme.typography.bodyMedium, color = Film.bone)
                         PrimaryButton(PreInstallCopy.dontInstall.pick(hindi), dontInstall)
                     }
                     else -> {

@@ -381,7 +381,7 @@ private fun ReadyResult(
     VerdictCard(app, report, hindi, Modifier.reveal(0))
     if (isFile && fileKey != null) {
         // Check before install: the decision sits right under the verdict, the evidence follows.
-        PreInstallPanel(fileKey, report, hindi, onConsentCheck = onAudit, onOpenInstalled = onOpenInstalled, onBack = onBack, modifier = Modifier.padding(top = 16.dp))
+        PreInstallPanel(fileKey, report, hindi, app.bundle, onConsentCheck = onAudit, onOpenInstalled = onOpenInstalled, onBack = onBack, modifier = Modifier.padding(top = 16.dp))
     }
     Spacer(Modifier.height(12.dp))
     DetailsCard(app, hindi, Modifier.reveal(1))
@@ -516,6 +516,9 @@ private fun DetailsCard(app: InspectedApp, hindi: Boolean, modifier: Modifier = 
         Hairline(Modifier.padding(vertical = 4.dp))
         Field("Built for Android API", facts.targetSdk?.toString() ?: "Not reported")
         if (app.fileSizeBytes != null) Field("File", listOfNotNull(app.fileName, ApkFactsMapper.size(app.fileSizeBytes)).joinToString(" · "))
+        app.bundle?.let { b ->
+            Field("App bundle", "${b.apkCount} APK files" + if (b.splitNames.isEmpty()) "" else ": base + " + b.splitNames.joinToString(", "))
+        }
         Fingerprints("Signing certificate SHA-256", facts.certSha256)
         app.fileSha256?.let { Fingerprints("File SHA-256", listOf(it)) }
     }

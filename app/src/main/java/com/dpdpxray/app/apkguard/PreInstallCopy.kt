@@ -52,6 +52,14 @@ object PreInstallCopy {
         "TraceVeil का यह बिल्ड ऐप इंस्टॉल नहीं करता। अगर इस जाँच के बाद भी आपको फ़ाइल पर भरोसा है: उस ऐप में वापस जाएँ जहाँ फ़ाइल मिली थी (जैसे Files या Chrome की डाउनलोड), फ़ाइल पर फिर टैप करें और Android का पैकेज इंस्टॉलर चुनें। Android उस ऐप से इंस्टॉल की अनुमति माँग सकता है; बाद में इसे सेटिंग्स › ऐप्स › ख़ास ऐप ऐक्सेस › अनजान ऐप इंस्टॉल करें में फिर से बंद कर सकते हैं।",
     )
 
+    /** An app bundle (.xapk, .apks, .apkm) with [apks] APK files: checked, not installed by TraceVeil. */
+    fun bundle(apks: Int) = Bilingual(
+        "This is an app bundle with $apks APK files (the app plus configuration splits). TraceVeil checked the base APK's permissions and signer and the code of all $apks. " +
+            "It does not install bundles: Android's own installer cannot open them either, so they are installed by a bundle installer, usually the store app that offered the file.",
+        "यह $apks APK फ़ाइलों वाला ऐप बंडल है (ऐप और कॉन्फ़िगरेशन स्प्लिट)। TraceVeil ने मूल APK की अनुमतियाँ और साइनर, और सभी $apks का कोड जाँचा। " +
+            "यह बंडल इंस्टॉल नहीं करता: Android का अपना इंस्टॉलर भी इन्हें नहीं खोल पाता, इसलिए इन्हें बंडल इंस्टॉलर, आम तौर पर फ़ाइल देने वाला स्टोर ऐप, इंस्टॉल करता है।",
+    )
+
     // --- SDKs named in the code -------------------------------------------------------------------------------------
 
     val codeTitle = Bilingual("SDKs named in its code", "इसके कोड में SDK के नाम")
@@ -84,6 +92,6 @@ object PreInstallCopy {
     fun all(): List<Bilingual> = listOf(
         sectionTitle, decide, blocked, installAnyway, dontInstall, preparing, waiting, needsPermission, permissionGranted,
         openSetting, installed, runConsentCheck, seeInstalled, cancelled, declined, footnote, continueWithInstaller,
-        codeTitle, codeFooter, codeNone, codeRead, codeReading, codeUnavailable, codePartial,
+        codeTitle, codeFooter, codeNone, codeRead, codeReading, codeUnavailable, codePartial, bundle(3),
     )
 }
