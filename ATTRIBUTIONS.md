@@ -68,6 +68,33 @@ All read on 10 October 2026 and cited in the catalogue with their quotes; each s
 
 CleverTap is deliberately unresolved (three entities in three countries, no headquarters named). 22 catalogue entities were not researched and show "Not established".
 
+### Website trackers: the vendor pages behind the website-check additions
+
+Read on 11 October 2026. Each catalogue entry keeps its page in `domainSource`, and each path or cookie rule in `core/src/main/resources/web/web_trackers.json` keeps its page and a short quote. Only facts (a domain or cookie name and who uses it) are recorded; no list or dataset was imported. Company facts (headquarters, incorporation) were not researched for these entries and show "Not established", except Google Tag Manager, which reuses the Google facts above.
+
+| Vendor page | Supports |
+| --- | --- |
+| [Google tag install](https://developers.google.com/tag-platform/gtagjs/install) | Google Tag Manager (googletagmanager.com) |
+| [Meta Pixel get started](https://developers.facebook.com/docs/meta-pixel/get-started) | Meta's /tr pixel path on facebook.com |
+| [Meta fbp and fbc](https://developers.facebook.com/docs/marketing-api/conversions-api/parameters/fbp-and-fbc) | _fbp, _fbc |
+| [LinkedIn Insight Tag troubleshooting](https://www.linkedin.com/help/lms/answer/a425696) | LinkedIn Insight Tag domains |
+| [Pinterest tag](https://developers.pinterest.com/docs/track-conversions/pinterest-tag/) | ct.pinterest.com, s.pinimg.com/ct/ |
+| [Snap Conversions API](https://developers.snap.com/api/marketing-api/Conversions-API/UsingTheAPI) | tr.snapchat.com |
+| [Criteo OneTag](https://developers.criteo.com/retailer-integration/docs/onetag) | criteo.com |
+| [Taboola base pixel](https://developers.taboola.com/pixel/docs/add-the-base-pixel-manually) | taboola.com |
+| [Outbrain JavaScript guide](https://developer.outbrain.com/outbrain-javascript-implementation-guide/) | outbrain.com |
+| [Adobe ID service CSP](https://experienceleague.adobe.com/en/docs/id-service/using/reference/csp) | demdex.net, omtrdc.net |
+| [Microsoft Invest user ID syncing](https://learn.microsoft.com/en-us/xandr/invest/user-id-syncing-with-external-partners) | adnxs.com |
+| [The Trade Desk UID guidelines (PDF)](https://www.thetradedesk.com/assets/general/Unified-ID-Adoption-Guidelines-for-DSPs-v1.3.pdf) | adsrvr.org |
+| [Comscore privacy policy](https://www.comscore.com/About/Privacy-Policy) | scorecardresearch.com |
+| [Hotjar content security policies](https://help.hotjar.com/hc/en-us/articles/36820026388881-Content-Security-Policies) and [Hotjar cookies](https://help.hotjar.com/hc/en-us/articles/36819973371409-Cookies-Set-by-the-Hotjar-Tracking-Code) | hotjar.io; _hjSessionUser_*, _hjSession_* |
+| [Google Analytics cookie usage](https://support.google.com/analytics/answer/11397207) and [Google's ad products cookies](https://business.safety.google/adscookies/) | _ga, _ga_*, _gid, _gat, _gcl_au, _gcl_aw |
+| [Microsoft Clarity cookies](https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-cookies) | _clck, _clsk |
+| [TikTok Pixel cookies](https://ads.tiktok.com/help/article/using-cookies-with-tiktok-pixel?lang=en) | _ttp |
+| [Amplitude Browser SDK 2](https://amplitude.com/docs/sdks/analytics/browser/browser-sdk-2) | AMP_* |
+| [mixpanel-js persistence source](https://raw.githubusercontent.com/mixpanel/mixpanel-js/master/src/mixpanel-persistence.js) | mp_*_mixpanel |
+| [Segment Analytics.js persistence](https://www.twilio.com/docs/segment/connections/sources/catalog/libraries/website/javascript/cookie-validity-update) | ajs_anonymous_id, ajs_user_id |
+
 ## Country outlines (Natural Earth) — 11 October 2026
 
 | Item | Detail |
