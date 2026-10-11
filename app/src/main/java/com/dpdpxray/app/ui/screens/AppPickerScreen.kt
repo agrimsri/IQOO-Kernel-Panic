@@ -299,7 +299,15 @@ private fun AuditSetup(
     var gms by remember { mutableStateOf(false) }
     // The safe option is the default: an app a restart would disturb is checked without restarting it.
     var restartAnyway by remember { mutableStateOf(false) }
-    val leftRunning = shizukuReady && !freshReset && !effects.isNullOrEmpty() && !restartAnyway
+    // Only a Full check clears data; Quick and Preview keep it even with the switch on.
+    val clears = freshReset && full
+    val leftRunning = shizukuReady && !clears && !effects.isNullOrEmpty() && !restartAnyway
+    // Clearing any app other than the demo apps is confirmed first; choosing Full never turns it on by itself.
+    val confirmFirst = CheckSheet.resetNeedsConfirmation(app.packageName)
+    var askReset by remember { mutableStateOf(false) }
+    if (askReset) com.dpdpxray.app.ui.modes.ResetConfirmDialog(app.label, com.dpdpxray.app.ui.guide.guideLang(),
+        onConfirm = { askReset = false; allowReset = true; full = true; preview = false },
+        onDismiss = { askReset = false; if (!allowReset) full = false })
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CheckSheetTitle("Check ${app.label}")
@@ -308,7 +316,7 @@ private fun AuditSetup(
         // The step's advice stays as one quiet line under the title (read-aloud speaks it too).
         Text(setupStep.body.pick(com.dpdpxray.app.ui.guide.guideLang()), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
         if (shizukuReady) Toggle("Reset: clear this test app's local data", "Developer testing only. Removes its saved state, accounts and settings before each run. Leave off for personal apps: TraceVeil then only restarts the app, which keeps its data.", allowReset) {
-            allowReset = it
+            if (it && confirmFirst) askReset = true else allowReset = it
             if (!it) full = false
         }
         Column(Modifier.reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -317,15 +325,18 @@ private fun AuditSetup(
                 "Full audit · normal timing",
                 "Three fresh-state runs: Silent, Reject, Accept. Observes Silent for 25 seconds and each choice for 15 seconds; launch, consent and AI review add time.",
                 full, enabled = shizukuReady,
-            ) { full = true; preview = false; allowReset = true }
+            ) {
+                full = true; preview = false
+                if (!confirmFirst) allowReset = true else if (!allowReset) askReset = true
+            }
             if (!shizukuReady) ShizukuAccessNotice(shizukuHelp.running, shizukuHelp.onAllow, shizukuHelp.onOpenShizuku)
             PlanOption("Quick audit · normal timing", "One Accept-plan run with 15 seconds of observation. No Silent or Reject comparison.", !full && !preview, enabled = true) { full = false; preview = false }
             PlanOption("Fast Preview · limited evidence", "One Accept-plan run with 8 seconds of observation and a shorter consent-screen wait. Delayed traffic may be missed; not a Full audit.", preview, enabled = true) { full = false; preview = true }
             // The caveat's first sentence stays in view; the rest folds behind More.
             val (lead, rest) = leadAndRest(
                 if (leftRunning) "Quick opens the app as it is, without restarting it, so what it runs stays on; it may reuse launch-time lookups it made before. An app that was used before may keep its consent choice and not ask again. A missing dialog or quiet run is not a privacy pass."
-                else if (!freshReset && shizukuReady) "Quick restarts the app first (it keeps its data), so its launch-time lookups are made again. An app that was used before may keep its consent choice and not ask again. A missing dialog or quiet run is not a privacy pass."
-                else if (!freshReset) "Quick keeps the app's data and cannot restart it without Shizuku. An already-opened app may keep its consent choice and not repeat launch-time DNS lookups. A missing dialog or quiet run is not a privacy pass."
+                else if (!clears && shizukuReady) "Quick restarts the app first (it keeps its data), so its launch-time lookups are made again. An app that was used before may keep its consent choice and not ask again. A missing dialog or quiet run is not a privacy pass."
+                else if (!clears) "Quick keeps the app's data and cannot restart it without Shizuku. An already-opened app may keep its consent choice and not repeat launch-time DNS lookups. A missing dialog or quiet run is not a privacy pass."
                 else "Starting an audit clears this selected app's local data before each plan. Use a test app or a backed-up development build; do not use a personal app with data you need.",
             )
             Callout(lead, detail = rest)
@@ -343,7 +354,7 @@ private fun AuditSetup(
             Toggle("Include Google Play services lookups", "Some SDKs upload through Play services. Those lookups may include other apps' traffic.", gms) { gms = it }
         }
 
-        RestartWarning(app.label, effects, canStop = shizukuReady, reset = freshReset, restartAnyway = restartAnyway, onChange = { restartAnyway = it },
+        RestartWarning(app.label, effects, canStop = shizukuReady, reset = clears, restartAnyway = restartAnyway, onChange = { restartAnyway = it },
             lang = com.dpdpxray.app.ui.guide.guideLang())
 
         GradientAction("Start check", {

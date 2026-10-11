@@ -54,12 +54,36 @@ class CheckSheetTest {
         assertEquals(listOf(CheckChoice.FULL, CheckChoice.QUICK, CheckChoice.PREVIEW), CheckSheet.offered(Audience.DEVELOPER))
     }
 
+    @Test fun `only a Full check clears data, never Quick or Preview, whatever the switch says`() {
+        Audience.entries.forEach { a ->
+            for (choice in listOf(CheckChoice.QUICK, CheckChoice.PREVIEW)) {
+                val c = CheckSheet.config(a, "com.reskill.hacktracker", "HackTracker", choice, allowReset = true, shizukuReady = true,
+                    agentTaps = false, childFacing = false, includeGms = false)
+                assertFalse("$a $choice cleared data", c.resetAppData)
+            }
+        }
+    }
+
+    @Test fun `choosing Full turns clearing on by itself only for the demo apps, any other app needs a confirmation`() {
+        assertFalse(CheckSheet.resetNeedsConfirmation("com.leakyshop.demo"))
+        assertFalse(CheckSheet.resetNeedsConfirmation("com.leakyshop.demo.fixed"))
+        assertTrue(CheckSheet.resetNeedsConfirmation("com.reskill.hacktracker"))
+        assertTrue(CheckSheet.resetNeedsConfirmation("com.example.shop"))
+    }
+
+    @Test fun `the clear-data confirmation names the app and says what is lost`() {
+        val t = CheckSheet.resetConfirmText("HackTracker")
+        assertTrue(t.title.en.contains("HackTracker"))
+        assertTrue(t.body.en.contains("log", ignoreCase = true) && t.body.en.contains("cannot be undone"))
+        assertTrue(t.body.hi.isNotBlank() && t.confirm.en.isNotBlank() && t.cancel.en.isNotBlank())
+    }
+
     @Test fun `every offered choice builds a valid check and clears data only with approval and Shizuku`() {
         Audience.entries.forEach { a ->
             CheckSheet.offered(a).forEach { choice ->
                 for (reset in bools) for (shizuku in bools) for (agent in bools) {
                     val c = CheckSheet.config(a, "com.example.shop", "Shop", choice, reset, shizuku, agent, childFacing = true, includeGms = false)
-                    assertEquals(reset && shizuku, c.resetAppData)
+                    assertEquals(reset && shizuku && choice == CheckChoice.FULL, c.resetAppData)
                     assertEquals(choice == CheckChoice.PREVIEW, c.fastPreview)
                     assertEquals(agent, c.autoDrive)
                     assertTrue(c.childFacing)

@@ -87,7 +87,15 @@ internal fun EverydayCheckSetup(
     val freshReset = allowReset && shizukuReady
     // The safe option is the default: an app a restart would disturb is checked without restarting it.
     var restartAnyway by remember { mutableStateOf(false) }
-    val leftRunning = shizukuReady && !freshReset && !effects.isNullOrEmpty() && !restartAnyway
+    // Only a Full check clears data; Quick keeps it even with the switch on.
+    val clears = freshReset && choice == CheckChoice.FULL
+    val leftRunning = shizukuReady && !clears && !effects.isNullOrEmpty() && !restartAnyway
+    // Clearing any app other than the demo apps is confirmed first; choosing Full never turns it on by itself.
+    val confirmFirst = CheckSheet.resetNeedsConfirmation(app.packageName)
+    var askReset by remember { mutableStateOf(false) }
+    if (askReset) ResetConfirmDialog(app.label, lang,
+        onConfirm = { askReset = false; allowReset = true; choice = CheckChoice.FULL },
+        onDismiss = { askReset = false; if (!allowReset && choice == CheckChoice.FULL) choice = CheckChoice.QUICK })
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CheckSheetTitle(c.title(app.label).pick(lang))
@@ -97,21 +105,24 @@ internal fun EverydayCheckSetup(
         Text(step.body.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
         Column(Modifier.padding(top = 4.dp).reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             PlanOption(
-                c.quickTitle.pick(lang), (if (freshReset) c.quickDetailFresh else if (shizukuReady && !leftRunning) c.quickDetailRestart else c.quickDetail).pick(lang),
+                c.quickTitle.pick(lang), (if (shizukuReady && !leftRunning) c.quickDetailRestart else c.quickDetail).pick(lang),
                 selected = choice == CheckChoice.QUICK, enabled = true, lang = lang,
             ) { choice = CheckChoice.QUICK }
             SwitchRow(c.agentTitle.pick(lang), c.agentDetail.pick(lang), agent, { agent = it })
-            SheetCaveat((if (freshReset) c.resetCaveat else c.quickCaveat).pick(lang), lang)
+            SheetCaveat((if (clears) c.resetCaveat else c.quickCaveat).pick(lang), lang)
         }
 
         CollapsibleCard(
             c.advanced.pick(lang), Modifier.padding(top = 8.dp).reveal(2),
             summary = c.advancedSummary.pick(lang), glyph = Glyph.SETTINGS, initiallyOpen = choice == CheckChoice.FULL,
         ) {
-            PlanOption(c.fullTitle.pick(lang), c.fullDetail.pick(lang), selected = choice == CheckChoice.FULL, enabled = shizukuReady, lang = lang) { choice = CheckChoice.FULL; allowReset = true }
+            PlanOption(c.fullTitle.pick(lang), c.fullDetail.pick(lang), selected = choice == CheckChoice.FULL, enabled = shizukuReady, lang = lang) {
+                choice = CheckChoice.FULL
+                if (!confirmFirst) allowReset = true else if (!allowReset) askReset = true
+            }
             if (!shizukuReady) ShizukuAccessNotice(shizukuHelp.running, shizukuHelp.onAllow, shizukuHelp.onOpenShizuku)
             if (shizukuReady) SwitchRow(c.resetTitle.pick(lang), c.resetDetail.pick(lang), allowReset, { on ->
-                allowReset = on
+                if (on && confirmFirst) askReset = true else allowReset = on
                 if (!on && choice == CheckChoice.FULL) choice = CheckChoice.QUICK
             })
             Hairline()
@@ -123,7 +134,7 @@ internal fun EverydayCheckSetup(
             FoldText(c.quarantineNote.pick(lang), moreLabel = lang.moreLabel, lessLabel = lang.lessLabel)
         }
 
-        RestartWarning(app.label, effects, canStop = shizukuReady, reset = freshReset, restartAnyway = restartAnyway, onChange = { restartAnyway = it }, lang = lang)
+        RestartWarning(app.label, effects, canStop = shizukuReady, reset = clears, restartAnyway = restartAnyway, onChange = { restartAnyway = it }, lang = lang)
 
         GradientAction(c.start.pick(lang), {
             onStart(CheckSheet.config(Audience.USER, app.packageName, app.label, choice, allowReset, shizukuReady, agent, child, gms,

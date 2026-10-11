@@ -19,10 +19,12 @@ object DiagnosisCopy {
         "रीस्टार्ट हर रन से पहले ऐप को बंद करके फिर खोलता है, ताकि वह अपने लुकअप फिर से करे और TraceVeil उन्हें देख सके। आपका डेटा बना रहता है।",
     )
     val reset = Bi("Check again with a reset", "रीसेट करके फिर से जाँचें")
-    fun resetConfirmTitle(app: String) = Bi("Reset $app?", "$app रीसेट करें?")
+    fun resetConfirmTitle(app: String) = Bi("Clear all of $app's data?", "$app का पूरा डेटा मिटाएँ?")
     fun resetConfirmBody(app: String) = Bi(
-        "This clears $app's data before each run: accounts, saved state and settings. Use it only for your own test app.",
-        "यह हर रन से पहले $app का डेटा साफ़ करता है: अकाउंट, सहेजी स्थिति और सेटिंग। इसे सिर्फ़ अपने टेस्ट ऐप पर इस्तेमाल करें।",
+        "This clears $app's data before each run: accounts, logins, saved state, settings and anything not yet uploaded. " +
+            "This cannot be undone. Use it only for your own test app that you can set up again.",
+        "यह हर रन से पहले $app का डेटा मिटाता है: अकाउंट, लॉगिन, सहेजी स्थिति, सेटिंग और जो कुछ अभी अपलोड नहीं हुआ। " +
+            "इसे वापस नहीं लाया जा सकता। इसे सिर्फ़ अपने ऐसे टेस्ट ऐप पर इस्तेमाल करें जिसे आप फिर से सेट कर सकें।",
     )
     val resetConfirm = Bi("Reset and check", "रीसेट करके जाँचें")
     val cancel = Bi("Cancel", "रद्द करें")

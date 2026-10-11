@@ -4,6 +4,7 @@ import com.dpdpxray.app.audit.AuditConfig
 import com.dpdpxray.app.audit.FoundSideEffect
 import com.dpdpxray.app.audit.RestartPolicy
 import com.dpdpxray.app.data.Audience
+import com.dpdpxray.app.ui.guide.Bi
 import com.dpdpxray.core.model.AuditPlan
 
 /** The ways the check sheet can run an app. */
@@ -59,7 +60,30 @@ object CheckSheet {
         else -> RestartPolicy.SKIP
     }
 
-    /** App data is cleared only when the person approved it and Shizuku can do it. */
+    /**
+     * Choosing Full may turn clearing on by itself only for TraceVeil's own demo apps. For any other app (including a
+     * debuggable build, which may well be someone's personal app) clearing waits for [resetConfirmText] to be confirmed.
+     */
+    fun resetNeedsConfirmation(pkg: String): Boolean = pkg !in com.dpdpxray.app.audit.CheckAgain.CONTROLLED_DEMOS
+
+    data class ResetConfirm(val title: Bi, val body: Bi, val confirm: Bi, val cancel: Bi)
+
+    /** The confirmation before TraceVeil may clear an app's data: it names the app and what is lost. */
+    fun resetConfirmText(app: String) = ResetConfirm(
+        title = Bi("Clear all of $app's data?", "$app का पूरा डेटा मिटाएँ?"),
+        body = Bi(
+            "A Full check clears $app's data before each of its three runs: accounts, logins, settings and anything not yet " +
+                "uploaded. This cannot be undone. Use it only for a test app you can set up again. For an app you use, choose " +
+                "Quick: it keeps the app's data.",
+            "Full जाँच अपने तीनों रन से पहले $app का डेटा मिटाती है: अकाउंट, लॉगिन, सेटिंग और जो कुछ अभी अपलोड नहीं हुआ। " +
+                "इसे वापस नहीं लाया जा सकता। इसे सिर्फ़ ऐसे टेस्ट ऐप के लिए चुनें जिसे आप फिर से सेट कर सकें। जिस ऐप को आप " +
+                "इस्तेमाल करते हैं, उसके लिए Quick चुनें: वह ऐप का डेटा रखता है।",
+        ),
+        confirm = Bi("Clear $app's data", "$app का डेटा मिटाएँ"),
+        cancel = Bi("Keep its data", "डेटा रखें"),
+    )
+
+    /** App data is cleared only for a Full check, when the person approved it and Shizuku can do it; Quick and Preview never clear. */
     fun config(
         audience: Audience,
         targetPackage: String,
@@ -76,7 +100,7 @@ object CheckSheet {
         return AuditConfig(
             targetPackage = targetPackage, targetLabel = targetLabel,
             plans = plans(audience, choice, freshReset),
-            childFacing = childFacing, includeGms = includeGms, autoDrive = agentTaps, resetAppData = freshReset,
+            childFacing = childFacing, includeGms = includeGms, autoDrive = agentTaps, resetAppData = freshReset && choice == CheckChoice.FULL,
             fastPreview = choice == CheckChoice.PREVIEW,
             restart = restart,
         )

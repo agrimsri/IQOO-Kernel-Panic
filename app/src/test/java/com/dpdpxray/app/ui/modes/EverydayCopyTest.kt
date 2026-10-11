@@ -73,7 +73,6 @@ class EverydayCopyTest {
         // With the Shizuku helper every check restarts the app first; that never deletes anything.
         val restart = EverydaySheetCopy.quickDetailRestart.en
         assertTrue(restart, restart.startsWith("Restarts the app (keeps your data)") && restart.contains("Reject") && restart.contains("15 seconds"))
-        assertTrue(EverydaySheetCopy.quickDetailFresh.en.startsWith("Resets the app (clears its data)"))
         assertTrue(EverydaySheetCopy.resetTitle.en.startsWith("Reset: clear"))
         assertTrue(EverydaySheetCopy.resetDetail.en.contains("restart"))
         assertTrue(EverydaySheetCopy.quickDetailRestart in sheet)

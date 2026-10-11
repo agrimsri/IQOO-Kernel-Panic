@@ -213,9 +213,6 @@ object EverydaySheetCopy {
     /** Quick with the Shizuku helper ready: the app is closed and opened again first, so it starts fresh. Nothing is deleted. */
     val quickDetailRestart = Bi("Restarts the app (keeps your data), says No (Reject) to its consent popup, then watches for 15 seconds.",
         "ऐप को रीस्टार्ट करता है (आपका डेटा बना रहता है), कंसेंट पॉपअप पर 'ना' (Reject) कहा जाता है, फिर 15 सेकंड तक देखा जाता है।")
-    /** Quick with clearing approved under Advanced: the same single No run, from a fresh start. */
-    val quickDetailFresh = Bi("Resets the app (clears its data), opens it once, says No (Reject) to its consent popup, then watches for 15 seconds.",
-        "ऐप को रीसेट करता है (उसका डेटा साफ़ होता है), उसे एक बार खोलता है, कंसेंट पॉपअप पर 'ना' (Reject) कहा जाता है, फिर 15 सेकंड तक देखा जाता है।")
     val agentTitle = Bi("Let TraceVeil tap No for me", "TraceVeil मेरे लिए 'ना' दबाए")
     val agentDetail = Bi("Off: you tap it yourself when the app asks.", "बंद: ऐप पूछे तो आप खुद दबाएँ।")
     val quickCaveat = Bi(
@@ -249,6 +246,6 @@ object EverydaySheetCopy {
         "सिर्फ़ इस ऐप का इंटरनेट काटता है और दर्ज करता है कि यह कहाँ पहुँचने की कोशिश करता है और कौन-सी अनुमतियाँ माँगता है। यह ऐप के बारे में फ़ैसला नहीं देता।")
 
     fun all(): List<Bi> = listOf(title("App"), guide("App").title, guide("App").body, guide("App").spoken, quickTitle, quickDetail,
-        quickDetailRestart, quickDetailFresh, agentTitle, agentDetail, quickCaveat, resetCaveat, start, advanced, advancedSummary, fullTitle, fullDetail, fullNeeds,
+        quickDetailRestart, agentTitle, agentDetail, quickCaveat, resetCaveat, start, advanced, advancedSummary, fullTitle, fullDetail, fullNeeds,
         resetTitle, resetDetail, childTitle, childDetail, gmsTitle, gmsDetail, quarantine, quarantineNote)
 }
