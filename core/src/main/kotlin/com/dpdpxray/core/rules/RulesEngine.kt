@@ -286,16 +286,19 @@ class RulesEngine(
         )
     }
 
+    /**
+     * V0 names its likely causes from what the phone recorded ([VisibilityDiagnosis]) instead of generic advice; it never
+     * tells anyone to clear a personal app's data. The result stays inconclusive: unknown stays unknown.
+     */
     private fun lowVisibility(sessions: List<AuditSession>): Finding {
-        val privateDns = sessions.any { it.privateDnsActive == true }
+        val diagnosis = VisibilityDiagnosis.diagnose(sessions)
         return Finding(
             checkId = CheckId.V0, severity = Severity.INFO, evidenceType = EvidenceType.OBSERVED,
             title = CheckId.V0.title,
-            explanation = "Almost no DNS lookups were captured, so this audit cannot call the app clean. " +
-                (if (privateDns) "Private DNS is turned on — turn it Off in Settings and re-run. " else "") +
-                "The app may have cached DNS before the audit, use DNS-over-HTTPS, or simply not have started; " +
-                "clear its data and re-run the audit.",
-            evidence = sessions.map { "${it.plan.label}: ${it.netEvents.size} lookups" },
+            explanation = "Almost no DNS lookups were captured, so this audit cannot call the app clean and gives no score. " +
+                "Likely cause: ${VisibilityDiagnosis.explanation(diagnosis)}",
+            evidence = (sessions.map { "${it.plan.label}: ${it.netEvents.size} lookups" } + diagnosis.flatMap { it.evidence })
+                .distinct().take(MAX_EVIDENCE),
             plans = sessions.map { it.plan }.distinct(),
             dpdpRefs = emptyList(),
             penaltyBand = PenaltyBand.NONE,
