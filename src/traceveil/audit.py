@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, adb, laws, netwatch
+from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, adb, fixes, laws, netwatch
 from .colors import PLAIN, Style
 from .netenv import OWN_PACKAGE
 
@@ -131,12 +131,15 @@ def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) ->
     t = rep["target"]
     lines = [f"Traceveil audit  {style.bold(t.get('label', '?'))} ({t.get('package', '?')})  "
              f"score {style.score(rep['score'], rep['band'])} / {style.band(rep['band'])}  findings {len(rep['findings'])}"]
+    plan = {i["check"]: i for i in rep.get("fixPlan", {}).get("issues", [])}
     for f in rep["findings"]:
         sev = str(f.get("severity", "?"))
         tag = style.dim(" inferred") if str(f.get("evidenceType", "")).upper() == "INFERRED" else ""
         lines.append(f"  {f.get('check', '?'):<4} {style.severity(sev, 8)} {f.get('title', '')}{tag}")
         if f.get("entities"):
             lines.append(f"       {style.dim('trackers:')} {_names(f['entities'], style)}")
+        if f.get("check") in plan:
+            lines += fixes.summary_lines({**rep["fixPlan"], "issues": [plan[f["check"]]]}, style, compact=True)
     if rep.get("lenses"):
         lines += laws.table(rep["lenses"], style)
     if rep.get("network"):
@@ -144,6 +147,8 @@ def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) ->
     for r in reasons:
         lines.append(f"  {style.warn('policy:')} {r}")
     lines.append(f"  report saved: {saved}")
+    if rep.get("fixPlan", {}).get("fixes"):
+        lines.append(style.dim("  fixes are in the report's fixPlan (give the JSON to a coding agent); --format md prints them as Markdown"))
     return "\n".join(lines)
 
 
@@ -172,7 +177,7 @@ def _wait_for_device(dev, io: Io, deadline: list[float], request_id: str) -> boo
 
 
 def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_drive: bool, reset: bool, wait_s: float,
-              resume: str | None, as_json: bool, out_file: str | None, request_id: str | None = None,
+              resume: str | None, as_json: bool, out_file: str | None, request_id: str | None = None, as_md: bool = False,
               fail_on_override: str | None = None, lenses=None, policy: str | None = None,
               watch_network: bool | None = None, fail_on_hidden: bool = False) -> int:
     request_id = resume or request_id or new_request_id()
@@ -233,7 +238,9 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
         return _fail(io, problem, EXIT_INCONCLUSIVE)
 
     try:
-        rep["lenses"] = laws.assess_all(rep, lenses or cfg["audit"]["lenses"], policy or cfg["audit"]["policy"])
+        policy = policy or cfg["audit"]["policy"]
+        rep["lenses"] = laws.assess_all(rep, lenses or cfg["audit"]["lenses"], policy)
+        rep["fixPlan"] = fixes.build(rep, laws.assess_all(rep, "all", policy))  # every country, whatever lenses are shown
     except ValueError as e:
         return _fail(io, str(e), EXIT_USAGE)
     if sampler:
@@ -246,13 +253,16 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
     out_dir.mkdir(parents=True, exist_ok=True)
     saved = out_dir / f"{request_id}.json"
     saved.write_text(json.dumps(rep, indent=2), encoding="utf-8")
-    if out_file:
+    if out_file:  # a .md path gets the fix plan as Markdown; anything else the JSON report, fixPlan included
         Path(out_file).parent.mkdir(parents=True, exist_ok=True)
-        Path(out_file).write_text(json.dumps(rep, indent=2), encoding="utf-8")
+        Path(out_file).write_text(fixes.markdown(rep["fixPlan"]) if out_file.endswith(".md") else json.dumps(rep, indent=2),
+                                  encoding="utf-8")
     code, reasons = exit_for_report(laws.policy_view(rep["lenses"]), fail_on_override or cfg["audit"]["fail_on"],
                                     int(cfg["audit"]["min_score"]))
     if fail_on_hidden and rep.get("network") and netwatch.hidden(rep["network"]):
         reasons.append("the app made connections the DNS capture could not see (--fail-on-hidden)")
         code = code if code != EXIT_PASS else EXIT_FINDINGS
-    print(json.dumps(rep, indent=2) if as_json else summary(rep, reasons, saved, Style(io.color_out)), file=io.out)
+    text = (json.dumps(rep, indent=2) if as_json else fixes.markdown(rep["fixPlan"]) if as_md
+            else summary(rep, reasons, saved, Style(io.color_out)))
+    print(text, file=io.out)
     return code

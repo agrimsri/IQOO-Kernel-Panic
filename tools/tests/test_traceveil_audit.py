@@ -141,6 +141,19 @@ class AuditCommandTests(unittest.TestCase):
         _, i = self.run_audit(FakePhone(files=self.good_files()), as_json=True)
         self.assertEqual(21, json.loads(i.out.getvalue())["score"])
 
+    def test_report_carries_the_fix_plan_and_md_format_prints_it(self):
+        self.cfg["audit"]["fail_on"] = "off"
+        _, i = self.run_audit(FakePhone(files=self.good_files()), as_json=True)
+        plan = json.loads(i.out.getvalue())["fixPlan"]
+        self.assertEqual(plan["schema"], "traceveil/fix-plan@1")
+        self.assertIn("issues", plan)
+        with tempfile.TemporaryDirectory() as d:
+            md = Path(d) / "fixes.md"
+            _, i = self.run_audit(FakePhone(files=self.good_files()), as_md=True, out_file=str(md))
+            self.assertTrue(i.out.getvalue().startswith("# Traceveil fix plan"))
+            self.assertTrue(md.read_text(encoding="utf-8").startswith("# Traceveil fix plan"))
+            self.assertIn("fixPlan", (Path(self.cfg["output"]["dir"]) / "REQ.json").read_text())  # saved report stays JSON
+
     def test_trigger_sends_explicit_component_and_quotes_values(self):
         phone = FakePhone(files=self.good_files())
         self.run_audit(phone, plans="silent,reject", auto_drive=True)
