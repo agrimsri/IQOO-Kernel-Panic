@@ -96,4 +96,27 @@ class BlockerAgentTest {
         val msg = BlockerAgent.userMessage(BlockerAgent.digest(tour), listOf("Typed a test name into “Nickname”"))
         assertTrue(msg.contains("button \"Skip\"") && msg.contains("Typed a test name"))
     }
+
+    @Test fun `an open date picker is one control to confirm, not fields to fill`() {
+        val picker = UiNode(
+            className = "android.widget.DatePicker",
+            children = listOf(
+                UiNode(className = "android.widget.NumberPicker", children = listOf(UiNode(className = "android.widget.EditText", text = "Jan", isEditable = true))),
+                UiNode(className = "android.widget.NumberPicker", children = listOf(UiNode(className = "android.widget.EditText", text = "1990", isEditable = true))),
+            ),
+        )
+        val tree = screen(text("Please enter the following details"), picker, button("Cancel"), button("OK"))
+        val d = BlockerAgent.digest(tree).text
+        assertTrue(d.contains("picker is open"))
+        assertFalse("inner number fields must not be listed as text fields", d.contains("text field"))
+        val ok = numberOf(tree, "\"OK\"")
+        assertTrue(decide("""{"action":"tap","target":$ok,"reason":"confirm the date"}""", tree) is Step.Tap)
+    }
+
+    @Test fun `a refusal by the safety check can be told apart from the model giving up`() {
+        val gaveUp = decide("""{"action":"hand_off","reason":"needs a real phone number"}""", tour) as Step.HandOff
+        assertFalse(gaveUp.vetoed)
+        val vetoed = decide("""{"action":"tap","target":99,"reason":"x"}""", tour) as Step.HandOff
+        assertTrue(vetoed.vetoed)
+    }
 }

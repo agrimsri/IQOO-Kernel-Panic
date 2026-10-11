@@ -12,6 +12,7 @@ import android.util.Log
 import com.dpdpxray.core.model.ScreenAudit
 import com.dpdpxray.core.screen.ConsentAuditPrompt
 import com.dpdpxray.core.screen.VlmResponseParser
+import com.dpdpxray.core.consent.BlockerAgent
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Capabilities
 import com.google.ai.edge.litertlm.Content
@@ -198,6 +199,25 @@ class LlmEngine(private val context: Context) {
             val text = outcome.textOrNull ?: return@withContext null
             VlmResponseParser.parse(text)?.copy(modelId = modelName, latencyMs = SystemClock.elapsedRealtime() - start)
                 ?: null.also { Log.w(TAG, "screen review: model reply did not parse as a screen audit (${text.length} chars)") }
+        }
+    }
+
+    /**
+     * One step for a screen between launch and an app's consent screen that no rule covers (see BlockerAgent). Text only: the
+     * numbered list of what is on screen is enough, and it keeps the answer quick. The reply is only a proposal; BlockerAgent
+     * decides whether it is safe to carry out.
+     */
+    suspend fun decideBlockerStep(userMessage: String): String? = mutex.withLock {
+        withContext(Dispatchers.Default) {
+            val e = engine ?: return@withContext null
+            if (thermallyStressed()) Thread.sleep(1500)
+            val constrained = llmCatching {
+                ask(e, BlockerAgent.SYSTEM, Contents.of(userMessage), AskOptions(constrained = true, maxOutputTokens = 160), BlockerAgent.JSON_SCHEMA)
+            }
+            val outcome = if (constrained is LlmOutcome.Text) constrained
+            else llmCatching { ask(e, BlockerAgent.SYSTEM, Contents.of(userMessage), AskOptions(maxOutputTokens = 160)) }
+            record("blocker step", outcome)
+            outcome.textOrNull
         }
     }
 

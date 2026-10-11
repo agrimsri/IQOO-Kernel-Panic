@@ -37,7 +37,8 @@ object BlockerAgent {
         data class Tap(val index: Int, val label: String, override val reason: String = "") : Step
         data class Type(val index: Int, val label: String, val kind: FieldKind, val value: String, override val reason: String = "") : Step
         data class Wait(override val reason: String = "") : Step
-        data class HandOff(override val reason: String) : Step
+        /** [vetoed] is true when the safety check refused what the model chose, false when the model itself gave up. */
+        data class HandOff(override val reason: String, val vetoed: Boolean = true) : Step
     }
 
     /** What the model is shown, and how its numbers map back to positions in [UiNode.flatten]. */
@@ -60,7 +61,17 @@ object BlockerAgent {
             positions += i
             lines += "${positions.size}. $text"
         }
+        // A date or number picker is one control: its inner number fields are not text fields to fill.
+        val insidePicker = mutableSetOf<Int>()
         nodes.forEachIndexed { i, n ->
+            if (isPicker(n)) { val size = n.flatten().size; for (k in i + 1 until i + size) insidePicker += k }
+        }
+        nodes.forEachIndexed { i, n ->
+            if (i in insidePicker) return@forEachIndexed
+            if (isPicker(n)) {
+                add(i, "picker is open, showing: ${clip(n.flatten().mapNotNull { it.text?.takeIf { t -> t.isNotBlank() } }.joinToString(" "))} (confirm it with its OK button)")
+                return@forEachIndexed
+            }
             val label = clip(n.label.ifBlank { descendantLabel(n) })
             when {
                 BlockerLexicon.isField(n) -> {
@@ -76,6 +87,8 @@ object BlockerAgent {
         }
         return Digest(lines.joinToString("\n"), positions)
     }
+
+    private fun isPicker(n: UiNode) = n.className.endsWith("DatePicker") || n.className.endsWith("TimePicker") || n.className.endsWith("NumberPicker")
 
     private fun descendantLabel(n: UiNode): String = n.children.firstNotNullOfOrNull { c ->
         c.label.ifBlank { descendantLabel(c) }.takeIf { it.isNotBlank() }
@@ -96,7 +109,7 @@ object BlockerAgent {
         - Prefer a button such as Skip, Not now, Maybe later, Continue as guest, Next, Continue, Get started, OK or Done.
         - For a plain profile form (name, date of birth, age, city) use "type", one field at a time, saying what kind of field it is
           with field_kind; the app supplies a harmless test value. Then tap the Continue button.
-        - A date-of-birth field is also "type" with field_kind "birth_date". If a date picker is open, tap its OK button.
+        - A date-of-birth field is also "type" with field_kind "birth_date". If the list says a picker is open, tap its OK button.
         - If a field asks for a phone number, email, password, code, address, ID or card number, or you need any real detail,
           answer "hand_off". Also answer "hand_off" if signing in or creating an account is the only way forward.
         - Never tap Sign in, Log in, Sign up, Register, Continue with Google/Facebook/Apple, Buy, Pay, Subscribe, Install or Delete.
@@ -170,7 +183,7 @@ object BlockerAgent {
         val p = proposal(reply) ?: return Step.HandOff("The model's reply could not be read.")
         when (p.action) {
             "wait" -> return Step.Wait(p.reason)
-            "hand_off", "handoff", "hand off" -> return Step.HandOff(p.reason.ifEmpty { "The model could not find a safe way forward." })
+            "hand_off", "handoff", "hand off" -> return Step.HandOff(p.reason.ifEmpty { "The model could not find a safe way forward." }, vetoed = false)
         }
         val nodes = tree.flatten()
         val at = digest.position(p.target) ?: return Step.HandOff("The model chose something that is not on the screen.")

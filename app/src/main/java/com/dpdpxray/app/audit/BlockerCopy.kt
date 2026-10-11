@@ -50,9 +50,13 @@ internal object BlockerCopy {
         }
     }
 
-    fun promptBody(hindi: Boolean = false) =
-        if (hindi) "TraceVeil आपके लिए कुछ नहीं टाइप करता। आपके आगे बढ़ते ही जाँच अपने आप चलती रहेगी।"
-        else "TraceVeil never types for you. The check carries on by itself as soon as you are through."
+    /** [why] is the reason TraceVeil could not carry on by itself, when it knows one. */
+    fun promptBody(hindi: Boolean = false, why: String? = null): String {
+        val base = if (hindi) "TraceVeil पासवर्ड, कोड या निजी जानकारी कभी नहीं भरता। आपके आगे बढ़ते ही जाँच अपने आप चलती रहेगी।"
+        else "TraceVeil never types a password, code or personal detail. The check carries on by itself as soon as you are through."
+        val reason = why?.let { (if (hindi) "रुकने का कारण: " else "Why TraceVeil stopped: ") + it }
+        return listOfNotNull(base, reason).joinToString("\n")
+    }
 
     fun promptStop(hindi: Boolean = false) = if (hindi) "जाँच रोकें" else "Stop check"
     fun promptHide(hindi: Boolean = false) = if (hindi) "छिपाएँ" else "Hide"
@@ -62,7 +66,7 @@ internal object BlockerCopy {
         val kind = outcome.blocker ?: return emptyList()
         return buildList {
             if (outcome.skipped.isNotEmpty()) {
-                add("A ${kind(kind)} appeared before the consent screen; the agent tapped ${outcome.skipped.joinToString { "“$it”" }} to continue.")
+                add("A ${kind(kind)} appeared before the consent screen; the agent took these steps to continue: ${outcome.skipped.joinToString("; ") { "“$it”" }}.")
             }
             if (outcome.handedOff) {
                 add("A ${kind(kind)} could not be skipped; TraceVeil waited ${outcome.blockedMs / 1000} s for the person to complete it.")
