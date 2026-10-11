@@ -31,9 +31,17 @@ object AuditSpokenSummary {
         val parts = mutableListOf<String>()
         var hint = ""
         if (e.sample) parts += t.sample
+        val range = r.historyBounds?.takeIf { score == null }
         when {
             r.findings.any { it.checkId == CheckId.V0 } -> parts += t.lowVisibility(e.label)
-            historyUnknown != null && historyUnknown.entities.isNotEmpty() -> {
+            range != null -> {
+                // Consent history unknown, bounded: the range and the band it can reach, never "Inconclusive".
+                parts += t.range(e.label, range)
+                historyUnknown?.let { parts += t.lookupsWithUnknownHistory(names(it.entities, t)) }
+                if (r.findings.any { it.severity != Severity.INFO }) mostSerious(r.findings)?.let { parts += t.mostSerious(r.findings.size, it) }
+                if (range.questionNeeded) hint = t.answerHint
+            }
+            historyUnknown != null && historyUnknown.entities.isNotEmpty() && !historyUnknown.declared -> {
                 parts += t.noVerdict(e.label, inconclusive = r.band == ScoreBand.INCONCLUSIVE)
                 parts += t.lookupsWithUnknownHistory(names(historyUnknown.entities, t))
                 if (r.findings.any { it.severity != Severity.INFO }) mostSerious(r.findings)?.let { parts += t.mostSerious(r.findings.size, it) }
@@ -41,8 +49,10 @@ object AuditSpokenSummary {
             }
             score == null || r.band == ScoreBand.INCONCLUSIVE -> parts += t.inconclusive(e.label)
             else -> {
-                if (historyUnknown == null) {
+                val answer = r.historyBounds?.answer?.takeIf { it.declared }
+                if (historyUnknown == null || answer != null) {
                     parts += t.score(e.label, score, r.band)
+                    answer?.let { parts += t.basedOnAnswer(it == com.dpdpxray.core.model.ConsentHistory.DECLARED_NEVER) }
                 } else {
                     // A score may stand, but no band: whether consent was given earlier is unknown.
                     parts += t.scoreOnly(e.label, score)
@@ -100,6 +110,9 @@ object AuditSpokenSummary {
         fun lowVisibility(label: String): String
         fun inconclusive(label: String): String
         fun noVerdict(label: String, inconclusive: Boolean): String
+        fun range(label: String, b: com.dpdpxray.core.model.HistoryBounds): String
+        fun basedOnAnswer(never: Boolean): String
+        val answerHint: String
         fun lookupsWithUnknownHistory(names: String): String
         fun score(label: String, score: Int, band: ScoreBand): String
         fun scoreOnly(label: String, score: Int): String
@@ -121,6 +134,13 @@ object AuditSpokenSummary {
         override val rejectMissing = "The Reject choice was not recorded, so refusal was not tested."
         override val notCertificate = "A full score is not a safety certificate."
         override val fullCheckHint = "To test consent from a first launch, run a Full check of a test install."
+        override val answerHint = "Answer one question on the result, whether you ever agreed to tracking in this app, to get one score."
+        override fun range(label: String, b: com.dpdpxray.core.model.HistoryBounds) =
+            "In this check of $label, consent history is unknown because the app kept its data, so the result is a range from " +
+                "${b.lowScore} to ${b.highScore} out of 100: " +
+                (if (b.bandSettled) "${band(b.lowBand)} whichever way you answer." else "at best ${band(b.bestBand)}.")
+        override fun basedOnAnswer(never: Boolean) =
+            if (never) "This is based on your answer that you never agreed to tracking in this app." else "This is based on your answer that you agreed earlier, so it is never Ready on that answer alone."
         override fun lowVisibility(label: String) = "In this check of $label, the result is Inconclusive: too few lookups were captured to give a score."
         override fun inconclusive(label: String) = "In this check of $label, the result is Inconclusive, so there is no score."
         override fun noVerdict(label: String, inconclusive: Boolean) =
@@ -158,6 +178,12 @@ object AuditSpokenSummary {
         override val rejectMissing = "मना करने का चुनाव दर्ज नहीं हुआ, इसलिए अस्वीकृति की जाँच नहीं हुई।"
         override val notCertificate = "पूरा स्कोर सुरक्षा का प्रमाणपत्र नहीं है।"
         override val fullCheckHint = "पहली बार खोलने पर सहमति जाँचने के लिए, किसी टेस्ट इंस्टॉल की पूरी जाँच (Full check) चलाइए।"
+        override val answerHint = "एक स्कोर पाने के लिए नतीजे पर एक सवाल का जवाब दीजिए: क्या आपने कभी इस ऐप में ट्रैकिंग की सहमति दी थी।"
+        override fun range(label: String, b: com.dpdpxray.core.model.HistoryBounds) =
+            "इस जाँच में $label का सहमति इतिहास अज्ञात है क्योंकि ऐप ने अपना डेटा रखा, इसलिए नतीजा 100 में से ${b.lowScore} से ${b.highScore} " +
+                "के बीच है: " + (if (b.bandSettled) "आप जो भी जवाब दें, ${band(b.lowBand)}।" else "ज़्यादा से ज़्यादा ${band(b.bestBand)}।")
+        override fun basedOnAnswer(never: Boolean) =
+            if (never) "यह आपके इस जवाब पर आधारित है कि आपने इस ऐप में कभी ट्रैकिंग की सहमति नहीं दी।" else "यह आपके इस जवाब पर आधारित है कि आपने पहले सहमति दी थी, इसलिए सिर्फ़ इस जवाब पर यह कभी तैयार नहीं होता।"
         override fun lowVisibility(label: String) = "इस जाँच में $label का नतीजा अनिर्णायक है: बहुत कम लुकअप दर्ज हुए, इसलिए कोई स्कोर नहीं है।"
         override fun inconclusive(label: String) = "इस जाँच में $label का नतीजा अनिर्णायक है, इसलिए कोई स्कोर नहीं है।"
         override fun noVerdict(label: String, inconclusive: Boolean) =

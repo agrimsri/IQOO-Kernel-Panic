@@ -111,3 +111,45 @@ fun ScoreRing(score: Int?, band: ScoreBand, modifier: Modifier = Modifier, ringS
         }
     }
 }
+
+/**
+ * A consent-history range as a ring: the never-agreed end as a solid arc in its band colour, the stretch up to the
+ * agreed-earlier end as a faint arc, and "low–high" in the middle. Static (nothing animates at rest); TalkBack hears
+ * the range and the band it allows in one sentence.
+ */
+@Composable
+fun RangeRing(bounds: com.dpdpxray.core.model.HistoryBounds, modifier: Modifier = Modifier, ringSize: Dp = 164.dp, hindi: Boolean = false) {
+    val stops = bandStops(bounds.lowBand)
+    val label = "Consent readiness between ${bounds.lowScore} and ${bounds.highScore} out of 100, depending on your consent history: ${bounds.verdict()}"
+    val low = bounds.lowScore.coerceIn(0, 100) / 100f
+    val high = bounds.highScore.coerceIn(0, 100) / 100f
+    Box(
+        modifier.size(ringSize).clearAndSetSemantics { contentDescription = label }.drawWithCache {
+            val stroke = 8.dp.toPx()
+            val inset = stroke / 2f + 6.dp.toPx()
+            val arcSize = Size(size.width - inset * 2, size.height - inset * 2)
+            val topLeft = Offset(inset, inset)
+            val radius = arcSize.width / 2f
+            val c = Offset(size.width / 2f, size.height / 2f)
+            val butt = Stroke(stroke, cap = StrokeCap.Butt)
+            onDrawBehind {
+                drawCircle(Film.fill, radius = radius, center = c, style = Stroke(stroke))
+                rotate(-90f, c) {
+                    if (high > low) drawArc(stops.last().copy(alpha = 0.35f), 360f * low, 360f * (high - low), false, topLeft, arcSize, style = butt)
+                    if (low > 0f) drawArc(stops.last(), 0f, 360f * low, false, topLeft, arcSize, style = butt)
+                }
+            }
+        },
+        contentAlignment = Alignment.Center,
+    ) {
+        val scale = LocalScale.current
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                bounds.range,
+                style = MaterialTheme.typography.displayLarge.copy(fontSize = scale.sp(40), lineHeight = scale.sp(44)),
+                color = stops.last(),
+            )
+            Text(if (hindi) "100 में से" else "of 100", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, color = Film.boneDim)
+        }
+    }
+}

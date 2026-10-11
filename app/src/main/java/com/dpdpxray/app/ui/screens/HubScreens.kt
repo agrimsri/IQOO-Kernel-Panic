@@ -90,7 +90,8 @@ fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit, onRecheck: (Strin
     val lang = guideLang()
     var filter by rememberSaveable { mutableIntStateOf(0) }
     val bands = listOf(null, ScoreBand.AT_RISK, ScoreBand.NEEDS_WORK, ScoreBand.READY)
-    val shown = remember(audits, filter) { bands[filter].let { b -> if (b == null) audits else audits.filter { it.band == b } } }
+    // A consent-history range is filed under its worse band (RecentChecks.listBand), so it is never hidden as "Inconclusive".
+    val shown = remember(audits, filter) { bands[filter].let { b -> if (b == null) audits else audits.filter { RecentChecks.listBand(it) == b } } }
     Column(Modifier.fillMaxSize()) {
         TopBar("Reports", onBack = null)
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -104,7 +105,7 @@ fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit, onRecheck: (Strin
             // Where the list comes from and how many checks fall in each band (one line under the filter).
             if (audits.isNotEmpty()) item(key = "counts") {
                 Text(
-                    ReportsCopy.summary(audits.map { it.band }), style = MaterialTheme.typography.bodySmall, color = Film.boneDim,
+                    ReportsCopy.summary(audits.map { RecentChecks.listBand(it) }), style = MaterialTheme.typography.bodySmall, color = Film.boneDim,
                     modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
                 )
             }
@@ -244,7 +245,7 @@ internal fun SampleFixturesDialog(vm: XrayViewModel, onOpen: (String) -> Unit, o
  */
 @Composable
 internal fun RecentCheckCard(meta: AuditMeta, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val color = bandColor(meta.band)
+    val color = bandColor(RecentChecks.listBand(meta))
     val shape = RoundedCornerShape(Radii.tile)
     Row(
         modifier.fillMaxWidth().heightIn(min = 80.dp)
@@ -266,7 +267,7 @@ internal fun RecentCheckCard(meta: AuditMeta, modifier: Modifier = Modifier, onC
             }
             Text(
                 buildAnnotatedString {
-                    withStyle(SpanStyle(color = color)) { append(meta.band.label) }
+                    withStyle(SpanStyle(color = color)) { append(RecentChecks.listBand(meta).label) }
                     append(" · ")
                     append(if (meta.findingCount == 1) "1 finding" else "${meta.findingCount} findings")
                 },

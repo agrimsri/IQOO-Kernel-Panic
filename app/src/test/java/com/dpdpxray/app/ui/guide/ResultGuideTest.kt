@@ -36,6 +36,23 @@ class ResultGuideTest {
         assertTrue(lowVisibility.meaning.first().en.contains("Too little was captured"))
     }
 
+    @Test fun `a consent-history range gives its verdict, never Inconclusive`() {
+        val bounds = com.dpdpxray.core.model.HistoryBounds(65, ScoreBand.NEEDS_WORK, 99, ScoreBand.READY)
+        val f = facts(ScoreBand.INCONCLUSIVE, null, findings = 3)
+            .copy(inconclusiveReason = com.dpdpxray.core.rules.Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN, bounds = bounds)
+        val first = ResultGuide.explain(f).meaning.first()
+        assertTrue(first.en, first.en.startsWith("Needs work whichever way you answer (65–99)."))
+        assertTrue(first.en, first.en.contains("never Ready"))
+        assertFalse(first.en, first.en.contains("Inconclusive", ignoreCase = true) || first.en.contains("No score"))
+        assertTrue(first.hi, first.hi.contains("65–99"))
+        val open = f.copy(bounds = com.dpdpxray.core.model.HistoryBounds(35, ScoreBand.AT_RISK, 69, ScoreBand.NEEDS_WORK))
+        assertTrue(ResultGuide.explain(open).meaning.first().en.startsWith("At best Needs work (35–69)."))
+        val spoken = ResultGuide.step(f).spoken
+        assertTrue(spoken.en, spoken.en.contains("Needs work either way, 65 to 99"))
+        assertFalse(spoken.en, spoken.en.contains("Inconclusive"))
+        assertFalse(spoken.hi, spoken.hi.contains("अनिर्णायक"))
+    }
+
     @Test fun `findings come with the lookup caveat and an evidence action`() {
         val e = ResultGuide.explain(facts())
         assertTrue(e.meaning.any { it.en.contains("not proof that personal data was sent") })

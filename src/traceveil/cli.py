@@ -249,6 +249,9 @@ def from_app_export(bundle: dict) -> dict:
         "sessions": bundle.get("sessions") or [],
         "source": APP_EXPORT_SCHEMA,
     }
+    if isinstance(result.get("historyBounds"), dict):
+        # Consent history unknown: the range the app bounded the result by (and the person's answer, if given).
+        rep["historyBounds"] = result["historyBounds"]
     if observed:
         rep["observedTrackers"] = observed
     return rep
@@ -303,6 +306,8 @@ def cmd_laws(args, cfg, dev=None) -> int:
     else:
         t = rep.get("target", {})
         print(f"Traceveil lens  {st.bold(t.get('label', '?'))} ({t.get('package', '?')})  report {rep.get('requestId', '?')}")
+        for line in audit.history_lines(rep, st):
+            print(line)
         print(laws.detail(block, st) if args.detail else "\n".join(laws.table(block, st)))
         for r in reasons:
             print(f"  {st.warn('policy:')} {r}")

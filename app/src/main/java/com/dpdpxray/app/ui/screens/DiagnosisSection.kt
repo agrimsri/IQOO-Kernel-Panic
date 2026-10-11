@@ -46,8 +46,12 @@ internal object NoScoreHelp {
     fun items(b: AuditBundle): List<VisibilityDiagnosis.Item> = if (b.meta.sample) emptyList()
         else VisibilityDiagnosis.forResult(b.result, b.sessions)
 
+    /**
+     * A consent-history result saved before ranges existed (no bounds). A result with a range is not "no score": its
+     * own section (ConsentHistorySection) shows the range and the question instead.
+     */
     fun historyUnknown(b: AuditBundle): Boolean =
-        !b.meta.sample && Inconclusive.reason(b.result.findings) == Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN
+        !b.meta.sample && b.result.historyBounds == null && Inconclusive.reason(b.result.findings) == Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN
 
     /** True when this section brings its own filled action, so the result's next steps must not add a second one. */
     fun hasPrimary(b: AuditBundle): Boolean = VisibilityDiagnosis.primaryAction(items(b)) != Action.NONE
@@ -95,7 +99,10 @@ internal fun NoScoreSection(vm: XrayViewModel, b: AuditBundle, lang: GuideLang, 
     val pkg = b.meta.targetPackage
     val resetOk = remember(pkg) { vm.resetEligible(pkg) }
     var confirmReset by remember { mutableStateOf(false) }
-    val restart: () -> Unit = { vm.checkAgain(b, CheckAgain.Mode.RESTART, onLive) }
+    // The check found that a restart would switch something off: ask before restarting, never restart silently.
+    val disturbed = remember(b.meta.id) { com.dpdpxray.app.audit.RestartReminder.recorded(b.sessions) }
+    var confirmRestart by remember { mutableStateOf(false) }
+    val restart: () -> Unit = { if (disturbed.isEmpty()) vm.checkAgain(b, CheckAgain.Mode.RESTART, onLive) else confirmRestart = true }
     fun run(a: Action) = when (a) {
         Action.CHECK_AGAIN_WITH_RESTART, Action.CHECK_AGAIN, Action.NONE -> restart()
         Action.TURN_OFF_PRIVATE_DNS -> DeviceChecks.openPrivateDnsSettings(ctx)
@@ -133,6 +140,26 @@ internal fun NoScoreSection(vm: XrayViewModel, b: AuditBundle, lang: GuideLang, 
             if (resetOk) TextAction(DiagnosisCopy.reset.pick(lang), { confirmReset = true })
         }
         if (!pf.shizukuGranted) Notice(NoScoreHelp.noShizuku.pick(lang), kind = NoticeKind.INFO, action = NoScoreHelp.openAppInfo.pick(lang) to { DeviceChecks.openAppInfo(ctx, pkg) })
+    }
+
+    if (confirmRestart) {
+        val c = com.dpdpxray.app.audit.RestartSafeguardCopy
+        AlertDialog(
+            onDismissRequest = { confirmRestart = false },
+            title = { Text(c.title.pick(lang)) },
+            text = { Text(disturbed.joinToString("\n\n") { c.warning(b.meta.targetLabel, com.dpdpxray.app.audit.FoundSideEffect(it)).pick(lang) }) },
+            confirmButton = {
+                TextButton(onClick = { confirmRestart = false; vm.checkAgain(b, CheckAgain.Mode.RESTART, onLive, com.dpdpxray.app.audit.RestartPolicy.ALWAYS) }) {
+                    Text(c.anyway.pick(lang))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRestart = false; vm.checkAgain(b, CheckAgain.Mode.RESTART, onLive, com.dpdpxray.app.audit.RestartPolicy.SKIP) }) {
+                    Text(c.skip.pick(lang))
+                }
+            },
+            containerColor = Film.raised,
+        )
     }
 
     if (confirmReset) AlertDialog(

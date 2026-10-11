@@ -51,6 +51,19 @@ object DeviceChecks {
     }
 
     /** Android's VPN settings, where the user can turn their own VPN off before a check. */
+    /** The Settings screen where [kind] is turned on again after a restart the person chose; the app itself for a stopped service. */
+    fun openTurnBackOn(context: Context, kind: com.dpdpxray.app.audit.RestartSideEffect, pkg: String) {
+        val action = when (kind) {
+            com.dpdpxray.app.audit.RestartSideEffect.ACCESSIBILITY -> Settings.ACTION_ACCESSIBILITY_SETTINGS
+            com.dpdpxray.app.audit.RestartSideEffect.VPN -> Settings.ACTION_VPN_SETTINGS
+            com.dpdpxray.app.audit.RestartSideEffect.KEYBOARD -> Settings.ACTION_INPUT_METHOD_SETTINGS
+            com.dpdpxray.app.audit.RestartSideEffect.NOTIFICATION_LISTENER -> Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
+            com.dpdpxray.app.audit.RestartSideEffect.HOME, com.dpdpxray.app.audit.RestartSideEffect.SMS -> Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS
+            else -> null
+        }
+        if (action == null || runCatching { context.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isFailure) launch(context, pkg)
+    }
+
     fun openVpnSettings(context: Context) {
         runCatching { context.startActivity(Intent(Settings.ACTION_VPN_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }

@@ -27,6 +27,8 @@ import kotlinx.serialization.json.put
  *   when that choice was recorded (with no consent screen, or no recorded choice, behaviour after it was not tested).
  * - requireSignature false: the hardware signature next to a bundle (<bundle>.sig.json, traceveil.signature.v1) is
  *   always reported; set true to fail a bundle whose signature is missing or does not verify.
+ * - requireReady false: set true to require the top (85–100) band. A result whose consent history is unknown is a
+ *   range: it passes only when even its worst end is in the top band, and fails when its best band is lower.
  *
  * Unknown keys are an error, so a typo cannot silently weaken the gate. Keys starting with "_" or "$" are comments.
  */
@@ -39,6 +41,7 @@ data class Policy(
     val requirePlans: List<AuditPlan> = AuditPlan.entries.toList(),
     val allowNotEstablished: Boolean = false,
     val requireSignature: Boolean = false,
+    val requireReady: Boolean = false,
 ) {
     fun toJson(): JsonObject = buildJsonObject {
         put("failOn", JsonArray(failOn.map { JsonPrimitive(it.code) }))
@@ -49,11 +52,12 @@ data class Policy(
         put("allowNotEstablished", allowNotEstablished)
         put("requirePlans", JsonArray(requirePlans.map { JsonPrimitive(it.name) }))
         put("requireSignature", requireSignature)
+        put("requireReady", requireReady)
     }
 
     companion object {
         val DEFAULT_FAIL_ON = listOf(CheckId.C2, CheckId.C9)
-        val KEYS = listOf("failOn", "minScore", "maxHigh", "requireFreshState", "allowInconclusive", "allowNotEstablished", "requirePlans", "requireSignature")
+        val KEYS = listOf("failOn", "minScore", "maxHigh", "requireFreshState", "allowInconclusive", "allowNotEstablished", "requirePlans", "requireSignature", "requireReady")
 
         /** Throws [UsageException] with a plain reason when the policy cannot be used. */
         fun parse(text: String): Policy {
@@ -73,6 +77,7 @@ data class Policy(
             root["allowNotEstablished"]?.let { p = p.copy(allowNotEstablished = bool(it, "allowNotEstablished")) }
             root["requirePlans"]?.let { p = p.copy(requirePlans = strings(it, "requirePlans").map(::plan).distinct()) }
             root["requireSignature"]?.let { p = p.copy(requireSignature = bool(it, "requireSignature")) }
+            root["requireReady"]?.let { p = p.copy(requireReady = bool(it, "requireReady")) }
             return p
         }
 

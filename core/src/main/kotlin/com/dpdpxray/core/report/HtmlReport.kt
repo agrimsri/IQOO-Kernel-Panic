@@ -170,7 +170,9 @@ object HtmlReport {
     private fun StringBuilder.hero(result: AuditResult, sessions: List<AuditSession>, c: HtmlCoverage, zone: ZoneId, view: LensView) {
         val first = sessions.firstOrNull()
         val lookups = sessions.sumOf { it.netEvents.size }
-        val band = bandClass(result.band)
+        val bounds = result.historyBounds
+        val range = bounds?.takeIf { result.score == null }
+        val band = bandClass(range?.let { it.verdictBand ?: it.lowBand } ?: result.band)
         append("<section id=\"summary\" class=\"hero\" aria-labelledby=\"app-title\"><div class=\"hero-main\">")
         append("<p class=\"eyebrow\">Consent evidence report</p>")
         append("<h1 id=\"app-title\">").append(esc(first?.targetLabel ?: "Unknown app")).append("</h1>")
@@ -195,14 +197,19 @@ object HtmlReport {
         val score = result.score ?: 0
         val circ = 2 * PI * 52
         append("<div class=\"dial\"><svg viewBox=\"0 0 132 132\" role=\"img\" aria-label=\"")
-        append(if (inconclusive) "Score inconclusive" else "Score $score out of 100, ${esc(result.band.label)}").append("\">")
+        append(when {
+            range != null -> "Score between ${range.lowScore} and ${range.highScore}, depending on consent history: ${esc(range.verdict())}"
+            inconclusive -> "Score inconclusive"
+            else -> "Score $score out of 100, ${esc(result.band.label)}"
+        }).append("\">")
         append("<circle cx=\"66\" cy=\"66\" r=\"60\" class=\"dial-halo\"/><circle cx=\"66\" cy=\"66\" r=\"52\" class=\"dial-track\"/>")
         if (!inconclusive) {
             append("<circle cx=\"66\" cy=\"66\" r=\"52\" class=\"dial-arc\" stroke-dasharray=\"").append(f1(circ * score / 100.0))
                 .append(' ').append(f1(circ)).append("\" transform=\"rotate(-90 66 66)\"/>")
         }
-        append("</svg><span class=\"dial-num\">").append(if (inconclusive) "?" else score.toString()).append("</span></div>")
-        append("<p class=\"band\">").append(esc(result.band.label)).append("</p>")
+        append("</svg><span class=\"dial-num\">").append(range?.range ?: if (inconclusive) "?" else score.toString()).append("</span></div>")
+        append("<p class=\"band\">").append(esc(range?.verdict()?.substringBefore(" · ") ?: result.band.label)).append("</p>")
+        if (bounds != null) append("<p class=\"dim small\">").append(esc(MarkdownReport.historyLine(bounds))).append("</p>")
         append("<p class=\"dim small\">Consent readiness out of 100 · not a safety or compliance certificate</p>")
         append("<p class=\"lens-score small\" data-lens=\"").append(view.id.name).append("\"><strong>").append(esc(view.scoreLine)).append("</strong> ")
             .append(esc(view.scoreNote)).append("</p>")

@@ -17,8 +17,11 @@ object CheckAgain {
     fun resetAllowed(debuggable: Boolean, controlledDemo: Boolean, allowlisted: Boolean, system: Boolean): Boolean =
         !system && (debuggable || controlledDemo || allowlisted)
 
-    /** Options the saved audit did not record fall back to the safe side: the person taps, no Play services lookups. */
-    fun config(meta: AuditMeta, sessions: List<AuditSession>, mode: Mode): AuditConfig {
+    /**
+     * Options the saved audit did not record fall back to the safe side: the person taps, no Play services lookups, and
+     * an app that a restart would disturb is left running unless [restart] says the person chose otherwise.
+     */
+    fun config(meta: AuditMeta, sessions: List<AuditSession>, mode: Mode, restart: RestartPolicy = RestartPolicy.AUTO): AuditConfig {
         val fromMeta = meta.plans.mapNotNull { label -> AuditPlan.entries.firstOrNull { it.label == label } }.distinct()
         val plans = fromMeta.ifEmpty { sessions.map { it.plan }.distinct() }.ifEmpty { listOf(AuditPlan.REJECT) }
         return AuditConfig(
@@ -30,6 +33,7 @@ object CheckAgain {
             autoDrive = meta.autoDrive ?: false,
             resetAppData = mode == Mode.RESET,
             fastPreview = meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW && plans == listOf(AuditPlan.ACCEPT),
+            restart = restart,
         )
     }
 }

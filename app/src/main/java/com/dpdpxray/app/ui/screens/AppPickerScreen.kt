@@ -92,6 +92,7 @@ import com.dpdpxray.app.ui.guide.moreLabel
 import com.dpdpxray.app.ui.modes.CheckChoice
 import com.dpdpxray.app.ui.modes.CheckSheet
 import com.dpdpxray.app.ui.modes.EverydayCheckSetup
+import com.dpdpxray.app.ui.modes.RestartWarning
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
@@ -196,11 +197,15 @@ fun AppPickerScreen(
             LaunchedEffect(app.packageName, pf.shizukuGranted) {
                 while (!pf.shizukuGranted) { kotlinx.coroutines.delay(1_000); vm.refreshPreflight() }
             }
+            // What restarting this app would switch off (accessibility service, VPN, keyboard...), read once as the sheet opens.
+            val effects by androidx.compose.runtime.produceState<List<com.dpdpxray.app.audit.FoundSideEffect>?>(null, app.packageName, pf.shizukuGranted) {
+                value = vm.restartSideEffects(app.packageName)
+            }
             // Everyday mode: one Quick check that says No; Full and clearing data fold under Advanced.
             if (settings.audience == Audience.USER) {
-                EverydayCheckSetup(app, controlledDemo = app.packageName in demoPackages, shizukuReady = pf.shizukuGranted, shizukuHelp = help, onQuarantine = quarantine, onStart = start)
+                EverydayCheckSetup(app, controlledDemo = app.packageName in demoPackages, shizukuReady = pf.shizukuGranted, shizukuHelp = help, onQuarantine = quarantine, onStart = start, effects = effects)
             } else {
-                AuditSetup(app, shizukuReady = pf.shizukuGranted, shizukuHelp = help, preferPreview = settings.fastDemo, onQuarantine = quarantine, onStart = start)
+                AuditSetup(app, shizukuReady = pf.shizukuGranted, shizukuHelp = help, preferPreview = settings.fastDemo, onQuarantine = quarantine, onStart = start, effects = effects)
             }
         }
     }
@@ -279,7 +284,10 @@ private fun leadAndRest(text: String): Pair<String, String?> {
 }
 
 @Composable
-private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, shizukuHelp: ShizukuHelp, preferPreview: Boolean, onQuarantine: () -> Unit = {}, onStart: (AuditConfig) -> Unit) {
+private fun AuditSetup(
+    app: AuditableApp, shizukuReady: Boolean, shizukuHelp: ShizukuHelp, preferPreview: Boolean, onQuarantine: () -> Unit = {}, onStart: (AuditConfig) -> Unit,
+    effects: List<com.dpdpxray.app.audit.FoundSideEffect>? = null,
+) {
     val controlledDemo = app.packageName == "com.leakyshop.demo" || app.packageName == "com.leakyshop.demo.fixed"
     val initial = remember { CheckSheet.defaults(Audience.DEVELOPER, controlledDemo, shizukuReady, preferPreview) }
     var allowReset by remember { mutableStateOf(initial.allowReset) }
@@ -289,6 +297,9 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, shizukuHelp: Sh
     var agent by remember { mutableStateOf(initial.agentTaps) }
     var child by remember { mutableStateOf(false) }
     var gms by remember { mutableStateOf(false) }
+    // The safe option is the default: an app a restart would disturb is checked without restarting it.
+    var restartAnyway by remember { mutableStateOf(false) }
+    val leftRunning = shizukuReady && !freshReset && !effects.isNullOrEmpty() && !restartAnyway
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CheckSheetTitle("Check ${app.label}")
@@ -312,7 +323,8 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, shizukuHelp: Sh
             PlanOption("Fast Preview · limited evidence", "One Accept-plan run with 8 seconds of observation and a shorter consent-screen wait. Delayed traffic may be missed; not a Full audit.", preview, enabled = true) { full = false; preview = true }
             // The caveat's first sentence stays in view; the rest folds behind More.
             val (lead, rest) = leadAndRest(
-                if (!freshReset && shizukuReady) "Quick restarts the app first (it keeps its data), so its launch-time lookups are made again. An app that was used before may keep its consent choice and not ask again. A missing dialog or quiet run is not a privacy pass."
+                if (leftRunning) "Quick opens the app as it is, without restarting it, so what it runs stays on; it may reuse launch-time lookups it made before. An app that was used before may keep its consent choice and not ask again. A missing dialog or quiet run is not a privacy pass."
+                else if (!freshReset && shizukuReady) "Quick restarts the app first (it keeps its data), so its launch-time lookups are made again. An app that was used before may keep its consent choice and not ask again. A missing dialog or quiet run is not a privacy pass."
                 else if (!freshReset) "Quick keeps the app's data and cannot restart it without Shizuku. An already-opened app may keep its consent choice and not repeat launch-time DNS lookups. A missing dialog or quiet run is not a privacy pass."
                 else "Starting an audit clears this selected app's local data before each plan. Use a test app or a backed-up development build; do not use a personal app with data you need.",
             )
@@ -331,9 +343,13 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, shizukuHelp: Sh
             Toggle("Include Google Play services lookups", "Some SDKs upload through Play services. Those lookups may include other apps' traffic.", gms) { gms = it }
         }
 
+        RestartWarning(app.label, effects, canStop = shizukuReady, reset = freshReset, restartAnyway = restartAnyway, onChange = { restartAnyway = it },
+            lang = com.dpdpxray.app.ui.guide.guideLang())
+
         GradientAction("Start check", {
             val choice = when { full -> CheckChoice.FULL; preview -> CheckChoice.PREVIEW; else -> CheckChoice.QUICK }
-            onStart(CheckSheet.config(Audience.DEVELOPER, app.packageName, app.label, choice, allowReset, shizukuReady, agent, child, gms))
+            onStart(CheckSheet.config(Audience.DEVELOPER, app.packageName, app.label, choice, allowReset, shizukuReady, agent, child, gms,
+                CheckSheet.restartPolicy(effects.takeIf { shizukuReady }, restartAnyway)))
         }, Modifier.padding(top = 8.dp).reveal(3), glyph = Glyph.PLAY, sweep = true)
         // Quarantine run (separate feature): opens its own explainer; nothing starts until Start is tapped there.
         OutlineAction("Run in quarantine (network blocked)", onQuarantine, Modifier.reveal(3), glyph = Glyph.LOCK)

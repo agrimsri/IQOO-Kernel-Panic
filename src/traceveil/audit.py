@@ -104,11 +104,62 @@ def validate_report(text: str, request_id: str) -> tuple[dict | None, str]:
     return rep, ""
 
 
-def exit_for_report(rep: dict, fail_on: str, min_score: int) -> tuple[int, list[str]]:
-    if rep.get("score") is None or rep.get("band") == "INCONCLUSIVE":
-        return EXIT_INCONCLUSIVE, ["audit result is inconclusive (no score)"]
+BAND_LABEL = {"READY": "Ready", "NEEDS_WORK": "Needs work", "AT_RISK": "At risk", "INCONCLUSIVE": "Inconclusive"}
+ANSWER_LINE = {"UNKNOWN": "unknown (not answered)", "DECLARED_NEVER": "declared by the person: never agreed",
+               "DECLARED_AGREED": "declared by the person: agreed earlier", "NOT_SURE": "the person is not sure (unknown)"}
+
+
+def _best_band(b: dict) -> str:
+    """`HistoryBounds.bestBand`: the agreed-earlier end's band, never Ready unless the never-agreed end is too."""
+    return "NEEDS_WORK" if b.get("highBand") == "READY" and b.get("lowBand") != "READY" else str(b.get("highBand"))
+
+
+def history_verdict(b: dict) -> str:
+    """`HistoryBounds.verdict` in the app: "Needs work either way · 65–99", "At best Needs work · 41–77", or the answered end."""
+    rng = f"{b.get('lowScore')}–{b.get('highScore')}"
+    if b.get("answer") == "DECLARED_NEVER":
+        return f"{b.get('lowScore')} · {BAND_LABEL.get(b.get('lowBand'), b.get('lowBand'))} · based on your answer"
+    if b.get("answer") == "DECLARED_AGREED":
+        return f"{b.get('highScore')} · {BAND_LABEL.get(_best_band(b))} · based on your answer"
+    if b.get("lowBand") == _best_band(b):
+        return f"{BAND_LABEL.get(b.get('lowBand'), b.get('lowBand'))} either way · {rng}"
+    return f"At best {BAND_LABEL.get(_best_band(b))} · {rng}"
+
+
+def history_lines(rep: dict, style: Style = PLAIN) -> list[str]:
+    """The consent-history range of a kept-data audit (report key "historyBounds", when present), or the answer that picked an end."""
+    b = rep.get("historyBounds")
+    if not isinstance(b, dict):
+        return []
+    answer = b.get("answer")
+    if answer in ("DECLARED_NEVER", "DECLARED_AGREED"):
+        return [f"  {style.warn('Consent history:')} {ANSWER_LINE[answer]} (not checkable) -> {history_verdict(b)}"]
+    why = "asked, the person is not sure" if answer == "NOT_SURE" else "the app kept its data and showed no consent screen"
+    return [f"  {style.warn('consent history unknown:')} {history_verdict(b)}  ({why}; "
+            f"never agreed -> {b.get('lowScore')}, agreed earlier -> {b.get('highScore')})"]
+
+
+def _range_reasons(b: dict, fail_on: str, min_score: int) -> list[str]:
+    """A range is judged by its never-agreed end: a gate never passes on a consent history nobody could check."""
     reasons = []
-    if rep["score"] < min_score:
+    rng = f"{b.get('lowScore')}–{b.get('highScore')}"
+    if b.get("highScore", 0) < min_score:
+        reasons.append(f"score range {rng}: even if the person agreed earlier it is below min_score {min_score}")
+    elif b.get("lowScore", 0) < min_score:
+        reasons.append(f"score range {rng}: min_score {min_score} is met only if the person agreed earlier (consent history unknown)")
+    if fail_on in SEVERITY_ORDER and SEVERITY_ORDER.index(fail_on) <= SEVERITY_ORDER.index("high"):
+        reasons.append(f"consent history unknown: if the person never agreed, tracker lookups count as before consent (C1, high; range {rng})")
+    return reasons
+
+
+def exit_for_report(rep: dict, fail_on: str, min_score: int) -> tuple[int, list[str]]:
+    bounds = rep.get("historyBounds")
+    reasons = []
+    if rep.get("score") is None and isinstance(bounds, dict):
+        reasons += _range_reasons(bounds, fail_on, min_score)
+    elif rep.get("score") is None or rep.get("band") == "INCONCLUSIVE":
+        return EXIT_INCONCLUSIVE, ["audit result is inconclusive (no score)"]
+    elif rep["score"] < min_score:
         reasons.append(f"score {rep['score']} is below min_score {min_score}")
     if fail_on in SEVERITY_ORDER:
         bar = SEVERITY_ORDER.index(fail_on)
@@ -182,12 +233,16 @@ def sdk_lines(inv: dict, style: Style = PLAIN) -> list[str]:
 
 def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) -> str:
     t = rep["target"]
-    lines = [f"Traceveil audit  {style.bold(t.get('label', '?'))} ({t.get('package', '?')})  "
-             f"score {style.score(rep['score'], rep['band'])} / {style.band(rep['band'])}  findings {len(rep['findings'])}"]
+    bounded = rep.get("score") is None and isinstance(rep.get("historyBounds"), dict)
+    verdict = f"range {history_verdict(rep['historyBounds'])}" if bounded else f"score {style.score(rep['score'], rep['band'])} / {style.band(rep['band'])}"
+    lines = [f"Traceveil audit  {style.bold(t.get('label', '?'))} ({t.get('package', '?')})  {verdict}  findings {len(rep['findings'])}"]
+    lines += history_lines(rep, style)
     plan = {i["check"]: i for i in rep.get("fixPlan", {}).get("issues", [])}
     for f in rep["findings"]:
         sev = str(f.get("severity", "?"))
         tag = style.dim(" inferred") if str(f.get("evidenceType", "")).upper() == "INFERRED" else ""
+        if f.get("declared"):
+            tag += style.dim(" based on your answer")
         lines.append(f"  {f.get('check', '?'):<4} {style.severity(sev, 8)} {f.get('title', '')}{tag}")
         if f.get("entities"):
             lines.append(f"       {style.dim('trackers:')} {_names(f['entities'], style)}")

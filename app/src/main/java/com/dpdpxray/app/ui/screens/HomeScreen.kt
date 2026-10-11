@@ -385,10 +385,10 @@ private fun EverydayUpdatesSection(items: List<UpdatedApp>, lang: GuideLang, onR
 internal fun CheckRow(meta: AuditMeta, lang: GuideLang, onClick: () -> Unit) {
     val partial = RecentChecks.coverageWarning(meta) != null
     val subtitle = (if (partial) EverydayCopy.partial.pick(lang) + " · " else "") +
-        EverydayCopy.band(meta.band).pick(lang) + " · " + SimpleDateFormat("d MMM", Locale.US).format(Date(meta.createdAtMs))
+        EverydayCopy.band(RecentChecks.listBand(meta)).pick(lang) + " · " + SimpleDateFormat("d MMM", Locale.US).format(Date(meta.createdAtMs))
     ListRow(
         title = meta.targetLabel, subtitle = subtitle, onClick = onClick,
-        trailing = { Text(RecentChecks.scoreText(meta), style = MaterialTheme.typography.titleLarge, color = bandColor(meta.band)) },
+        trailing = { Text(RecentChecks.scoreText(meta), style = MaterialTheme.typography.titleLarge, color = bandColor(RecentChecks.listBand(meta))) },
     )
 }
 

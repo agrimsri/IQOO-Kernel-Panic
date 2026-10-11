@@ -135,6 +135,8 @@ data class LensView(
     val findings: List<LensFinding>,
     val score: Int?,
     val band: ScoreBand,
+    /** The consent-history range of the result read (unknown history), so the line names it instead of "inconclusive". */
+    val historyBounds: com.dpdpxray.core.model.HistoryBounds? = null,
 ) {
     val required: List<LensFinding> get() = findings.filter { it.relation == LawRelation.REQUIRED }
     val context: List<LensFinding> get() = findings.filter { it.relation == LawRelation.CONTEXT }
@@ -145,7 +147,12 @@ data class LensView(
     /** "Score under the EU / EEA lens: 79/100 · Needs work" or the inconclusive equivalent. */
     val scoreLine: String
         get() = "Score under the ${profile.name} lens: " +
-            (if (score == null || band == ScoreBand.INCONCLUSIVE) "inconclusive" else "$score/100 · ${band.label}")
+            when {
+                (score == null || band == ScoreBand.INCONCLUSIVE) && historyBounds != null ->
+                    "depends on consent history (consent-first range ${historyBounds.range})"
+                score == null || band == ScoreBand.INCONCLUSIVE -> "inconclusive"
+                else -> "$score/100 · ${band.label}"
+            }
 
     /** What the lens score counts and skips, and that it is not a verdict. */
     val scoreNote: String
@@ -195,7 +202,7 @@ class LegalLens(profiles: List<LensProfile>, val passages: List<LensPassage>) {
         val p = profile(id)
         val findings = result.findings.map { f -> LensFinding(f, mapping(id, f.checkId.code), f.checkId.code in p.checks) }
         val (score, band) = scoreUnder(findings)
-        return LensView(id, p, findings, score, band)
+        return LensView(id, p, findings, score, band, result.historyBounds)
     }
 
     companion object {

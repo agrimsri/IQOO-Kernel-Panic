@@ -10,6 +10,8 @@ import com.dpdpxray.core.model.StartMode
  *   deleted and the person's data, sign-in and settings stay.
  * - Only when the person approved it for a test app is the data also cleared (`pm clear`): a **reset**.
  * - Without Shizuku the app is opened as it is (it may already be running), and the notes say so.
+ * - When stopping it would switch something off (an accessibility service, a VPN...; see [RestartDecision]) and the
+ *   person did not choose a restart, it is opened as it is too: [keepRunning] says why.
  *
  * Shell access is passed in, so the policy is tested on the JVM.
  */
@@ -23,11 +25,13 @@ internal class AppStart(
     /** [freshState]: the data was actually cleared. [problem]: why a restart or reset did not happen, in plain words. */
     data class Outcome(val mode: StartMode, val freshState: Boolean, val runningBefore: Boolean?, val problem: String?, val notes: List<String>)
 
-    suspend fun prepare(pkg: String, resetApproved: Boolean): Outcome {
+    suspend fun prepare(pkg: String, resetApproved: Boolean, keepRunning: String? = null): Outcome {
         if (!shizukuReady()) {
             return Outcome(StartMode.NOT_RESTARTED, false, null, NO_SHIZUKU, listOf(NO_SHIZUKU_KEPT_NOTE, notRestartedNote(NO_SHIZUKU)))
         }
         val running = runCatching { processRunning(pkg) }.getOrNull()
+        // Left running on purpose: no force-stop at all. The plan's own note says why (RestartDecision).
+        if (keepRunning != null && !resetApproved) return Outcome(StartMode.NOT_RESTARTED, false, running, keepRunning, listOf(KEPT_NOTE))
         val stopped = forceStop(pkg)
         if (stopped.isFailure) {
             val why = "stopping it failed: ${stopped.exceptionOrNull()?.message ?: "unknown error"}"
