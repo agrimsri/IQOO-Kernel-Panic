@@ -33,9 +33,16 @@ Nothing here sends data off the phone, and nothing starts a consent check, a VPN
 
 A `file://` URI, a missing file or a web address is not read; the result screen says why and what to do instead (open it from Files or Chrome's downloads, or share it).
 
+**Split bundles (.xapk, .apks, .apkm)** are checked with the same rules as the developer CLI (`traceveil audit --apk`, `src/traceveil/apkfile.py` on `origin/cli`). They usually reach APK Guard through **Choose a file**: Android gives them no standard MIME type, so the "Open with" filter does not match them.
+- A zip with `AndroidManifest.xml` at its root is an APK; a zip with APK files inside is a bundle.
+- The base APK is the one whose binary manifest has no `split` attribute (`core/.../apk/ApkBundles.kt`, a Kotlin port of the CLI's `manifest_attrs`).
+- `manifest.json` (XAPK) or `info.json` (APKM) only fills gaps such as the app name.
+- The report uses the base APK's facts; the code scan covers every APK inside. Entry names are flattened into a private folder, at most 64 APKs and 400 MB, deleted after the read.
+- The CLI also installs bundles over adb. TraceVeil on the phone only checks them: it shows "This is an app bundle with N APK files…" and offers only **Don't install** (Android's own installer cannot open bundles either). OBB expansion files are ignored.
+
 ## Flow 2: a new APK appears in Downloads
 
-- Setting: **Settings › Auto-guard › Check new APK downloads**, on by default, English and Hindi text (`DownloadAlertCopy`).
+- Setting: **Settings › Auto-guard › Check new APK downloads**, on by default, English and Hindi text (`DownloadAlertCopy`). The same switch is a row in **What TraceVeil uses** (Home's Setup sheet and Settings › Permissions & background: `ControlId.APK_DOWNLOADS`, under "TraceVeil's own switches"). It has its own job, so it stays switchable while the new-app check is off.
 - A one-shot JobScheduler job (id **4104**) with `JobInfo.TriggerContentUri` on `MediaStore.Downloads.EXTERNAL_CONTENT_URI` (descendants), 3 s quiet period, at most 30 s delay. Content-URI jobs cannot be persisted, so it is scheduled again after each run, after a restart or an update of TraceVeil, and at every app start. No battery constraint: each run only asks MediaStore about the changed items.
 - For each changed item (`DownloadsWatch.newApks`):
   - if MediaStore lets TraceVeil see the row, it uses the name, MIME type, `IS_PENDING` and `DATE_ADDED`;
@@ -76,12 +83,12 @@ A `file://` URI, a missing file or a web address is not read; the result screen 
 
 ## Tests (JVM)
 
-- `core`: `SignerCheckTest` (same, rotated, different, unknown signer; downgrade; APK Guard's same-package signal), `PreInstallCheckTest` (blocks, banners, ordering, minimum target API, wording), `InstallHighlightsTest`.
+- `core`: `SignerCheckTest` (same, rotated, different, unknown signer; downgrade; APK Guard's same-package signal), `PreInstallCheckTest` (blocks, banners, ordering, minimum target API, wording), `InstallHighlightsTest`, `ApkBundlesTest` (binary manifest, base APK, bundle metadata).
 - `app`:
   - `IncomingApkTest`: VIEW/SEND/INSTALL_PACKAGE, content vs file URIs, bad input.
   - `InstallHandoffTest`: the installer-session wrapper against a fake `InstallerGateway`, status mapping, hand-off dedup.
-  - `InstallAlertCopyTest`, `DownloadsWatchTest` (MediaStore logic against a fake `DownloadsSource`, notification copy, taps), `ApkOpenerTest`, `PreInstallCopyTest`.
-  - Manifest, settings and trust tests updated.
+  - `InstallAlertCopyTest`, `DownloadsWatchTest` (MediaStore logic against a fake `DownloadsSource`, notification copy, taps), `ApkOpenerTest`, `PreInstallCopyTest`, `BundleReaderTest` (unpacking, zip-slip names, caps).
+  - Manifest, settings, trust and controls-inventory tests updated.
 
 ## Phone test steps (Android 16 test phone; not yet run)
 
