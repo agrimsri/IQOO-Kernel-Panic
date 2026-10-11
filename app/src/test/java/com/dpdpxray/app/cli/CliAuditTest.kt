@@ -119,6 +119,7 @@ class CliAuditTest {
         assertFalse("observedTrackers" in Json.parseToJsonElement(CliAuditReport.build("r1", b)).jsonObject)
         val obj = Json.parseToJsonElement(CliAuditReport.build("r1", b, catalog)).jsonObject
         assertTrue("observedTrackers" in obj.keys)
+        assertTrue("network" in obj.keys)
         val t = obj["observedTrackers"]!!.jsonArray.single().jsonObject
         assertEquals("AppsFlyer", t["entity"]!!.jsonPrimitive.content)
         assertEquals("ATTRIBUTION", t["category"]!!.jsonPrimitive.content)

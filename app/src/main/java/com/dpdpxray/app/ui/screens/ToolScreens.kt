@@ -1,9 +1,13 @@
 package com.dpdpxray.app.ui.screens
 
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
+import androidx.compose.material3.AlertDialog
+import com.dpdpxray.app.BuildConfig
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
@@ -479,8 +483,93 @@ fun SettingsScreen(
             SectionCard(Modifier.reveal(8), title = "Not legal advice", glyph = Glyph.BOOK, accent = Film.warn) {
                 FoldText("Results are an automated technical assessment. Legal passages come from the selected legal lens (India's DPDP Act 2023 and Rules 2025, the EU GDPR and ePrivacy Directive, UK GDPR and PECR, California's CCPA, US COPPA, Brazil's LGPD or Singapore's PDPA) and are context, not a verdict.")
             }
+
+            GroupHeader("About and updates", Modifier.reveal(9))
+            SectionCard(Modifier.reveal(9), title = "App version and updates", glyph = Glyph.INFO) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("TraceVeil v${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleMedium, color = Film.bone)
+                        Text("Build ${BuildConfig.VERSION_CODE} · USB Debug", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                    }
+                    Tag("v${BuildConfig.VERSION_NAME}", Film.scan)
+                }
+                Spacer(Modifier.height(10.dp))
+                FoldText("USB debugged builds do not update on the phone automatically when you run git pull on your computer. Tap below to view update commands and sync the latest code.")
+                Spacer(Modifier.height(12.dp))
+                var showUpdateDialog by remember { mutableStateOf(false) }
+                GradientAction(
+                    "Update version",
+                    onClick = { showUpdateDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    glyph = Glyph.RESET,
+                )
+                if (showUpdateDialog) {
+                    UpdateVersionDialog(vm = vm, onDismiss = { showUpdateDialog = false })
+                }
+            }
             Spacer(Modifier.height(16.dp))
         }
     }
+}
+
+@Composable
+private fun UpdateVersionDialog(vm: XrayViewModel, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val updateCmd = "git pull origin main && ./gradlew installDebug && adb shell am force-stop com.dpdpxray.app && adb shell am start -n com.dpdpxray.app/.MainActivity"
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconBadge(Glyph.RESET, Film.scan, size = 32.dp)
+                Spacer(Modifier.width(10.dp))
+                Text("Update TraceVeil", style = MaterialTheme.typography.titleLarge)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Current build:", style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                    Spacer(Modifier.width(6.dp))
+                    Tag("v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", Film.scan)
+                }
+                Text(
+                    "Git pulls on your computer do not automatically update the app installed on this USB device. To compile and push the latest changes from main, run this command in your computer's terminal:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Film.bone,
+                )
+                CodeBlock(updateCmd)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SecondaryAction(
+                        "Copy update command",
+                        onClick = { vm.copy("Update command", updateCmd) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Hairline(Modifier.padding(vertical = 4.dp))
+                Text(
+                    "You can also check published releases on GitHub:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Film.boneDim,
+                )
+                SecondaryAction(
+                    "Open GitHub releases",
+                    onClick = {
+                        runCatching {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/agrimsri/IQOO-Kernel-Panic/releases"))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            ctx.startActivity(intent)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text("Close", color = Film.scan)
+            }
+        },
+        containerColor = Film.raised,
+    )
 }
 
