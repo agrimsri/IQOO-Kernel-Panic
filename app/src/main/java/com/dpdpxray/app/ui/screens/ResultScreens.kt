@@ -205,7 +205,7 @@ fun ResultsScreen(
                 // The visible step banner is gone; people who use read-aloud still hear the same step.
                 SpeakStep(ResultGuide.step(facts))
 
-                ScoreHero(b, lang, Modifier.reveal(0))
+                ScoreHero(b, grade, lang, Modifier.reveal(0))
                 Text(headline(r.findings), style = MaterialTheme.typography.bodyLarge, color = Film.bone, modifier = Modifier.padding(top = 20.dp).reveal(1))
 
                 // Caveats that must stay in view, above anything the reader might act on. Only those that apply are shown.
@@ -247,7 +247,7 @@ fun ResultsScreen(
                     r.findings.forEachIndexed { i, f ->
                         if (i > 0) GroupDivider()
                         ListRow(
-                            f.title, subtitle = findingSubtitle(f), subtitleMaxLines = 3,
+                            f.title, subtitle = findingSubtitle(f, ResultSources.of(f, b.sessions)), subtitleMaxLines = 3,
                             leading = { StatusDot(severityColor(f.severity)) },
                             onClick = { onFinding(f.checkId) },
                         )
@@ -374,7 +374,8 @@ fun ResultsScreen(
                 // The one-line lookup caveat stays in view; the remaining notes fold behind one link.
                 val caveat = if (r.findings.isNotEmpty()) explanation.meaning.getOrNull(1) else null
                 caveat?.let { KeyCaveat(it.pick(lang), Modifier.padding(top = 20.dp), color = Film.boneDim) }
-                val rest = explanation.meaning.drop(if (caveat != null) 2 else 1)
+                // Everything else "What this means" said, including its first line when no notice above showed it.
+                val rest = explanation.meaning.filterIndexed { i, _ -> !(i == 0 && standalone) && !(i == 1 && caveat != null) }
                 if (rest.isNotEmpty()) {
                     LearnMore(
                         Modifier.padding(top = 4.dp),
@@ -430,18 +431,29 @@ private fun headline(findings: List<Finding>): String {
  * and one line of severity counts. Inconclusive shows "?" in a dashed ring, never a zero.
  */
 @Composable
-private fun ScoreHero(b: AuditBundle, lang: GuideLang, modifier: Modifier = Modifier) {
+private fun ScoreHero(b: AuditBundle, grade: ConfidenceGrade?, lang: GuideLang, modifier: Modifier = Modifier) {
     val r = b.result
     val color = bandColor(r.band)
     Column(modifier.fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         ScoreRing(if (r.band == ScoreBand.INCONCLUSIVE) null else r.score, r.band, ringSize = 176.dp, key = b.meta.id)
         Text(r.band.label, style = MaterialTheme.typography.titleLarge, color = color, modifier = Modifier.padding(top = 12.dp))
+        Text("Consent readiness", style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
         val counts = Severity.entries.map { s -> s to r.findings.count { it.severity == s } }.filter { it.second > 0 }
         if (counts.isNotEmpty()) {
             Text(
                 counts.joinToString(" · ") { (s, n) -> "$n ${s.label.lowercase()}" },
                 style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 4.dp),
             )
+        }
+        // How sure the capture is, in words (the full grade is in Evidence and limits); a sample was never measured.
+        val confidence = when {
+            b.meta.sample -> "Confidence not measured"
+            grade != null -> "Evidence confidence: ${grade.level.label}"
+            else -> null
+        }
+        val capture = if (!b.meta.sample && b.meta.timingProfile == AuditTimingPolicy.NORMAL) "Normal capture" else null
+        listOfNotNull(confidence, capture).takeIf { it.isNotEmpty() }?.let {
+            Text(it.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = Film.boneDim, modifier = Modifier.padding(top = 2.dp))
         }
         // How far AI and documentation readings could move this score; shown only when they can move it at all.
         ScoreRobustnessLine.of(r)?.let { rob ->
@@ -486,21 +498,32 @@ private fun nextGlyph(a: NextAction) = when (a) {
 @Composable
 private fun ResultActions(next: List<NextStep>, lang: GuideLang, onAction: (NextAction) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        next.firstOrNull()?.let { PrimaryButton(it.title.pick(lang), { onAction(it.action) }) }
+        next.firstOrNull()?.let {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                PrimaryButton(it.title.pick(lang), { onAction(it.action) })
+                Text(
+                    it.reason.pick(lang), style = MaterialTheme.typography.bodySmall, color = Film.boneDim, textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 6.dp, start = 8.dp, end = 8.dp),
+                )
+            }
+        }
         if (next.size > 1) Group {
             next.drop(1).forEachIndexed { i, step ->
                 if (i > 0) GroupDivider()
-                ListRow(step.title.pick(lang), onClick = { onAction(step.action) })
+                ListRow(step.title.pick(lang), subtitle = step.reason.pick(lang), onClick = { onAction(step.action) })
             }
         }
     }
 }
 
-/** A finding's second line: severity word first (the dot only repeats it), then who was contacted, then how sure we are. */
-private fun findingSubtitle(f: Finding): String = buildString {
+/**
+ * A finding's second line: severity word first (the dot only repeats it), then who was contacted, then where the
+ * finding comes from (observed on the device, AI-inferred or inferred from documentation).
+ */
+private fun findingSubtitle(f: Finding, source: ResultSource): String = buildString {
     append(f.severity.label)
     if (f.entities.isNotEmpty()) append(" · ").append(f.entities.joinToString())
-    if (f.evidenceType != EvidenceType.OBSERVED) append(" · Inferred")
+    append(" · ").append(if (source == ResultSource.OBSERVED) "Observed on device" else source.label)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
