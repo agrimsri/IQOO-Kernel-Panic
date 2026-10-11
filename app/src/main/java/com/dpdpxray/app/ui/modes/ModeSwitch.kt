@@ -96,3 +96,33 @@ private fun ModeTile(audience: Audience, selected: Boolean, lang: GuideLang, mod
     }
 }
 
+
+/**
+ * Home's compact mode switch, under the header: two segments on one quiet track ("Everyday · I use apps", "Developer ·
+ * I build apps"), the chosen one lifted onto the surface colour, like the app's other segmented controls. It sets the
+ * same Audience as Settings and onboarding; a tap switches at once. Reads as a radio group to TalkBack.
+ */
+@Composable
+fun ModeSegments(current: Audience, onChange: (Audience) -> Unit, lang: GuideLang, modifier: Modifier = Modifier) {
+    val track = RoundedCornerShape(12.dp)
+    Row(modifier.fillMaxWidth().clip(track).background(Film.fill).padding(3.dp).selectableGroup()) {
+        com.dpdpxray.app.ui.screens.HomeLayout.modes.forEach { audience ->
+            val on = audience == current
+            val (name, who) = com.dpdpxray.app.ui.screens.HomeLayout.modeLines(audience)
+            Column(
+                Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(10.dp))
+                    .background(
+                        if (!on) androidx.compose.ui.graphics.Color.Transparent
+                        else if (com.dpdpxray.app.ui.theme.ActivePalette.current.dark) Film.bone.copy(alpha = 0.14f) else Film.raised,
+                    )
+                    .selectable(selected = on, role = Role.RadioButton, onClick = { if (!on) onChange(audience) })
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(name.pick(lang), style = MaterialTheme.typography.labelLarge, color = if (on) Film.bone else Film.boneDim, textAlign = TextAlign.Center, maxLines = 1)
+                Text(who.pick(lang), style = MaterialTheme.typography.labelSmall, color = Film.boneDim, textAlign = TextAlign.Center, maxLines = 1)
+            }
+        }
+    }
+}

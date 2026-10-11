@@ -64,6 +64,7 @@ import com.dpdpxray.app.ui.guide.SpeakStep
 import com.dpdpxray.app.ui.guide.guideLang
 import com.dpdpxray.app.ui.modes.EverydayCopy
 import com.dpdpxray.app.ui.modes.EverydayUpdates
+import com.dpdpxray.app.ui.modes.ModeSegments
 import com.dpdpxray.app.autoguard.UpdateWatchCopy
 import com.dpdpxray.core.update.UpdatedApp
 import com.dpdpxray.app.ui.system.Group
@@ -194,116 +195,121 @@ fun HomeScreen(
                 GlyphIcon(Glyph.SETTINGS, Film.boneDim, size = 24.dp)
             }
         }
-        Spacer(Modifier.height(16.dp))
+        val latest = audits.firstOrNull()
+        HomeLayout.sections(settings.audience, updated.size, trustAvailable = onTrust != null).forEach { section ->
+            when (section) {
+                // Everyday or Developer, right under the header: the same Audience setting as Settings and onboarding.
+                HomeSection.MODE_SWITCH -> ModeSegments(
+                    settings.audience, { a -> vm.updateSettings { it.copy(audience = a) } }, lang, Modifier.padding(top = 12.dp),
+                )
 
-        // The one hero: a promise, one sentence, one action, one readiness line.
-        Column(
-            Modifier.fillMaxWidth().reveal(0).cardSurface().padding(24.dp),
-        ) {
-            if (running != null) {
-                Text(HomeCopy.checking(running.config.targetLabel).pick(lang), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
-                Spacer(Modifier.height(20.dp))
-                PrimaryButton(EverydayCopy.running.pick(lang), onLive)
-            } else {
-                Text(HomeCopy.heroTitle.pick(lang), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-                Text(HomeCopy.heroBody.pick(lang), style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 8.dp))
-                Spacer(Modifier.height(20.dp))
-                PrimaryButton(HomeCopy.checkApp.pick(lang), startCheck)
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
+                // The one hero: a promise, one sentence, one action, one readiness line.
+                HomeSection.HERO -> Column(
+                    Modifier.padding(top = 16.dp).fillMaxWidth().reveal(0).cardSurface().padding(24.dp),
                 ) {
-                    if (todo.isEmpty()) {
-                        com.dpdpxray.app.ui.system.StatusDot(Film.clear)
-                        Spacer(Modifier.size(8.dp))
-                        Text(EverydayCopy.ready.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                    if (running != null) {
+                        Text(HomeCopy.checking(running.config.targetLabel).pick(lang), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+                        Spacer(Modifier.height(20.dp))
+                        PrimaryButton(EverydayCopy.running.pick(lang), onLive)
                     } else {
-                        TextAction(HomeCopy.stepsToFinish(todo.size).pick(lang) + "  ›", { showSetup = true }, color = Film.warn)
+                        Text(HomeCopy.heroTitle.pick(lang), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+                        Text(HomeCopy.heroBody.pick(lang), style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 8.dp))
+                        Spacer(Modifier.height(20.dp))
+                        PrimaryButton(HomeCopy.checkApp.pick(lang), startCheck)
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            if (todo.isEmpty()) {
+                                com.dpdpxray.app.ui.system.StatusDot(Film.clear)
+                                Spacer(Modifier.size(8.dp))
+                                Text(EverydayCopy.ready.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+                            } else {
+                                TextAction(HomeCopy.stepsToFinish(todo.size).pick(lang) + "  ›", { showSetup = true }, color = Film.warn)
+                            }
+                        }
+                    }
+                }
+
+                // Update Watch, only while a checked app has a different version installed. Developer mode keeps the
+                // version and last-result detail; everyday mode says it plainly, in both guidance languages.
+                HomeSection.UPDATES ->
+                    if (developer) DeveloperUpdates(updated, onRecheck) else EverydayUpdatesSection(updated, lang, onRecheck, onAllReports)
+
+                // Recent checks: three rows, the rest in Reports.
+                HomeSection.RECENT -> {
+                    SectionHeader(EverydayCopy.recentTitle.pick(lang)) {
+                        if (audits.size > RECENT_ON_HOME) TextAction(EverydayCopy.seeAll.pick(lang), onAllReports)
+                    }
+                    if (audits.isEmpty()) {
+                        Group {
+                            ListRow(
+                                EverydayCopy.emptyTitle.pick(lang), subtitle = null, titleColor = Film.boneDim,
+                                trailing = { TextAction(EverydayCopy.seeSample.pick(lang), { vm.openSample(onOpen) }) },
+                            )
+                        }
+                    } else {
+                        Group {
+                            audits.take(RECENT_ON_HOME).forEachIndexed { i, meta ->
+                                if (i > 0) GroupDivider()
+                                CheckRow(meta, lang) { onOpen(meta.id) }
+                            }
+                        }
+                    }
+                }
+
+                // "Why you can trust TraceVeil": four code-checked facts and this install's live permission line, folded
+                // after the first view; it opens the full trust page (also in More, About TraceVeil).
+                HomeSection.TRUST -> if (onTrust != null) HomeTrustCard(lang, onTrust, Modifier.padding(top = 32.dp))
+
+                // Other ways to check; developer mode adds its quick actions as rows, one tap from Home.
+                HomeSection.MORE_WAYS -> {
+                    SectionHeader(HomeCopy.moreWays.pick(lang))
+                    Group {
+                        HomeLayout.ways(settings.audience, onCheckup != null, onAutomation != null, latest != null).forEachIndexed { i, way ->
+                            if (i > 0) GroupDivider(54.dp)
+                            when (way) {
+                                HomeWay.APK_FILE -> ListRow(
+                                    HomeCopy.fileTitle.pick(lang), subtitle = HomeCopy.fileBody.pick(lang),
+                                    leading = { GlyphIcon(Glyph.APK, Film.boneDim, size = 24.dp) },
+                                    onClick = { filePicker.launch(arrayOf(IncomingApk.APK_MIME, "application/octet-stream")) },
+                                )
+                                HomeWay.PHONE_APPS -> onCheckup?.let { open ->
+                                    ListRow(
+                                        HomeCopy.appsTitle.pick(lang), subtitle = HomeCopy.appsBody.pick(lang),
+                                        leading = { GlyphIcon(Glyph.SEARCH, Film.boneDim, size = 24.dp) }, onClick = open,
+                                    )
+                                }
+                                HomeWay.AUTOMATE -> onAutomation?.let { open ->
+                                    ListRow(
+                                        HomeCopy.automateTitle.pick(lang), subtitle = HomeCopy.automateBody.pick(lang),
+                                        leading = { GlyphIcon(Glyph.PLAY, Film.boneDim, size = 24.dp) }, onClick = open,
+                                    )
+                                }
+                                HomeWay.ASK_LAST -> latest?.let { last ->
+                                    ListRow(
+                                        HomeCopy.askTitle.pick(lang), subtitle = last.targetLabel,
+                                        leading = { GlyphIcon(Glyph.ASK, Film.boneDim, size = 24.dp) }, onClick = { onVoice(last.id) },
+                                    )
+                                }
+                                HomeWay.CAMERA -> ListRow(
+                                    HomeCopy.cameraTitle.pick(lang), subtitle = HomeCopy.cameraBody.pick(lang),
+                                    leading = { GlyphIcon(Glyph.CAMERA, Film.boneDim, size = 24.dp) }, onClick = onCamera,
+                                )
+                                HomeWay.SAMPLE -> ListRow(
+                                    EverydayCopy.seeSample.pick(lang), subtitle = null,
+                                    leading = { GlyphIcon(Glyph.SAMPLE, Film.boneDim, size = 24.dp) }, onClick = { vm.openSample(onOpen) },
+                                )
+                                HomeWay.MORE_SAMPLES -> ListRow(
+                                    HomeCopy.samplesTitle.pick(lang), subtitle = HomeCopy.samplesBody.pick(lang),
+                                    leading = { GlyphIcon(Glyph.REPORTS, Film.boneDim, size = 24.dp) }, onClick = { showSamples = true },
+                                )
+                            }
+                        }
                     }
                 }
             }
-        }
-
-        // Update Watch: shown only while a checked app has a different version installed. Developer mode keeps the version
-        // and last-result detail; everyday mode says it plainly, in both guidance languages.
-        if (updated.isNotEmpty()) {
-            if (developer) DeveloperUpdates(updated, onRecheck) else EverydayUpdatesSection(updated, lang, onRecheck, onAllReports)
-        }
-
-        // Recent checks: three rows, the rest in Reports.
-        SectionHeader(EverydayCopy.recentTitle.pick(lang)) {
-            if (audits.size > RECENT_ON_HOME) TextAction(EverydayCopy.seeAll.pick(lang), onAllReports)
-        }
-        if (audits.isEmpty()) {
-            Group {
-                ListRow(
-                    EverydayCopy.emptyTitle.pick(lang), subtitle = null, titleColor = Film.boneDim,
-                    trailing = { TextAction(EverydayCopy.seeSample.pick(lang), { vm.openSample(onOpen) }) },
-                )
-            }
-        } else {
-            Group {
-                audits.take(RECENT_ON_HOME).forEachIndexed { i, meta ->
-                    if (i > 0) GroupDivider()
-                    CheckRow(meta, lang) { onOpen(meta.id) }
-                }
-            }
-        }
-
-        // Other ways to check; developer mode adds the tools that used to sit in Quick actions.
-        SectionHeader(HomeCopy.moreWays.pick(lang))
-        Group {
-            ListRow(
-                HomeCopy.fileTitle.pick(lang), subtitle = HomeCopy.fileBody.pick(lang),
-                leading = { GlyphIcon(Glyph.APK, Film.boneDim, size = 24.dp) },
-                onClick = { filePicker.launch(arrayOf(IncomingApk.APK_MIME, "application/octet-stream")) },
-            )
-            if (onCheckup != null) {
-                GroupDivider(54.dp)
-                ListRow(
-                    HomeCopy.appsTitle.pick(lang), subtitle = HomeCopy.appsBody.pick(lang),
-                    leading = { GlyphIcon(Glyph.SEARCH, Film.boneDim, size = 24.dp) }, onClick = onCheckup,
-                )
-            }
-            if (developer) {
-                GroupDivider(54.dp)
-                ListRow(
-                    HomeCopy.cameraTitle.pick(lang), subtitle = HomeCopy.cameraBody.pick(lang),
-                    leading = { GlyphIcon(Glyph.CAMERA, Film.boneDim, size = 24.dp) }, onClick = onCamera,
-                )
-                audits.firstOrNull()?.let { latest ->
-                    GroupDivider(54.dp)
-                    ListRow(
-                        HomeCopy.askTitle.pick(lang), subtitle = latest.targetLabel,
-                        leading = { GlyphIcon(Glyph.ASK, Film.boneDim, size = 24.dp) }, onClick = { onVoice(latest.id) },
-                    )
-                }
-                GroupDivider(54.dp)
-                ListRow(
-                    EverydayCopy.seeSample.pick(lang), subtitle = null,
-                    leading = { GlyphIcon(Glyph.SAMPLE, Film.boneDim, size = 24.dp) }, onClick = { vm.openSample(onOpen) },
-                )
-                GroupDivider(54.dp)
-                ListRow(
-                    HomeCopy.samplesTitle.pick(lang), subtitle = HomeCopy.samplesBody.pick(lang),
-                    leading = { GlyphIcon(Glyph.REPORTS, Film.boneDim, size = 24.dp) }, onClick = { showSamples = true },
-                )
-                if (onAutomation != null) {
-                    GroupDivider(54.dp)
-                    ListRow(
-                        HomeCopy.automateTitle.pick(lang), subtitle = HomeCopy.automateBody.pick(lang),
-                        leading = { GlyphIcon(Glyph.PLAY, Film.boneDim, size = 24.dp) }, onClick = onAutomation,
-                    )
-                }
-            }
-        }
-
-        // "Why you can trust TraceVeil": four code-checked facts and this install's live permission line; it opens the
-        // full trust page (also in More › About TraceVeil).
-        if (onTrust != null) {
-            Spacer(Modifier.height(32.dp))
-            HomeTrustCard(lang, onTrust)
         }
         Spacer(Modifier.height(32.dp))
     }
