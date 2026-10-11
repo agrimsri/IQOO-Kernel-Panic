@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, access, adb, fixes, laws, netwatch
+from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, access, adb, fixes, laws, netwatch, sdks
 from .colors import PLAIN, Style
 from .netenv import OWN_PACKAGE
 
@@ -167,6 +167,19 @@ def network_lines(net: dict, style: Style = PLAIN) -> list[str]:
     return lines
 
 
+def sdk_lines(inv: dict, style: Style = PLAIN) -> list[str]:
+    """Bundled SDKs, the ones also looked up live first; the full rows (with actions) are under sdkInventory."""
+    rows = sorted(inv.get("sdks", []), key=lambda r: (r["status"] != "in-apk-and-live", r["status"] != "live-only", r["entity"]))
+    c = inv.get("counts", {})
+    lines = [f"  {style.bold('SDKs')}  {c.get('in-apk-and-live', 0)} bundled and looked up, {c.get('in-apk-only', 0)} bundled only, "
+             f"{c.get('live-only', 0)} looked up without a matching SDK"]
+    label = {"in-apk-and-live": style.warn("bundled+live"), "in-apk-only": style.dim("bundled    "), "live-only": "live only   "}
+    for r in rows:
+        phases = ", ".join(p.lower() for p in (r.get("observed") or {}).get("phases", []))
+        lines.append(f"    {label.get(r['status'], r['status'])} {r['entity']:<30} {r['category'].lower():<12} {style.dim(phases)}")
+    return lines
+
+
 def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) -> str:
     t = rep["target"]
     lines = [f"Traceveil audit  {style.bold(t.get('label', '?'))} ({t.get('package', '?')})  "
@@ -185,6 +198,8 @@ def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) ->
         lines += network_lines(rep["network"], style)
     if rep.get("dataAccess") is not None:
         lines += access.lines(rep["dataAccess"], style)
+    if rep.get("sdkInventory"):
+        lines += sdk_lines(rep["sdkInventory"], style)
     if rep.get("lenses"):
         lines += laws.table(rep["lenses"], style)
     if rep.get("socketWatch"):
@@ -224,7 +239,7 @@ def _wait_for_device(dev, io: Io, deadline: list[float], request_id: str) -> boo
 def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_drive: bool, reset: bool, wait_s: float,
               resume: str | None, as_json: bool, out_file: str | None, request_id: str | None = None, as_md: bool = False,
               fail_on_override: str | None = None, lenses=None, policy: str | None = None,
-              watch_network: bool | None = None, fail_on_hidden: bool = False) -> int:
+              watch_network: bool | None = None, fail_on_hidden: bool = False, app_file=None) -> int:
     request_id = resume or request_id or new_request_id()
     package = package or cfg["target"]["package"]
     if not resume and not package:
@@ -291,6 +306,16 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
         rep["fixPlan"] = fixes.build(rep, laws.assess_all(rep, "all", policy))  # every country, whatever lenses are shown
     except ValueError as e:
         return _fail(io, str(e), EXIT_USAGE)
+    if app_file is not None:  # audited from a file: say which build it was and what SDKs ship inside it
+        rep["apk"] = app_file.describe()
+        try:
+            perms = sdks.parse_requested_permissions(dev.shell_checked(f"dumpsys package {shlex.quote(app_file.package)}"))
+        except adb.AdbError:
+            perms = None
+        try:
+            rep["sdkInventory"] = sdks.build(app_file.base, sdks.load_signatures(), rep, perms)
+        except sdks.ApkError as e:
+            print(f"warning: SDK scan of {app_file.base.name} failed: {e}", file=io.err)
     if sampler:
         try:
             vpn = netwatch.declares_vpn_service(dev.shell_checked(f"dumpsys package {shlex.quote(package)}"))

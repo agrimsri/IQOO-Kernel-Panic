@@ -8,9 +8,11 @@ import os
 import sys
 from pathlib import Path
 
-from . import (audit, EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_POLICY, EXIT_USAGE, __version__, adb, config, egress,
-               fixes, laws, netenv, netwatch, report, sdks, shizuku)
+from . import (audit, EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_POLICY, EXIT_USAGE, __version__, adb, apkfile, config,
+               egress, fixes, laws, netenv, netwatch, report, sdks, shizuku)
 from .colors import Style, enabled_for
+
+APK_CACHE = Path(".traceveil/apks")  # split bundles (.xapk/.apks/.apkm) are unpacked here once
 
 
 def _common(default) -> argparse.ArgumentParser:
@@ -34,7 +36,11 @@ def _parser() -> argparse.ArgumentParser:
     sub.add_parser("init", parents=[shared], help="write a traceveil.toml with defaults").add_argument("--force", action="store_true")
 
     a = sub.add_parser("audit", parents=[shared], help="run an audit on the phone (debug build), wait, and save its JSON report")
-    a.add_argument("--package", help="app to audit (default: target.package)")
+    a.add_argument("--apk", "--path", dest="apk", metavar="FILE",
+                   help="app file to install and audit: .apk, or a split bundle .xapk/.apks/.apkm (package name is read from it)")
+    a.add_argument("--reinstall", action="store_true", help="with --apk: install even when the same version is already on the phone")
+    a.add_argument("--no-install", action="store_true", help="with --apk: do not install; only read the package and scan its SDKs")
+    a.add_argument("--package", help="app to audit (default: read from --apk, else target.package)")
     a.add_argument("--plans", help="comma list of silent,reject,accept (default: all three)")
     a.add_argument("--auto-drive", action="store_true", help="let Traceveil tap Accept/Reject itself (default: you tap on the phone)")
     a.add_argument("--reset", action="store_true", help="clear the app's data first; only for developer-owned test apps; needs Shizuku")
@@ -84,7 +90,8 @@ def _parser() -> argparse.ArgumentParser:
     fx.add_argument("--out", help="also write the JSON report with fixPlan to this file (a .md path writes the plan as Markdown)")
 
     k = sub.add_parser("sdks", parents=[shared], help="list tracking SDKs bundled in an APK and compare them with an audit's live lookups")
-    k.add_argument("--apk", required=True, help="APK to inspect (no phone needed for this part)")
+    k.add_argument("--apk", "--path", dest="apk", required=True, metavar="FILE",
+                   help="APK or .xapk/.apks/.apkm bundle to inspect (no phone needed for this part)")
     k.add_argument("--report", help="audit report to compare with: a JSON file, or a request id saved under output.dir")
     k.add_argument("--package", help="also read the app's requested permissions from the phone (needs adb)")
     k.add_argument("--fail-on-consent", action="store_true", help="exit 1 if a bundled SDK was looked up before consent or after Reject")
@@ -165,7 +172,22 @@ def cmd_audit(args, cfg, dev: adb.Device) -> int:
     io = audit.Io(interactive=sys.stdin.isatty() and sys.stdout.isatty(), color=enabled_for(sys.stderr),
                   color_out=enabled_for(sys.stdout))
     plans = args.plans or None
-    return audit.run_audit(dev, cfg, io, package=args.package or "", plans=plans, auto_drive=args.auto_drive, reset=args.reset,
+    app = None
+    if args.apk:
+        try:
+            app = apkfile.open_app(args.apk, APK_CACHE)
+        except apkfile.ApkFileError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return EXIT_USAGE
+        if args.package and args.package != app.package:
+            print(f"error: --package {args.package} does not match {Path(args.apk).name} ({app.package})", file=sys.stderr)
+            return EXIT_USAGE
+        print(f"app: {app.label or app.package} ({app.package} {app.version_name or ''}) from {app.source.name}"
+              f"{f', {len(app.apks)} APKs' if len(app.apks) > 1 else ''}", file=sys.stderr)
+        if not args.no_install:
+            state = apkfile.install(dev, app, force=args.reinstall, log=lambda m: print(m, file=sys.stderr))
+            print(f"{app.package}: {state}", file=sys.stderr)
+    return audit.run_audit(dev, cfg, io, package=(app.package if app else args.package) or "", app_file=app, plans=plans, auto_drive=args.auto_drive, reset=args.reset,
                            wait_s=args.wait, resume=args.resume, as_json=args.format == "json", as_md=args.format == "md", out_file=args.out,
                            lenses=args.lenses, policy=args.policy, watch_network=args.watch_network,
                            fail_on_hidden=args.fail_on_hidden)
@@ -247,8 +269,8 @@ def cmd_sdks(args, cfg, dev=None) -> int:
             return EXIT_DEVICE
         perms = sdks.parse_requested_permissions(dump)
     try:
-        inv = sdks.build(Path(args.apk), sdks.load_signatures(), rep, perms)
-    except sdks.ApkError as e:
+        inv = sdks.build(apkfile.code_apk(args.apk, APK_CACHE), sdks.load_signatures(), rep, perms)
+    except (sdks.ApkError, apkfile.ApkFileError) as e:
         print(f"error: {e}", file=sys.stderr)
         return EXIT_INCONCLUSIVE
     print(report.dumps(inv) if args.json else sdks.summary(inv, Style(enabled_for(sys.stdout))))
