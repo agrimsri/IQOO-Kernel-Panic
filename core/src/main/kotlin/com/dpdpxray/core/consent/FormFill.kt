@@ -45,6 +45,9 @@ object FormFill {
         return cues.any { cue -> if (cue.contains(' ') || cue.length > 3) text.contains(cue) else cue in w }
     }
 
+    /** True when a field called [label] could identify or authenticate someone. */
+    fun isSensitive(label: String): Boolean = hasWord(label, SENSITIVE)
+
     /** The value to type for a field called [label], or null when it is not a safe profile field. */
     fun valueFor(label: String): String? = when {
         hasWord(label, SENSITIVE) -> null
