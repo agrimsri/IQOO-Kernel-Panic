@@ -52,7 +52,10 @@ object ResultGuide {
                         "TraceVeil recorded ${findings(f.findingCount)}, and the score is in the At risk range. Open each finding to see the lookups and times behind it.",
                         "TraceVeil ने ${f.findingCount} फ़ाइंडिंग दर्ज कीं, और स्कोर At risk श्रेणी में है। हर फ़ाइंडिंग खोलकर उसके पीछे के लुकअप और समय देखें।",
                     )
-                    ScoreBand.INCONCLUSIVE -> Bi(
+                    ScoreBand.INCONCLUSIVE -> if (f.inconclusiveReason == com.dpdpxray.core.rules.Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN) Bi(
+                        "No score: the lookups were captured, but this app kept its data, so whether you agreed to tracking earlier can't be seen. Unknown stays unknown: this is not a pass.",
+                        "कोई स्कोर नहीं: लुकअप दर्ज हुए, लेकिन ऐप ने अपना डेटा रखा, इसलिए आपने पहले ट्रैकिंग की सहमति दी थी या नहीं, यह नहीं दिखता। अज्ञात, अज्ञात ही रहता है: इसे पास न समझें।",
+                    ) else Bi(
                         "Too little was captured to give a score. Unknown stays unknown: this is not a pass.",
                         "स्कोर देने के लिए बहुत कम जानकारी दर्ज हुई। अज्ञात, अज्ञात ही रहता है: इसे पास न समझें।",
                     )

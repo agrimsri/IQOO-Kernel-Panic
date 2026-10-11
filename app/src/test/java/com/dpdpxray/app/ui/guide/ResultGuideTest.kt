@@ -26,6 +26,16 @@ class ResultGuideTest {
         assertTrue(e.next.any { it.action == NextAction.CHECK_AGAIN })
     }
 
+    @Test fun `an unknown consent history is not described as too little captured`() {
+        val f = facts(ScoreBand.INCONCLUSIVE, null, findings = 3)
+            .copy(inconclusiveReason = com.dpdpxray.core.rules.Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN)
+        val first = ResultGuide.explain(f).meaning.first().en
+        assertTrue(first, first.contains("kept its data"))
+        assertFalse(first, first.contains("Too little was captured"))
+        val lowVisibility = ResultGuide.explain(f.copy(inconclusiveReason = com.dpdpxray.core.rules.Inconclusive.Reason.LOW_VISIBILITY))
+        assertTrue(lowVisibility.meaning.first().en.contains("Too little was captured"))
+    }
+
     @Test fun `findings come with the lookup caveat and an evidence action`() {
         val e = ResultGuide.explain(facts())
         assertTrue(e.meaning.any { it.en.contains("not proof that personal data was sent") })
