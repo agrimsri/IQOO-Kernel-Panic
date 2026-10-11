@@ -141,14 +141,19 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
                     )
                 }
                 // Live, and how much this capture can show: one quiet line (the caveat word carries the caution colour).
+                val watch = p.config.isWatch
                 Text(
-                    if (p.config.fastPreview) "Live · Fast Preview · limited evidence" else "Live · Normal capture",
+                    when {
+                        watch -> com.dpdpxray.app.audit.WatchCopy.liveLabel.pick(guideLang())
+                        p.config.fastPreview -> "Live · Fast Preview · limited evidence"
+                        else -> "Live · Normal capture"
+                    },
                     style = MaterialTheme.typography.bodySmall, color = if (p.config.fastPreview) Film.warn else Film.boneDim,
                     modifier = Modifier.padding(top = 4.dp),
                 )
                 if (p.config.fastPreview) Callout("8-second observation; delayed traffic may be missed. Silent and Reject are not tested.", Modifier.padding(top = 8.dp), fold = true)
                 // The plans really are a sequence, so they are shown as numbered frames.
-                RunFrames(p.config.plans, p.planIndex, Modifier.padding(top = 12.dp))
+                RunFrames(p.config.plans, p.planIndex, Modifier.padding(top = 12.dp), watch = watch)
                 // Narrated in the background by GuideNarrator, so this banner only shows the step.
                 run {
                     val lang = guideLang()
@@ -163,7 +168,8 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
                 Row(Modifier.fillMaxWidth().padding(top = 14.dp).height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Counter(classified.size, if (classified.size == 1) "lookup" else "lookups", Film.bone, Modifier.weight(1f))
                     Counter(trackers.size, "to trackers", if (trackers.isEmpty()) Film.bone else Film.high, Modifier.weight(1f))
-                    Counter(before, "before any choice", if (before > 0) Film.leak else Film.bone, Modifier.weight(1f))
+                    // A watch drives no consent choice, so "before any choice" would say nothing.
+                    if (!watch) Counter(before, "before any choice", if (before > 0) Film.leak else Film.bone, Modifier.weight(1f))
                 }
                 // The key caveat stays in view while numbers climb.
                 KeyCaveat("A lookup is an attempt to contact an address, not proof data was sent.", Modifier.padding(top = 6.dp), color = Film.boneDim)
@@ -178,8 +184,12 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
                 }
                 Timeline(classified, consent, p.sessionStartNanos, Modifier.weight(1f))
                 Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    SecondaryAction("Mark consent now", { vm.markConsentNow() }, Modifier.weight(1f))
-                    SecondaryAction("Stop check", { vm.cancelAudit(); onBack() }, Modifier.weight(1f))
+                    // A watch is stopped and saved, as from its notification; the result opens when it is saved.
+                    if (watch) SecondaryAction(com.dpdpxray.app.audit.WatchCopy.stop.pick(guideLang()), { vm.stopWatch() }, Modifier.weight(1f))
+                    else {
+                        SecondaryAction("Mark consent now", { vm.markConsentNow() }, Modifier.weight(1f))
+                        SecondaryAction("Stop check", { vm.cancelAudit(); onBack() }, Modifier.weight(1f))
+                    }
                 }
             }
             else -> {
@@ -205,9 +215,10 @@ private fun planName(plan: AuditPlan) = when (plan) {
 
 /** One frame per run: finished runs are ticked, the current one is outlined in the brand gradient. */
 @Composable
-private fun RunFrames(plans: List<AuditPlan>, current: Int, modifier: Modifier = Modifier) {
+private fun RunFrames(plans: List<AuditPlan>, current: Int, modifier: Modifier = Modifier, watch: Boolean = false) {
+    fun name(plan: AuditPlan) = if (watch) com.dpdpxray.core.model.BackgroundWatches.LABEL else planName(plan)
     Row(
-        modifier.fillMaxWidth().semantics { contentDescription = "Run ${current + 1} of ${plans.size}: ${planName(plans[current.coerceIn(plans.indices)])}" },
+        modifier.fillMaxWidth().semantics { contentDescription = "Run ${current + 1} of ${plans.size}: ${name(plans[current.coerceIn(plans.indices)])}" },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         plans.forEachIndexed { i, plan ->
@@ -225,7 +236,7 @@ private fun RunFrames(plans: List<AuditPlan>, current: Int, modifier: Modifier =
                 if (done) GlyphIcon(Glyph.CHECK, Film.clear, size = 16.dp)
                 else Text("${i + 1}", style = MaterialTheme.typography.labelLarge, color = if (now) Brand.coral else Film.boneDim)
                 Spacer(Modifier.width(6.dp))
-                Text(planName(plan), style = MaterialTheme.typography.labelLarge, color = if (now) Film.bone else Film.boneDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(name(plan), style = MaterialTheme.typography.labelLarge, color = if (now) Film.bone else Film.boneDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
