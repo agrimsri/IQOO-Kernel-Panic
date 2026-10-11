@@ -116,6 +116,10 @@ data class UiNode(
     val isClickable: Boolean = false,
     val bounds: Bounds? = null,
     val children: List<UiNode> = emptyList(),
+    /** A text field whose content is hidden (a password or PIN box). Older saved audits read as false. */
+    val isPassword: Boolean = false,
+    /** A field the person types into. Older saved audits read as false. */
+    val isEditable: Boolean = false,
 ) {
     val label: String get() = listOfNotNull(text, contentDescription).joinToString(" ").trim()
 

@@ -105,6 +105,7 @@ object HomeCopy {
     fun checking(app: String) = Bi("Checking $app", "$app की जाँच हो रही है")
     val fix = Bi("Fix", "ठीक करें")
     val allow = Bi("Allow", "अनुमति दें")
+    val openShizuku = Bi("Open Shizuku", "Shizuku खोलें")
 }
 
 private const val RECENT_ON_HOME = 3
@@ -343,6 +344,21 @@ private fun SetupSheetContent(
         }
         Spacer(Modifier.height(20.dp))
         Group(title = HomeCopy.optional.pick(lang)) {
+            // Full check needs Shizuku; this is where it is allowed (or opened, when it is not running yet).
+            items.firstOrNull { it.kind == SetupKind.SHIZUKU }?.let { s ->
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                ListRow(
+                    s.title, subtitle = s.detail, subtitleMaxLines = 4,
+                    trailing = {
+                        when {
+                            s.done -> GlyphIcon(Glyph.CHECK, Film.clear, size = 20.dp)
+                            s.fixable -> TextAction(HomeCopy.allow.pick(lang), { fix(SetupKind.SHIZUKU) })
+                            else -> TextAction(HomeCopy.openShizuku.pick(lang), { com.dpdpxray.app.control.DeviceChecks.launch(ctx, "moe.shizuku.privileged.api") })
+                        }
+                    },
+                )
+                GroupDivider()
+            }
             ListRow(
                 HomeCopy.aiTitle.pick(lang), subtitle = aiLine,
                 trailing = { TextAction(HomeCopy.aiAction.pick(lang), onLab) },

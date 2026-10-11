@@ -11,6 +11,8 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.dpdpxray.app.quarantine.QuarantineBus
 import com.dpdpxray.app.quarantine.QuarantineUiWatcher
+import com.dpdpxray.core.consent.BlockerKind
+import com.dpdpxray.core.consent.BlockerLexicon
 import com.dpdpxray.core.consent.ConsentLexicon
 import com.dpdpxray.core.model.ConsentEvent
 import com.dpdpxray.core.model.ConsentKind
@@ -224,6 +226,39 @@ class ConsentAccessibilityService : AccessibilityService() {
         if (label.isNotBlank() && ConsentLexicon.classifyButton(label) == kind && (n.isClickable || n.parent?.isClickable == true)) return n
         for (i in 0 until n.childCount) {
             val hit = n.getChild(i)?.let { findButton(it, kind) }
+            if (hit != null) return hit
+        }
+        return null
+    }
+
+    /**
+     * The sign-in, verification-code, CAPTCHA or biometric screen the audited app is showing right now, or null. Reads the
+     * app's window only; never taps. Callers use the main dispatcher.
+     */
+    fun blockerNow(): BlockerKind? {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        val tree = NodeMapper.map(targetRoot()) ?: return null
+        return BlockerLexicon.detect(tree)
+    }
+
+    /**
+     * Taps a harmless skip button ("Skip", "Not now", "Continue as guest") on the audited app's screen and returns its
+     * label, or null when there is none. It never types, and never taps a sign-in, social-login or sign-up button.
+     */
+    fun trySkipBlocker(): String? {
+        val root = targetRoot() ?: return null
+        val target = findSkip(root) ?: return null
+        val label = NodeMapper.labelOf(target)
+        var node: AccessibilityNodeInfo? = target
+        while (node != null && !node.isClickable) node = node.parent
+        return label.takeIf { node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true }
+    }
+
+    private fun findSkip(n: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val label = listOfNotNull(n.text, n.contentDescription).joinToString(" ")
+        if (label.isNotBlank() && BlockerLexicon.isSkipLabel(label) && (n.isClickable || n.parent?.isClickable == true)) return n
+        for (i in 0 until n.childCount) {
+            val hit = n.getChild(i)?.let { findSkip(it) }
             if (hit != null) return hit
         }
         return null

@@ -15,6 +15,10 @@ internal object AuditPlanCoverage {
     fun completedPlans(sessions: List<AuditSession>): Set<AuditPlan> = sessions.groupBy { it.plan }
         .filterValues { attempts -> attempts.groupBy { it.targetPackage }.values.all(::complete) }.keys
 
+    /** A plan whose consent screen was never reached because a sign-in or verification screen blocked the app. */
+    private fun blocked(sessions: List<AuditSession>): Boolean =
+        sessions.any { s -> s.notes.any { it.startsWith(BlockerCopy.BLOCKED_MARK) } }
+
     fun gaps(sessions: List<AuditSession>): List<String> = sessions.groupBy { it.targetPackage to it.plan }
         .values.filterNot(::complete).map { attempts ->
             when (attempts.first().plan) {
@@ -22,7 +26,7 @@ internal object AuditPlanCoverage {
                 AuditPlan.ACCEPT -> "Plan A never reached Accept; the planned consent choice was not completed."
                 AuditPlan.SILENT -> error("Silent has no required choice")
             }
-        }.distinct()
+        }.distinct() + listOfNotNull(BlockerCopy.GAP_LINE.takeIf { blocked(sessions) })
 
     fun freshStateHint(sessions: List<AuditSession>): String? = if (sessions.any { session ->
         session.netEvents.isEmpty() && session.consentEvents.isEmpty() && session.notes.any {

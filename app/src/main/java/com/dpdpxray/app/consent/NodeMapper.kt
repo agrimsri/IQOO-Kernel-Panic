@@ -28,6 +28,8 @@ object NodeMapper {
                 isCheckable = n.isCheckable,
                 isChecked = n.isChecked,
                 isClickable = n.isClickable,
+                isPassword = n.isPassword,
+                isEditable = n.isEditable,
                 bounds = Bounds(r.left, r.top, r.right, r.bottom),
                 children = kids,
             )

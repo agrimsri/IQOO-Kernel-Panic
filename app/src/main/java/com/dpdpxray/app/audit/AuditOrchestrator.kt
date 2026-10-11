@@ -206,12 +206,29 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         }
 
         step("Waiting for a consent screen", t0)
-        val appeared = ConsentScreenWaiter(
+        // A sign-in, code, CAPTCHA or fingerprint screen can stand between launch and the consent screen: skip it with a
+        // harmless button when there is one, otherwise ask the person to complete it and keep watching meanwhile.
+        val waited = ConsentWaitAssist(
             probe = {
                 withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.probeNow() }
                 ConsentBus.events.value.firstOrNull { it.kind == ConsentKind.SCREEN_APPEARED || it.kind == ConsentKind.MANUAL_MARK }
-            }, clockMs = SystemClock::elapsedRealtime, pause = { delay(it) },
+            },
+            detectBlocker = { withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.blockerNow() } },
+            trySkip = { withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.trySkipBlocker() } },
+            onHandoff = { kind ->
+                step(BlockerCopy.waitingStep(kind), t0)
+                BlockerNotifier.post(context, config.targetLabel, kind)
+            },
+            onResume = {
+                BlockerNotifier.clear(context)
+                step("Waiting for a consent screen", t0)
+            },
+            clockMs = SystemClock::elapsedRealtime, pause = { delay(it) },
+            interactive = plan != AuditPlan.SILENT,
         ).await(t.waitConsentMs)
+        BlockerNotifier.clear(context)
+        notes += BlockerCopy.notes(waited, blocksPlan = plan != AuditPlan.SILENT)
+        val appeared = waited.consent
 
         // A child of this plan: cancelling the audit cancels the review too.
         val review = appeared?.let { ev -> async { graph.screenAuditor.audit(ev.tree, ev.screenshotPath?.let(::File)) } }
