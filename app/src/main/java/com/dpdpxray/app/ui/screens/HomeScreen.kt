@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,6 +46,9 @@ import com.dpdpxray.app.apkguard.ApkFileChecks
 import com.dpdpxray.app.apkguard.IncomingApk
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.control.DeviceChecks
+import com.dpdpxray.app.controls.ControlsCopy
+import com.dpdpxray.app.controls.ControlsSheetGroups
+import com.dpdpxray.app.controls.HomeControlsSection
 import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.trust.HomeTrustCard
@@ -149,16 +153,16 @@ fun HomeScreen(
     val lang = guideLang()
     val pf by vm.preflight.collectAsState()
     val audits by vm.audits.collectAsState()
-    val llm by vm.llmStatus.collectAsState()
     val progress by vm.progress.collectAsState()
     val settings by vm.settings.collectAsState()
     // Update Watch: checked apps whose installed version changed since their last check (same list as Reports).
     val updated by vm.updatedApps.collectAsState()
     var showSetup by remember { mutableStateOf(false) }
+    // The same sheet opens from the readiness line ("Setup") and from "What TraceVeil uses" (titled that way).
+    var sheetFromControls by remember { mutableStateOf(false) }
     var showSamples by remember { mutableStateOf(false) }
     val developer = settings.audience == Audience.DEVELOPER
 
-    val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { vm.refreshPreflight() }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) onApkFile(ApkFileChecks.start(ctx, uri))
     }
@@ -176,23 +180,6 @@ fun HomeScreen(
     val running = progress as? AuditProgress.Running
     // The visible guide banner is gone from Home; read-aloud still speaks the same step.
     if (running == null) SpeakStep(com.dpdpxray.app.ui.guide.GuideFlow.home(pf))
-    val fix: (SetupKind) -> Unit = { kind ->
-        when (kind) {
-            SetupKind.VPN -> if (DeviceChecks.otherVpnActive(ctx)) DeviceChecks.openVpnSettings(ctx) else VpnService.prepare(ctx)?.let { vpnLauncher.launch(it) } ?: vm.refreshPreflight()
-            SetupKind.WATCHER -> DeviceChecks.openAccessibilitySettings(ctx)
-            SetupKind.PRIVATE_DNS -> DeviceChecks.openPrivateDnsSettings(ctx)
-            SetupKind.SHIZUKU -> vm.requestShizuku()
-        }
-    }
-    // Everything on is not the end of it: each item stays reachable here so it can be turned off again (the system screen does the revoking).
-    val manage: (SetupKind) -> Unit = { kind ->
-        when (kind) {
-            SetupKind.VPN -> DeviceChecks.openVpnSettings(ctx)
-            SetupKind.WATCHER -> DeviceChecks.openAccessibilitySettings(ctx)
-            SetupKind.PRIVATE_DNS -> DeviceChecks.openPrivateDnsSettings(ctx)
-            SetupKind.SHIZUKU -> DeviceChecks.openShizuku(ctx)
-        }
-    }
     // Same gate as before; when it is not met the sheet explains what is missing instead of a dead button.
     val startCheck = { if (pf.canAudit && vm.prepareAudit()) onAudit() else showSetup = true }
 
@@ -207,7 +194,7 @@ fun HomeScreen(
             }
         }
         val latest = audits.firstOrNull()
-        HomeLayout.sections(settings.audience, updated.size, trustAvailable = onTrust != null).forEach { section ->
+        HomeLayout.sections(settings.audience, updated.size, trustAvailable = onTrust != null, controlsAvailable = true).forEach { section ->
             when (section) {
                 // Everyday or Developer, right under the header: the same Audience setting as Settings and onboarding.
                 HomeSection.MODE_SWITCH -> ModeSegments(
@@ -274,7 +261,13 @@ fun HomeScreen(
 
                 // "Why you can trust TraceVeil": four code-checked facts and this install's live permission line, folded
                 // after the first view; it opens the full trust page (also in More, About TraceVeil).
-                HomeSection.TRUST -> if (onTrust != null) HomeTrustCard(lang, onTrust, Modifier.padding(top = 32.dp))
+                // The card's own permission count is left to "What TraceVeil uses" right under it, so it is said once.
+                HomeSection.TRUST -> if (onTrust != null) HomeTrustCard(lang, onTrust, Modifier.padding(top = 32.dp), permissionLine = false)
+
+                // "What TraceVeil uses · switch off any time": one line with the on/off count; Manage opens the sheet.
+                HomeSection.CONTROLS -> HomeControlsSection(
+                    vm, lang, onManage = { sheetFromControls = true; showSetup = true }, Modifier.padding(top = 32.dp),
+                )
 
                 // Other ways to check; developer mode adds its quick actions as rows, one tap from Home.
                 HomeSection.MORE_WAYS -> {
@@ -329,8 +322,13 @@ fun HomeScreen(
 
     if (showSetup) {
         val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(onDismissRequest = { showSetup = false }, sheetState = sheet, containerColor = Film.base) {
-            SetupSheetContent(items, todo, lang, aiLine = aiStatusLine(llm), otherVpn = pf.otherVpnActive, fix = fix, manage = manage, onLab = { showSetup = false; onLab() })
+        ModalBottomSheet(onDismissRequest = { showSetup = false; sheetFromControls = false }, sheetState = sheet, containerColor = Film.base) {
+            // One sheet for everything TraceVeil uses: Android's setup items with their Fix / Allow / Manage buttons, then
+            // the other permissions, TraceVeil's own switches and saved checks.
+            SetupContent(
+                vm, lang, title = if (sheetFromControls) ControlsCopy.title else HomeCopy.setupTitle,
+                onLab = { showSetup = false; onLab() }, extra = { ControlsSheetGroups(vm, lang) },
+            )
         }
     }
     if (showSamples) SampleFixturesDialog(vm, onOpen) { showSamples = false }
@@ -385,14 +383,65 @@ internal fun CheckRow(meta: AuditMeta, lang: GuideLang, onClick: () -> Unit) {
     )
 }
 
+/** The Setup sheet's two buttons: [fix] gets an item ready; [manage] opens Android's screen, where it can be turned off again. */
+internal class SetupActions(val fix: (SetupKind) -> Unit, val manage: (SetupKind) -> Unit)
+
+/** The one set of Setup handlers, shared by Home's sheet and Settings › Permissions & background. */
+@Composable
+internal fun rememberSetupActions(vm: XrayViewModel): SetupActions {
+    val ctx = LocalContext.current
+    val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { vm.refreshPreflight() }
+    return remember(ctx, vm, vpnLauncher) {
+        SetupActions(
+            fix = { kind ->
+                when (kind) {
+                    SetupKind.VPN -> if (DeviceChecks.otherVpnActive(ctx)) DeviceChecks.openVpnSettings(ctx) else VpnService.prepare(ctx)?.let { vpnLauncher.launch(it) } ?: vm.refreshPreflight()
+                    SetupKind.WATCHER -> DeviceChecks.openAccessibilitySettings(ctx)
+                    SetupKind.PRIVATE_DNS -> DeviceChecks.openPrivateDnsSettings(ctx)
+                    SetupKind.SHIZUKU -> vm.requestShizuku()
+                }
+            },
+            // Everything on is not the end of it: each item stays reachable here so it can be turned off again (the system screen does the revoking).
+            manage = { kind ->
+                when (kind) {
+                    SetupKind.VPN -> DeviceChecks.openVpnSettings(ctx)
+                    SetupKind.WATCHER -> DeviceChecks.openAccessibilitySettings(ctx)
+                    SetupKind.PRIVATE_DNS -> DeviceChecks.openPrivateDnsSettings(ctx)
+                    SetupKind.SHIZUKU -> DeviceChecks.openShizuku(ctx)
+                }
+            },
+        )
+    }
+}
+
+/**
+ * The Setup sheet's content, read live from [vm]: Home's sheet and the body of Settings › Permissions & background.
+ * [title] null leaves the heading to the screen's own top bar; [lead] goes under the heading, [extra] after the groups.
+ */
+@Composable
+internal fun SetupContent(
+    vm: XrayViewModel, lang: GuideLang, title: Bi?, onLab: () -> Unit,
+    lead: @Composable ColumnScope.() -> Unit = {}, extra: @Composable ColumnScope.() -> Unit = {},
+) {
+    val pf by vm.preflight.collectAsState()
+    val llm by vm.llmStatus.collectAsState()
+    val setup = rememberSetupActions(vm)
+    val items = SetupSteps.from(pf)
+    SetupSheetContent(
+        items, SetupSteps.todo(items), lang, title?.pick(lang), aiStatusLine(llm), pf.otherVpnActive, setup.fix, setup.manage, onLab, lead, extra,
+    )
+}
+
 /** The Setup sheet: what still needs doing first, then what is already in place, then the optional on-device AI. */
 @Composable
 private fun SetupSheetContent(
-    items: List<SetupItem>, todo: List<SetupItem>, lang: GuideLang, aiLine: String, otherVpn: Boolean, fix: (SetupKind) -> Unit, manage: (SetupKind) -> Unit, onLab: () -> Unit,
+    items: List<SetupItem>, todo: List<SetupItem>, lang: GuideLang, title: String?, aiLine: String, otherVpn: Boolean, fix: (SetupKind) -> Unit, manage: (SetupKind) -> Unit, onLab: () -> Unit,
+    lead: @Composable ColumnScope.() -> Unit, extra: @Composable ColumnScope.() -> Unit,
 ) {
     val done = items.filter { it !in todo && it.need != SetupNeed.OPTIONAL }
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).navigationBarsPadding().padding(bottom = 24.dp)) {
-        Text(HomeCopy.setupTitle.pick(lang), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp).semantics { heading() })
+        if (title != null) Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp).semantics { heading() })
+        lead()
         if (todo.isNotEmpty()) {
             Group(title = HomeCopy.toDo.pick(lang)) {
                 todo.forEachIndexed { i, item ->
@@ -448,5 +497,6 @@ private fun SetupSheetContent(
                 trailing = { TextAction(HomeCopy.aiAction.pick(lang), onLab) },
             )
         }
+        extra()
     }
 }
