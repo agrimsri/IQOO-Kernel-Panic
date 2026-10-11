@@ -71,6 +71,22 @@ object SdkSimulator {
 
     /** Resolve each host on a background thread, like an SDK warming up its endpoint. No payload is ever sent. */
     fun touch(vararg hosts: String) = hosts.forEach { h -> thread { runCatching { InetAddress.getAllByName(h) } } }
+
+    /**
+     * Opens a TLS connection and completes the handshake, then closes it: the connection a real SDK makes before its
+     * first request. Used so the connection-level capture has a real, encrypted connection to a tracker to observe.
+     * No application data (no HTTP request, no identifier) is ever written.
+     */
+    fun handshake(vararg hosts: String) = hosts.forEach { h ->
+        thread {
+            runCatching {
+                (javax.net.ssl.SSLSocketFactory.getDefault().createSocket(h, 443) as javax.net.ssl.SSLSocket).use {
+                    it.soTimeout = 5000
+                    it.startHandshake()
+                }
+            }
+        }
+    }
 }
 
 object Consent {
@@ -149,6 +165,7 @@ class ShopActivity : ComponentActivity() {
                         Consent.save(this, false)
                         // The bug TraceVeil catches: refusal is stored but the SDKs keep running.
                         SdkSimulator.touch(SdkSimulator.FACEBOOK, SdkSimulator.FIREBASE_ANALYTICS)
+                        SdkSimulator.handshake(SdkSimulator.FACEBOOK)
                         AppsFlyerLib.start()
                         MixpanelAPI.track()
                         onDone()

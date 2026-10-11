@@ -73,6 +73,9 @@ class FlowTracker(private val maxFlows: Int = MAX_FLOWS) {
 
     fun close(id: Long, now: Long) = synchronized(lock) { flows[id]?.let { if (it.end == 0L) it.end = now } }
 
+    /** Forgets every connection (a new audit plan starts). Ids keep counting so late callbacks never hit a new flow. */
+    fun clear() = synchronized(lock) { flows.clear(); dropped = 0 }
+
     fun snapshot(ipNames: Map<String, String> = emptyMap()): List<FlowRecord> = synchronized(lock) {
         flows.values.map { f ->
             val dns = ipNames[f.dstIp]

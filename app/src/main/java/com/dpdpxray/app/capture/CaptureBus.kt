@@ -8,6 +8,9 @@ import com.dpdpxray.core.capture.LookupTicket
 import com.dpdpxray.core.dns.DnsAnswer
 import com.dpdpxray.core.dns.UnparsedPacket
 import com.dpdpxray.core.model.NetEvent
+import com.dpdpxray.core.netcapture.FlowPhases
+import com.dpdpxray.core.netcapture.FlowRecord
+import com.dpdpxray.core.netcapture.FlowTracker
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,11 +40,21 @@ object CaptureBus {
 
     private val sessions = CaptureSessions(clock = SystemClock::elapsedRealtimeNanos, onEvents = { _events.value = it })
 
+    /** Connections seen by the full-relay capture; stays empty in DNS-only mode. */
+    val flowTracker = FlowTracker()
+
+    /** Full-relay capture (connection metadata and cleartext HTTP heads) for new audits. DNS-only when false. */
+    @Volatile var deepCapture = true
+
     /** Closes the current session and starts a new one; it is measured from now if capture is running. */
     fun reset() {
         log("closed", sessions.snapshot())
         sessions.reset()
+        flowTracker.clear()
     }
+
+    /** Connections so far, each named from the DNS answers of the current session when the app looked the address up. */
+    fun flowSnapshot(): List<FlowRecord> = flowTracker.snapshot(FlowPhases.ipNames(sessions.snapshot().events))
 
     /** Immutable events and health of the current session, taken at one instant. */
     fun snapshot(): CaptureSnapshot = sessions.snapshot()

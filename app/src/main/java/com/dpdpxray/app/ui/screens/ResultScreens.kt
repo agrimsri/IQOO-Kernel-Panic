@@ -245,6 +245,8 @@ fun ResultsScreen(
                     }
                 }
 
+                NetworkFindingsSection(b.sessions, vm)
+
                 GroupHeader(ResultCopy.evidence.pick(lang))
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     CollapsibleCard(

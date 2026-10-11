@@ -124,6 +124,12 @@ object TrustText {
                 "${fallbackResolvers.joinToString(" or ")} if they fail. They count in the numbers above.",
         ),
         NetworkPath(
+            "capture/SocketConnector.kt", "Connection relay, during a deep check",
+            "In a deep check, the checked app's own connections are forwarded unchanged to the servers the app chose, using " +
+                "TraceVeil's sockets. TraceVeil adds nothing to them and sends nothing of its own. Android counts these bytes to " +
+                "TraceVeil, so the upload figure above is not shown for a deep check.",
+        ),
+        NetworkPath(
             "voice/SarvamTts.kt", "Online voice (Sarvam AI), only if switched on",
             if (onlineVoiceOn) "On: each spoken answer's text goes to api.sarvam.ai and counts in the numbers above."
             else "Off on this phone, so it sends nothing.",
@@ -140,7 +146,7 @@ object TrustText {
 
     const val NETWORK_COUNTER_DETAIL = "Android counts every byte sent or received by TraceVeil's own connections, including any made " +
         "by a library inside it, so these numbers are a check on the list below. They include retries and packet headers and " +
-        "reset when the phone restarts. The checked app's other traffic never passes through TraceVeil and is not counted here."
+        "reset when the phone restarts. In a DNS-only check the checked app's other traffic never passes through TraceVeil and is not counted here; in a deep check it is relayed and the figure is not shown."
 
     /** How results are made. Each line matches the rules engine, the score and the result labels. */
     val findings: List<Claim> = listOf(
