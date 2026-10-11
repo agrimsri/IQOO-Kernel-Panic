@@ -72,7 +72,8 @@ Test-only (`junit` 4.13.2, EPL-1.0; `kotlinx-coroutines-test`) and build tools (
 
 These came up while compiling the inventory and are listed so they are not forgotten; none was assessed:
 
-- Store policies for the permissions TraceVeil uses (`VpnService`, an accessibility service, `QUERY_ALL_PACKAGES`), and the privacy policy and data-safety declarations a store listing needs.
+- Store policies for the permissions TraceVeil uses (`VpnService`, an accessibility service, `QUERY_ALL_PACKAGES`, `REQUEST_INSTALL_PACKAGES`), and the privacy policy and data-safety declarations a store listing needs.
+- **Store review item: `REQUEST_INSTALL_PACKAGES`** (added for APK Guard's "Install anyway", `docs/CHECK_BEFORE_INSTALL.md`). Google Play restricts it to apps whose core purpose includes installing packages and asks for a declaration. If a store does not accept it, build with `-Ptraceveil.installHandoff=false`: the permission is removed from the merged manifest and APK Guard explains how to continue with Android's own installer instead.
 - Trademark clearance for the name "TraceVeil".
 - Export classification of the shipped Qualcomm libraries (the Qualcomm licences require compliance with US export and sanctions law).
 
