@@ -34,8 +34,8 @@ object TrustText {
      */
     fun purpose(permission: String, ownPackage: String, onlineVoiceAvailable: Boolean = ApiEnv.ONLINE_VOICE_AVAILABLE): Pair<String, String>? = when (permission) {
         "android.permission.INTERNET" -> "Internet" to
-            if (onlineVoiceAvailable) "Relays the checked app's DNS lookups during a check. The optional online voice and wake-word model download also use it, only if you turn them on."
-            else "Relays the checked app's DNS lookups during a check. The optional wake-word model download also uses it, only if you start it."
+            if (onlineVoiceAvailable) "Relays the checked app's DNS lookups during a check, and opens a website you ask TraceVeil to check. The optional online voice and wake-word model download also use it, only if you turn them on."
+            else "Relays the checked app's DNS lookups during a check, and opens a website you ask TraceVeil to check. The optional wake-word model download also uses it, only if you start it."
         "android.permission.RECEIVE_BOOT_COMPLETED" -> "Resume after a restart" to
             "Lets Auto-guard reschedule its new-app check and weekly phone checkup after the phone restarts. Both run on this phone only and can be switched off in Settings."
         "android.permission.ACCESS_NETWORK_STATE" -> "Network state" to
@@ -163,6 +163,8 @@ object TrustText {
             if (onlineVoiceOn) "On: each spoken answer's text goes to api.sarvam.ai and counts in the numbers above."
             else "Off on this phone, so it sends nothing.",
         ),
+        NetworkPath("webcheck/WebCheckBrowser.kt", WEBSITE_CHECK_TITLE, WEBSITE_CHECK_LINE),
+        NetworkPath("webcheck/WebHostResolver.kt", WEBSITE_ADDRESSES_TITLE, WEBSITE_ADDRESSES_LINE),
         NetworkPath(
             "voice/wake/WakeModelManager.kt", "Wake-word model, only if you tap Download",
             "Android's download service fetches the Vosk model (about 40 MB) from alphacephei.com. Android normally counts those " +
@@ -173,6 +175,15 @@ object TrustText {
     const val NETWORK_NOTHING_ELSE = "Nothing else in TraceVeil's code opens a network connection, and it contains no analytics, " +
         "advertising or crash-reporting library."
 
+    const val WEBSITE_CHECK_TITLE = "Website check, only when you start one"
+    const val WEBSITE_CHECK_LINE = "TraceVeil opens the address you typed in its own browser on this phone, only while the check is on " +
+        "screen; the site sees a normal visit and its pages load as in any browser, while TraceVeil records the addresses they " +
+        "request. Google Safe Browsing lookups and usage statistics are off for this browser, and it is cleared before each run " +
+        "and afterwards. These bytes count in the numbers above."
+    const val WEBSITE_ADDRESSES_TITLE = "Server addresses for the map, after a website check"
+    const val WEBSITE_ADDRESSES_LINE = "TraceVeil asks this phone's DNS resolver for the addresses of the servers the site contacted " +
+        "during the check (at most ${com.dpdpxray.app.webcheck.WebHostResolver.MAX_HOSTS}), so the server map can place them. Nothing else is sent."
+
     const val NETWORK_COUNTER_DETAIL = "Android counts every byte sent or received by TraceVeil's own connections, including any made " +
         "by a library inside it, so these numbers are a check on the list below. They include retries and packet headers and " +
         "reset when the phone restarts. The checked app's other traffic never passes through TraceVeil and is not counted here."
@@ -182,8 +193,9 @@ object TrustText {
         Claim(
             "Rules decide",
             "Each finding comes from fixed rules applied to what this phone recorded. The same evidence always gives the same result.",
-            "Network findings rest on DNS lookups matched against TraceVeil's tracker catalogue, never on inspected content. A lookup " +
-                "is an attempt to contact a server, not proof that data was sent.",
+            "Network findings rest on DNS lookups (app checks) or the page's requests in TraceVeil's own browser (website checks), " +
+                "matched against TraceVeil's tracker catalogue, never on inspected content. A lookup or request is an attempt to contact " +
+                "a server, not proof of what data was sent.",
         ),
         Claim(
             "AI explains, and is labelled",

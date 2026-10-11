@@ -64,7 +64,7 @@ class ControlsInventoryTest {
             listOf(
                 ControlId.NOTIFICATIONS, ControlId.MICROPHONE,
                 ControlId.NEW_APP_CHECK, ControlId.UPDATE_ALERTS, ControlId.SPEAK_ALERTS, ControlId.WEEKLY_CHECKUP,
-                ControlId.WAKE_WORD, ControlId.AUTO_LOAD_AI, ControlId.RUNNER, ControlId.SIGNED_EXPORTS, ControlId.SAVED_CHECKS,
+                ControlId.WAKE_WORD, ControlId.AUTO_LOAD_AI, ControlId.WEBSITE_CHECK, ControlId.RUNNER, ControlId.SIGNED_EXPORTS, ControlId.SAVED_CHECKS,
             ),
             dev().map { it.id },
         )
@@ -249,6 +249,16 @@ class ControlsInventoryTest {
         val config = ApiEnv.load(onlineVoiceAvailable = false) { read = true; "USE_API=true\nSARVAM_API_KEY=k" }
         assertFalse(config.useApi)
         assertFalse(read)
+    }
+
+    @Test fun `the website check's browser is a network use with no switch, shown in both modes`() {
+        listOf(dev(), everyday()).forEach { list ->
+            val row = list.of(ControlId.WEBSITE_CHECK)
+            assertEquals(ControlState.INFO, row.state)
+            assertEquals(ControlAction.None, row.action)
+            assertTrue(row.what.en.contains("only while you watch the check"))
+        }
+        assertEquals(ControlGroup.TRACEVEIL, ControlId.WEBSITE_CHECK.group)
     }
 
     @Test fun `signed exports have no switch and are shown as information in developer mode only`() {
