@@ -103,7 +103,6 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
     val progress by vm.progress.collectAsState()
     val net by vm.liveNet.collectAsState()
     val consent by vm.liveConsent.collectAsState()
-    val developer = vm.settings.collectAsState().value.audience == com.dpdpxray.app.data.Audience.DEVELOPER
 
     LaunchedEffect(progress) {
         (progress as? AuditProgress.Done)?.let {
@@ -141,6 +140,12 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
                         modifier = Modifier.weight(1f).semantics { heading() },
                     )
                 }
+                // Live, and how much this capture can show: one quiet line (the caveat word carries the caution colour).
+                Text(
+                    if (p.config.fastPreview) "Live · Fast Preview · limited evidence" else "Live · Normal capture",
+                    style = MaterialTheme.typography.bodySmall, color = if (p.config.fastPreview) Film.warn else Film.boneDim,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
                 if (p.config.fastPreview) Callout("8-second observation; delayed traffic may be missed. Silent and Reject are not tested.", Modifier.padding(top = 8.dp), fold = true)
                 // The plans really are a sequence, so they are shown as numbered frames.
                 RunFrames(p.config.plans, p.planIndex, Modifier.padding(top = 12.dp))
@@ -162,8 +167,8 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
                 }
                 // The key caveat stays in view while numbers climb.
                 KeyCaveat("A lookup is an attempt to contact an address, not proof data was sent.", Modifier.padding(top = 6.dp), color = Film.boneDim)
-                // The orchestrator's own wording stays visible for developers; the banner above is the plain version.
-                if (developer && LivePhase.of(p.step) != LivePhase.OTHER) {
+                // The orchestrator's own wording (with its timings) stays visible under the plain step above.
+                if (LivePhase.of(p.step) != LivePhase.OTHER) {
                     Text("Status: ${p.step}", style = MaterialTheme.typography.labelMedium, color = Film.boneDim, modifier = Modifier.padding(top = 10.dp))
                 }
                 Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {

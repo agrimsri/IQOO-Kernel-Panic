@@ -100,6 +100,13 @@ fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit, onRecheck: (Strin
                     Modifier.padding(bottom = 8.dp),
                 )
             }
+            // Where the list comes from and how many checks fall in each band (one line under the filter).
+            if (audits.isNotEmpty()) item(key = "counts") {
+                Text(
+                    ReportsCopy.summary(audits.map { it.band }), style = MaterialTheme.typography.bodySmall, color = Film.boneDim,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
+                )
+            }
             if (audits.isEmpty()) item(key = "empty") {
                 EmptyState(
                     "No checks yet",
@@ -116,6 +123,14 @@ fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit, onRecheck: (Strin
             // Back up / restore: also reachable on a new phone, when the list above is still empty.
             item(key = "backup") { BackupRestoreCard(vm, Modifier.padding(top = 24.dp)) }
         }
+    }
+}
+
+/** The line under the Reports filter: where the checks live, then a count per score band (bands with none are left out). */
+object ReportsCopy {
+    fun summary(bands: List<ScoreBand>): String {
+        val counts = ScoreBand.entries.mapNotNull { b -> bands.count { it == b }.takeIf { it > 0 }?.let { "$it ${b.label}" } }
+        return (listOf("Saved on this phone, newest first") + counts).joinToString(" · ")
     }
 }
 

@@ -132,11 +132,17 @@ fun AppPickerScreen(
     val demos = apps.filter { it.packageName in demoPackages }
     Column(Modifier.fillMaxSize()) {
         TopBar("Choose an app", onBack)
-        SpeakStep(GuideFlow.picker(demoInstalled = demos.isNotEmpty()))
+        val pickStep = GuideFlow.picker(demoInstalled = demos.isNotEmpty())
+        SpeakStep(pickStep)
         if (onSwitchToApk != null) {
             SegmentedControl(listOf("Live check", "APK Guard"), 0, { if (it == 1) onSwitchToApk() }, Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
         }
         SearchField(query, { query = it }, "Search apps", Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+        // The step's advice stays on screen as one quiet line (which app to pick, which to avoid); read-aloud speaks it too.
+        Text(
+            pickStep.body.pick(com.dpdpxray.app.ui.guide.guideLang()), style = MaterialTheme.typography.bodySmall, color = Film.boneDim,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp),
+        )
         val q = query.trim()
         val shown = apps.filter { q.isBlank() || it.label.contains(q, true) || it.packageName.contains(q, true) }
         val showDemoSection = q.isBlank() && demos.isNotEmpty()

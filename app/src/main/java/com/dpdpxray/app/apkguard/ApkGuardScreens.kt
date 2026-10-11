@@ -167,7 +167,7 @@ fun ApkGuardHubScreen(
                     Spacer(Modifier.height(16.dp))
                     PrimaryButton("Choose a file", { picker.launch(arrayOf(IncomingApk.APK_MIME, "application/octet-stream")) })
                     Text(
-                        "Not an antivirus. It never installs anything.",
+                        "Not an antivirus. It only reads, never installs anything, and what it finds stays on this phone.",
                         style = MaterialTheme.typography.bodySmall, color = Film.boneDim, modifier = Modifier.padding(top = 12.dp),
                     )
                     LearnMore(Modifier.padding(top = 4.dp), label = "How APK Guard works") {
@@ -221,6 +221,10 @@ fun ApkGuardHubScreen(
                 Column(Modifier.reveal(3)) {
                     GroupHeader("Installed apps", trailing = { if (shown != null) CountChip(shown.size) })
                     SearchField(query, { query = it }, "Search by name or package")
+                    Text(
+                        "Newest installs first. Apps without a launcher screen are listed too.",
+                        style = MaterialTheme.typography.bodySmall, color = Film.boneDim, modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                    )
                     SwitchRow("Show system apps", "Apps that came with the phone.", showSystem, { showSystem = it })
                     Spacer(Modifier.height(8.dp))
                 }
@@ -230,7 +234,7 @@ fun ApkGuardHubScreen(
                 items(3, key = { "loading-$it" }) { i -> SkeletonCard(Modifier.padding(bottom = 8.dp), label = if (i == 0) "Loading installed apps…" else "Loading") }
             } else {
                 if (shown.isEmpty()) item(key = "none") { EmptyHint("No matching apps.", glyph = Glyph.SEARCH) }
-                items(shown, key = { it.packageName }) { app -> InstalledRow(app, Modifier.padding(bottom = 8.dp)) { onOpenApp(app.packageName) } }
+                items(shown, key = { it.packageName }) { app -> InstalledRow(app, showPackage = query.isNotBlank(), Modifier.padding(bottom = 8.dp)) { onOpenApp(app.packageName) } }
             }
         }
     }
@@ -242,9 +246,12 @@ private fun CountChip(n: Int) {
     Box(Modifier.clearAndSetSemantics { contentDescription = "$n apps" }) { Tag("$n", Film.boneDim) }
 }
 
-/** One installed app: icon, name, and a second line only when something is worth saying (system app, no launcher screen). */
+/**
+ * One installed app: icon, name, and one quiet line with when it was installed (the list is newest first) or that it came
+ * with the phone, plus "No launcher screen" when that applies. The package name shows while searching, as in the picker.
+ */
 @Composable
-private fun InstalledRow(app: ApkInspector.ListedApp, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun InstalledRow(app: ApkInspector.ListedApp, showPackage: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val ctx = LocalContext.current
     val icon by produceState<ImageBitmap?>(null, app.packageName) {
         value = withContext(Dispatchers.IO) {
@@ -252,11 +259,14 @@ private fun InstalledRow(app: ApkInspector.ListedApp, modifier: Modifier = Modif
         }
     }
     val shape = RoundedCornerShape(Radii.row)
-    val note = when {
-        app.isSystem -> "Came with the phone"
-        !app.hasLauncher -> "No launcher screen"
-        else -> null
-    }
+    val note = listOfNotNull(
+        when {
+            app.isSystem -> "Came with the phone"
+            ApkInspector.plausibleInstallTime(app.firstInstallTime) -> "Installed ${date(app.firstInstallTime)}"
+            else -> "Install date not reported (preloaded)"
+        },
+        "No launcher screen".takeIf { !app.hasLauncher },
+    ).joinToString(" · ")
     Row(
         modifier.fillMaxWidth().heightIn(min = 64.dp)
             .pressClickable(shape = shape, onClick = onClick)
@@ -269,7 +279,8 @@ private fun InstalledRow(app: ApkInspector.ListedApp, modifier: Modifier = Modif
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(app.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (note != null) Text(note, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+            if (showPackage) Text(app.packageName, fontFamily = Mono, fontSize = 12.sp, color = Film.boneDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(note, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
         }
         Spacer(Modifier.width(6.dp))
         GlyphIcon(Glyph.CHEVRON_RIGHT, Film.graphic, size = 16.dp)
