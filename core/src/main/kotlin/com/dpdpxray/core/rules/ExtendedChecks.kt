@@ -17,6 +17,7 @@ import com.dpdpxray.core.model.PenaltyBand
 import com.dpdpxray.core.model.Phase
 import com.dpdpxray.core.model.Severity
 import com.dpdpxray.core.netcapture.CleartextPersonalData
+import com.dpdpxray.core.netcapture.ConnectionFacts
 import com.dpdpxray.core.netcapture.FlowProtocol
 import com.dpdpxray.core.netcapture.TlsStatus
 import com.dpdpxray.core.quarantine.QuarantineUiRules
@@ -298,11 +299,9 @@ internal class ExtendedChecks(
      * answer TraceVeil saw had given, and that no lookup asked for; Encrypted Client Hello and unnamed QUIC connections.
      */
     private fun connectionLines(s: AuditSession): List<String> {
-        if (s.captureDepth != FULL_RELAY || s.flows.isEmpty()) return emptyList()
+        if (s.captureDepth != ConnectionFacts.FULL_RELAY || s.flows.isEmpty()) return emptyList()
         val plan = s.plan.label
-        val looked = s.netEvents.flatMap { listOf(it.hostname) + it.cnameChain }.map { it.lowercase().trimEnd('.') }.toSet()
-        val unseen = s.flows.filter { it.noLookup }.mapNotNull { it.host?.lowercase()?.trimEnd('.') }
-            .filterNot { IPV4.matches(it) || it in looked }.distinct()
+        val unseen = ConnectionFacts.namesWithoutLookup(s)
         val ech = s.flows.count { it.tls == TlsStatus.ECH_HIDDEN }
         val quic = s.flows.count { it.protocol == FlowProtocol.QUIC && it.sni == null }
         return buildList {
@@ -406,9 +405,7 @@ internal class ExtendedChecks(
         /** A consent screen, a hand-marked consent moment or a recorded choice: the notice was on screen by then. */
         private val NOTICE_KINDS = SCREEN_KINDS + setOf(ConsentKind.ACCEPT, ConsentKind.REJECT)
 
-        const val FULL_RELAY = "full-relay"
         private const val MAX_NAMES = 6
-        private val IPV4 = Regex("\\d{1,3}(\\.\\d{1,3}){3}")
 
         private val NOTIFICATION_CUES = listOf("notification", "सूचनाएं भेजने", "सूचनाएँ भेजने", "नोटिफ़िकेशन", "नोटिफिकेशन", "ಅಧಿಸೂಚನೆ")
 
