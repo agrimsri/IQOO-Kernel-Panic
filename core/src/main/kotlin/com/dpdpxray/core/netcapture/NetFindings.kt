@@ -192,8 +192,10 @@ object NetFindings {
         else {
             add("Only IPv4 was captured; IPv6 traffic bypasses this view.")
             if (session.flows.any { it.tls == TlsStatus.SNI_ONLY || it.tls == TlsStatus.ECH_HIDDEN }) add("Encrypted (HTTPS) request contents are not readable; only the server name, timing and byte counts.")
-            if (session.flows.any { it.protocol == FlowProtocol.QUIC }) add("QUIC (HTTP/3) connections are visible by address and size only.")
-            if (session.flows.any { it.tls == TlsStatus.ECH_HIDDEN }) add("Some connections hide their server name (Encrypted Client Hello).")
+            val quic = session.flows.filter { it.protocol == FlowProtocol.QUIC }
+            if (quic.any { it.sni != null }) add("QUIC (HTTP/3) server names are read from the client's first (Initial) packet, whose protection is public by design; the contents are not readable.")
+            if (quic.any { it.sni == null }) add("Some QUIC (HTTP/3) connections are visible by address and size only (no readable version 1 Initial packet).")
+            if (session.flows.any { it.tls == TlsStatus.ECH_HIDDEN }) add("Some connections offered Encrypted Client Hello, so the visible server name may be the provider's public name rather than the real one.")
         }
     }
 

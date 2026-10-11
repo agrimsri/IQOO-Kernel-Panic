@@ -24,6 +24,8 @@ class FlowTracker(private val maxFlows: Int = MAX_FLOWS) {
         val http = ArrayList<HttpExchange>()
         val samples = ArrayList<ByteSample>()
         var pendingStatus = false
+        var quic: QuicHelloAssembler? = null
+        var quicDatagrams = 0
     }
 
     private val lock = Any()
@@ -58,6 +60,29 @@ class FlowTracker(private val maxFlows: Int = MAX_FLOWS) {
             val head = HttpHeadParser.parse(data.copyOfRange(off, off + minOf(len, 2048)))
             val status = head?.status
             if (status != null && f.http.isNotEmpty()) f.http[f.http.size - 1] = f.http.last().copy(status = status)
+        }
+    }
+
+    /**
+     * One client datagram of a [FlowProtocol.QUIC] flow. Its server name and ALPN are read from the QUIC version 1
+     * Initial packets ([QuicInitial]); after the hello is read, or after [MAX_QUIC_DATAGRAMS] datagrams without one,
+     * nothing more is looked at. Byte counts still go through [transportOnly].
+     */
+    fun quicDatagram(id: Long, data: ByteArray, off: Int, len: Int) = synchronized(lock) {
+        val f = flows[id] ?: return
+        if (f.protocol != FlowProtocol.QUIC || f.decided) return
+        if (++f.quicDatagrams > MAX_QUIC_DATAGRAMS) { f.decided = true; f.quic = null; return }
+        val initial = QuicInitial.read(data, off, len) as? QuicRead.Initial ?: return
+        val a = f.quic ?: QuicHelloAssembler().also { f.quic = it }
+        when (val r = a.add(initial)) {
+            is QuicHello.Read -> {
+                f.sni = r.info.sni
+                f.alpn = r.info.alpn
+                f.tls = tlsStatus(r.info)
+                f.decided = true; f.quic = null
+            }
+            QuicHello.NotHello -> { f.decided = true; f.quic = null }
+            QuicHello.Pending -> {}
         }
     }
 
@@ -110,11 +135,7 @@ class FlowTracker(private val maxFlows: Int = MAX_FLOWS) {
             if (hello != null) {
                 f.sni = hello.sni
                 f.alpn = hello.alpn
-                f.tls = when {
-                    hello.sni != null -> TlsStatus.SNI_ONLY
-                    hello.ech -> TlsStatus.ECH_HIDDEN
-                    else -> TlsStatus.OPAQUE
-                }
+                f.tls = tlsStatus(hello)
                 f.decided = true
                 f.sniff.reset()
             } else if (buf.size > MAX_SNIFF) giveUp(f)
@@ -128,6 +149,17 @@ class FlowTracker(private val maxFlows: Int = MAX_FLOWS) {
                 f.sniff.reset()
             } else if (buf.size > MAX_SNIFF * 4) giveUp(f)
         } else giveUp(f)
+    }
+
+    /**
+     * With an Encrypted Client Hello extension the visible name may be the provider's public name rather than the real
+     * server (or, with a placeholder "GREASE" ECH, the real one): the hello alone cannot tell, so the flow is marked
+     * [TlsStatus.ECH_HIDDEN] and keeps the visible name.
+     */
+    private fun tlsStatus(hello: TlsHelloInfo): TlsStatus = when {
+        hello.ech -> TlsStatus.ECH_HIDDEN
+        hello.sni != null -> TlsStatus.SNI_ONLY
+        else -> TlsStatus.OPAQUE
     }
 
     private fun giveUp(f: Flow) {
@@ -159,6 +191,7 @@ class FlowTracker(private val maxFlows: Int = MAX_FLOWS) {
         const val MAX_HTTP_PER_FLOW = 50
         const val MAX_SAMPLES = 400
         const val MAX_SNIFF = 4096
+        const val MAX_QUIC_DATAGRAMS = 12
         const val BUCKET_NANOS = 500_000_000L
     }
 }

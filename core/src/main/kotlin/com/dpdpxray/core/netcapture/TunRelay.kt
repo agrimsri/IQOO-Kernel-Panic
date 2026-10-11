@@ -250,6 +250,7 @@ class TunRelay(
         f.lastActive = clock()
         val payload = p.payload()
         tracker.transportOnly(f.flowId, clock(), payload.size.toLong(), 0)
+        tracker.quicDatagram(f.flowId, payload, 0, payload.size) // reads the server name from QUIC Initials only
         f.up.send(payload, payload.size)
     }
 
