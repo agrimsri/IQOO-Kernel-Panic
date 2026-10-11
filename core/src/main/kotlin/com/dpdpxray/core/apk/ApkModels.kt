@@ -68,8 +68,16 @@ enum class InstallSource {
 
 data class InstallOrigin(val source: InstallSource, val installerPackage: String? = null, val storeName: String? = null)
 
-/** An installed app with the same package name as an APK file being checked. */
-data class InstalledTwin(val label: String, val certSha256: List<String>)
+/**
+ * An installed app with the same package name as an APK file being checked. [versionCode] and [versionName] are the
+ * installed version; null when Android did not report them.
+ */
+data class InstalledTwin(
+    val label: String,
+    val certSha256: List<String>,
+    val versionCode: Long? = null,
+    val versionName: String? = null,
+)
 
 data class ApkFacts(
     val packageName: String,
@@ -87,6 +95,11 @@ data class ApkFacts(
     val certSha256: List<String> = emptyList(),
     /** X.500 subject of each signing certificate, when readable. */
     val signerSubjects: List<String> = emptyList(),
+    /**
+     * Upper-case hex SHA-256 of each certificate in the signing history (APK Signature Scheme v3 key rotation), oldest
+     * first, including the current one; empty when the package has no rotated key or Android did not report it.
+     */
+    val certHistorySha256: List<String> = emptyList(),
     /** Whether the app shows an icon in the launcher; null when not knowable (an APK file). */
     val hasLauncherIcon: Boolean? = null,
     /** For an APK file: the installed app with the same package name, if any. */
