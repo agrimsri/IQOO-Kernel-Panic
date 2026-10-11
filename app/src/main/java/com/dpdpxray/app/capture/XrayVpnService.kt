@@ -71,6 +71,12 @@ class XrayVpnService : VpnService() {
                 startQuarantineNotice(intent.getStringExtra(EXTRA_LABEL) ?: pkg)
                 startQuarantine(pkg, runId)
             }
+            // The background watch's Stop: the watch ends early and keeps what it saw; the orchestrator closes the tunnel.
+            ACTION_WATCH_STOP -> {
+                com.dpdpxray.app.audit.WatchControl.requestStop()
+                // A late tap after the watch ended must not leave a stray service behind.
+                if (synchronized(this) { tun == null }) stopSelfResult(startId)
+            }
             ACTION_QUARANTINE_STOP -> {
                 // Only the quarantine tunnel is ever closed here, never an audit's capture tunnel.
                 val ended = endQuarantine(if (intent.getBooleanExtra(EXTRA_BY_USER, false)) QuarantineStopReason.USER else null)
@@ -342,8 +348,9 @@ class XrayVpnService : VpnService() {
         private const val VPN_ADDRESS = "10.111.0.2"
         private const val DNS_ADDRESS = "10.111.0.53"
         private const val MTU = 1500
-        private const val CHANNEL = "capture"
-        private const val NOTIFICATION_ID = 7
+        internal const val CHANNEL = "capture"
+        internal const val NOTIFICATION_ID = 7
+        private const val ACTION_WATCH_STOP = "com.dpdpxray.capture.WATCH_STOP"
         const val GMS_PACKAGE = "com.google.android.gms"
         private const val ACTION_QUARANTINE = "com.dpdpxray.capture.QUARANTINE"
         private const val ACTION_QUARANTINE_STOP = "com.dpdpxray.capture.QUARANTINE_STOP"
@@ -366,6 +373,33 @@ class XrayVpnService : VpnService() {
         fun stop(context: Context) {
             if (CaptureBus.state.value is CaptureState.Idle) return
             context.startService(Intent(context, XrayVpnService::class.java).setAction(ACTION_STOP))
+        }
+
+        /**
+         * Replaces the capture's ongoing notification with the background watch's: [title] with the time left, [text], and
+         * a Stop action that ends the watch early and keeps what it saw. Same channel, id and foreground-service type as the
+         * capture it belongs to, so it stays while the screen is locked and TraceVeil is in the background.
+         */
+        fun showWatchNotice(context: Context, title: String, text: String, stopLabel: String) {
+            val nm = context.getSystemService(NotificationManager::class.java) ?: return
+            val stop = PendingIntent.getService(
+                context, 3, Intent(context, XrayVpnService::class.java).setAction(ACTION_WATCH_STOP),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            val open = context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
+                PendingIntent.getActivity(context, 4, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            }
+            val n = Notification.Builder(context, CHANNEL)
+                .setSmallIcon(android.R.drawable.ic_menu_view)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(Notification.BigTextStyle().bigText(text))
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .apply { if (open != null) setContentIntent(open) }
+                .addAction(Notification.Action.Builder(null, stopLabel, stop).build())
+                .build()
+            runCatching { nm.notify(NOTIFICATION_ID, n) }
         }
 
         /** Starts a quarantine run's tunnel for [targetPackage]; progress is reported on [QuarantineBus.tunnel]. */

@@ -187,7 +187,8 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         }
         val config = com.dpdpxray.app.audit.CheckAgain.config(bundle.meta, bundle.sessions, mode, restart)
         val begin = { if (startAudit(config, onStarted)) onStarted() }
-        if (!ShizukuBridge.hasPermission()) {
+        // A background watch restarts nothing, so it does not wait for the Shizuku helper.
+        if (!config.isWatch && !ShizukuBridge.hasPermission()) {
             refreshPreflight()
             val need = AccessNeeds.shizuku(ShizukuBridge.isRunning(), granted = false)
             if (need != null) { _access.value = AccessPrompt(need) { begin() }; return }
@@ -234,6 +235,19 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         return true
     }
     fun cancelAudit() = graph.orchestrator.cancel()
+
+    /**
+     * Starts a background watch of [pkg] for [minutes]: the capture records only this app while the person uses the phone
+     * as usual or locks it. Nothing is restarted, opened, tapped or cleared, so it needs no Shizuku and no confirmation.
+     * [onStarted] shows the live check.
+     */
+    fun startWatch(pkg: String, label: String, minutes: Int, includeGms: Boolean = false, onStarted: () -> Unit) {
+        val config = com.dpdpxray.app.ui.modes.CheckSheet.watchConfig(pkg, label, minutes, includeGms)
+        if (startAudit(config, onStarted)) onStarted()
+    }
+
+    /** Ends the running background watch early; what it saw is saved and scored. */
+    fun stopWatch() = graph.orchestrator.stopWatch()
     fun acknowledgeProgress() = graph.orchestrator.acknowledge()
 
     fun markConsentNow() = viewModelScope.launch {

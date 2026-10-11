@@ -22,6 +22,12 @@ object CheckAgain {
      * an app that a restart would disturb is left running unless [restart] says the person chose otherwise.
      */
     fun config(meta: AuditMeta, sessions: List<AuditSession>, mode: Mode, restart: RestartPolicy = RestartPolicy.AUTO): AuditConfig {
+        // A background watch is repeated as the same watch: no restart, no reset, whatever was asked.
+        com.dpdpxray.core.model.BackgroundWatches.of(sessions)?.let { w ->
+            return com.dpdpxray.app.ui.modes.CheckSheet.watchConfig(
+                meta.targetPackage, meta.targetLabel, w.plannedMinutes.coerceAtLeast(1), meta.includeGms ?: false, sessions.any { it.childFacing },
+            )
+        }
         val fromMeta = meta.plans.mapNotNull { label -> AuditPlan.entries.firstOrNull { it.label == label } }.distinct()
         val plans = fromMeta.ifEmpty { sessions.map { it.plan }.distinct() }.ifEmpty { listOf(AuditPlan.REJECT) }
         return AuditConfig(

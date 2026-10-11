@@ -23,6 +23,7 @@ import com.dpdpxray.app.report.EvidenceReport
 import com.dpdpxray.core.model.AppManifestFacts
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditSession
+import com.dpdpxray.core.model.BackgroundWatch
 import com.dpdpxray.core.model.ConsentEvent
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.PlanConditions
@@ -59,12 +60,23 @@ data class AuditConfig(
      * AUTO, the default, leaves such an app running; only the person's "Restart anyway" (ALWAYS) stops it.
      */
     val restart: RestartPolicy = RestartPolicy.AUTO,
+    /**
+     * Set for a background watch: one long plan of this length in which TraceVeil keeps capturing the app without opening,
+     * restarting or tapping it (see BackgroundWatchRun). null for every other check.
+     */
+    val watchMs: Long? = null,
 ) {
     init {
         require(!fastPreview || plans == listOf(AuditPlan.ACCEPT)) {
             "Fast Preview is a single Accept-plan check, not a Full audit."
         }
+        require(watchMs == null || (plans == listOf(AuditPlan.SILENT) && !resetAppData && !fastPreview && watchMs > 0)) {
+            "A background watch is one plan that never clears data and has a length."
+        }
     }
+
+    /** This check is a background watch. */
+    val isWatch: Boolean get() = watchMs != null
 }
 
 sealed interface AuditProgress {
@@ -89,6 +101,9 @@ sealed interface AuditProgress {
  * Around each plan it records the conditions a low-visibility result needs to explain itself (PlanConditions): how the
  * app was started, Private DNS, another VPN, the network, the lock screen, a crash dialog, the app's own network use
  * and the first blocker. A check that loses its app or its capture between plans keeps the plans already captured.
+ *
+ * A background watch ([AuditConfig.watchMs]) is one long plan instead: no restart, launch, consent wait or tap, only the
+ * capture of this one app while the person uses the phone as usual (see [runWatch]).
  */
 class AuditOrchestrator(private val context: Context, private val graph: AppGraph) {
     private val _progress = MutableStateFlow<AuditProgress>(AuditProgress.Idle)
@@ -143,6 +158,12 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         if (_progress.value !is AuditProgress.Running) _progress.value = AuditProgress.Idle
     }
 
+    /** Ends a running background watch early; it is saved with what it saw. Does nothing for other checks. */
+    fun stopWatch() {
+        val running = _progress.value as? AuditProgress.Running ?: return
+        if (running.config.isWatch) WatchControl.requestStop()
+    }
+
     private suspend fun run(config: AuditConfig) {
         val auditId = "audit-${System.currentTimeMillis()}"
         val dir = graph.repository.newAuditDir(auditId)
@@ -151,7 +172,8 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             // foreground service, and the running capture service keeps TraceVeil allowed to work between plans.
             _progress.value = AuditProgress.Running(config, 0, config.plans.first(), "Starting per-app DNS capture")
             startCapture(config)
-            if (graph.settings.settings.value.autoLoadModel && graph.llm.status.value is LlmStatus.NotLoaded) {
+            // A watch reviews no consent screen, so it never loads the model.
+            if (!config.isWatch && graph.settings.settings.value.autoLoadModel && graph.llm.status.value is LlmStatus.NotLoaded) {
                 _progress.value = AuditProgress.Running(config, 0, config.plans.first(), "Loading on-device AI model")
                 graph.llm.load(BackendKind.GPU)
             }
@@ -160,12 +182,14 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             val facts = DeviceChecks.appFacts(context, config.targetPackage)
             // What stopping the app would switch off (its accessibility service, VPN, keyboard...), read once before the
             // first plan, while it is all still on. null = could not be read.
-            val sideEffects = withContext(Dispatchers.IO) {
+            // A watch never restarts the app, so it has nothing to decide here.
+            val sideEffects = if (config.isWatch) null else withContext(Dispatchers.IO) {
                 runCatching { RestartSideEffects.detect(config.targetPackage, AndroidSideEffectProbe(context)) }.getOrNull()
             }
             val done = mutableListOf<CapturedPlan>()
             var stopNote: String? = null
-            for ((i, plan) in config.plans.withIndex()) {
+            if (config.isWatch) done += runWatch(config, auditId, manifest, facts)
+            else for ((i, plan) in config.plans.withIndex()) {
                 try {
                     done += ConsentPlanRetry.capture(plan, config.targetPackage, { config.resetAppData && ShizukuBridge.hasPermission() }, { it.session }) { attempt ->
                         runPlan(config, plan, i, auditId, dir, attempt, manifest, facts, sideEffects)
@@ -216,7 +240,132 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         }
         graph.repository.save(meta, sessions, result, markdown, capturedPlans.map { it.upload })
         _progress.value = AuditProgress.Done(auditId)
-        returnToXray()
+        // After a watch the person may be busy in another app: a notification says it is done instead of jumping in front.
+        if (config.isWatch) WatchNotifier.finished(context, config.targetLabel, graph.settings.settings.value.guideLanguage == "hi")
+        else returnToXray()
+    }
+
+    /**
+     * A background watch: the capture records only this app for the chosen length while the person uses the phone as
+     * usual or locks it. Nothing is restarted, launched or tapped, and the consent watcher is not armed, so no consent
+     * screen is driven or recorded. The ongoing notification shows the time left and can stop the watch early; what was
+     * seen until then is kept. Locking the phone is expected here and is not a problem.
+     */
+    private suspend fun runWatch(
+        config: AuditConfig, auditId: String, manifest: AppManifestFacts?, facts: DeviceChecks.AppFacts?,
+    ): CapturedPlan {
+        val plannedMs = requireNotNull(config.watchMs)
+        val pkg = config.targetPackage
+        val label = config.targetLabel
+        val plan = config.plans.single()
+        val hindi = graph.settings.settings.value.guideLanguage == "hi"
+        fun step(s: String, start: Long = 0) {
+            _progress.value = AuditProgress.Running(config, 0, plan, s, start)
+        }
+        AuditTargets.beforePlan(label, installed = DeviceChecks.appFacts(context, pkg) != null,
+            captureRunning = CaptureBus.state.value is CaptureState.Running)?.let { throw IllegalStateException(it) }
+
+        val notes = mutableListOf(WatchCopy.startNote(label, (plannedMs / 60_000).toInt()))
+        val privateDnsAtStart = DeviceChecks.privateDnsActive(context)
+        val networkAtStart = DeviceChecks.networkOnline(context)
+        // Read only, never acted on: a watch does not stop the app.
+        val runningBefore = if (ShizukuBridge.hasPermission()) runCatching { ShizukuBridge.processRunning(pkg) }.getOrNull() else null
+        val trafficStart = AppTrafficReader.mark(facts?.uid)
+        val connectionSamples = mutableListOf<Int>()
+        var locked = false
+        var lastConnectionRead = 0L
+
+        WatchControl.reset()
+        val captureStart = planCapture.start()
+        val t0 = SystemClock.elapsedRealtimeNanos()
+        val epoch = System.currentTimeMillis()
+        var shown: String? = null
+        val outcome = WatchLoop(
+            clockNanos = SystemClock::elapsedRealtimeNanos,
+            pause = { delay(it) },
+            stopRequested = { WatchControl.stopRequested },
+            captureRunning = { CaptureBus.state.value is CaptureState.Running },
+            screen = {
+                // About once a minute, the app's open connections (a count only), for the plan's conditions.
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastConnectionRead >= 60_000) {
+                    lastConnectionRead = now
+                    withContext(Dispatchers.IO) { AppTrafficReader.connections(facts?.uid) }?.let { connectionSamples += it }
+                }
+                if (DeviceChecks.phoneLocked(context)) {
+                    locked = true
+                    ScreenSample.OFF
+                } else when (withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.packageOnScreen(pkg) }) {
+                    false -> ScreenSample.OFF
+                    true -> ScreenSample.ON
+                    null -> ScreenSample.UNKNOWN
+                }
+            },
+            onTick = { left ->
+                val line = WatchCopy.step(left)
+                if (line != shown) {
+                    shown = line
+                    step(line, t0)
+                    WatchNotifier.progress(context, label, left, hindi)
+                }
+            },
+        ).run(plannedMs)
+
+        val capturedBoundary = planCapture.finish("$auditId-WATCH", captureStart)
+        val snapshot = capturedBoundary.snapshot
+        val tEnd = snapshot.health.captureEndedNanos ?: SystemClock.elapsedRealtimeNanos()
+        val deep = CaptureBus.deepCapture || config.isWatch
+        val flows = if (deep) FlowPhases.assign(CaptureBus.flowSnapshot(), PhaseClock.from(emptyList())) else emptyList()
+        when (outcome.end) {
+            WatchLoop.End.STOPPED_BY_PERSON -> notes += WatchCopy.stoppedNote(outcome.watchedMs)
+            WatchLoop.End.CAPTURE_STOPPED -> notes += WatchCopy.captureStoppedNote(outcome.watchedMs)
+            WatchLoop.End.FINISHED -> Unit
+        }
+        if (DeviceChecks.phoneLocked(context)) locked = true
+        if (locked) notes += WatchCopy.LOCKED_NOTE
+        if (outcome.firstOffNanos == null) notes += WatchCopy.NEVER_OFF_SCREEN_NOTE
+        val onScreenNanos = outcome.onScreen.sumOf { it.toNanos - it.fromNanos }
+        if (onScreenNanos > 0) notes += WatchCopy.onScreenNote(label, onScreenNanos / 1_000_000)
+        val privateDnsAtEnd = DeviceChecks.privateDnsActive(context)
+        if (privateDnsAtEnd && !privateDnsAtStart) notes += "Private DNS was turned on during the watch; lookups after that may be hidden from TraceVeil."
+        if (privateDnsAtStart && !privateDnsAtEnd) notes += "Private DNS was turned off during the watch."
+        val conditions = PlanConditions(
+            startMode = com.dpdpxray.core.model.StartMode.NOT_RESTARTED, runningBeforeStart = runningBefore,
+            privateDnsAtStart = privateDnsAtStart, privateDnsAtEnd = privateDnsAtEnd,
+            otherVpnAtEnd = DeviceChecks.otherVpnActive(context),
+            networkAtStart = networkAtStart, networkAtEnd = DeviceChecks.networkOnline(context),
+            phoneLocked = locked,
+            appTraffic = AppTrafficReader.traffic(facts?.uid, trafficStart, connectionSamples.maxOrNull()),
+            systemApp = facts?.system,
+        )
+        val session = AuditSession(
+            id = "$auditId-WATCH",
+            targetPackage = pkg,
+            targetLabel = label,
+            plan = plan,
+            childFacing = config.childFacing,
+            startedAtNanos = t0,
+            endedAtNanos = tEnd,
+            startedAtEpochMs = epoch,
+            netEvents = snapshot.events,
+            deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}",
+            androidVersion = Build.VERSION.RELEASE,
+            privateDnsActive = privateDnsAtStart || privateDnsAtEnd,
+            notes = notes,
+            captureHealth = snapshot.health,
+            // The app kept its data: a watch never clears it.
+            freshState = false,
+            backgroundStartedNanos = outcome.firstOffNanos,
+            manifestFacts = manifest,
+            conditions = conditions,
+            flows = flows,
+            captureDepth = if (deep) "full-relay" else "dns-only",
+            watch = BackgroundWatch(
+                plannedMs = plannedMs, watchedMs = outcome.watchedMs,
+                stoppedEarly = outcome.end == WatchLoop.End.STOPPED_BY_PERSON, onScreen = outcome.onScreen,
+            ),
+        )
+        return CapturedPlan(session, capturedBoundary.reading)
     }
 
     private suspend fun runPlan(
@@ -478,7 +627,8 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
 
     private suspend fun startCapture(config: AuditConfig) {
         CaptureBus.reset()
-        runCatching { XrayVpnService.start(context, config.targetPackage, config.includeGms) }
+        // A watch always records connections as well as lookups (full relay), whatever the capture setting.
+        runCatching { XrayVpnService.start(context, config.targetPackage, config.includeGms, fullRelay = config.isWatch || CaptureBus.deepCapture) }
             .onFailure { throw IllegalStateException("Could not start capture: ${it.message}") }
         val state = withTimeoutOrNull(6_000) { CaptureBus.state.first { it is CaptureState.Running || it is CaptureState.Error } }
         if (state !is CaptureState.Running) {

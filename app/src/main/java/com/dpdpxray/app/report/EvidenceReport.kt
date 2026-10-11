@@ -20,9 +20,12 @@ internal object EvidenceReport {
             listOfNotNull(if (sample) null else AuditTimingPolicy.coverageHint(timingProfile)) +
             listOfNotNull(backgroundHint(sessions))
 
-    /** Only for plans that recorded a confirmed background moment; older audits and Fast Preview have none. */
+    /**
+     * Only for plans that recorded a confirmed background moment; older audits and Fast Preview have none. A background
+     * watch has its own coverage line (its timing profile) and is left out here.
+     */
     fun backgroundHint(sessions: List<AuditSession>): String? {
-        val plans = sessions.filter { it.backgroundStartedNanos != null }.map { it.plan.label }.distinct()
+        val plans = sessions.filter { it.backgroundStartedNanos != null && it.watch == null }.map { it.plan.label }.distinct()
         if (plans.isEmpty()) return null
         return "Background check: after the observation window the app was sent to the background and capture continued " +
             "(${plans.joinToString()}). Lookups in that window are marked in the network timeline."
