@@ -58,10 +58,13 @@ class WatchResultTest {
         assertEquals(Action.WATCH_LONGER, VisibilityDiagnosis.primaryAction(items))
         assertEquals(30, NoScoreHelp.watchMinutes(b))
         assertEquals(emptyList<Action>(), NoScoreHelp.otherActions(items, watch = true))
-        assertEquals("In 10 minutes of watching, RollCall made almost no connections. Why, and what to try next, is just below.",
-            headline(b.result.findings, b.sessions))
-        assertEquals("Too few lookups were captured to judge this app. Why, and what to try next, is just below.",
-            headline(bundle(QuietBackgroundAppReplay.quickCheck()).result.findings, listOf(QuietBackgroundAppReplay.quickCheck())))
+        val head = quietWatchHeadline(b.result.findings, b.sessions)!!
+        assertEquals("In 10 minutes of watching, RollCall made almost no connections. Why, and what to try next, is just below.", head.en)
+        assertTrue(head.hi, head.hi.contains("10 मिनट") && head.hi.contains("RollCall"))
+        val quick = bundle(QuietBackgroundAppReplay.quickCheck())
+        assertEquals(null, quietWatchHeadline(quick.result.findings, quick.sessions))
+        assertEquals(null, quietWatchHeadline(bundle(QuietBackgroundAppReplay.backgroundWatch()).result.findings, listOf(QuietBackgroundAppReplay.backgroundWatch())))
+        assertEquals("Too few lookups were captured to judge this app. Why, and what to try next, is just below.", headline(quick.result.findings))
     }
 
     @Test fun `the recent checks list names a watch, never as an untested Reject`() {

@@ -221,7 +221,8 @@ fun ResultsScreen(
                 ScoreHero(b, grade, lang, Modifier.reveal(0))
                 // A consent-history range has its own verdict line (never "Inconclusive"); everything else keeps the headline.
                 val head = r.historyBounds?.takeIf { r.score == null }?.let { ConsentHistoryCopy.headline(it).pick(lang) }
-                    ?: if (web) webHeadline(r.findings) else headline(r.findings, b.sessions)
+                    ?: quietWatchHeadline(r.findings, b.sessions)?.pick(lang)
+                    ?: if (web) webHeadline(r.findings) else headline(r.findings)
                 Text(head, style = MaterialTheme.typography.bodyLarge, color = Film.bone, modifier = Modifier.padding(top = 20.dp).reveal(1))
 
                 // Caveats that must stay in view, above anything the reader might act on. Only those that apply are shown.
@@ -477,16 +478,26 @@ internal fun webHeadline(findings: List<Finding>): String {
     }
 }
 
-internal fun headline(findings: List<Finding>, sessions: List<com.dpdpxray.core.model.AuditSession> = emptyList()): String {
+/**
+ * A background watch that saw almost nothing says what it observed, not a generic "too little was captured": the app
+ * itself made almost no connections in N minutes. null for every other result.
+ */
+internal fun quietWatchHeadline(findings: List<Finding>, sessions: List<com.dpdpxray.core.model.AuditSession>): Bi? {
+    val watch = com.dpdpxray.core.model.BackgroundWatches.of(sessions) ?: return null
+    if (findings.none { it.checkId == CheckId.V0 }) return null
+    val app = sessions.first().targetLabel
+    return Bi(
+        "In ${com.dpdpxray.core.model.BackgroundWatches.length(watch)} of watching, $app made almost no connections. Why, and what to try next, is just below.",
+        "${com.dpdpxray.core.model.BackgroundWatches.lengthHi(watch)} की निगरानी में $app ने लगभग कोई कनेक्शन नहीं बनाया। क्यों, और आगे क्या आज़माएँ, यह नीचे है।",
+    )
+}
+
+internal fun headline(findings: List<Finding>): String {
     val c1 = findings.firstOrNull { it.checkId == CheckId.C1 }
     val c2 = findings.firstOrNull { it.checkId == CheckId.C2 }
     val v0 = findings.any { it.checkId == CheckId.V0 }
     val answered = findings.firstOrNull { it.checkId == CheckId.U1 && it.declared }
-    val watch = com.dpdpxray.core.model.BackgroundWatches.of(sessions)
     return when {
-        // What a quiet watch observed, not a generic "too little": the app itself made almost no connections.
-        v0 && watch != null -> "In ${com.dpdpxray.core.model.BackgroundWatches.length(watch)} of watching, ${sessions.first().targetLabel} made " +
-            "almost no connections. Why, and what to try next, is just below."
         v0 -> "Too few lookups were captured to judge this app. Why, and what to try next, is just below."
         c1 != null && c1.declared ->
             "Based on your answer, hosts of ${c1.entities.size} tracker${if (c1.entities.size == 1) " was" else "s were"} looked up although you never agreed: ${c1.entities.joinToString()}."
