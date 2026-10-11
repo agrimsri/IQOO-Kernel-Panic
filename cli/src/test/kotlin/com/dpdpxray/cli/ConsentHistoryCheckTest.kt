@@ -119,5 +119,6 @@ class ConsentHistoryCheckTest {
         assertEquals("NEEDS_WORK", b["bestBand"]!!.jsonPrimitive.content)
         assertEquals("UNKNOWN", b["answer"]!!.jsonPrimitive.content)
         assertEquals("Consent history: unknown (not answered)", b["consentHistory"]!!.jsonPrimitive.content)
+        assertEquals("65–99 depending on consent history · 60–84 band either way", current["bandText"]!!.jsonPrimitive.content)
     }
 }

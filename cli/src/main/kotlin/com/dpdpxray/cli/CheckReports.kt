@@ -333,7 +333,8 @@ object CheckJson {
     private fun result(r: AuditResult) = buildJsonObject {
         put("score", r.score)
         put("band", r.band.name)
-        put("bandText", Wording.band(r.band, r.score, answered = r.historyBounds?.answer?.declared == true))
+        val bounds = r.historyBounds
+        put("bandText", if (r.score == null && bounds != null) Wording.range(bounds) else Wording.band(r.band, r.score, answered = bounds?.answer?.declared == true))
         put("checks", JsonArray(r.findings.map { JsonPrimitive(it.checkId.code) }))
         r.historyBounds?.let { b ->
             put("historyBounds", buildJsonObject {
