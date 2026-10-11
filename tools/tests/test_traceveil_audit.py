@@ -45,6 +45,8 @@ class FakePhone:
             return "package:com.dpdpxray.app\n" if self.installed else ""
         if command.startswith("am broadcast"):
             return self.broadcast
+        if command.startswith(("date", "appops")):
+            return ""
         if command == "echo ok" or command.startswith("cat "):
             self.reads += 1
             if self.reads in self.gone_at:

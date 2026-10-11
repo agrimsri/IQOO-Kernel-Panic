@@ -79,6 +79,7 @@ import com.dpdpxray.app.ui.screens.ReportsScreen
 import com.dpdpxray.app.ui.screens.ReportScreen
 import com.dpdpxray.app.ui.screens.ResultsScreen
 import com.dpdpxray.app.ui.screens.SettingsScreen
+import com.dpdpxray.app.ui.system.AccessPromptHost
 import com.dpdpxray.app.ui.shell.AppBottomBar
 import com.dpdpxray.app.ui.shell.AppTab
 import com.dpdpxray.app.ui.shell.AppTabs
@@ -133,7 +134,8 @@ class MainActivity : ComponentActivity() {
             val settings by vm.settings.collectAsState()
             val toast by vm.toast.collectAsState()
             LaunchedEffect(toast) {
-                toast?.let { Toast.makeText(this@MainActivity, it, Toast.LENGTH_LONG).show(); vm.toastShown() }
+                // A permission dialog already says it; the toast stays for everything else.
+                toast?.let { if (vm.access.value == null) Toast.makeText(this@MainActivity, it, Toast.LENGTH_LONG).show(); vm.toastShown() }
             }
             val guideNote by guideVoice.note.collectAsState()
             val guide = GuideState(
@@ -150,6 +152,7 @@ class MainActivity : ComponentActivity() {
             XrayTheme(stageMode = settings.stageMode, themeMode = settings.themeMode) {
                 CompositionLocalProvider(LocalGuide provides guide) {
                 val nav = rememberNavController()
+                AccessPromptHost(vm)
                 val entry by nav.currentBackStackEntryAsState()
                 val route = entry?.destination?.route
                 // The bar belongs to the five top-level screens only, and steps aside while the keyboard is open.
@@ -200,7 +203,7 @@ class MainActivity : ComponentActivity() {
                             OnboardingScreen(
                                 onDone = leaveOnboarding,
                                 onSample = { leaveOnboarding(); vm.openSample { nav.navigate("results/$it") } },
-                                onDemo = { leaveOnboarding(); if (vm.prepareAudit()) nav.navigate("pick?q=LeakyShop") },
+                                onDemo = { leaveOnboarding(); if (vm.prepareAudit { nav.navigate("pick?q=LeakyShop") }) nav.navigate("pick?q=LeakyShop") },
                                 onApk = apkCheck()?.let { open -> { leaveOnboarding(); open() } },
                                 // Mode choice: nothing pre-picked on first run; a replay shows the current mode.
                                 audience = settings.audience.takeIf { settings.onboardingDone },
@@ -267,7 +270,7 @@ class MainActivity : ComponentActivity() {
                                 onFixes = { nav.navigate("fixes/$id") },
                                 onReport = { nav.navigate("report/$id") },
                                 onAsk = { nav.navigate(AuditRoutes.voice(id)) },
-                                onCheckAgain = { if (vm.prepareAudit()) nav.navigate("pick") { popUpTo("home") } },
+                                onCheckAgain = { if (vm.prepareAudit { nav.navigate("pick") { popUpTo("home") } }) nav.navigate("pick") { popUpTo("home") } },
                             )
                         }
                         composable("finding/{id}/{check}") { e ->
