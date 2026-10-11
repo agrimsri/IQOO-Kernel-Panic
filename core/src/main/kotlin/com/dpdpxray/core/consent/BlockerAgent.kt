@@ -37,7 +37,8 @@ object BlockerAgent {
         data class Tap(val index: Int, val label: String, override val reason: String = "") : Step
         data class Type(val index: Int, val label: String, val kind: FieldKind, val value: String, override val reason: String = "") : Step
         data class Wait(override val reason: String = "") : Step
-        data class HandOff(override val reason: String) : Step
+        /** [vetoed] is true when the safety check refused what the model chose, false when the model itself gave up. */
+        data class HandOff(override val reason: String, val vetoed: Boolean = true) : Step
     }
 
     /** What the model is shown, and how its numbers map back to positions in [UiNode.flatten]. */
@@ -60,7 +61,18 @@ object BlockerAgent {
             positions += i
             lines += "${positions.size}. $text"
         }
+        // A date or number picker or a dropdown is one control: what is inside it is not listed on its own.
+        val insidePicker = mutableSetOf<Int>()
+        var pickerNote: String? = null
         nodes.forEachIndexed { i, n ->
+            if (isPicker(n) || n.className.endsWith("Spinner")) { val size = n.flatten().size; for (k in i + 1 until i + size) insidePicker += k }
+        }
+        nodes.forEachIndexed { i, n ->
+            if (i in insidePicker) return@forEachIndexed
+            if (isPicker(n)) {
+                pickerNote = "a date or number picker is open, showing: ${clip(n.flatten().mapNotNull { it.text?.takeIf { t -> t.isNotBlank() } }.joinToString(" "))}"
+                return@forEachIndexed
+            }
             val label = clip(n.label.ifBlank { descendantLabel(n) })
             when {
                 BlockerLexicon.isField(n) -> {
@@ -74,8 +86,21 @@ object BlockerAgent {
                 n.children.isEmpty() && !n.isClickable && n.text?.isNotBlank() == true -> add(i, "text \"${clip(n.text!!.trim())}\"")
             }
         }
+        pickerNote?.let { note ->
+            val ok = FormFill.pickerConfirmIndex(tree)?.let { positions.indexOf(it) }?.takeIf { it >= 0 }
+            lines += "Note: $note. " + (ok?.let { "Confirm it by tapping button ${it + 1}." } ?: "Confirm it with its OK button.")
+        }
+        // When there is nothing left to fill in, say so and name the way on: a small model otherwise keeps looking for fields.
+        val filled = lines.count { it.contains("text field") && it.endsWith("already filled") }
+        val empty = lines.count { it.contains("text field") && !it.endsWith("already filled") && !it.contains("password") }
+        val forward = FormFill.forwardIndex(tree)?.let { positions.indexOf(it) }?.takeIf { it >= 0 }
+        if (filled > 0 && empty == 0 && forward != null) {
+            lines += "Note: every text field is filled in. The way forward is to tap button ${forward + 1}."
+        }
         return Digest(lines.joinToString("\n"), positions)
     }
+
+    private fun isPicker(n: UiNode) = n.className.endsWith("DatePicker") || n.className.endsWith("TimePicker") || n.className.endsWith("NumberPicker")
 
     private fun descendantLabel(n: UiNode): String = n.children.firstNotNullOfOrNull { c ->
         c.label.ifBlank { descendantLabel(c) }.takeIf { it.isNotBlank() }
@@ -96,13 +121,14 @@ object BlockerAgent {
         - Prefer a button such as Skip, Not now, Maybe later, Continue as guest, Next, Continue, Get started, OK or Done.
         - For a plain profile form (name, date of birth, age, city) use "type", one field at a time, saying what kind of field it is
           with field_kind; the app supplies a harmless test value. Then tap the Continue button.
-        - A date-of-birth field is also "type" with field_kind "birth_date". If a date picker is open, tap its OK button.
+        - A date-of-birth field is also "type" with field_kind "birth_date". If a note says a picker is open, tap the OK button it names.
         - If a field asks for a phone number, email, password, code, address, ID or card number, or you need any real detail,
           answer "hand_off". Also answer "hand_off" if signing in or creating an account is the only way forward.
         - Never tap Sign in, Log in, Sign up, Register, Continue with Google/Facebook/Apple, Buy, Pay, Subscribe, Install or Delete.
         - Never tap Accept, Reject, Allow or Deny on a privacy choice: that is not your job.
+        - When every text field is already filled in, do not type again: tap the Continue or Next button.
         - If the screen is just loading, answer "wait". If you are unsure, answer "hand_off".
-        - "target" is the number in the list. It is required for tap and type.
+        - "target" is the number in the list. It is required for tap and type. A screenshot may be attached to help you read the screen.
     """.trimIndent()
 
     val JSON_SCHEMA = """
@@ -114,7 +140,11 @@ object BlockerAgent {
         },"required":["action","reason"]}
     """.trimIndent()
 
-    fun userMessage(digest: Digest, history: List<String>): String = buildString {
+    fun userMessage(digest: Digest, history: List<String>, screenshotAttached: Boolean = false): String = buildString {
+        if (screenshotAttached) {
+            append("A screenshot of this same screen is attached. Use it to understand icons, images and text the list misses, ")
+            append("but only ever choose a target from the numbered list.\n\n")
+        }
         append("On screen now:\n").append(digest.text.ifEmpty { "(nothing readable)" })
         if (history.isNotEmpty()) {
             append("\n\nSteps already taken on this screen (if it did not change, choose something different or hand_off):\n")
@@ -170,7 +200,7 @@ object BlockerAgent {
         val p = proposal(reply) ?: return Step.HandOff("The model's reply could not be read.")
         when (p.action) {
             "wait" -> return Step.Wait(p.reason)
-            "hand_off", "handoff", "hand off" -> return Step.HandOff(p.reason.ifEmpty { "The model could not find a safe way forward." })
+            "hand_off", "handoff", "hand off" -> return Step.HandOff(p.reason.ifEmpty { "The model could not find a safe way forward." }, vetoed = false)
         }
         val nodes = tree.flatten()
         val at = digest.position(p.target) ?: return Step.HandOff("The model chose something that is not on the screen.")
