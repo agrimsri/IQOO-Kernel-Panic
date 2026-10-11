@@ -11,6 +11,9 @@ object ApkGuardRoutes {
     const val APP = "apkguard/app/{pkg}"
     const val FILE = "apkguard/file/{key}"
 
+    /** A tapped "New APK downloaded" alert for a file TraceVeil cannot open itself: pick it from Downloads. */
+    const val DOWNLOADS = "apkguard/downloads"
+
     /** The existing audit app picker; TraceVeil has no per-package audit setup route. */
     const val AUDIT_PICKER = "pick"
 

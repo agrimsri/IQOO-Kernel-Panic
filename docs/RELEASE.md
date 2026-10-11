@@ -59,6 +59,10 @@ Any other value of the property stops the build with an error. When the flag is 
 
 Release APKs built before this switch (including `TraceVeil-1.1.0-release.apk` above) still contain the online voice, off unless `api.env` enables it.
 
+## Install anyway: on by default, removable for a store build
+
+APK Guard's "Install anyway" (`docs/CHECK_BEFORE_INSTALL.md`) needs `REQUEST_INSTALL_PACKAGES`, which Google Play reviews as a restricted permission. Gradle sets `BuildConfig.INSTALL_HANDOFF` from `-Ptraceveil.installHandoff` (default `true` for debug and release). With `-Ptraceveil.installHandoff=false` the permission is removed from the merged manifest (`app/src/noInstallHandoff/AndroidManifest.xml`), the result screen shows only "Don't install" plus how to continue with Android's installer, and the downloads and after-install alerts are unchanged. Any other value stops the build. To check a build, look for `REQUEST_INSTALL_PACKAGES` in `app/build/intermediates/merged_manifests/<variant>/.../AndroidManifest.xml`.
+
 **Look after the key.** Keep an offline backup of `traceveil-release.jks` and its properties file somewhere other than this laptop. Android only installs an update signed with the same key, so if the key is lost, existing users cannot update and must uninstall. If the app is later published on Google Play, Play App Signing would add Google's own app-signing key; the published certificate digest would then change and this page must be updated.
 
 ## The demo phone runs a debug build: switching to the release build

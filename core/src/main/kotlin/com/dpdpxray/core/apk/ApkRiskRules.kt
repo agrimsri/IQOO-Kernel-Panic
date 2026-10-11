@@ -460,18 +460,16 @@ object ApkRiskRules {
             bi("What the app actually does", "ऐप असल में क्या करता है"),
             bi("Not established. This check reads what the app asks for, not what it does. A permission is a capability, not proof of misuse.",
                 "पता नहीं। यह जाँच सिर्फ़ यह पढ़ती है कि ऐप क्या माँगता है, यह नहीं कि वह क्या करता है। अनुमति एक क्षमता है, ग़लत इस्तेमाल का सबूत नहीं।"),
-            if (f.isFile) bi("TraceVeil can audit an app only after it is installed, and it never installs apps itself.",
-                "TraceVeil किसी ऐप का ऑडिट उसके इंस्टॉल होने के बाद ही कर सकता है, और यह ख़ुद कभी ऐप इंस्टॉल नहीं करता।")
+            if (f.isFile) bi("A TraceVeil consent check can run only after the app is installed. TraceVeil installs a file only if you tap Install anyway and then confirm in Android's own installer.",
+                "TraceVeil की सहमति जाँच ऐप के इंस्टॉल होने के बाद ही चल सकती है। TraceVeil कोई फ़ाइल तभी इंस्टॉल करता है जब आप Install anyway दबाएँ और फिर Android के अपने इंस्टॉलर में पुष्टि करें।")
             else bi("Run a TraceVeil privacy audit to observe which internet hosts it looks up while you use it.",
                 "इस्तेमाल के दौरान यह किन इंटरनेट होस्ट को खोजता है, यह देखने के लिए TraceVeil प्राइवेसी ऑडिट चलाएँ।"),
         ))
 
         facts.installedTwin?.let { twin ->
             val label = twin.label
-            val mine = facts.certSha256.map { it.uppercase() }.toSet()
-            val theirs = twin.certSha256.map { it.uppercase() }.toSet()
-            add(when {
-                mine.isEmpty() || theirs.isEmpty() -> ApkSignal(
+            add(when (SignerCheck.relation(facts.certSha256, facts.certHistorySha256, twin)) {
+                InstallRelation.NEW_INSTALL, InstallRelation.SIGNER_UNKNOWN -> ApkSignal(
                     "same_package_installed", ApkSeverity.INFO, ApkEvidence.NOT_ESTABLISHED,
                     bi("Compared with your installed \"$label\"", "आपके इंस्टॉल \"$label\" से तुलना"),
                     bi("An app with the same package name is already installed, but a signing certificate could not be read on one side, so whether they share a signer is not established.",
@@ -479,7 +477,7 @@ object ApkRiskRules {
                     bi("Update the app from where you first installed it.", "ऐप को वहीं से अपडेट करें जहाँ से पहली बार इंस्टॉल किया था।"),
                     listOf("Package: ${facts.packageName}"),
                 )
-                mine == theirs -> ApkSignal(
+                InstallRelation.SAME_SIGNER -> ApkSignal(
                     "same_package_installed", ApkSeverity.INFO, ApkEvidence.OBSERVED,
                     bi("Same signer as your installed \"$label\"", "आपके इंस्टॉल \"$label\" जैसा ही सर्टिफ़िकेट"),
                     bi("An app with the same package name is already installed and signed with the same certificate. Installing this file would update it.",
@@ -488,7 +486,16 @@ object ApkRiskRules {
                         "एक जैसा सर्टिफ़िकेट सिर्फ़ एक ही साइनिंग चाबी दिखाता है, यह नहीं कि यह अपडेट भरोसेमंद है। अपडेट उसी स्टोर से लें जहाँ से इंस्टॉल किया था।"),
                     listOf("Package: ${facts.packageName}"),
                 )
-                else -> ApkSignal(
+                InstallRelation.ROTATED_SIGNER -> ApkSignal(
+                    "same_package_installed", ApkSeverity.INFO, ApkEvidence.OBSERVED,
+                    bi("Signed with a newer signing key of your installed \"$label\"", "आपके इंस्टॉल \"$label\" की नई साइनिंग चाबी से साइन"),
+                    bi("An app with the same package name is already installed. This file is signed with a newer key, and its signing history includes your installed app's key (key rotation), so Android treats it as an update.",
+                        "इसी पैकेज नाम का ऐप पहले से इंस्टॉल है। यह फ़ाइल नई चाबी से साइन है, और इसके साइनिंग इतिहास में आपके इंस्टॉल ऐप की चाबी है (की रोटेशन), इसलिए Android इसे अपडेट मानता है।"),
+                    bi("A signing history shows who holds the key, not that this update is trustworthy. Prefer updates from the store you installed it from.",
+                        "साइनिंग इतिहास सिर्फ़ यह दिखाता है कि चाबी किसके पास है, यह नहीं कि यह अपडेट भरोसेमंद है। अपडेट उसी स्टोर से लें जहाँ से इंस्टॉल किया था।"),
+                    listOf("Package: ${facts.packageName}"),
+                )
+                InstallRelation.DIFFERENT_SIGNER -> ApkSignal(
                     "same_package_installed", ApkSeverity.REVIEW_CAREFULLY, ApkEvidence.OBSERVED,
                     bi("Signed differently from your installed \"$label\"", "आपके इंस्टॉल \"$label\" से अलग सर्टिफ़िकेट"),
                     bi("An app with the same package name is already installed, but this file is signed with a different certificate, so it was not signed with the same key as your installed app. Android will not install it as an update.",

@@ -124,7 +124,7 @@ class ApkGuardMappingTest {
     @Test fun `alert text names the app, asks to check before opening and is never a verdict`() {
         val summary = ApkRiskRules.summary(emptyList())
         val alert = InstallAlertPolicy.alert("Fast Loan", summary)
-        assertEquals("New app installed: Fast Loan — check it before you open it", alert.title)
+        assertEquals("New app: Fast Loan · check it before you open it", alert.title)
         assertTrue(alert.text.contains("not a safety guarantee"))
         assertTrue(alert.hindi.contains("Fast Loan"))
         assertTrue(alert.spokenEn.startsWith("New app installed: Fast Loan."))
@@ -166,7 +166,7 @@ class ApkGuardMappingTest {
     }
 
     @Test fun `long or empty labels stay readable`() {
-        assertEquals("New app installed: com.x.app — check it before you open it", InstallAlertPolicy.alert(" ", ApkRiskRules.summary(emptyList()), "com.x.app").title)
+        assertEquals("New app: com.x.app · check it before you open it", InstallAlertPolicy.alert(" ", ApkRiskRules.summary(emptyList()), "com.x.app").title)
         assertTrue(InstallAlertPolicy.alert("A".repeat(200), ApkRiskRules.summary(emptyList())).title.length < 120)
     }
 

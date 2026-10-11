@@ -1,5 +1,6 @@
 package com.dpdpxray.app.controls
 
+import com.dpdpxray.app.autoguard.DownloadAlertCopy
 import com.dpdpxray.app.autoguard.UpdateWatchCopy
 import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.data.XraySettings
@@ -34,6 +35,7 @@ enum class ControlId(val group: ControlGroup) {
     NEW_APP_CHECK(ControlGroup.TRACEVEIL),
     UPDATE_ALERTS(ControlGroup.TRACEVEIL),
     SPEAK_ALERTS(ControlGroup.TRACEVEIL),
+    APK_DOWNLOADS(ControlGroup.TRACEVEIL),
     WEEKLY_CHECKUP(ControlGroup.TRACEVEIL),
     WAKE_WORD(ControlGroup.TRACEVEIL),
     AUTO_LOAD_AI(ControlGroup.TRACEVEIL),
@@ -176,6 +178,8 @@ object ControlsInventory {
             // Update alerts and spoken alerts ride on the new-app check's job and live receiver.
             add(switch(ControlId.UPDATE_ALERTS, s.alertCheckedAppUpdates, enabled = s.autoCheckNewApps))
             add(switch(ControlId.SPEAK_ALERTS, s.speakApkGuardAlerts, enabled = s.autoCheckNewApps))
+            // The downloads watcher has its own job, so it does not depend on the new-app check.
+            add(switch(ControlId.APK_DOWNLOADS, s.checkApkDownloads))
             add(switch(ControlId.WEEKLY_CHECKUP, s.weeklyCheckup))
             add(switch(ControlId.WAKE_WORD, s.heyTraceVeil, what = if (s.heyTraceVeil && r.wakeListening) ControlsText.wakeListening else ControlsText.what(ControlId.WAKE_WORD)))
             add(switch(ControlId.AUTO_LOAD_AI, s.autoLoadModel))
@@ -234,7 +238,7 @@ object ControlsInventory {
 
     /** Where a TraceVeil switch writes; null for Android's permissions and information rows. */
     fun storeOf(id: ControlId): SwitchStore? = when (id) {
-        ControlId.NEW_APP_CHECK, ControlId.UPDATE_ALERTS, ControlId.SPEAK_ALERTS, ControlId.WEEKLY_CHECKUP,
+        ControlId.NEW_APP_CHECK, ControlId.UPDATE_ALERTS, ControlId.SPEAK_ALERTS, ControlId.APK_DOWNLOADS, ControlId.WEEKLY_CHECKUP,
         ControlId.WAKE_WORD, ControlId.AUTO_LOAD_AI -> SwitchStore.SETTINGS
         ControlId.RUNNER -> SwitchStore.RUNNER
         ControlId.ONLINE_VOICE -> SwitchStore.ONLINE_VOICE
@@ -246,6 +250,7 @@ object ControlsInventory {
         ControlId.NEW_APP_CHECK -> s.copy(autoCheckNewApps = on)
         ControlId.UPDATE_ALERTS -> s.copy(alertCheckedAppUpdates = on)
         ControlId.SPEAK_ALERTS -> s.copy(speakApkGuardAlerts = on)
+        ControlId.APK_DOWNLOADS -> s.copy(checkApkDownloads = on)
         ControlId.WEEKLY_CHECKUP -> s.copy(weeklyCheckup = on)
         ControlId.WAKE_WORD -> s.copy(heyTraceVeil = on)
         ControlId.AUTO_LOAD_AI -> s.copy(autoLoadModel = on)
@@ -327,6 +332,7 @@ internal object ControlsText {
         ControlId.NEW_APP_CHECK to Names(Bi("Auto-guard new-app check", "ऑटो-गार्ड: नए ऐप की जाँच"), Bi("Check new apps automatically", "नए ऐप अपने-आप जाँचें")),
         ControlId.UPDATE_ALERTS to Names(UpdateWatchCopy.switchTitle),
         ControlId.SPEAK_ALERTS to Names(Bi("Speak APK Guard alerts", "APK Guard सूचनाएँ बोलकर सुनाएँ"), Bi("Read new-app alerts aloud", "नए ऐप की सूचना बोलकर सुनाएँ")),
+        ControlId.APK_DOWNLOADS to Names(DownloadAlertCopy.switchTitle),
         ControlId.WEEKLY_CHECKUP to Names(Bi("Weekly phone checkup", "साप्ताहिक फ़ोन जाँच")),
         ControlId.WAKE_WORD to Names(Bi("“Hey TraceVeil” wake word", "“Hey TraceVeil” वेक वर्ड"), Bi("Start with “Hey TraceVeil”", "“Hey TraceVeil” बोलकर शुरू करें")),
         ControlId.AUTO_LOAD_AI to Names(Bi("Load Gemma when a check starts", "जाँच शुरू होने पर Gemma लोड करें"), Bi("Load on-device AI for each check", "हर जाँच के लिए फ़ोन पर AI लोड करें")),
@@ -340,8 +346,8 @@ internal object ControlsText {
 
     private val whats = mapOf(
         ControlId.NOTIFICATIONS to Bi(
-            "Shows new-app, update and weekly checkup alerts.",
-            "नए ऐप, अपडेट और साप्ताहिक जाँच की सूचनाएँ दिखाता है।",
+            "Shows new-app, new-download, update and weekly checkup alerts.",
+            "नए ऐप, नई डाउनलोड, अपडेट और साप्ताहिक जाँच की सूचनाएँ दिखाता है।",
         ),
         ControlId.MICROPHONE to Bi(
             "Used only by the voice copilot and “Hey TraceVeil”, after you start them.",
@@ -362,6 +368,10 @@ internal object ControlsText {
         ControlId.SPEAK_ALERTS to Bi(
             "Reads new-app alerts aloud with an offline voice already on this phone.",
             "नए ऐप की सूचना फ़ोन में पहले से मौजूद ऑफ़लाइन आवाज़ से बोलकर सुनाता है।",
+        ),
+        ControlId.APK_DOWNLOADS to Bi(
+            "A notification when Android reports a new app file (APK) in Downloads, so you check it before installing.",
+            "जब Android Downloads में नई ऐप फ़ाइल (APK) बताता है, तो एक सूचना, ताकि आप इंस्टॉल करने से पहले उसकी जाँच करें।",
         ),
         ControlId.WEEKLY_CHECKUP to Bi(
             "Once a week, counts apps with powerful access and notifies you if any need review.",
@@ -437,7 +447,7 @@ internal object ControlsText {
     val signedHint = Bi("No switch: it runs only when you export.", "कोई स्विच नहीं: यह सिर्फ़ एक्सपोर्ट करने पर चलता है।")
 
     fun switchHint(id: ControlId, on: Boolean): Bi = when (id) {
-        ControlId.NEW_APP_CHECK, ControlId.WEEKLY_CHECKUP ->
+        ControlId.NEW_APP_CHECK, ControlId.WEEKLY_CHECKUP, ControlId.APK_DOWNLOADS ->
             if (on) Bi("Switching off cancels its background job at once.", "बंद करते ही इसका बैकग्राउंड काम तुरंत रद्द हो जाता है।")
             else Bi("Off: nothing runs in the background for this.", "बंद: इसके लिए बैकग्राउंड में कुछ नहीं चलता।")
         ControlId.WAKE_WORD ->

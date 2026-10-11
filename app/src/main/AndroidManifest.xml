@@ -14,6 +14,11 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Auto-guard: keeps the background new-app check and weekly checkup jobs scheduled after a restart. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- APK Guard "Install anyway": hands the exact APK file the person just checked to Android's installer through a
+         PackageInstaller session that always asks the person to confirm. Android also requires the person to allow
+         TraceVeil under "Install unknown apps"; TraceVeil never installs by itself. A build made with
+         -Ptraceveil.installHandoff=false removes this permission (src/noInstallHandoff/AndroidManifest.xml). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Needed to list installed apps that can be audited. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
@@ -46,10 +51,17 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- APK Guard: offered when the user opens or shares an .apk file (WhatsApp, Files).
-                 TraceVeil only reads the file to explain it; it never installs anything. -->
+            <!-- APK Guard "check before install": offered when the user opens or shares an .apk file (Chrome downloads,
+                 Files, WhatsApp). TraceVeil reads the file and explains it; it installs it only if the person taps
+                 "Install anyway" and then confirms in Android's own installer. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/vnd.android.package-archive" />
+            </intent-filter>
+            <!-- Some file managers still send the deprecated INSTALL_PACKAGE action when an APK is tapped. -->
+            <intent-filter>
+                <action android:name="android.intent.action.INSTALL_PACKAGE" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="content" android:mimeType="application/vnd.android.package-archive" />
             </intent-filter>
@@ -118,6 +130,17 @@
             android:name=".autoguard.PhoneCheckupJobService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+        <!-- Auto-guard downloads watcher: a content-URI job on MediaStore Downloads. It asks Android only for the
+             type of each new download and never reads files. -->
+        <service
+            android:name=".autoguard.DownloadsJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <!-- APK Guard "Install anyway": Android's installer reports the session result here, only through
+             TraceVeil's own PendingIntent (no intent filter). -->
+        <receiver
+            android:name=".apkguard.InstallResultReceiver"
+            android:exported="false" />
         <!-- Re-checks the Auto-guard jobs after a restart or an update of TraceVeil. It starts no microphone,
              VPN or audit. -->
         <receiver

@@ -40,6 +40,15 @@ class TrustTextTest {
     }
 
     @Test
+    fun `the install permission says Android asks every time`() {
+        val (title, purpose) = TrustText.purpose("android.permission.REQUEST_INSTALL_PACKAGES", own)!!
+        assertEquals("Install anyway (Android asks you)", title)
+        assertTrue(purpose, purpose.contains("Install anyway"))
+        assertTrue(purpose, purpose.contains("Android"))
+        assertTrue(purpose, purpose.contains("Install unknown apps"))
+    }
+
+    @Test
     fun `permissions the libraries add are described too`() {
         // Seen in the merged manifest of this build: AndroidX core and the Shizuku API add these.
         listOf("$own.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION", "moe.shizuku.manager.permission.API_V23").forEach {

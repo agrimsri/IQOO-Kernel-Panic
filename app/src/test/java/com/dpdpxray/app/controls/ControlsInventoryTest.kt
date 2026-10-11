@@ -63,7 +63,7 @@ class ControlsInventoryTest {
         assertEquals(
             listOf(
                 ControlId.NOTIFICATIONS, ControlId.MICROPHONE,
-                ControlId.NEW_APP_CHECK, ControlId.UPDATE_ALERTS, ControlId.SPEAK_ALERTS, ControlId.WEEKLY_CHECKUP,
+                ControlId.NEW_APP_CHECK, ControlId.UPDATE_ALERTS, ControlId.SPEAK_ALERTS, ControlId.APK_DOWNLOADS, ControlId.WEEKLY_CHECKUP,
                 ControlId.WAKE_WORD, ControlId.AUTO_LOAD_AI, ControlId.RUNNER, ControlId.SIGNED_EXPORTS, ControlId.SAVED_CHECKS,
             ),
             dev().map { it.id },
@@ -160,7 +160,7 @@ class ControlsInventoryTest {
         val defaults = dev()
         mapOf(
             ControlId.NEW_APP_CHECK to true, ControlId.UPDATE_ALERTS to true, ControlId.SPEAK_ALERTS to false,
-            ControlId.WEEKLY_CHECKUP to true, ControlId.WAKE_WORD to false, ControlId.AUTO_LOAD_AI to true, ControlId.RUNNER to false,
+            ControlId.APK_DOWNLOADS to true, ControlId.WEEKLY_CHECKUP to true, ControlId.WAKE_WORD to false, ControlId.AUTO_LOAD_AI to true, ControlId.RUNNER to false,
         ).forEach { (id, on) ->
             val c = defaults.of(id)
             assertEquals("$id", ControlAction.Toggle(on), c.action)
@@ -182,11 +182,25 @@ class ControlsInventoryTest {
         }
     }
 
+    @Test fun `the APK downloads check has its own job, so it stays switchable while the new-app check is off`() {
+        val list = dev(readings(settings = XraySettings(autoCheckNewApps = false, checkApkDownloads = true)))
+        val row = list.of(ControlId.APK_DOWNLOADS)
+        assertEquals(ControlState.ON, row.state)
+        assertEquals(ControlAction.Toggle(on = true, enabled = true), row.action)
+        assertEquals("Check new APK downloads", row.title.en)
+        assertTrue(row.what.en, row.what.en.contains("Downloads"))
+        assertTrue(row.hint.en, row.hint.en.contains("cancels its background job"))
+        val off = dev(readings(settings = XraySettings(checkApkDownloads = false))).of(ControlId.APK_DOWNLOADS)
+        assertEquals(ControlAction.Toggle(false), off.action)
+        assertEquals(false, ControlsInventory.settingsAfter(ControlId.APK_DOWNLOADS, false, XraySettings())!!.checkApkDownloads)
+    }
+
     @Test fun `each settings switch writes exactly its own stored key`() {
         val keys = mapOf(
             ControlId.NEW_APP_CHECK to "auto_check_new_apps",
             ControlId.UPDATE_ALERTS to "alert_checked_app_updates",
             ControlId.SPEAK_ALERTS to "speak_apk_guard_alerts",
+            ControlId.APK_DOWNLOADS to "check_apk_downloads",
             ControlId.WEEKLY_CHECKUP to "weekly_checkup",
             ControlId.WAKE_WORD to "hey_traceveil",
             ControlId.AUTO_LOAD_AI to "auto_load_model",
@@ -286,21 +300,21 @@ class ControlsInventoryTest {
 
     @Test fun `summary counts on and off over this list and the Setup sheet, keeps not-reported apart, ignores info and data`() {
         val s = ControlsInventory.summary(dev(readings(savedChecks = 4)), setup())
-        // On: notifications, new-app check, update alerts, weekly checkup, load AI.
+        // On: notifications, new-app check, update alerts, APK downloads check, weekly checkup, load AI.
         // Off: microphone (not granted), spoken alerts, wake word, runner; and from Setup: VPN, watcher, Shizuku.
-        assertEquals(5, s.on)
+        assertEquals(6, s.on)
         assertEquals(7, s.off)
         assertEquals(0, s.notReported)
-        assertEquals("5 on · 7 off", s.line.en)
-        assertEquals("5 चालू · 7 बंद", s.line.hi)
+        assertEquals("6 on · 7 off", s.line.en)
+        assertEquals("6 चालू · 7 बंद", s.line.hi)
 
         val unknown = ControlsInventory.summary(dev(readings(notificationsOn = null)), setup(preflight(otherVpn = true)))
         assertEquals(2, unknown.notReported)
-        assertEquals("4 on · 6 off · 2 not reported", unknown.line.en)
+        assertEquals("5 on · 6 off · 2 not reported", unknown.line.en)
         assertTrue(hasHindi(unknown.line))
 
         // Without the Setup sheet's items the count covers this list only.
-        assertEquals(ControlsSummary(5, 4, 0), ControlsInventory.summary(dev()))
+        assertEquals(ControlsSummary(6, 4, 0), ControlsInventory.summary(dev()))
     }
 
     @Test fun `state words are the chip text, in both languages`() {

@@ -34,6 +34,11 @@ data class XraySettings(
      */
     val alertCheckedAppUpdates: Boolean = true,
     /**
+     * Auto-guard: notify when Android reports a new APK file in Downloads, asking for a check before installing. On by
+     * default; it only asks Android for each new download's type and never opens, installs or deletes anything by itself.
+     */
+    val checkApkDownloads: Boolean = true,
+    /**
      * The legal lens (a core LegalProfile name such as "EU"). Empty means automatic: picked from the device region, else
      * the global baseline. It changes which law results quote, never the evidence or the consent-first score.
      */
@@ -74,6 +79,7 @@ internal object SettingsCodec {
         autoCheckNewApps = kv.getBoolean("auto_check_new_apps", defaults.autoCheckNewApps),
         weeklyCheckup = kv.getBoolean("weekly_checkup", defaults.weeklyCheckup),
         alertCheckedAppUpdates = kv.getBoolean("alert_checked_app_updates", defaults.alertCheckedAppUpdates),
+        checkApkDownloads = kv.getBoolean("check_apk_downloads", defaults.checkApkDownloads),
         legalProfile = kv.getString("legal_profile", defaults.legalProfile),
         themeMode = kv.getString("theme_mode", defaults.themeMode),
     )
@@ -92,6 +98,7 @@ internal object SettingsCodec {
         sink.putBoolean("auto_check_new_apps", s.autoCheckNewApps)
         sink.putBoolean("weekly_checkup", s.weeklyCheckup)
         sink.putBoolean("alert_checked_app_updates", s.alertCheckedAppUpdates)
+        sink.putBoolean("check_apk_downloads", s.checkApkDownloads)
         sink.putString("legal_profile", s.legalProfile)
         sink.putString("theme_mode", s.themeMode)
     }

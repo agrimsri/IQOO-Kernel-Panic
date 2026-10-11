@@ -49,7 +49,7 @@ object EverydayCopy {
         "देखें कि कोई ऐप आपके फ़ोन पर क्या-क्या कर सकता है, और आपके 'ना' कहने पर वह मानता है या नहीं।",
     )
     val onPhone = Bi("Checks run on this phone", "जाँच इसी फ़ोन पर होती है")
-    val readsOnly = Bi("Reads app files, never installs them", "ऐप फ़ाइल सिर्फ़ पढ़ता है, इंस्टॉल नहीं करता")
+    val readsOnly = Bi("Checks app files before you install them", "ऐप फ़ाइलों को इंस्टॉल करने से पहले जाँचता है")
 
     val file = Card(
         Bi("Check a file someone sent me", "किसी की भेजी फ़ाइल जाँचें"),

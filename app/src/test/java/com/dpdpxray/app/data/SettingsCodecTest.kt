@@ -56,6 +56,15 @@ class SettingsCodecTest {
         assertEquals(false, SettingsCodec.read(kv).alertCheckedAppUpdates)
     }
 
+    @Test fun `checking new APK downloads is on by default and switching it off is remembered`() {
+        assertEquals(true, SettingsCodec.read(MapKv()).checkApkDownloads)
+        assertEquals(true, SettingsCodec.read(MapKv(mutableMapOf("auto_check_new_apps" to false))).checkApkDownloads)
+        val kv = MapKv()
+        SettingsCodec.write(XraySettings(checkApkDownloads = false), kv)
+        assertEquals(false, kv.map["check_apk_downloads"])
+        assertEquals(false, SettingsCodec.read(kv).checkApkDownloads)
+    }
+
     @Test fun `guide fields round trip`() {
         val kv = MapKv()
         val next = XraySettings(onboardingDone = true, spokenGuidance = true, guideLanguage = "hi", stageMode = true)

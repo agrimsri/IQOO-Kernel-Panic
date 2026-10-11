@@ -50,11 +50,12 @@ fun AutoGuardSettingsCard(onCheckup: (() -> Unit)?, modifier: Modifier = Modifie
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { resumes++ }
     val lastNewAppCheck = remember(resumes, s.autoCheckNewApps) { AutoGuardStore(ctx).newAppsLastRunAt }
     val notificationsOn = remember(resumes) { ApkInstallWatcher.notificationsAllowed(ctx) }
-    val on = listOf(s.autoCheckNewApps, s.weeklyCheckup).count { it }
+    val on = listOf(s.autoCheckNewApps, s.weeklyCheckup, s.checkApkDownloads).count { it }
+    val lang = guideLang()
 
     SectionCard(
         modifier, title = "Auto-guard", glyph = Glyph.BELL,
-        trailing = { Tag(if (on == 0) "Off" else "$on of 2 on", if (on == 0) Film.boneDim else Film.clear) },
+        trailing = { Tag(if (on == 0) "Off" else "$on of 3 on", if (on == 0) Film.boneDim else Film.clear) },
     ) {
         SwitchRow(
             "Check new apps automatically, even when TraceVeil is closed",
@@ -75,7 +76,6 @@ fun AutoGuardSettingsCard(onCheckup: (() -> Unit)?, modifier: Modifier = Modifie
                 )
             }
             // Update Watch rides on the same job and live receiver, so it is offered only while that check is on.
-            val lang = guideLang()
             SwitchRow(
                 UpdateWatchCopy.switchTitle.pick(lang),
                 UpdateWatchCopy.switchDetail.pick(lang),
@@ -83,6 +83,14 @@ fun AutoGuardSettingsCard(onCheckup: (() -> Unit)?, modifier: Modifier = Modifie
                 { v -> store.update { it.copy(alertCheckedAppUpdates = v) } },
             )
         }
+        Hairline()
+        // Check before install: a notification when Android reports a new APK file in Downloads.
+        SwitchRow(
+            DownloadAlertCopy.switchTitle.pick(lang),
+            DownloadAlertCopy.switchDetail.pick(lang),
+            s.checkApkDownloads,
+            { v -> store.update { it.copy(checkApkDownloads = v) } },
+        )
         Hairline()
         SwitchRow(
             "Weekly phone checkup",
@@ -96,9 +104,9 @@ fun AutoGuardSettingsCard(onCheckup: (() -> Unit)?, modifier: Modifier = Modifie
             Note("Runs on this phone only. Nothing is sent anywhere.", Film.clear)
         }
         LearnMore(label = "If the checks pause") {
-            Note("If TraceVeil is force-stopped (by you or by the phone's battery manager), Android pauses both checks until you open TraceVeil again.")
+            Note("If TraceVeil is force-stopped (by you or by the phone's battery manager), Android pauses these checks until you open TraceVeil again.")
         }
-        if (!notificationsOn && (s.autoCheckNewApps || s.weeklyCheckup)) {
+        if (!notificationsOn && (s.autoCheckNewApps || s.weeklyCheckup || s.checkApkDownloads)) {
             Callout("Notifications are off for TraceVeil, so Auto-guard cannot show its alerts.", Modifier.padding(top = 4.dp, bottom = 8.dp))
         }
         if (onCheckup != null) SecondaryAction("Open my phone checkup", onCheckup, Modifier.fillMaxWidth().padding(top = 4.dp))
