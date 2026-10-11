@@ -70,7 +70,9 @@
             "unreadablePackets": 0,
             "domainsOverflow": 0,
             "destinationsOverflow": 0,
-            "uiEventsOverflow": 0
+            "uiEventsOverflow": 0,
+            "connections": [],
+            "connectionsRead": null
         },
         "summary": {
             "domainsAttempted": [
@@ -96,7 +98,13 @@
                 "DISPLAY_OVER_OTHER_APPS"
             ],
             "appCameToScreen": true,
-            "nothingObserved": false
+            "nothingObserved": false,
+            "connectionsAnswered": 0,
+            "serverNames": [],
+            "namesWithoutLookup": [],
+            "cleartextRequests": [],
+            "cleartextPersonalData": [],
+            "echConnections": 0
         },
         "timeline": [
             {
@@ -135,7 +143,9 @@
             "Only this app's own internet is cut off. SMS, phone calls, and requests it hands to other apps or system services (for example Android's download manager or push messaging) are neither blocked nor seen.",
             "After quarantine ends the app has its normal internet again and may then send what it could not send now.",
             "Apps that wait longer than this run, need a login, or wait for a remote command may show little or nothing.",
-            "Encrypted DNS inside the app (DNS over HTTPS) shows only as blocked connections to an address, not as names.",
+            "Encrypted DNS inside the app (DNS over HTTPS) shows as a connection to the resolver (its name read from the TLS hello), never as the names looked up through it.",
+            "To see which server a connection was for, TraceVeil answers the app's connections on the phone itself and closes them right after the first message; nothing is forwarded. HTTPS contents are never readable (no certificate is installed): only the server name in the TLS or QUIC hello, and for plain HTTP the request line and a few headers, with every value replaced by its kind. Request bodies are not read.",
+            "IPv6 connections, and connections to the DNS ports 53 and 853, are recorded only by address, port and protocol.",
             "Every lookup is answered \"does not exist\", so the app may give up early or try other addresses. Attempts are not proof that any data would have been sent.",
             "If the app was already open before the run, it may reuse addresses or connections from before.",
             "Packet counts include Android's automatic retries; they are not separate decisions by the app.",

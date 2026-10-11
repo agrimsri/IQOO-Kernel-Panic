@@ -1,5 +1,6 @@
 package com.dpdpxray.core.quarantine
 
+import com.dpdpxray.core.netcapture.FlowRecord
 import kotlinx.serialization.Serializable
 
 /** OBSERVED = seen on this phone. INFERRED = reasoned from what was seen. NOT_ESTABLISHED = this run cannot tell. */
@@ -99,6 +100,14 @@ data class QuarantineObservations(
     val destinationsOverflow: Long = 0,
     /** New dialog texts or settings screens after their lists were full. */
     val uiEventsOverflow: Long = 0,
+    /**
+     * Connections the app opened that TraceVeil answered on the phone (IPv4 TCP, and QUIC on UDP 443; see
+     * [QuarantineSinkhole]), each with what its first message said: the TLS or QUIC server name, or the redacted head of
+     * a plain-HTTP request. Nothing was forwarded. Their packets also appear in [blocked].
+     */
+    val connections: List<FlowRecord> = emptyList(),
+    /** true when this run recorded [connections]; null for reports from builds that did not (unknown, not "none"). */
+    val connectionsRead: Boolean? = null,
 )
 
 /**
