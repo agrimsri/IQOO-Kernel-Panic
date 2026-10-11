@@ -3,6 +3,7 @@ package com.dpdpxray.app.capture
 import com.dpdpxray.core.netcapture.UpstreamConnector
 import com.dpdpxray.core.netcapture.UpstreamTcp
 import com.dpdpxray.core.netcapture.UpstreamUdp
+import android.util.Log
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
@@ -22,7 +23,9 @@ class SocketConnector(
     override fun tcp(dstIp: String, port: Int): UpstreamTcp? {
         val s = Socket()
         return try {
-            if (!protectTcp(s)) { s.close(); return null }
+            // A plain Socket has no file descriptor until it is bound or connected, and protect() needs one.
+            s.bind(null)
+            if (!protectTcp(s)) { Log.w(TAG, "relay: protect(tcp) refused"); s.close(); return null }
             s.tcpNoDelay = true
             s.connect(InetSocketAddress(InetAddress.getByName(dstIp), port), CONNECT_TIMEOUT_MS)
             object : UpstreamTcp {
@@ -33,7 +36,8 @@ class SocketConnector(
                 override fun shutdownOutput() { runCatching { s.shutdownOutput() } }
                 override fun close() { runCatching { s.close() } }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "relay: tcp connect failed: ${e.javaClass.simpleName}") // class only, never the destination
             runCatching { s.close() }
             null
         }
@@ -61,6 +65,7 @@ class SocketConnector(
     }
 
     private companion object {
+        const val TAG = "TraceVeilCapture"
         const val CONNECT_TIMEOUT_MS = 8000
         const val UDP_IDLE_MS = 30_000
     }
