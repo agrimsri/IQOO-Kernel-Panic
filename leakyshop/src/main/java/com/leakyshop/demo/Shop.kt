@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import com.appsflyer.AppsFlyerLib
 import com.mixpanel.android.mpmetrics.MixpanelAPI
 import com.onesignal.OneSignal
+import io.branch.referral.Branch
 import kotlinx.coroutines.delay
 import java.net.InetAddress
 import java.util.Locale
@@ -60,6 +61,7 @@ import kotlin.concurrent.thread
  * behaviour flags in build.gradle.kts).
  * A few lookups go through demo stand-ins that borrow real SDK package names (com.appsflyer, com.mixpanel, com.onesignal,
  * io.sentry) so `traceveil sdks` can show "SDK found in APK" next to "tracker observed live"; the rest are plain app code.
+ * The io.branch stand-in resolves over DNS-over-HTTPS instead, to demonstrate traffic the DNS capture cannot see.
  */
 object SdkSimulator {
     const val FIREBASE_ANALYTICS = "app-measurement.com"
@@ -77,6 +79,22 @@ object SdkSimulator {
 
     /** Resolve each host on a background thread, like an SDK warming up its endpoint. No payload is ever sent. */
     fun touch(vararg hosts: String) = hosts.forEach { h -> thread { runCatching { InetAddress.getAllByName(h) } } }
+
+    /**
+     * Opens a TLS connection and completes the handshake, then closes it: the connection a real SDK makes before its
+     * first request. Used so the connection-level capture has a real, encrypted connection to a tracker to observe.
+     * No application data (no HTTP request, no identifier) is ever written.
+     */
+    fun handshake(vararg hosts: String) = hosts.forEach { h ->
+        thread {
+            runCatching {
+                (javax.net.ssl.SSLSocketFactory.getDefault().createSocket(h, 443) as javax.net.ssl.SSLSocket).use {
+                    it.soTimeout = 5000
+                    it.startHandshake()
+                }
+            }
+        }
+    }
 }
 
 object Consent {
@@ -96,6 +114,7 @@ class ShopApp : Application() {
             SdkSimulator.touch(SdkSimulator.FIREBASE_ANALYTICS, SdkSimulator.FACEBOOK, SdkSimulator.CRASHLYTICS, SdkSimulator.AMPLITUDE, SdkSimulator.CLARITY)
             AppsFlyerLib.start()
             MixpanelAPI.track()
+            Branch.init() // resolves over DNS-over-HTTPS: invisible to the DNS capture, caught by the socket sampler
         } else if (Consent.accepted(this)) {
             SdkSimulator.touch(SdkSimulator.FIREBASE_ANALYTICS, SdkSimulator.FACEBOOK)
             MixpanelAPI.track()
@@ -177,6 +196,7 @@ class ShopActivity : ComponentActivity() {
                         // The bug TraceVeil catches: refusal is stored but the SDKs keep running (fixed in 1.1).
                         if (BuildConfig.TRACKERS_AFTER_REJECT) {
                             SdkSimulator.touch(SdkSimulator.FACEBOOK, SdkSimulator.FIREBASE_ANALYTICS)
+                            SdkSimulator.handshake(SdkSimulator.FACEBOOK)
                             AppsFlyerLib.start()
                             MixpanelAPI.track()
                         }
