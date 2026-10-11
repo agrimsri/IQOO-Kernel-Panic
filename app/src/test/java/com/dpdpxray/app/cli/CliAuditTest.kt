@@ -21,6 +21,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.long
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -104,6 +105,19 @@ class CliAuditTest {
         assertEquals("ATTRIBUTION", t["category"]!!.jsonPrimitive.content)
         assertEquals(2, t["lookups"]!!.jsonPrimitive.int)
         assertEquals(listOf("AFTER_REJECT", "BEFORE_CONSENT"), t["phases"]!!.jsonArray.map { it.jsonPrimitive.content })
+    }
+
+    @Test fun `lookups are dated on the wall clock only when a clock anchor is given`() {
+        val catalog = TrackerCatalog(listOf(TrackerEntry("AppsFlyer", Category.ATTRIBUTION, listOf("appsflyer.com"))))
+        val b = bundle(21).let { b -> b.copy(sessions = b.sessions.map { it.copy(netEvents = listOf(NetEvent(9_000_000_000, "t.appsflyer.com"))) }) }
+        val plain = Json.parseToJsonElement(CliAuditReport.build("r1", b, catalog)).jsonObject["observedTrackers"]!!.jsonArray.single().jsonObject
+        assertFalse("lookupEvents" in plain)
+        // the anchor says elapsed 10 s == wall 100_000 ms, so a lookup at elapsed 9 s happened at wall 99_000 ms
+        val anchor = CliAuditReport.ClockAnchor(wallMs = 100_000, elapsedNanos = 10_000_000_000)
+        val dated = Json.parseToJsonElement(CliAuditReport.build("r1", b, catalog, anchor)).jsonObject["observedTrackers"]!!.jsonArray.single().jsonObject
+        val ev = dated["lookupEvents"]!!.jsonArray.single().jsonObject
+        assertEquals(99_000L, ev["atMs"]!!.jsonPrimitive.long)
+        assertEquals("AFTER_REJECT", ev["phase"]!!.jsonPrimitive.content)
     }
 
     @Test fun `unknown score stays null and is never turned into zero`() {

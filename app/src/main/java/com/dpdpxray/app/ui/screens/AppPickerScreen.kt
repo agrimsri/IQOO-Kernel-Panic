@@ -80,6 +80,8 @@ import com.dpdpxray.app.ui.guide.GradientAction
 import com.dpdpxray.app.ui.guide.GuideFlow
 import com.dpdpxray.app.ui.guide.SpeakStep
 import com.dpdpxray.app.ui.system.SearchField
+import com.dpdpxray.app.ui.system.ShizukuAccessNotice
+import com.dpdpxray.app.ui.system.ShizukuHelp
 import com.dpdpxray.app.ui.system.SegmentedControl
 import com.dpdpxray.app.ui.guide.GuideLang
 import com.dpdpxray.app.ui.guide.LinkAction
@@ -162,13 +164,24 @@ fun AppPickerScreen(
             val quarantine = { selected = null; onQuarantine(app.packageName) }
             val start: (AuditConfig) -> Unit = { config ->
                 selected = null
-                if (vm.startAudit(config)) onStarted()
+                if (vm.startAudit(config, onStarted)) onStarted()
+            }
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val help = ShizukuHelp(
+                running = pf.shizukuRunning,
+                onAllow = { vm.requestShizuku() },
+                onOpenShizuku = { com.dpdpxray.app.control.DeviceChecks.launch(ctx, "moe.shizuku.privileged.api") },
+            )
+            // Full check needs Shizuku's permission; while the sheet is open and it is missing, look again each second
+            // so Full becomes selectable the moment the person allows it.
+            LaunchedEffect(app.packageName, pf.shizukuGranted) {
+                while (!pf.shizukuGranted) { kotlinx.coroutines.delay(1_000); vm.refreshPreflight() }
             }
             // Everyday mode: one Quick check that says No; Full and clearing data fold under Advanced.
             if (settings.audience == Audience.USER) {
-                EverydayCheckSetup(app, controlledDemo = app.packageName in demoPackages, shizukuReady = pf.shizukuGranted, onQuarantine = quarantine, onStart = start)
+                EverydayCheckSetup(app, controlledDemo = app.packageName in demoPackages, shizukuReady = pf.shizukuGranted, shizukuHelp = help, onQuarantine = quarantine, onStart = start)
             } else {
-                AuditSetup(app, shizukuReady = pf.shizukuGranted, preferPreview = settings.fastDemo, onQuarantine = quarantine, onStart = start)
+                AuditSetup(app, shizukuReady = pf.shizukuGranted, shizukuHelp = help, preferPreview = settings.fastDemo, onQuarantine = quarantine, onStart = start)
             }
         }
     }
@@ -247,7 +260,7 @@ private fun leadAndRest(text: String): Pair<String, String?> {
 }
 
 @Composable
-private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, preferPreview: Boolean, onQuarantine: () -> Unit = {}, onStart: (AuditConfig) -> Unit) {
+private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, shizukuHelp: ShizukuHelp, preferPreview: Boolean, onQuarantine: () -> Unit = {}, onStart: (AuditConfig) -> Unit) {
     val controlledDemo = app.packageName == "com.leakyshop.demo" || app.packageName == "com.leakyshop.demo.fixed"
     val initial = remember { CheckSheet.defaults(Audience.DEVELOPER, controlledDemo, shizukuReady, preferPreview) }
     var allowReset by remember { mutableStateOf(initial.allowReset) }
@@ -270,9 +283,9 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, preferPreview: 
             PlanOption(
                 "Full audit · normal timing",
                 "Three fresh-state runs: Silent, Reject, Accept. Observes Silent for 25 seconds and each choice for 15 seconds; launch, consent and AI review add time.",
-                full, enabled = freshReset,
-            ) { full = true; preview = false }
-            if (!freshReset) Callout("Full audits need Shizuku and explicit approval to reset a test app between runs.")
+                full, enabled = shizukuReady,
+            ) { full = true; preview = false; allowReset = true }
+            if (!shizukuReady) ShizukuAccessNotice(shizukuHelp.running, shizukuHelp.onAllow, shizukuHelp.onOpenShizuku)
             PlanOption("Quick audit · normal timing", "One Accept-plan run with 15 seconds of observation. No Silent or Reject comparison.", !full && !preview, enabled = true) { full = false; preview = false }
             PlanOption("Fast Preview · limited evidence", "One Accept-plan run with 8 seconds of observation and a shorter consent-screen wait. Delayed traffic may be missed; not a Full audit.", preview, enabled = true) { full = false; preview = true }
             // The caveat's first sentence stays in view; the rest folds behind More.

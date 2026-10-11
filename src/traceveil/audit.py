@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, adb, laws
+from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, access, adb, laws
 from .colors import PLAIN, Style
 from .netenv import OWN_PACKAGE
 
@@ -136,6 +136,8 @@ def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) ->
         lines.append(f"  {f.get('check', '?'):<4} {style.severity(sev, 8)} {f.get('title', '')}{tag}")
         if f.get("entities"):
             lines.append(f"       {style.dim('trackers:')} {_names(f['entities'], style)}")
+    if rep.get("dataAccess") is not None:
+        lines += access.lines(rep["dataAccess"], style)
     if rep.get("lenses"):
         lines += laws.table(rep["lenses"], style)
     for r in reasons:
@@ -217,6 +219,9 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
     if rep is None:
         return _fail(io, problem, EXIT_INCONCLUSIVE)
 
+    data_access = access.collect(dev, rep["target"].get("package") or package, rep)
+    if data_access is not None:
+        rep["dataAccess"] = data_access
     try:
         rep["lenses"] = laws.assess_all(rep, lenses or cfg["audit"]["lenses"], policy or cfg["audit"]["policy"])
     except ValueError as e:

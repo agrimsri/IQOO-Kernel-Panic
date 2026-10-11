@@ -2,7 +2,9 @@ package com.dpdpxray.app.cli
 
 import com.dpdpxray.app.data.AuditBundle
 import com.dpdpxray.core.audit.PhaseAssigner
+import com.dpdpxray.core.model.Category
 import com.dpdpxray.core.model.ConsentKind
+import com.dpdpxray.core.model.Phase
 import com.dpdpxray.core.trackers.TrackerCatalog
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -23,8 +25,14 @@ object CliAuditReport {
 
     private fun strings(items: Iterable<String>): JsonElement = JsonArray(items.map { JsonPrimitive(it) })
 
-    /** [catalog] adds `observedTrackers` (every catalogue entity looked up, by consent phase); omitted when null. */
-    fun build(requestId: String, bundle: AuditBundle, catalog: TrackerCatalog? = null): String {
+    /** One moment read on both clocks, so a lookup's monotonic time (`tNanos`) can be dated on the phone's wall clock. */
+    data class ClockAnchor(val wallMs: Long, val elapsedNanos: Long) {
+        fun wallMsOf(tNanos: Long): Long = wallMs - (elapsedNanos - tNanos) / 1_000_000
+    }
+
+    /** [catalog] adds `observedTrackers` (every catalogue entity looked up, by consent phase); omitted when null.
+     *  [anchor] also dates each lookup (`lookupEvents`) so the CLI can line them up with Android's data-access log. */
+    fun build(requestId: String, bundle: AuditBundle, catalog: TrackerCatalog? = null, anchor: ClockAnchor? = null): String {
         val first = bundle.sessions.firstOrNull()
         val obj = buildJsonObject {
             put("schemaVersion", SCHEMA_VERSION)
@@ -57,28 +65,33 @@ object CliAuditReport {
                     put("notes", strings(s.notes))
                 }
             }))
-            if (catalog != null) put("observedTrackers", observedTrackers(bundle, catalog))
+            if (catalog != null) put("observedTrackers", observedTrackers(bundle, catalog, anchor))
         }
         return pretty.encodeToString(JsonObject.serializer(), obj)
     }
 
     /** Hostname lookups only: an entry says the app looked the tracker up, not what data was sent. */
-    private fun observedTrackers(bundle: AuditBundle, catalog: TrackerCatalog): JsonArray {
+    private fun observedTrackers(bundle: AuditBundle, catalog: TrackerCatalog, anchor: ClockAnchor?): JsonArray {
         val hits = bundle.sessions.flatMap { s ->
             PhaseAssigner.assign(s.netEvents, s.consentEvents).mapNotNull { e ->
                 val info = catalog.classify(e.hostname, e.cnameChain)
-                info.entity?.let { Triple(it, info.category, e.phase) }
+                info.entity?.let { Hit(it, info.category, e.phase, e.tNanos) }
             }
         }
-        return JsonArray(hits.groupBy { it.first }.toSortedMap().map { (entity, rows) ->
+        return JsonArray(hits.groupBy { it.entity }.toSortedMap().map { (entity, rows) ->
             buildJsonObject {
                 put("entity", entity)
-                put("category", rows.first().second.name)
+                put("category", rows.first().category.name)
                 put("lookups", rows.size)
-                put("phases", strings(rows.map { it.third.name }.distinct().sorted()))
+                put("phases", strings(rows.map { it.phase.name }.distinct().sorted()))
+                if (anchor != null) put("lookupEvents", JsonArray(rows.sortedBy { it.tNanos }.map {
+                    buildJsonObject { put("atMs", anchor.wallMsOf(it.tNanos)); put("phase", it.phase.name) }
+                }))
             }
         })
     }
+
+    private data class Hit(val entity: String, val category: Category, val phase: Phase, val tNanos: Long)
 
     fun status(requestId: String, state: String, step: String? = null, auditId: String? = null, error: String? = null, now: Long = System.currentTimeMillis()): String =
         pretty.encodeToString(JsonObject.serializer(), buildJsonObject {
