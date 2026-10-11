@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.VpnService
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,8 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -43,16 +40,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.dpdpxray.app.ui.components.ChipFlow
-import com.dpdpxray.app.ui.components.IconBadge
 import com.dpdpxray.app.ui.components.chevronTurn
 import com.dpdpxray.app.ui.components.foldSpec
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.guide.GuideLang
 import com.dpdpxray.app.ui.guide.LinkAction
-import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
-import com.dpdpxray.app.ui.theme.FilmExtra
 import com.dpdpxray.app.ui.theme.Radii
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -61,7 +55,7 @@ import kotlinx.coroutines.withContext
 private data class HomeTrustLive(val facts: List<TrustFact>, val permissions: PermissionSummary)
 
 /**
- * "Why you can trust TraceVeil" on both Home screens: a brand-edged card with four short, code-checked facts (HomeTrust)
+ * "Why you can trust TraceVeil" on Home (both modes): a flat card with four short, code-checked facts (HomeTrust)
  * and a live line of TraceVeil's own permissions ("2 of 4 permissions on · see why") that opens the trust screen. Folded,
  * the facts are small chips; open, each says what it means. Open on the card's first view, folded after that.
  */
@@ -79,10 +73,8 @@ fun HomeTrustCard(lang: GuideLang, onOpen: () -> Unit, modifier: Modifier = Modi
     // No fact is shown before this install has been read, so an exception (online voice, backup) is never hidden.
     val current = live
 
-    Column(
-        modifier.fillMaxWidth().clip(shape).background(FilmExtra.card).background(TrustWash)
-            .border(1.dp, TrustEdge, shape).animateContentSize(foldSpec()),
-    ) {
+    // Same flat surface as every other group: no border, no wash; status colour stays on the small check marks.
+    Column(modifier.fillMaxWidth().clip(shape).background(Film.raised).animateContentSize(foldSpec())) {
         val turn = chevronTurn(open)
         Row(
             Modifier.fillMaxWidth().heightIn(min = 56.dp)
@@ -91,8 +83,8 @@ fun HomeTrustCard(lang: GuideLang, onOpen: () -> Unit, modifier: Modifier = Modi
                 .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconBadge(Glyph.LOCK, Film.clear, size = 40.dp)
-            Spacer(Modifier.width(12.dp))
+            GlyphIcon(Glyph.LOCK, Film.boneDim, size = 24.dp)
+            Spacer(Modifier.width(14.dp))
             Text(
                 HomeTrust.title.pick(lang), style = MaterialTheme.typography.titleMedium, color = Film.bone,
                 modifier = Modifier.weight(1f).semantics { heading() },
@@ -108,7 +100,7 @@ fun HomeTrustCard(lang: GuideLang, onOpen: () -> Unit, modifier: Modifier = Modi
                 ChipFlow { current.facts.forEach { FactChip(it, lang) } }
             } else {
                 current.facts.forEach { FactRow(it, lang) }
-                LinkAction(HomeTrust.open.pick(lang), onOpen, glyph = Glyph.LOCK, color = Film.clear)
+                LinkAction(HomeTrust.open.pick(lang), onOpen, glyph = Glyph.LOCK)
             }
         }
     }
@@ -128,13 +120,12 @@ private fun FactRow(f: TrustFact, lang: GuideLang) {
     }
 }
 
-/** A fact as a soft pill: a check for a fact that holds, a warning mark for an exception on this install. */
+/** A fact as a quiet pill: a check for a fact that holds, a warning mark for an exception on this install. */
 @Composable
 private fun FactChip(f: TrustFact, lang: GuideLang) {
     val color = if (f.holds) Film.clear else Film.warn
     Row(
-        Modifier.clip(CircleShape).background(color.copy(alpha = 0.10f)).border(1.dp, color.copy(alpha = 0.35f), CircleShape)
-            .padding(start = 8.dp, end = 12.dp, top = 5.dp, bottom = 5.dp),
+        Modifier.clip(CircleShape).background(Film.fill).padding(start = 8.dp, end = 12.dp, top = 5.dp, bottom = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) { GlyphIcon(if (f.holds) Glyph.CHECK else Glyph.WARN, color, size = 16.dp) }
@@ -142,10 +133,6 @@ private fun FactChip(f: TrustFact, lang: GuideLang) {
         Text(f.short.pick(lang), style = MaterialTheme.typography.labelMedium, color = Film.bone)
     }
 }
-
-/** A brand hairline: peach to coral to rose, fading into the clear-green of the trust accent. */
-private val TrustEdge = Brush.horizontalGradient(listOf(Brand.peach.copy(alpha = 0.7f), Brand.rose.copy(alpha = 0.45f), Film.clear.copy(alpha = 0.35f)))
-private val TrustWash = Brush.linearGradient(listOf(Film.clear.copy(alpha = 0.08f), Color.Transparent, Color.Transparent))
 
 /** Reads the facts' inputs and the permission states. Read-only: it never asks for anything or changes a setting. */
 private fun readLive(ctx: Context): HomeTrustLive {

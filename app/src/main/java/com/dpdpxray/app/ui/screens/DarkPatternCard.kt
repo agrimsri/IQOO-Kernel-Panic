@@ -20,7 +20,6 @@ import com.dpdpxray.app.ui.components.KeyCaveat
 import com.dpdpxray.app.ui.components.Note
 import com.dpdpxray.app.ui.components.Tag
 import com.dpdpxray.app.ui.guide.Glyph
-import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.core.darkpattern.DarkPatternScanner
 import com.dpdpxray.core.darkpattern.DarkPatternSignal
@@ -75,7 +74,7 @@ private fun DarkPatternRow(s: DarkPatternSignal) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(DarkPatternText.rowTitle(s), style = MaterialTheme.typography.titleSmall, color = Film.bone, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(8.dp))
-            Tag(DarkPatternText.chip(s), if (s.evidenceType == EvidenceType.OBSERVED) Film.scan else Brand.rose)
+            Tag(DarkPatternText.chip(s), if (s.evidenceType == EvidenceType.OBSERVED) Film.scan else Film.boneDim)
         }
         Text(DarkPatternText.resembles(s), style = MaterialTheme.typography.bodySmall, color = Film.boneDim)
         s.evidence.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium, color = Film.bone) }

@@ -62,7 +62,7 @@ internal fun BackupRestoreCard(vm: XrayViewModel, modifier: Modifier = Modifier)
             { open.launch(arrayOf(AuditBackups.MIME, "application/octet-stream", "text/plain")) },
             Modifier.fillMaxWidth(), enabled = !working,
         )
-        KeyCaveat(CheckBackups.PRIVACY_LINE, Modifier.padding(top = 8.dp), color = Film.clear)
+        KeyCaveat(CheckBackups.PRIVACY_LINE, Modifier.padding(top = 8.dp), color = Film.boneDim)
         when (val s = state) {
             BackupUi.Idle -> Unit
             is BackupUi.Working -> Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
