@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, access, adb, laws
+from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, access, adb, fixes, laws, netwatch
 from .colors import PLAIN, Style
 from .netenv import OWN_PACKAGE
 
@@ -22,6 +22,7 @@ RECEIVER = f"{OWN_PACKAGE}/.cli.DebugAuditReceiver"
 REMOTE_REPORTS = f"/sdcard/Android/data/{OWN_PACKAGE}/files/reports"
 SCHEMA_VERSION = 1
 SEVERITY_ORDER = ["info", "low", "medium", "high", "critical"]
+NET_SAMPLE_S = 1.0  # socket sampling interval while an audit runs
 REQUIRED_KEYS = ("schemaVersion", "requestId", "auditId", "target", "score", "band", "findings", "sessions")
 
 
@@ -140,24 +141,59 @@ def diagnosis_lines(rep: dict, style: Style = PLAIN) -> list[str]:
     return lines
 
 
+def network_lines(net: dict, style: Style = PLAIN) -> list[str]:
+    """Connection-level capture: risk, findings, traffic per consent phase, and the connections seen."""
+    if net.get("depth") != "full-relay":
+        return ["  Network (connections)  not captured: this audit ran DNS-only"]
+    lines = [f"  Network (connections)  risk {net.get('level', '?')}  "
+             f"{net.get('connectionCount', 0)} connections, {net.get('httpRequestCount', 0)} plain-HTTP requests read"]
+    for f in net.get("findings", []):
+        lines.append(f"    {style.severity(str(f.get('severity', '?')), 8)} {f.get('title', '')}: {f.get('destination', '')} "
+                     f"[{str(f.get('phase', '')).lower()}, confidence {str(f.get('confidence', '')).lower()}]")
+        for e in f.get("evidence", [])[:2]:
+            lines.append(f"       {style.dim(e)}")
+    for t in net.get("traffic", []):
+        lines.append(f"    {t.get('phase', '?'):<16} {t.get('connections', 0)} conn, {t.get('bytesUp', 0)} B up, {t.get('bytesDown', 0)} B down")
+    shown = net.get("connections", [])[:10]
+    for c in shown:
+        reqs = c.get("http") or []
+        tail = f"  {len(reqs)} HTTP request(s): " + "; ".join(f"{r.get('method')} {r.get('host')}{r.get('target')}" for r in reqs[:2]) if reqs else ""
+        lines.append(f"      {c.get('protocol', '?'):<4} {(c.get('host') or c.get('ip', '')):<34} :{c.get('port')} {c.get('tls', ''):<10} "
+                     f"{c.get('phase', '').lower():<14} {c.get('bytesUp', 0)}/{c.get('bytesDown', 0)} B{tail}")
+    if len(net.get("connections", [])) > len(shown):
+        lines.append(f"      ... {len(net['connections']) - len(shown)} more in the saved JSON")
+    for lim in net.get("limitations", [])[:3]:
+        lines.append(f"    {style.dim('limit: ' + lim)}")
+    return lines
+
+
 def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) -> str:
     t = rep["target"]
     lines = [f"Traceveil audit  {style.bold(t.get('label', '?'))} ({t.get('package', '?')})  "
              f"score {style.score(rep['score'], rep['band'])} / {style.band(rep['band'])}  findings {len(rep['findings'])}"]
+    plan = {i["check"]: i for i in rep.get("fixPlan", {}).get("issues", [])}
     for f in rep["findings"]:
         sev = str(f.get("severity", "?"))
         tag = style.dim(" inferred") if str(f.get("evidenceType", "")).upper() == "INFERRED" else ""
         lines.append(f"  {f.get('check', '?'):<4} {style.severity(sev, 8)} {f.get('title', '')}{tag}")
         if f.get("entities"):
             lines.append(f"       {style.dim('trackers:')} {_names(f['entities'], style)}")
+        if f.get("check") in plan:
+            lines += fixes.summary_lines({**rep["fixPlan"], "issues": [plan[f["check"]]]}, style, compact=True)
     lines += diagnosis_lines(rep, style)
+    if rep.get("network") is not None:
+        lines += network_lines(rep["network"], style)
     if rep.get("dataAccess") is not None:
         lines += access.lines(rep["dataAccess"], style)
     if rep.get("lenses"):
         lines += laws.table(rep["lenses"], style)
+    if rep.get("socketWatch"):
+        lines += netwatch.summary_lines(rep["socketWatch"], style)
     for r in reasons:
         lines.append(f"  {style.warn('policy:')} {r}")
     lines.append(f"  report saved: {saved}")
+    if rep.get("fixPlan", {}).get("fixes"):
+        lines.append(style.dim("  fixes are in the report's fixPlan (give the JSON to a coding agent); --format md prints them as Markdown"))
     return "\n".join(lines)
 
 
@@ -186,8 +222,9 @@ def _wait_for_device(dev, io: Io, deadline: list[float], request_id: str) -> boo
 
 
 def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_drive: bool, reset: bool, wait_s: float,
-              resume: str | None, as_json: bool, out_file: str | None, request_id: str | None = None,
-              fail_on_override: str | None = None, lenses=None, policy: str | None = None) -> int:
+              resume: str | None, as_json: bool, out_file: str | None, request_id: str | None = None, as_md: bool = False,
+              fail_on_override: str | None = None, lenses=None, policy: str | None = None,
+              watch_network: bool | None = None, fail_on_hidden: bool = False) -> int:
     request_id = resume or request_id or new_request_id()
     package = package or cfg["target"]["package"]
     if not resume and not package:
@@ -203,9 +240,20 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
     except adb.AdbDisconnected as e:
         return _fail(io, f"device disconnected before the audit started ({e}); reconnect and run again", EXIT_DEVICE)
 
+    sampler = None
+    if not resume and (cfg["audit"].get("watch_network", True) if watch_network is None else watch_network):
+        try:
+            uid = netwatch.uid_of(dev, package)
+            sampler = netwatch.Sampler(dev, uid, io.clock) if uid is not None else None
+        except adb.AdbError:
+            sampler = None
+    poll_s = min(io.poll_s, NET_SAMPLE_S) if sampler else io.poll_s
+
     deadline = [io.clock() + wait_s]
     last_step = ""
     while True:
+        if sampler:
+            sampler.sample()  # first, so even an audit that is already done gets one sample
         try:
             raw = dev.shell_checked(f"cat {shlex.quote(_remote(request_id, 'status.json'))}")
             state = _json_or_none(raw)
@@ -222,7 +270,7 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
         if io.clock() >= deadline[0]:
             return _fail(io, f"timed out after {wait_s:.0f}s (last step: {last_step or 'unknown'}). The audit was not cancelled; "
                              f"fetch it later with: traceveil audit --resume {request_id}", EXIT_TIMEOUT)
-        io.sleep(io.poll_s)
+        io.sleep(poll_s)
 
     try:
         text = dev.shell_checked(f"cat {shlex.quote(_remote(request_id, 'report.json'))}")
@@ -238,17 +286,31 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
     if data_access is not None:
         rep["dataAccess"] = data_access
     try:
-        rep["lenses"] = laws.assess_all(rep, lenses or cfg["audit"]["lenses"], policy or cfg["audit"]["policy"])
+        policy = policy or cfg["audit"]["policy"]
+        rep["lenses"] = laws.assess_all(rep, lenses or cfg["audit"]["lenses"], policy)
+        rep["fixPlan"] = fixes.build(rep, laws.assess_all(rep, "all", policy))  # every country, whatever lenses are shown
     except ValueError as e:
         return _fail(io, str(e), EXIT_USAGE)
+    if sampler:
+        try:
+            vpn = netwatch.declares_vpn_service(dev.shell_checked(f"dumpsys package {shlex.quote(package)}"))
+        except adb.AdbError:
+            vpn = None
+        rep["socketWatch"] = netwatch.analyze(sampler.seen, rep, sampler.as_dict(poll_s), vpn)
     out_dir = Path(cfg["output"]["dir"])
     out_dir.mkdir(parents=True, exist_ok=True)
     saved = out_dir / f"{request_id}.json"
     saved.write_text(json.dumps(rep, indent=2), encoding="utf-8")
-    if out_file:
+    if out_file:  # a .md path gets the fix plan as Markdown; anything else the JSON report, fixPlan included
         Path(out_file).parent.mkdir(parents=True, exist_ok=True)
-        Path(out_file).write_text(json.dumps(rep, indent=2), encoding="utf-8")
+        Path(out_file).write_text(fixes.markdown(rep["fixPlan"]) if out_file.endswith(".md") else json.dumps(rep, indent=2),
+                                  encoding="utf-8")
     code, reasons = exit_for_report(laws.policy_view(rep["lenses"]), fail_on_override or cfg["audit"]["fail_on"],
                                     int(cfg["audit"]["min_score"]))
-    print(json.dumps(rep, indent=2) if as_json else summary(rep, reasons, saved, Style(io.color_out)), file=io.out)
+    if fail_on_hidden and rep.get("socketWatch") and netwatch.hidden(rep["socketWatch"]):
+        reasons.append("the app made connections the DNS capture could not see (--fail-on-hidden)")
+        code = code if code != EXIT_PASS else EXIT_FINDINGS
+    text = (json.dumps(rep, indent=2) if as_json else fixes.markdown(rep["fixPlan"]) if as_md
+            else summary(rep, reasons, saved, Style(io.color_out)))
+    print(text, file=io.out)
     return code

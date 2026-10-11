@@ -7,10 +7,10 @@ import com.dpdpxray.core.model.Severity
 import com.dpdpxray.core.rules.ScoreCalculator
 
 /**
- * Every assignment of the checks that carry points: each of the 13 scored checks (CheckVariants.scored) is absent or in
+ * Every assignment of the checks that carry points: each of the 14 scored checks (CheckVariants.scored) is absent or in
  * one of the variants the engine can give it. An assignment is a mixed-radix number: digit k is 0 when check k is absent,
  * otherwise 1 + the index of its variant. 2^3 (C1, NC, C2) x 3^7 (C3-C9: absent, observed, inferred) x 2^2 (C10, C13)
- * x 3 (C14: absent, Info, Low) = 209,952 assignments.
+ * x 3 (C14: absent, Info, Low) x 3 (C16: absent, observed, inferred) = 629,856 assignments.
  *
  * The space is a superset of what the engine can reach (it also contains pairs the engine never emits together, such as
  * NC with C2), so an invariant proved on all of it holds on every real audit.

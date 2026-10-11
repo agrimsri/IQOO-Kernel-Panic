@@ -38,4 +38,4 @@ version = { attr = "traceveil.__version__" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-traceveil = ["data/*.json", "data/law/*.json"]
+traceveil = ["data/*.json", "data/law/*.json", "data/fixes/*.json", "data/trackers/*.json"]

@@ -17,20 +17,20 @@ import org.junit.Test
  * Exhaustive verification over every combination of the real checks, each in every severity and evidence label the rules
  * engine can give it (CheckVariants), with the production ScoreCalculator.
  *
- * The full space has 209,952 assignments of the 13 checks that carry points (ScoreSpace) times 192 combinations of the 7
+ * The full space has 629,856 assignments of the 14 checks that carry points (ScoreSpace) times 192 combinations of the 7
  * checks that never carry points: V0 (absent/present) x U1 (absent / no trackers / with trackers) x 2^5 notes (S1, C11,
- * C12, C15, V1) = 40,310,784 finding sets.
+ * C12, C15, V1) = 120,932,352 finding sets.
  *
- * 1. Each of the 209,952 scored assignments: score, band, the gate and an independent integer oracle.
+ * 1. Each of the 629,856 scored assignments: score, band, the gate and an independent integer oracle.
  * 2. Every edge of the lattice (add one finding, or confirm an inferred one / raise C14 from Info to Low): score and band
  *    never improve. Monotonicity along edges gives it for every superset by transitivity.
  * 3. The zero-weight checks. ScoreCalculator reads a finding set only through three per-finding folds (any V0 or U1 with
  *    trackers; the sum of weight x multiplier; any observed High or Critical), and a zero-weight check adds 0 to the sum and
  *    is never serious. So it is enough, and fast, to check each scored assignment with each of the 8 zero-weight variants
  *    alone, with all of them together (with and without V0 / U1 with trackers) and with one seeded random combination of
- *    the 192: 13 sets per assignment, 2,729,376 in all. Inconclusive ones must give no score; the others exactly the scored
- *    assignment's result. Set TRACEVEIL_SCORE_FULL=1 to evaluate all 40,310,784 sets instead (14 to 80 s on the team
- *    laptop; it passed twice on 10 October 2026).
+ *    the 192: 13 sets per assignment, 8,188,128 in all. Inconclusive ones must give no score; the others exactly the scored
+ *    assignment's result. Set TRACEVEIL_SCORE_FULL=1 to evaluate all 120,932,352 sets instead (the 40,310,784-set space
+ *    before C16 took 14 to 80 s on the team laptop and passed twice on 10 October 2026; expect about three times that).
  *
  * The counts and the band distribution are written to core/build/reports/score-science/exhaustive.{json,md}.
  */
@@ -60,7 +60,7 @@ class ScoreExhaustiveTest {
     @Test
     fun `every scored assignment - bounds, oracle, band rule and gate`() {
         val n = space.size
-        assertEquals(209_952, n)
+        assertEquals(629_856, n)
         for (i in 0 until n) {
             val s = t.score[i]
             assertTrue("#$i", s in 0..100)
@@ -154,7 +154,7 @@ class ScoreExhaustiveTest {
                 sets++
             }
         }
-        assertEquals(if (full) 40_310_784L else 2_729_376L, sets)
+        assertEquals(if (full) 120_932_352L else 8_188_128L, sets)
         report["zeroWeightMode"] = if (full) "full product (all 192 combinations per assignment)" else "factored (13 combinations per assignment)"
         report["zeroWeightSetsEvaluated"] = sets
         report["zeroWeightSeconds"] = "%.1f".format(java.util.Locale.ROOT, (System.nanoTime() - start) / 1e9)
@@ -236,7 +236,7 @@ class ScoreExhaustiveTest {
         // The gate only matters when exactly one observed High is the sole finding that carries points: 100 - 15 = 85.
         val gateCases = (0 until n).filter { t.score[it] >= 85 && t.serious[it] }
         assertTrue(gateCases.all { t.score[it] == 85 })
-        assertEquals(8, gateMoved)  // 4 checks can be an observed High (C1, NC, C3, C4) x C14 absent or Info
+        assertEquals(10, gateMoved)  // 5 checks can be an observed High (C1, NC, C3, C4, C16) x C14 absent or Info
         val names = listOf("AT_RISK", "NEEDS_WORK", "READY")
         report["scoredAssignments"] = n
         report["bands"] = names.indices.associate { names[it] to mapOf("count" to count[it], "minScore" to min[it], "maxScore" to max[it]) }
@@ -269,7 +269,7 @@ class ScoreExhaustiveTest {
                 buildString {
                     appendLine("# Exhaustive score verification")
                     appendLine()
-                    appendLine("Scored assignments (13 checks, every engine variant): ${report["scoredAssignments"]}")
+                    appendLine("Scored assignments (14 checks, every engine variant): ${report["scoredAssignments"]}")
                     appendLine("Full space with the 192 zero-weight combinations: ${report["fullSpace"]}")
                     appendLine()
                     appendLine("| Band | Assignments | Min score | Max score |")

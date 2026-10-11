@@ -1,5 +1,6 @@
 package com.dpdpxray.app.quarantine
 
+import com.dpdpxray.core.netcapture.FlowProtocol
 import com.dpdpxray.core.quarantine.AddressScope
 import com.dpdpxray.core.quarantine.AttemptProtocol
 import com.dpdpxray.core.quarantine.PacketHeader
@@ -27,6 +28,23 @@ class QuarantineBusTest {
         assertEquals(listOf("panel.example"), o.domains.map { it.hostname })
         assertEquals(listOf("203.0.113.9"), o.blocked.map { it.address })
         assertNull(QuarantineBus.close(run))
+    }
+
+    @Test
+    fun `each run has its own connection tracker and its answered connections are saved with it`() {
+        val old = QuarantineBus.open("com.traceveil.riskdemo", "Risk Demo")
+        val oldTracker = QuarantineBus.flowTracker(old)!!
+        QuarantineBus.close(old)
+        val run = QuarantineBus.open("com.traceveil.riskdemo", "Risk Demo")
+        assertNull("a finished run has no tracker", QuarantineBus.flowTracker(old))
+        oldTracker.open(FlowProtocol.TCP, "203.0.113.1", 443, 1) // a late connection of the old run changes nothing
+        val tracker = QuarantineBus.flowTracker(run)!!
+        tracker.open(FlowProtocol.TCP, "203.0.113.9", 443, 2)
+        QuarantineBus.publish()
+        assertEquals(listOf("203.0.113.9"), QuarantineBus.live.value.connections.map { it.dstIp })
+        val o = QuarantineBus.close(run)!!
+        assertEquals(listOf("203.0.113.9"), o.connections.map { it.dstIp })
+        assertEquals(true, o.connectionsRead)
     }
 
     @Test

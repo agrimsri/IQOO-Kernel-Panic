@@ -50,6 +50,30 @@ class QuarantineRoutesTextTest {
     }
 
     @Test
+    fun `answered connections are counted in the headline and described without values`() {
+        val r = QuarantineRecorder(QuarantineNet.RESOLVERS)
+        r.recordDns(1, "panel.example", 1, QuarantineNet.RESOLVER_V4)
+        val target = com.dpdpxray.core.netcapture.Redaction.target("/c?email=asha@example.in")
+        val http = com.dpdpxray.core.netcapture.HttpExchange(5, "GET", "c.example.in", target.text, sensitive = target.found)
+        val flows = listOf(
+            com.dpdpxray.core.netcapture.FlowRecord(1, com.dpdpxray.core.netcapture.FlowProtocol.TCP, "203.0.113.9", 443, 2, sni = "sdk.example.com", tls = com.dpdpxray.core.netcapture.TlsStatus.SNI_ONLY, alpn = listOf("h2")),
+            com.dpdpxray.core.netcapture.FlowRecord(2, com.dpdpxray.core.netcapture.FlowProtocol.TCP, "203.0.113.10", 80, 3, sni = "c.example.in", tls = com.dpdpxray.core.netcapture.TlsStatus.CLEARTEXT, http = listOf(http)),
+        )
+        val text = QuarantineText.headline(report(r.snapshot().copy(connections = flows, connectionsRead = true)))
+        assertEquals(
+            "In 60.0 s, Risk Demo tried to look up 1 name and opened 2 connections that TraceVeil answered on the phone. " +
+                "Nothing it tried could leave through its own connections.",
+            text,
+        )
+        assertEquals("TLS", QuarantineText.connectionLabel(flows[0]))
+        assertEquals("203.0.113.9:443 · name read from the TLS hello · h2 · catalogued as Demo (analytics)", QuarantineText.connectionNote(flows[0], "Demo (analytics)"))
+        assertEquals("HTTP", QuarantineText.connectionLabel(flows[1]))
+        val note = QuarantineText.connectionNote(flows[1], null)
+        assertEquals("203.0.113.10:80 · plain HTTP: GET /c?email=[email] · personal-data fields: email (email address)", note)
+        assertFalse(note.contains("asha"))
+    }
+
+    @Test
     fun `settings screens are stated without claiming who opened them`() {
         val r = QuarantineRecorder(QuarantineNet.RESOLVERS)
         r.recordSettingsScreen(1, com.dpdpxray.core.quarantine.SensitiveSettings.ACCESSIBILITY, "Accessibility")
@@ -63,7 +87,8 @@ class QuarantineRoutesTextTest {
     @Test
     fun `wording never gives a verdict on the app`() {
         val all = (QuarantineText.STEPS + QuarantineText.EXPLAINER + QuarantineText.ONLY_INTERNET + QuarantineText.NOT_A_VERDICT +
-            QuarantineText.bypassExplanation(listOf("203.0.113.9")) + QuarantineReports.LIMITS).joinToString(" ").lowercase()
+            QuarantineText.bypassExplanation(listOf("203.0.113.9")) + QuarantineText.namesWithoutLookupExplanation(listOf("x.example")) +
+            QuarantineText.cleartextExplanation(listOf("GET x.example/a")) + QuarantineReports.LIMITS).joinToString(" ").lowercase()
         for (word in listOf("malicious", "is safe", "fraud", "illegal", "malware detected", "virus")) assertFalse(word, word in all)
     }
 

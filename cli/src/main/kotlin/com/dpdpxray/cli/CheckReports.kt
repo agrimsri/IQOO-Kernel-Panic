@@ -7,6 +7,7 @@ import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.EvidenceType
 import com.dpdpxray.core.model.Finding
 import com.dpdpxray.core.model.ScoreBand
+import com.dpdpxray.core.netcapture.ConnectionSummary
 import com.dpdpxray.core.rules.ScoreCalculator
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -82,6 +83,26 @@ object Wording {
         else -> "no consent screen seen"
     }
 
+    /**
+     * The connection capture in one line, or null when the bundle's plans did not record their capture depth (older
+     * exports: unknown, so nothing is claimed).
+     */
+    fun network(n: ConnectionSummary?): String? {
+        if (n == null) return null
+        if (!n.captured) return "DNS only: connections were not captured"
+        val parts = mutableListOf(
+            "connection capture: ${n.connections} connections (${n.named} named from TLS, QUIC or HTTP; " +
+                "${n.cleartextRequests} plain-HTTP requests, ${n.personalDataRequests} with personal-data fields)",
+        )
+        if (n.namesWithoutLookup.isNotEmpty()) {
+            val shown = n.namesWithoutLookup.take(5).joinToString()
+            parts += "names without a lookup: $shown" + if (n.namesWithoutLookup.size > 5) " and ${n.namesWithoutLookup.size - 5} more" else ""
+        }
+        if (n.encryptedClientHello > 0) parts += "${n.encryptedClientHello} offered Encrypted Client Hello"
+        if (n.quicUnnamed > 0) parts += "${n.quicUnnamed} QUIC unnamed"
+        return parts.joinToString(" · ")
+    }
+
     fun fresh(c: List<PlanCoverage>): String {
         if (c.isEmpty()) return "NOT ESTABLISHED (no plans)"
         val byState = c.groupBy { it.fresh }
@@ -129,6 +150,7 @@ object CheckText {
         c.warnings.forEach { appendLine("Warning:  $it") }
         appendLine("Plans:    " + if (c.coverage.isEmpty()) "none" else c.coverage.joinToString(" | ") { "${it.plan.label}: ${Wording.choice(it)}" })
         appendLine("Fresh:    ${Wording.fresh(c.coverage)}")
+        Wording.network(ConnectionSummary.of(b.sessions))?.let { appendLine("Network:  $it") }
         if (c.resultChanged) {
             appendLine("Score:    ${Wording.score(c.current)} (re-evaluated with current rules)")
             appendLine("Stored:   ${Wording.score(c.stored)} (score saved on the phone; differs from today's rules)")
@@ -215,6 +237,7 @@ object CheckJson {
             }
         })
         put("findings", JsonArray(c.current.findings.map(::finding)))
+        ConnectionSummary.of(b.sessions)?.let { n -> put("network", network(n)) }
         put("rules", buildJsonArray {
             c.outcomes.forEach { o -> add(buildJsonObject { put("rule", o.rule); put("status", o.status.name); put("message", o.message) }) }
         })
@@ -222,6 +245,19 @@ object CheckJson {
         put("signature", c.signature?.toJson() ?: JsonNull)
         put("warnings", JsonArray(c.warnings.map(::JsonPrimitive)))
         put("passed", c.passed)
+    }
+
+    /** Counts and names only: never a request value (requests are stored redacted). */
+    private fun network(n: ConnectionSummary) = buildJsonObject {
+        put("depth", n.depth)
+        put("connections", n.connections)
+        put("named", n.named)
+        put("cleartextRequests", n.cleartextRequests)
+        put("personalDataRequests", n.personalDataRequests)
+        put("namesWithoutLookup", JsonArray(n.namesWithoutLookup.map(::JsonPrimitive)))
+        put("encryptedClientHello", n.encryptedClientHello)
+        put("quicUnnamed", n.quicUnnamed)
+        put("text", Wording.network(n))
     }
 
     private fun lens(c: BundleCheck) = buildJsonObject {

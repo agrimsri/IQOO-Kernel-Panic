@@ -1,5 +1,6 @@
 package com.dpdpxray.app.quarantine
 
+import com.dpdpxray.core.netcapture.FlowTracker
 import com.dpdpxray.core.quarantine.PacketHeader
 import com.dpdpxray.core.quarantine.QuarantineObservations
 import com.dpdpxray.core.quarantine.QuarantineRecorder
@@ -35,7 +36,15 @@ sealed interface QuarantineTunnel {
  * shutdown from an earlier run can never change a newer one. Pure Kotlin: no Android calls.
  */
 object QuarantineBus {
-    private class ActiveRun(val id: Long, val targetPackage: String, val targetLabel: String, val recorder: QuarantineRecorder)
+    private class ActiveRun(val id: Long, val targetPackage: String, val targetLabel: String, val recorder: QuarantineRecorder) {
+        /** Connections the tunnel answered on the phone (sinkhole relay); never forwarded. */
+        val flows = FlowTracker(maxFlows = MAX_CONNECTIONS)
+
+        fun observations() = recorder.snapshot().copy(connections = flows.snapshot(), connectionsRead = true)
+    }
+
+    /** At most this many answered connections per run; later ones are still blocked and counted as packets. */
+    const val MAX_CONNECTIONS = 500
 
     private val lock = Any()
     private var nextRunId = 1L
@@ -69,7 +78,7 @@ object QuarantineBus {
         val run = active?.takeIf { it.id == runId } ?: return@synchronized null
         active = null
         watchedPackage = null
-        val final = run.recorder.snapshot()
+        val final = run.observations()
         _live.value = final
         if (_tunnel.value.let { it is QuarantineTunnel.Starting || it is QuarantineTunnel.Running }) {
             _tunnel.value = QuarantineTunnel.Ended(runId, null)
@@ -101,6 +110,9 @@ object QuarantineBus {
         recorderFor(runId)?.recordPacket(tNanos, header)
     }
 
+    /** The connection tracker of [runId] while it is the active run, for the tunnel's sinkhole relay. */
+    fun flowTracker(runId: Long): FlowTracker? = synchronized(lock) { active?.takeIf { it.id == runId }?.flows }
+
     /** A permission-controller dialog's visible text while the current run is active. */
     fun permissionDialog(tNanos: Long, controllerPackage: String, text: String): Boolean {
         val run = synchronized(lock) { active } ?: return false
@@ -118,7 +130,7 @@ object QuarantineBus {
     /** Copies the current run's observations into [live]. */
     fun publish() {
         val run = synchronized(lock) { active } ?: return
-        _live.value = run.recorder.snapshot()
+        _live.value = run.observations()
     }
 
     private fun recorderFor(runId: Long): QuarantineRecorder? = synchronized(lock) { active?.takeIf { it.id == runId }?.recorder }

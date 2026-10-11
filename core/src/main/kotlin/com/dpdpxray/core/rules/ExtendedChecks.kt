@@ -16,6 +16,10 @@ import com.dpdpxray.core.model.NetEvent
 import com.dpdpxray.core.model.PenaltyBand
 import com.dpdpxray.core.model.Phase
 import com.dpdpxray.core.model.Severity
+import com.dpdpxray.core.netcapture.CleartextPersonalData
+import com.dpdpxray.core.netcapture.ConnectionFacts
+import com.dpdpxray.core.netcapture.FlowProtocol
+import com.dpdpxray.core.netcapture.TlsStatus
 import com.dpdpxray.core.quarantine.QuarantineUiRules
 import com.dpdpxray.core.screen.UiTreeLimits
 import com.dpdpxray.core.trackers.AppOwner
@@ -32,14 +36,15 @@ internal data class PlanEvidence(
 )
 
 /**
- * Checks added after C1–C10: C11–C15 and V1. Each rests only on evidence the phone records (DNS replies, the
+ * Checks added after C1–C10: C11–C16 and V1. Each rests only on evidence the phone records (DNS replies, the
  * background step, the installed manifest, Android's permission dialogs, the consent screen's accessibility tree,
- * capture health). When that evidence was not recorded a check stays silent; coverage tools report it as NOT
- * ESTABLISHED, never as passed.
+ * capture health, and in full-relay audits the connections). When that evidence was not recorded a check stays silent;
+ * coverage tools report it as NOT ESTABLISHED, never as passed.
  *
  * Scoring rule: one DNS lookup is scored at most once (by C1 or C2), so the lookup-based additions C11 and C12 are INFO.
  * C13 and C14 add facts no other check counts and are LOW. C15 has no clear DPDP basis and V1 qualifies the evidence,
- * so both are INFO. No new check shows a penalty band.
+ * so both are INFO. C16 is HIGH: personal data sent without encryption is a security-safeguard problem no other check
+ * counts. No new check shows a penalty band.
  */
 internal class ExtendedChecks(
     private val catalog: TrackerCatalog,
@@ -54,6 +59,7 @@ internal class ExtendedChecks(
         permissionBeforeNotice(plans),
         noPolicyLink(plans),
         hiddenLookups(plans),
+        cleartextPersonalData(plans),
     )
 
     private fun preConsent(e: NetEvent) = e.phase == Phase.BEFORE_CONSENT || e.phase == Phase.NO_CONSENT_SEEN
@@ -268,6 +274,7 @@ internal class ExtendedChecks(
                     add("$plan: $it lookups were dropped because the event buffer was full" + (h.eventBufferCapacity?.let { c -> " ($c events)" } ?: "") + ".")
                 }
                 unreadableDns(h)?.takeIf { it > 0 }?.let { add("$plan: $it DNS packets could not be read as questions.") }
+                addAll(connectionLines(s))
             }.map { s.plan to it }
         }
         if (lines.isEmpty()) return null
@@ -276,12 +283,94 @@ internal class ExtendedChecks(
             explanation = "Capture health shows that some lookups were not visible to TraceVeil. Findings cover only the " +
                 "lookups that were captured; the hidden ones are unknown, not absent, so a check without a finding here is " +
                 "not a clean result for them. Turning Private DNS off and re-running reduces this. Lookups an app resolves " +
-                "itself over HTTPS (DNS over HTTPS) leave no trace in this capture at all and cannot be counted.",
+                "itself over HTTPS (DNS over HTTPS) leave no trace in this capture at all and cannot be counted." +
+                (if (plans.any { connectionLines(it.session).isNotEmpty() }) " With the connection capture, servers the app " +
+                    "reached without a lookup TraceVeil saw are named from the connection itself (TLS or QUIC hello, HTTP Host) " +
+                    "where it says them." else ""),
             evidence = lines.map { it.second }.distinct().take(RulesEngine.MAX_EVIDENCE),
             plans = lines.map { it.first }.distinct(),
             dpdpRefs = emptyList(),
             penaltyBand = PenaltyBand.NONE,
         )
+    }
+
+    /**
+     * Full-relay audits: names the connections themselves stated (TLS or QUIC hello, HTTP Host) to addresses no DNS
+     * answer TraceVeil saw had given, and that no lookup asked for; Encrypted Client Hello and unnamed QUIC connections.
+     */
+    private fun connectionLines(s: AuditSession): List<String> {
+        if (s.captureDepth != ConnectionFacts.FULL_RELAY || s.flows.isEmpty()) return emptyList()
+        val plan = s.plan.label
+        val unseen = ConnectionFacts.namesWithoutLookup(s)
+        val ech = s.flows.count { it.tls == TlsStatus.ECH_HIDDEN }
+        val quic = s.flows.count { it.protocol == FlowProtocol.QUIC && it.sni == null }
+        return buildList {
+            if (unseen.isNotEmpty()) {
+                val names = unseen.take(MAX_NAMES).joinToString() + if (unseen.size > MAX_NAMES) " and ${unseen.size - MAX_NAMES} more" else ""
+                add(
+                    "$plan: the app connected to $names (names read from the connection itself: TLS or QUIC hello, or HTTP Host) " +
+                        "with no lookup TraceVeil saw for them; it resolved them another way (its own DNS, for example DNS over " +
+                        "HTTPS) or used cached or built-in addresses.",
+                )
+            }
+            if (ech > 0) add("$plan: $ech connections offered Encrypted Client Hello, so the server name read from them may be the provider's public name, not the real one.")
+            if (quic > 0) add("$plan: $quic QUIC (HTTP/3) connections could not be named (no readable version 1 Initial packet).")
+        }
+    }
+
+    // --- C16 -------------------------------------------------------------------------------------------------------
+
+    /** Plain-HTTP requests from the connection capture whose fields look like personal data (names and kinds only). */
+    private fun cleartextPersonalData(plans: List<PlanEvidence>): Finding? {
+        data class Hit(val p: PlanEvidence, val host: String, val method: String, val target: String, val t: Long, val fields: List<com.dpdpxray.core.netcapture.PersonalHit>)
+        val hits = plans.flatMap { p ->
+            p.session.flows.filter { it.tls == TlsStatus.CLEARTEXT }.flatMap { f ->
+                f.http.mapNotNull { h ->
+                    CleartextPersonalData.scan(h).takeIf { it.isNotEmpty() }?.let { Hit(p, (h.host ?: f.dstIp).lowercase(), h.method, h.target, h.tNanos, it) }
+                }
+            }
+        }
+        if (hits.isEmpty()) return null
+        val shaped = hits.any { hit -> hit.fields.any { it.valueShape } }
+        val hosts = hits.map { it.host }.distinct()
+        val kinds = hits.flatMap { it.fields }.map { it.kind.label }.distinct()
+        return Finding(
+            checkId = CheckId.C16, severity = Severity.HIGH,
+            evidenceType = if (shaped) EvidenceType.OBSERVED else EvidenceType.INFERRED,
+            title = CheckId.C16.title,
+            explanation = "The app sent requests over plain HTTP, without encryption, to ${hosts.joinToString()}, and their address " +
+                "or headers carried fields that look like personal data (${kinds.joinToString()}). Anyone on the network path, " +
+                "for example on the same Wi-Fi, can read such a request. " +
+                (if (shaped) "At least one value itself had the shape of personal data (for example an e-mail address). "
+                else "Only field names matched (for example first_name), so that real personal data was in them is inferred. ") +
+                "TraceVeil kept only the field names and the kind of value, never the values, and did not read request bodies, " +
+                "so personal data sent in a body is not counted here. DPDP s.8(5) requires a Data Fiduciary to protect personal " +
+                "data with reasonable security safeguards to prevent a personal data breach, and the DPDP Rules 2025 name " +
+                "encryption among those safeguards; whether this request falls short of that is a question for a qualified " +
+                "reviewer, not a verdict. The same request is listed under Network behaviour as \"Sensitive value in an " +
+                "unencrypted request\".",
+            evidence = hits.map { h ->
+                val s = h.p.session
+                "${h.method} ${h.host}${h.target} — fields: ${CleartextPersonalData.describe(h.fields)} — " +
+                    "${secs(h.t - s.startedAtNanos)} s after launch, ${relationAt(s, h.t)} [${s.plan.label}]"
+            }.distinct().take(RulesEngine.MAX_EVIDENCE),
+            plans = hits.map { it.p.session.plan }.distinct(),
+            dpdpRefs = listOf("s8(5)"),
+            penaltyBand = PenaltyBand.NONE,
+            confidence = if (shaped) 1.0 else 0.6,
+            entities = hosts.mapNotNull { catalog.classify(it).entity }.distinct(),
+        )
+    }
+
+    /** How a moment relates to the plan's consent choice, for evidence that is not a DNS lookup. */
+    private fun relationAt(s: AuditSession, t: Long): String {
+        val choice = s.consentChoice
+        return when {
+            choice == null && !s.consentScreenSeen -> "no consent screen seen in this capture"
+            choice == null -> "the user had not chosen yet"
+            t < choice.tNanos -> "${secs(choice.tNanos - t)} s before the consent choice"
+            else -> "${secs(t - choice.tNanos)} s after the user chose ${choice.kind.name.lowercase()}"
+        }
     }
 
     /** Plain-DNS packets that could not be read; null when the build did not break unparsed packets down. */
@@ -315,6 +404,8 @@ internal class ExtendedChecks(
 
         /** A consent screen, a hand-marked consent moment or a recorded choice: the notice was on screen by then. */
         private val NOTICE_KINDS = SCREEN_KINDS + setOf(ConsentKind.ACCEPT, ConsentKind.REJECT)
+
+        private const val MAX_NAMES = 6
 
         private val NOTIFICATION_CUES = listOf("notification", "सूचनाएं भेजने", "सूचनाएँ भेजने", "नोटिफ़िकेशन", "नोटिफिकेशन", "ಅಧಿಸೂಚನೆ")
 

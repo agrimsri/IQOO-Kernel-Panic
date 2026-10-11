@@ -149,5 +149,13 @@
     "manifest": null, "code": null,
     "steps": ["Add a visible \"Privacy policy\" link or text to the consent screen, in each language the notice offers.", "Point it at the same policy you list in Play Console; Google Play requires a privacy policy link or text within the app."],
     "docUrl": "https://support.google.com/googleplay/android-developer/answer/10144311", "verified": true
+  },
+  {
+    "id": "net-https-only", "kind": "ui", "title": "Send personal data only over HTTPS",
+    "appliesTo": ["C16"],
+    "manifest": "<!-- AndroidManifest.xml -->\n<application\n    android:networkSecurityConfig=\"@xml/network_security_config\"\n    android:usesCleartextTraffic=\"false\">\n</application>\n\n<!-- res/xml/network_security_config.xml -->\n<network-security-config>\n    <base-config cleartextTrafficPermitted=\"false\" />\n</network-security-config>",
+    "code": null,
+    "steps": ["Change every http:// endpoint the app or its SDKs call to https://.", "Turn cleartext off for the whole app with the manifest flag or a network security config. Cleartext is already off by default for apps targeting Android 9 (API 28) or higher unless the app turns it back on; raw sockets are not covered by these settings.", "Keep personal data out of URLs and query strings even over HTTPS: send it in the request body, and only when the feature needs it."],
+    "docUrl": "https://developer.android.com/privacy-and-security/security-config", "verified": true
   }
 ]

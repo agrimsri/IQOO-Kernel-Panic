@@ -15,9 +15,13 @@ import com.dpdpxray.app.quarantine.QuarantineNet
 import com.dpdpxray.core.dns.DnsAnswers
 import com.dpdpxray.core.dns.DnsPacketCodec
 import com.dpdpxray.core.model.NetEvent
+import com.dpdpxray.core.netcapture.SinkholeConnector
+import com.dpdpxray.core.netcapture.TunRelay
+import kotlinx.coroutines.asExecutor
+import kotlinx.coroutines.delay
 import com.dpdpxray.core.quarantine.IpAddresses
-import com.dpdpxray.core.quarantine.IpHeaders
 import com.dpdpxray.core.quarantine.QuarantineStopReason
+import com.dpdpxray.core.quarantine.SinkholeTap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,6 +41,12 @@ class XrayVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
     private var scope: CoroutineScope? = null
 
+    /**
+     * The relay of the current tunnel: forwarding in a full-relay audit, a sinkhole (answers on the phone, forwards
+     * nothing) in quarantine; null in a DNS-only audit.
+     */
+    private var relay: TunRelay? = null
+
     /** The tunnel opened in quarantine mode, and its run; an audit START replaces [tun] and leaves this stale. */
     private var quarantineTun: ParcelFileDescriptor? = null
     private var quarantineRunId = -1L
@@ -46,7 +56,7 @@ class XrayVpnService : VpnService() {
             ACTION_START -> {
                 val pkg = intent.getStringExtra(EXTRA_TARGET) ?: return START_NOT_STICKY
                 startForegroundNotice(pkg)
-                startCapture(pkg, intent.getBooleanExtra(EXTRA_INCLUDE_GMS, false))
+                startCapture(pkg, intent.getBooleanExtra(EXTRA_INCLUDE_GMS, false), intent.getBooleanExtra(EXTRA_FULL_RELAY, false))
             }
             ACTION_STOP -> {
                 stopTunnel()
@@ -76,8 +86,10 @@ class XrayVpnService : VpnService() {
     /**
      * Quarantine mode: ALL traffic of [pkg] (IPv4 and IPv6) enters the tunnel and nothing is ever forwarded. DNS
      * questions are recorded and answered locally with NXDOMAIN; every other packet is recorded from its IP/transport
-     * headers (destination, port, protocol) and dropped. Only this one app loses its internet; closing the tunnel
-     * restores it.
+     * headers (destination, port, protocol). IPv4 TCP connections and QUIC datagrams are also answered on the phone by
+     * a sinkhole relay ([SinkholeConnector]), which reads only the first message (TLS or QUIC server name, redacted
+     * HTTP request head) and closes the connection; everything else is dropped. Only this one app loses its internet;
+     * closing the tunnel restores it.
      */
     private fun startQuarantine(pkg: String, runId: Long) {
         stopTunnel()
@@ -105,19 +117,32 @@ class XrayVpnService : VpnService() {
             return
         }
         val s = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val output = FileOutputStream(fd.fileDescriptor)
+        val sinkhole = QuarantineBus.flowTracker(runId)?.let { tracker ->
+            TunRelay(
+                toTun = { pkt -> synchronized(output) { runCatching { output.write(pkt) } } },
+                connector = SinkholeConnector(),
+                tracker = tracker,
+                clock = SystemClock::elapsedRealtimeNanos,
+                executor = Dispatchers.IO.asExecutor(),
+                maxTcpFlows = SINKHOLE_MAX_TCP,
+            )
+        }
         synchronized(this) {
             tun = fd
             scope = s
+            relay = sinkhole
             quarantineTun = fd
             quarantineRunId = runId
         }
         QuarantineBus.tunnelRunning(runId, pkg)
-        s.launch { quarantineLoop(fd, s, runId) }
+        if (sinkhole != null) s.launch { while (isActive) { delay(15_000); sinkhole.sweep(SINKHOLE_IDLE_NANOS) } }
+        s.launch { quarantineLoop(fd, s, runId, sinkhole, output) }
     }
 
-    private fun quarantineLoop(fd: ParcelFileDescriptor, s: CoroutineScope, runId: Long) {
+    private fun quarantineLoop(fd: ParcelFileDescriptor, s: CoroutineScope, runId: Long, sinkhole: TunRelay?, output: FileOutputStream) {
         val input = FileInputStream(fd.fileDescriptor)
-        val output = FileOutputStream(fd.fileDescriptor)
+        val tap = SinkholeTap(sinkhole, QuarantineNet.RESOLVERS) { t, header -> QuarantineBus.dropped(runId, t, header) }
         val buffer = ByteArray(32767)
         try {
             while (s.isActive) {
@@ -133,10 +158,12 @@ class XrayVpnService : VpnService() {
                 if (query != null) {
                     QuarantineBus.lookup(runId, t, query.hostname, query.queryType, IpAddresses.format(query.dstAddress))
                     // Answered here, never forwarded: the name "does not exist" for this app during the run.
-                    runCatching { output.write(DnsPacketCodec.buildResponse(query, DnsPacketCodec.nxDomain(query.dnsPayload))) }
+                    val answer = DnsPacketCodec.buildResponse(query, DnsPacketCodec.nxDomain(query.dnsPayload))
+                    synchronized(output) { runCatching { output.write(answer) } }
                 } else {
-                    // Dropped. Only the IP/transport headers are read, for destination, port and protocol.
-                    QuarantineBus.dropped(runId, t, IpHeaders.parse(buffer, n))
+                    // Recorded from its IP/transport headers; IPv4 connections are also answered on the phone (never
+                    // forwarded) so their first message names the server. Everything else is dropped.
+                    tap.onPacket(t, buffer, n)
                 }
             }
         } finally {
@@ -156,13 +183,15 @@ class XrayVpnService : VpnService() {
         return true
     }
 
-    private fun startCapture(pkg: String, includeGms: Boolean) {
+    private fun startCapture(pkg: String, includeGms: Boolean, fullRelay: Boolean) {
         stopTunnel()
         val builder = Builder()
             .setSession("TraceVeil · $pkg")
             .addAddress(VPN_ADDRESS, 32)
             .addDnsServer(DNS_ADDRESS)
-            .addRoute(DNS_ADDRESS, 32)
+            // DNS-only: just the fake resolver enters the tunnel. Full relay: all IPv4 of the audited app does, and is
+            // forwarded unchanged (IPv6 is not routed, so it keeps flowing directly and is not captured).
+            .apply { if (fullRelay) addRoute("0.0.0.0", 0) else addRoute(DNS_ADDRESS, 32) }
             .setMtu(MTU)
             .setBlocking(true)
         try {
@@ -181,17 +210,28 @@ class XrayVpnService : VpnService() {
         }
         val forwarder = DnsForwarder(this) { protect(it) }
         val s = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val out = FileOutputStream(fd.fileDescriptor)
+        val r = if (fullRelay) {
+            TunRelay(
+                toTun = { pkt -> synchronized(out) { runCatching { out.write(pkt) } } },
+                connector = SocketConnector({ protect(it) }, { protect(it) }),
+                tracker = CaptureBus.flowTracker,
+                clock = SystemClock::elapsedRealtimeNanos,
+                executor = Dispatchers.IO.asExecutor(),
+            )
+        } else null
         synchronized(this) {
             tun = fd
             scope = s
+            relay = r
         }
         CaptureBus.setState(CaptureState.Running(pkg))
-        s.launch { readLoop(fd, forwarder, s) }
+        if (r != null) s.launch { while (isActive) { delay(15_000); r.sweep() } }
+        s.launch { readLoop(fd, forwarder, s, r, out) }
     }
 
-    private fun readLoop(fd: ParcelFileDescriptor, forwarder: DnsForwarder, s: CoroutineScope) {
+    private fun readLoop(fd: ParcelFileDescriptor, forwarder: DnsForwarder, s: CoroutineScope, relay: TunRelay?, output: FileOutputStream) {
         val input = FileInputStream(fd.fileDescriptor)
-        val output = FileOutputStream(fd.fileDescriptor)
         val buffer = ByteArray(32767)
         while (s.isActive) {
             val n = try {
@@ -201,6 +241,13 @@ class XrayVpnService : VpnService() {
             }
             if (n <= 0) continue
             val query = DnsPacketCodec.parse(buffer, n)
+            if (relay != null && (query == null || !query.dstAddress.contentEquals(FAKE_DNS_BYTES))) {
+                // Everything except lookups to our own resolver address is forwarded unchanged. A lookup sent straight
+                // to another resolver is recorded too (it is evidence), but not answered or altered here.
+                if (query != null) CaptureBus.record(NetEvent(tNanos = SystemClock.elapsedRealtimeNanos(), hostname = query.hostname, queryType = query.queryType))
+                if (!relay.onPacket(buffer, n)) CaptureBus.malformedPacket(DnsPacketCodec.classifyUnparsed(buffer, n))
+                continue
+            }
             if (query == null) {
                 CaptureBus.malformedPacket(DnsPacketCodec.classifyUnparsed(buffer, n))
                 continue
@@ -224,6 +271,8 @@ class XrayVpnService : VpnService() {
     /** Called from the main thread (commands) and a binder thread (onRevoke), hence synchronized. */
     @Synchronized
     private fun stopTunnel() {
+        relay?.closeAll()
+        relay = null
         scope?.cancel()
         scope = null
         runCatching { tun?.close() }
@@ -253,7 +302,7 @@ class XrayVpnService : VpnService() {
         val n = Notification.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_view)
             .setContentTitle("TraceVeil is auditing")
-            .setContentText("Watching DNS lookups of $pkg · nothing is uploaded")
+            .setContentText(if (CaptureBus.deepCapture) "Forwarding and watching connections of $pkg · TraceVeil sends nothing of its own" else "Watching DNS lookups of $pkg · nothing is uploaded")
             .setOngoing(true)
             .build()
         startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -286,6 +335,10 @@ class XrayVpnService : VpnService() {
         private const val ACTION_STOP = "com.dpdpxray.capture.STOP"
         private const val EXTRA_TARGET = "target"
         private const val EXTRA_INCLUDE_GMS = "gms"
+        private const val EXTRA_FULL_RELAY = "fullRelay"
+        private val FAKE_DNS_BYTES = byteArrayOf(10, 111, 0, 53)
+        private const val SINKHOLE_MAX_TCP = 128
+        private const val SINKHOLE_IDLE_NANOS = 30_000_000_000L
         private const val VPN_ADDRESS = "10.111.0.2"
         private const val DNS_ADDRESS = "10.111.0.53"
         private const val MTU = 1500
@@ -299,13 +352,14 @@ class XrayVpnService : VpnService() {
         private const val EXTRA_BY_USER = "byUser"
         private const val QUARANTINE_CHANNEL = "quarantine"
 
-        fun start(context: Context, targetPackage: String, includeGms: Boolean) {
+        fun start(context: Context, targetPackage: String, includeGms: Boolean, fullRelay: Boolean = CaptureBus.deepCapture) {
             CaptureBus.setState(CaptureState.Starting)
             context.startForegroundService(
                 Intent(context, XrayVpnService::class.java)
                     .setAction(ACTION_START)
                     .putExtra(EXTRA_TARGET, targetPackage)
-                    .putExtra(EXTRA_INCLUDE_GMS, includeGms),
+                    .putExtra(EXTRA_INCLUDE_GMS, includeGms)
+                    .putExtra(EXTRA_FULL_RELAY, fullRelay),
             )
         }
 

@@ -252,6 +252,13 @@ data class AuditSession(
      */
     @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
     val conditions: PlanConditions? = null,
+    /**
+     * Connections seen by the full-relay capture, labelled with their consent phase. Empty when the audit ran DNS-only
+     * or was saved before this existed: see [captureDepth]; empty never means "no connections".
+     */
+    val flows: List<com.dpdpxray.core.netcapture.FlowRecord> = emptyList(),
+    /** "dns-only" or "full-relay"; null = not recorded (older audits, DNS-only). */
+    val captureDepth: String? = null,
 ) {
     val consentChoice: ConsentEvent?
         get() = consentEvents.firstOrNull { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }
@@ -336,6 +343,16 @@ enum class CheckId(val code: String, val title: String) {
      * lookups). INFO, no score impact: unknown stays unknown. Legal note: none; it qualifies every other finding.
      */
     V1("V1", "Some lookups may be hidden from TraceVeil"),
+
+    /**
+     * The connection capture (full-relay audits) saw a plain-HTTP request whose address or headers carried fields that
+     * look like personal data. HIGH: OBSERVED when a value itself had the shape (an e-mail address, a phone number, an ID
+     * under an ID field name), INFERRED when only field names matched. Values are never stored. The scored, legally
+     * mapped form of the network finding "Sensitive value in an unencrypted request". Legal note: DPDP s.8(5)
+     * (reasonable security safeguards; the DPDP Rules 2025 name encryption among them); elsewhere security-of-processing
+     * rules such as GDPR Art. 32.
+     */
+    C16("C16", "Personal data in an unencrypted (HTTP) request"),
 }
 
 @Serializable

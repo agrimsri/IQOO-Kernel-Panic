@@ -31,7 +31,8 @@
         "NC": {"relation": "REQUIRED", "note": "A notice (s.5) and valid consent (s.6) must come before consent-based processing, and the Data Fiduciary must be able to prove both (s.6(10)). This covers only the captured window."},
         "U1": {"relation": "CONTEXT", "note": "Consent may have been given before the audit; the Data Fiduciary must be able to prove it (s.6(10)). Not scored."},
         "S1": {"relation": "CONTEXT", "note": "The Act has no first-party exception to its consent rules; TraceVeil shows same-company lookups but does not score them."},
-        "V0": {"relation": "CONTEXT", "note": "Not a legal finding: too little was captured to judge the app under any law."}
+        "V0": {"relation": "CONTEXT", "note": "Not a legal finding: too little was captured to judge the app under any law."},
+        "C16": {"relation": "CONTEXT", "note": "A Data Fiduciary must protect personal data with reasonable security safeguards to prevent a personal data breach (s.8(5)), and the DPDP Rules 2025 name encryption among them. Whether one unencrypted request falls short of that is for a qualified reviewer; the check also infers personal data from field names when no value shape was seen."}
       }
     },
     {
@@ -254,7 +255,8 @@
         "NC": {"relation": "REQUIRED", "note": "Good practice: ask before tracking, with a clear notice. The app may ask elsewhere; this covers only the captured window.", "refs": ["gb.clear-notice", "gb.wait-for-consent"]},
         "U1": {"relation": "CONTEXT", "note": "Earlier consent cannot be checked from this capture. Not scored."},
         "S1": {"relation": "CONTEXT", "note": "First-party collection is shown for review but not scored."},
-        "V0": {"relation": "CONTEXT", "note": "Too little was captured to judge the app."}
+        "V0": {"relation": "CONTEXT", "note": "Too little was captured to judge the app."},
+        "C16": {"relation": "REQUIRED", "note": "Good practice everywhere: send personal data only over encrypted connections (HTTPS), never in plain HTTP."}
       }
     }
   ]

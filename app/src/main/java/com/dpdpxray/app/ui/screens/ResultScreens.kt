@@ -304,6 +304,11 @@ fun ResultsScreen(
                     val mapOwners = remember(mapCatalog) { EndpointMapIntegration.owners(mapCatalog) }
                     EndpointMapCard(b.sessions, mapCatalog, owners = mapOwners)
                 }
+                // Connections beyond DNS: this audit's own (full-relay checks) and the latest quarantine run's, if any.
+                AuditConnectionsCard(b.sessions, vm, Modifier.padding(top = 12.dp))
+                if (!b.meta.sample) QuarantineConnectionsCard(b.meta.targetPackage, vm, Modifier.padding(top = 12.dp))
+
+                NetworkFindingsSection(b.sessions, vm)
 
                 GroupHeader(ResultCopy.evidence.pick(lang))
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

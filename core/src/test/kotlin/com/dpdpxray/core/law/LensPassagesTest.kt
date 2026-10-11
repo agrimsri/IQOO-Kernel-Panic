@@ -85,7 +85,8 @@ class LensPassagesTest {
     fun `existing DPDP passages are unchanged and not duplicated here`() {
         assertTrue(lens.passages.none { it.profile == "INDIA" })
         val dpdp = com.dpdpxray.core.dpdp.DpdpCorpus.loadDefault()
-        assertEquals(16, dpdp.passages.size)
+        assertEquals(17, dpdp.passages.size) // s8(5) (security safeguards, cited by C16) was added after the first 16
+        assertTrue(dpdp.byId("s8(5)")!!.text.contains("reasonable security safeguards to prevent personal data breach"))
         assertTrue(dpdp.byId("s6(1)")!!.text.contains("free, specific, informed, unconditional and unambiguous with a clear affirmative action"))
     }
 

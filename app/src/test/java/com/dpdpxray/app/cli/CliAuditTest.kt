@@ -118,7 +118,7 @@ class CliAuditTest {
         }
         assertFalse("observedTrackers" in Json.parseToJsonElement(CliAuditReport.build("r1", b)).jsonObject)
         val obj = Json.parseToJsonElement(CliAuditReport.build("r1", b, catalog)).jsonObject
-        assertEquals("observedTrackers", obj.keys.last())
+        assertTrue("observedTrackers" in obj.keys)
         val t = obj["observedTrackers"]!!.jsonArray.single().jsonObject
         assertEquals("AppsFlyer", t["entity"]!!.jsonPrimitive.content)
         assertEquals("ATTRIBUTION", t["category"]!!.jsonPrimitive.content)
@@ -137,6 +137,26 @@ class CliAuditTest {
         val ev = dated["lookupEvents"]!!.jsonArray.single().jsonObject
         assertEquals(99_000L, ev["atMs"]!!.jsonPrimitive.long)
         assertEquals("AFTER_REJECT", ev["phase"]!!.jsonPrimitive.content)
+    }
+
+    @Test fun `dns answers list each looked-up name with its addresses and catalogue entity`() {
+        val catalog = TrackerCatalog(listOf(TrackerEntry("AppsFlyer", Category.ATTRIBUTION, listOf("appsflyer.com"))))
+        val b = bundle(21).let { b ->
+            b.copy(sessions = b.sessions.map { s ->
+                s.copy(netEvents = listOf(
+                    NetEvent(0, "T.appsflyer.com.", answerIps = listOf("192.0.2.1")),
+                    NetEvent(1, "t.appsflyer.com", answerIps = listOf("192.0.2.2", "192.0.2.1")),
+                    NetEvent(2, "api.x.example"),
+                ))
+            })
+        }
+        val obj = Json.parseToJsonElement(CliAuditReport.build("r1", b, catalog)).jsonObject
+        assertEquals("dnsAnswers", obj.keys.last())
+        val rows = obj["dnsAnswers"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(listOf("api.x.example", "t.appsflyer.com"), rows.map { it["host"]!!.jsonPrimitive.content })
+        assertEquals(JsonNull, rows[0]["entity"])
+        assertEquals("AppsFlyer", rows[1]["entity"]!!.jsonPrimitive.content)
+        assertEquals(listOf("192.0.2.1", "192.0.2.2"), rows[1]["ips"]!!.jsonArray.map { it.jsonPrimitive.content })
     }
 
     @Test fun `unknown score stays null and is never turned into zero`() {

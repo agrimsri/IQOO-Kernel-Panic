@@ -7,6 +7,8 @@ import com.dpdpxray.app.AppGraph
 import com.dpdpxray.app.ai.BackendKind
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.capture.CaptureBus
+import com.dpdpxray.core.netcapture.FlowPhases
+import com.dpdpxray.core.netcapture.PhaseClock
 import com.dpdpxray.app.capture.CaptureState
 import com.dpdpxray.app.capture.XrayVpnService
 import com.dpdpxray.app.consent.ConsentAccessibilityService
@@ -383,6 +385,8 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         val tEnd = snapshot.health.captureEndedNanos ?: SystemClock.elapsedRealtimeNanos()
         val captured = snapshot.events
         val consentEvents = ConsentBus.events.value
+        val deep = CaptureBus.deepCapture
+        val flows = if (deep) FlowPhases.assign(CaptureBus.flowSnapshot(), PhaseClock.from(consentEvents)) else emptyList()
         if (ConsentBus.unconfirmedDialogClosedAtNanos != null && !ConsentBus.choiceMade) {
             notes += "Consent dialog closed without an observed button action; the choice remains unknown."
         }
@@ -438,6 +442,8 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             permissionDialogsWatched = ConsentAccessibilityService.instance != null,
             manifestFacts = manifest,
             conditions = conditions,
+            flows = flows,
+            captureDepth = if (deep) "full-relay" else "dns-only",
         )
         CapturedPlan(session, capturedBoundary.reading)
     }

@@ -105,6 +105,8 @@ object Coverage {
                 .takeIf { sessions.none { s -> s.consentEvents.any { it.tree != null && (it.kind == ConsentKind.SCREEN_APPEARED || it.kind == ConsentKind.MANUAL_MARK) } } }
             CheckId.V1 -> "capture health and the Private DNS setting were not recorded"
                 .takeIf { sessions.all { it.captureHealth == null && it.privateDnsActive == null } }
+            CheckId.C16 -> "connections were not captured (a DNS-only check or an older build), so plain-HTTP requests were not seen"
+                .takeIf { sessions.none { it.captureDepth == "full-relay" } }
             else -> null
         }
     }

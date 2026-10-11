@@ -1,4 +1,4 @@
-"""traceveil command line: doctor, env, init, audit."""
+"""traceveil command line: doctor, env, init, audit, watch, lens, fix, sdks."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from . import (audit, EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_POLICY, EXIT_USAGE, __version__, adb, config, egress,
-               laws, netenv, report, sdks, shizuku)
+               fixes, laws, netenv, netwatch, report, sdks, shizuku)
 from .colors import Style, enabled_for
 
 
@@ -40,12 +40,27 @@ def _parser() -> argparse.ArgumentParser:
     a.add_argument("--reset", action="store_true", help="clear the app's data first; only for developer-owned test apps; needs Shizuku")
     a.add_argument("--wait", type=float, default=900.0, help="seconds to wait for the audit (default 900)")
     a.add_argument("--resume", metavar="REQUEST_ID", help="fetch the result of an earlier request instead of starting a new audit")
-    a.add_argument("--json", action="store_true", help="print the JSON report instead of the summary")
-    a.add_argument("--out", help="also write the JSON report to this file")
+    a.add_argument("--format", choices=("text", "json", "md"), default="text",
+                   help="text summary (default), json report (fixes in fixPlan), or md fix plan")
+    a.add_argument("--json", dest="format", action="store_const", const="json", help="same as --format json")
+    a.add_argument("--out", help="also write the JSON report (with fixPlan) to this file; a .md path writes the fix plan as Markdown")
     a.add_argument("--lens", "--profile", dest="lenses",
                    help="legal lenses to read the result under: comma list (INDIA,EU,UK,US_CALIFORNIA,US_CHILDREN,BRAZIL,SINGAPORE,"
                         "GLOBAL_BASELINE; short: in,eu,us-ca,coppa,br,sg) or 'all' (default: audit.lenses)")
     a.add_argument("--policy", help="lens whose score decides the exit code (default: audit.policy = INDIA)")
+    a.add_argument("--no-net-watch", dest="watch_network", action="store_false", default=None,
+                   help="do not sample the app's sockets during the audit (default: audit.watch_network = true)")
+    a.add_argument("--fail-on-hidden", action="store_true",
+                   help="exit 1 when the app connected through encrypted DNS, direct DNS or to addresses no visible lookup returned")
+
+    w = sub.add_parser("watch", parents=[shared], help="sample an app's live connections for a while and flag traffic the DNS capture cannot see")
+    w.add_argument("--package", help="app to watch (default: target.package)")
+    w.add_argument("--seconds", type=float, default=60.0, help="how long to sample (default 60)")
+    w.add_argument("--interval", type=float, default=1.0, help="seconds between samples (default 1)")
+    w.add_argument("--report", help="audit report whose DNS answers the connections are matched against (file or request id)")
+    w.add_argument("--fail-on-hidden", action="store_true", help="exit 1 when hidden traffic is found")
+    w.add_argument("--json", action="store_true", help="print the JSON result instead of the summary")
+    w.add_argument("--out", help="also write the JSON result to this file")
 
     lw = sub.add_parser("lens", aliases=["laws"], parents=[shared],
                         help="read a saved audit report under the app's legal lenses (several countries' laws; no phone needed)")
@@ -56,6 +71,17 @@ def _parser() -> argparse.ArgumentParser:
     lw.add_argument("--list", action="store_true", help="list the lenses and their laws, then exit")
     lw.add_argument("--json", action="store_true", help="print the JSON assessment instead of the summary")
     lw.add_argument("--out", help="also write the JSON assessment to this file")
+
+    fx = sub.add_parser("fix", aliases=["fixes"], parents=[shared],
+                        help="how to fix a saved audit: per finding, the code/manifest change and the countries whose law requires it "
+                             "(JSON or Markdown a coding agent can work from; no phone needed)")
+    fx.add_argument("--report", help="audit report: a JSON file, or a request id saved under output.dir (default: the newest)")
+    fx.add_argument("--lens", "--profile", dest="lenses", default="all", help="lenses for the country view (default: all)")
+    fx.add_argument("--policy", help="lens that decides the exit code (default: audit.policy = INDIA)")
+    fx.add_argument("--format", choices=("text", "json", "md"), default="text",
+                    help="text summary (default), json report with fixPlan, or md fix plan")
+    fx.add_argument("--json", dest="format", action="store_const", const="json", help="same as --format json")
+    fx.add_argument("--out", help="also write the JSON report with fixPlan to this file (a .md path writes the plan as Markdown)")
 
     k = sub.add_parser("sdks", parents=[shared], help="list tracking SDKs bundled in an APK and compare them with an audit's live lookups")
     k.add_argument("--apk", required=True, help="APK to inspect (no phone needed for this part)")
@@ -140,8 +166,9 @@ def cmd_audit(args, cfg, dev: adb.Device) -> int:
                   color_out=enabled_for(sys.stdout))
     plans = args.plans or None
     return audit.run_audit(dev, cfg, io, package=args.package or "", plans=plans, auto_drive=args.auto_drive, reset=args.reset,
-                           wait_s=args.wait, resume=args.resume, as_json=args.json, out_file=args.out,
-                           lenses=args.lenses, policy=args.policy)
+                           wait_s=args.wait, resume=args.resume, as_json=args.format == "json", as_md=args.format == "md", out_file=args.out,
+                           lenses=args.lenses, policy=args.policy, watch_network=args.watch_network,
+                           fail_on_hidden=args.fail_on_hidden)
 
 
 def _load_report(ref: str | None, cfg) -> dict:
@@ -263,6 +290,65 @@ def cmd_laws(args, cfg, dev=None) -> int:
     return code
 
 
+def cmd_fix(args, cfg, dev=None) -> int:
+    try:
+        rep = _load_report(args.report, cfg)
+        policy = args.policy or cfg["audit"]["policy"]
+        block = laws.assess_all(rep, args.lenses, policy)
+        plan = fixes.build(rep, block)
+        code, _ = audit.exit_for_report(laws.policy_view(block), cfg["audit"]["fail_on"], int(cfg["audit"]["min_score"]))
+    except (OSError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    full = {**rep, "fixPlan": plan}  # the report itself carries the fixes; an older report gains them here
+    if args.format == "json":
+        print(report.dumps(full))
+    elif args.format == "md":
+        print(fixes.markdown(plan))
+    else:
+        print(fixes.summary(plan, Style(enabled_for(sys.stdout))))
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(fixes.markdown(plan) if args.out.endswith(".md") else report.dumps(full), encoding="utf-8")
+    return code
+
+
+def cmd_watch(args, cfg, dev) -> int:
+    import time
+    st = Style(enabled_for(sys.stdout))
+    package = args.package or cfg["target"]["package"]
+    if not package:
+        print("error: no app: pass --package or set target.package in traceveil.toml", file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        rep = _load_report(args.report, cfg) if args.report else None
+    except (OSError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    uid = netwatch.uid_of(dev, package)
+    if uid is None:
+        print(f"error: {package} is not installed on the device", file=sys.stderr)
+        return EXIT_DEVICE
+    print(f"watching {package} (uid {uid}) for {args.seconds:.0f}s: use the app now", file=sys.stderr)
+    sampler = netwatch.Sampler(dev, uid)
+    end = time.monotonic() + args.seconds
+    while time.monotonic() < end:
+        sampler.sample()
+        time.sleep(args.interval)
+    net = netwatch.analyze(sampler.seen, rep, sampler.as_dict(args.interval),
+                           netwatch.declares_vpn_service(dev.shell(f"dumpsys package {package}")))
+    if args.json:
+        print(report.dumps(net))
+    else:
+        print(f"Traceveil watch  {st.bold(package)}" + (f"  matched against {rep.get('requestId')}" if rep else "  (no report: lookups unknown)"))
+        print("\n".join(netwatch.summary_lines(net, st, max_rows=40)))
+        print(st.dim("  note: " + " ".join(net["limitations"])))
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(report.dumps(net), encoding="utf-8")
+    return EXIT_FINDINGS if args.fail_on_hidden and netwatch.hidden(net) else EXIT_PASS
+
+
 def cmd_init(args, cfg, dev=None) -> int:
     target = Path("traceveil.toml")
     if target.exists() and not args.force:
@@ -287,8 +373,10 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_sdks(args, cfg)
         if args.command in ("lens", "laws"):
             return cmd_laws(args, cfg)
+        if args.command in ("fix", "fixes"):
+            return cmd_fix(args, cfg)
         dev = adb.connect(args.adb or cfg["device"]["adb"] or None, args.serial or cfg["device"]["serial"] or None, args.timeout)
-        return {"doctor": cmd_doctor, "env": cmd_env, "audit": cmd_audit}[args.command](args, cfg, dev)
+        return {"doctor": cmd_doctor, "env": cmd_env, "audit": cmd_audit, "watch": cmd_watch}[args.command](args, cfg, dev)
     except config.ConfigError as e:
         print(f"config error: {e}", file=sys.stderr)
         return EXIT_USAGE
