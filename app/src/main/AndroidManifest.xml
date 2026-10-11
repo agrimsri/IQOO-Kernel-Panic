@@ -14,6 +14,11 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Auto-guard: keeps the background new-app check and weekly checkup jobs scheduled after a restart. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- APK Guard "Install anyway": hands the exact APK file the person just checked to Android's installer through a
+         PackageInstaller session that always asks the person to confirm. Android also requires the person to allow
+         TraceVeil under "Install unknown apps"; TraceVeil never installs by itself. A build made with
+         -Ptraceveil.installHandoff=false removes this permission (src/noInstallHandoff/AndroidManifest.xml). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Needed to list installed apps that can be audited. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
@@ -125,6 +130,11 @@
             android:name=".autoguard.PhoneCheckupJobService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+        <!-- APK Guard "Install anyway": Android's installer reports the session result here, only through
+             TraceVeil's own PendingIntent (no intent filter). -->
+        <receiver
+            android:name=".apkguard.InstallResultReceiver"
+            android:exported="false" />
         <!-- Re-checks the Auto-guard jobs after a restart or an update of TraceVeil. It starts no microphone,
              VPN or audit. -->
         <receiver

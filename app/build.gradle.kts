@@ -44,6 +44,16 @@ val onlineVoiceOverride: Boolean? = providers.gradleProperty("traceveil.onlineVo
     value.lowercase().toBooleanStrictOrNull() ?: throw GradleException("traceveil.onlineVoice must be true or false, not '$value'")
 }
 
+/**
+ * APK Guard "Install anyway" (docs/CHECK_BEFORE_INSTALL.md) needs REQUEST_INSTALL_PACKAGES, which Google Play reviews as
+ * a restricted permission. On by default. `-Ptraceveil.installHandoff=false` builds without it: the permission is removed
+ * from the merged manifest (src/noInstallHandoff/AndroidManifest.xml) and APK Guard explains how to continue with
+ * Android's own installer instead.
+ */
+val installHandoff: Boolean = providers.gradleProperty("traceveil.installHandoff").orNull?.trim()?.let { value ->
+    value.lowercase().toBooleanStrictOrNull() ?: throw GradleException("traceveil.installHandoff must be true or false, not '$value'")
+} ?: true
+
 android {
     namespace = "com.dpdpxray.app"
     compileSdk = 37
@@ -56,6 +66,13 @@ android {
         versionName = "1.1.0"
         // Release builds target arm64 phones only; this keeps LiteRT-LM's native libs small.
         ndk { abiFilters += "arm64-v8a" }
+        buildConfigField("boolean", "INSTALL_HANDOFF", installHandoff.toString())
+    }
+
+    if (!installHandoff) {
+        // Neither build type has its own manifest, so this overlay only removes REQUEST_INSTALL_PACKAGES.
+        sourceSets.getByName("debug").manifest.srcFile("src/noInstallHandoff/AndroidManifest.xml")
+        sourceSets.getByName("release").manifest.srcFile("src/noInstallHandoff/AndroidManifest.xml")
     }
 
     signingConfigs {

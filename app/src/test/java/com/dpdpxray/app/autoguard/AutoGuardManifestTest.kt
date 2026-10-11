@@ -41,7 +41,6 @@ class AutoGuardManifestTest {
         val permissions = elements("uses-permission").map { it.a("name") }.toSet()
         assertTrue("android.permission.RECEIVE_BOOT_COMPLETED" in permissions)
         listOf(
-            "android.permission.REQUEST_INSTALL_PACKAGES",
             "android.permission.SYSTEM_ALERT_WINDOW",
             "android.permission.READ_SMS",
             "android.permission.RECEIVE_SMS",

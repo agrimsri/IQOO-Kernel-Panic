@@ -49,7 +49,10 @@ object TrustText {
         "android.permission.FOREGROUND_SERVICE_MICROPHONE" -> "Wake-word service type" to
             "Lets Hey TraceVeil listen only after you start it, with a notification. Off by default."
         "android.permission.POST_NOTIFICATIONS" -> "Notifications" to
-            "Shows the running-check notification, APK Guard's new-install alerts and the Hey TraceVeil notification."
+            "Shows the running-check notification, APK Guard's new-install and new-download alerts and the Hey TraceVeil notification."
+        "android.permission.REQUEST_INSTALL_PACKAGES" -> "Install anyway (Android asks you)" to
+            "Only when you tap Install anyway after checking an APK file: TraceVeil hands that exact file to Android's installer, which asks you to confirm. " +
+            "Android also needs you to allow TraceVeil once under Install unknown apps; TraceVeil cannot switch that on itself."
         "android.permission.QUERY_ALL_PACKAGES" -> "See installed apps" to
             "Lists your installed apps so you can pick one to check, or to inspect in APK Guard. The list stays on this phone."
         "$ownPackage.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" -> "Private broadcasts (added by AndroidX)" to
