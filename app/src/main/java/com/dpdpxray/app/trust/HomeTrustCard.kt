@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import com.dpdpxray.app.control.DeviceChecks
 import com.dpdpxray.app.ui.components.ChipFlow
 import com.dpdpxray.app.ui.components.chevronTurn
 import com.dpdpxray.app.ui.components.foldSpec
@@ -58,9 +59,11 @@ private data class HomeTrustLive(val facts: List<TrustFact>, val permissions: Pe
  * "Why you can trust TraceVeil" on Home (both modes): a flat card with four short, code-checked facts (HomeTrust)
  * and a live line of TraceVeil's own permissions ("2 of 4 permissions on · see why") that opens the trust screen. Folded,
  * the facts are small chips; open, each says what it means. Open on the card's first view, folded after that.
+ * [permissionLine] false leaves the count to "What TraceVeil uses" right under the card; the line then just opens the
+ * trust page.
  */
 @Composable
-fun HomeTrustCard(lang: GuideLang, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+fun HomeTrustCard(lang: GuideLang, onOpen: () -> Unit, modifier: Modifier = Modifier, permissionLine: Boolean = true) {
     val ctx = LocalContext.current
     var resumes by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { resumes++ }
@@ -92,15 +95,19 @@ fun HomeTrustCard(lang: GuideLang, onOpen: () -> Unit, modifier: Modifier = Modi
             GlyphIcon(Glyph.CHEVRON_DOWN, Film.boneDim, Modifier.graphicsLayer { rotationZ = turn }, size = 20.dp)
         }
         // The live permission line opens the full trust page, where each permission's purpose is listed.
-        val line = current?.permissions?.line?.pick(lang) ?: if (lang == GuideLang.HI) "अनुमतियाँ पढ़ी जा रही हैं…" else "Reading permissions…"
-        LinkAction("$line · ${HomeTrust.seeWhy.pick(lang)}", onOpen, Modifier.padding(start = 8.dp), color = Film.scan, glyph = Glyph.SETTINGS)
+        if (permissionLine) {
+            val line = current?.permissions?.line?.pick(lang) ?: if (lang == GuideLang.HI) "अनुमतियाँ पढ़ी जा रही हैं…" else "Reading permissions…"
+            LinkAction("$line · ${HomeTrust.seeWhy.pick(lang)}", onOpen, Modifier.padding(start = 8.dp), color = Film.scan, glyph = Glyph.SETTINGS)
+        } else {
+            LinkAction(HomeTrust.open.pick(lang), onOpen, Modifier.padding(start = 8.dp), color = Film.scan, glyph = Glyph.LOCK)
+        }
         Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (current == null) return@Column
             if (!open) {
                 ChipFlow { current.facts.forEach { FactChip(it, lang) } }
             } else {
                 current.facts.forEach { FactRow(it, lang) }
-                LinkAction(HomeTrust.open.pick(lang), onOpen, glyph = Glyph.LOCK)
+                if (permissionLine) LinkAction(HomeTrust.open.pick(lang), onOpen, glyph = Glyph.LOCK)
             }
         }
     }
@@ -137,7 +144,9 @@ private fun FactChip(f: TrustFact, lang: GuideLang) {
 /** Reads the facts' inputs and the permission states. Read-only: it never asks for anything or changes a setting. */
 private fun readLive(ctx: Context): HomeTrustLive {
     val facts = HomeTrust.facts(TrustReader.onlineVoiceOn(ctx), TrustReader.backupAllowed(ctx))
-    val vpnAllowed = runCatching { VpnService.prepare(ctx) == null }.getOrNull()
+    // Never asks Android about the VPN while another app's VPN is on: prepare() could hand the slot to TraceVeil and stop
+    // that VPN (see DeviceChecks.vpnReady). Its state is then not reported, never off.
+    val vpnAllowed = runCatching { if (DeviceChecks.otherVpnActive(ctx)) null else VpnService.prepare(ctx) == null }.getOrNull()
     val permissions = HomeTrust.permissionSummary(TrustReader.permissions(ctx), vpnAllowed, runCatching { TrustReader.accessibilityOn(ctx) }.getOrNull())
     return HomeTrustLive(facts, permissions)
 }
