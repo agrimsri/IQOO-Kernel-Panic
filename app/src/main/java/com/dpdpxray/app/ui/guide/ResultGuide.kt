@@ -18,6 +18,8 @@ data class ResultFacts(
     val inconclusiveReason: com.dpdpxray.core.rules.Inconclusive.Reason? = null,
     /** The consent-history range of a kept-data check (score still open); null when the result has one score. */
     val bounds: com.dpdpxray.core.model.HistoryBounds? = null,
+    /** A website check: its evidence is the requests the page made in TraceVeil's own browser, not DNS lookups. */
+    val web: Boolean = false,
 )
 
 enum class NextAction { SEE_EVIDENCE, HOW_TO_FIX, CHECK_AGAIN, CHECK_REAL_APP, ASK, REPORT }
@@ -38,21 +40,28 @@ object ResultGuide {
         "लुकअप किसी पते तक पहुँचने की कोशिश है, यह इस बात का सबूत नहीं कि निजी डेटा भेजा गया।",
     )
 
+    private val requestCaveat = Bi(
+        "A request shows the page asked to contact an address, not proof of what personal data was sent.",
+        "रिक्वेस्ट दिखाती है कि पेज ने किसी पते से संपर्क माँगा, यह इस बात का सबूत नहीं कि कौन-सा निजी डेटा भेजा गया।",
+    )
+
     fun explain(f: ResultFacts): ResultExplanation {
         val meaning = buildList {
             add(
                 when (f.band) {
                     ScoreBand.READY -> Bi(
-                        "No problems were found in the evidence TraceVeil captured. This is not a safety or compliance certificate: it covers only this short window of DNS lookups.",
-                        "TraceVeil के दर्ज सबूतों में कोई समस्या नहीं मिली। यह सुरक्षा या अनुपालन का प्रमाणपत्र नहीं है: यह सिर्फ़ DNS लुकअप की इस छोटी अवधि को दिखाता है।",
+                        "No problems were found in the evidence TraceVeil captured. This is not a safety or compliance certificate: it covers only " +
+                            (if (f.web) "the requests this site made during this short check." else "this short window of DNS lookups."),
+                        "TraceVeil के दर्ज सबूतों में कोई समस्या नहीं मिली। यह सुरक्षा या अनुपालन का प्रमाणपत्र नहीं है: यह सिर्फ़ " +
+                            (if (f.web) "इस छोटी जाँच में साइट की रिक्वेस्ट को दिखाता है।" else "DNS लुकअप की इस छोटी अवधि को दिखाता है।"),
                     )
                     ScoreBand.NEEDS_WORK -> Bi(
                         "TraceVeil recorded ${findings(f.findingCount)} in the captured evidence. The consent flow needs work; each finding below shows its evidence.",
                         "TraceVeil ने दर्ज सबूतों में ${f.findingCount} फ़ाइंडिंग पाईं। कंसेंट फ़्लो में सुधार की ज़रूरत है; नीचे हर फ़ाइंडिंग का सबूत दिया है।",
                     )
                     ScoreBand.AT_RISK -> Bi(
-                        "TraceVeil recorded ${findings(f.findingCount)}, and the score is in the At risk range. Open each finding to see the lookups and times behind it.",
-                        "TraceVeil ने ${f.findingCount} फ़ाइंडिंग दर्ज कीं, और स्कोर At risk श्रेणी में है। हर फ़ाइंडिंग खोलकर उसके पीछे के लुकअप और समय देखें।",
+                        "TraceVeil recorded ${findings(f.findingCount)}, and the score is in the At risk range. Open each finding to see the ${if (f.web) "requests" else "lookups"} and times behind it.",
+                        "TraceVeil ने ${f.findingCount} फ़ाइंडिंग दर्ज कीं, और स्कोर At risk श्रेणी में है। हर फ़ाइंडिंग खोलकर उसके पीछे के ${if (f.web) "रिक्वेस्ट" else "लुकअप"} और समय देखें।",
                     )
                     ScoreBand.INCONCLUSIVE -> if (f.bounds != null) range(f.bounds)
                     else if (f.inconclusiveReason == com.dpdpxray.core.rules.Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN) Bi(
@@ -64,7 +73,7 @@ object ResultGuide {
                     )
                 },
             )
-            if (f.findingCount > 0) add(lookupCaveat)
+            if (f.findingCount > 0) add(if (f.web) requestCaveat else lookupCaveat)
             if (f.coverageGaps) add(Bi(
                 "Part of the planned check didn't finish, so the score covers only what was recorded.",
                 "जाँच का कुछ तय हिस्सा पूरा नहीं हुआ, इसलिए स्कोर सिर्फ़ दर्ज हिस्से पर आधारित है।",
@@ -87,7 +96,8 @@ object ResultGuide {
         val next = buildList {
             if (f.findingCount > 0) add(NextStep(NextAction.SEE_EVIDENCE,
                 Bi("See the evidence", "सबूत देखें"),
-                Bi("Open the first finding to see the lookups and times behind it.", "पहली फ़ाइंडिंग खोलकर उसके लुकअप और समय देखें।")))
+                if (f.web) Bi("Open the first finding to see the requests and times behind it.", "पहली फ़ाइंडिंग खोलकर उसकी रिक्वेस्ट और समय देखें।")
+                else Bi("Open the first finding to see the lookups and times behind it.", "पहली फ़ाइंडिंग खोलकर उसके लुकअप और समय देखें।")))
             if (f.fixCount > 0) add(NextStep(NextAction.HOW_TO_FIX,
                 Bi("How to fix (${f.fixCount})", "कैसे ठीक करें (${f.fixCount})"),
                 Bi("Code and manifest changes for developers. Rebuild, then check again.", "डेवलपर्स के लिए कोड और मैनिफ़ेस्ट बदलाव। फिर से बनाएँ और दोबारा जाँचें।")))
@@ -96,7 +106,9 @@ object ResultGuide {
                 Bi("Go back and check an app you're allowed to test.", "वापस जाएँ और ऐसा ऐप जाँचें जिसकी आपको अनुमति है।")))
             else if (incomplete) add(NextStep(NextAction.CHECK_AGAIN,
                 Bi("Check again", "दोबारा जाँचें"),
-                Bi("For your own test app, a Full check runs don't touch, Reject and Accept for a fuller picture.",
+                if (f.web) Bi("Check the site again: each run starts in an emptied browser, and you can tap its banner yourself.",
+                    "साइट को दोबारा जाँचें: हर रन खाली ब्राउज़र में शुरू होता है, और आप उसका बैनर ख़ुद टैप कर सकते हैं।")
+                else Bi("For your own test app, a Full check runs don't touch, Reject and Accept for a fuller picture.",
                     "अपने टेस्ट ऐप के लिए Full जाँच बिना छुए, Reject और Accept, तीनों रन चलाती है।")))
             add(NextStep(NextAction.ASK,
                 Bi("Ask this audit", "इस ऑडिट से पूछें"),

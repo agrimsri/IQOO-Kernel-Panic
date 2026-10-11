@@ -14,6 +14,18 @@ class ResultGuideTest {
 
     private val forbidden = listOf("safe.", "is safe", "compliant", "certified", "malicious", "fraud", "illegal")
 
+    @Test fun `a website result speaks of requests, never of DNS lookups`() {
+        for (band in listOf(ScoreBand.READY, ScoreBand.NEEDS_WORK, ScoreBand.AT_RISK)) {
+            val e = ResultGuide.explain(facts(band, if (band == ScoreBand.READY) 100 else 40, findings = 2).copy(web = true))
+            val text = (e.meaning + e.next.flatMap { listOf(it.title, it.reason) }).joinToString(" ") { it.en }
+            assertFalse(band.name + ": " + text, text.contains("lookup", ignoreCase = true) || text.contains("DNS"))
+            assertTrue(band.name + ": " + text, text.contains("request"))
+        }
+        val ready = ResultGuide.explain(facts(ScoreBand.READY, 100, findings = 0, fixes = 0).copy(web = true))
+        assertTrue(ready.meaning.first().en.contains("not a safety or compliance certificate"))
+        assertTrue(ready.meaning.first().hi.contains("रिक्वेस्ट"))
+    }
+
     @Test fun `a ready result says it is not a certificate`() {
         val e = ResultGuide.explain(facts(ScoreBand.READY, 100, findings = 0, fixes = 0))
         assertTrue(e.meaning.first().en.contains("not a safety or compliance certificate"))

@@ -211,6 +211,7 @@ fun ResultsScreen(
                     fastPreview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW, sample = b.meta.sample,
                     inconclusiveReason = com.dpdpxray.core.rules.Inconclusive.reason(r.findings),
                     bounds = r.historyBounds?.takeIf { r.score == null },
+                    web = web,
                 )
                 val explanation = remember(facts) { ResultGuide.explain(facts) }
                 // The visible step banner is gone; people who use read-aloud still hear the same step.
