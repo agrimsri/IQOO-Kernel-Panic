@@ -212,6 +212,7 @@ fun ResultsScreen(
                     inconclusiveReason = com.dpdpxray.core.rules.Inconclusive.reason(r.findings),
                     bounds = r.historyBounds?.takeIf { r.score == null },
                     web = web,
+                    watchMinutes = com.dpdpxray.core.model.BackgroundWatches.of(b.sessions)?.plannedMinutes,
                 )
                 val explanation = remember(facts) { ResultGuide.explain(facts) }
                 // The visible step banner is gone; people who use read-aloud still hear the same step.
@@ -220,7 +221,7 @@ fun ResultsScreen(
                 ScoreHero(b, grade, lang, Modifier.reveal(0))
                 // A consent-history range has its own verdict line (never "Inconclusive"); everything else keeps the headline.
                 val head = r.historyBounds?.takeIf { r.score == null }?.let { ConsentHistoryCopy.headline(it).pick(lang) }
-                    ?: if (web) webHeadline(r.findings) else headline(r.findings)
+                    ?: if (web) webHeadline(r.findings) else headline(r.findings, b.sessions)
                 Text(head, style = MaterialTheme.typography.bodyLarge, color = Film.bone, modifier = Modifier.padding(top = 20.dp).reveal(1))
 
                 // Caveats that must stay in view, above anything the reader might act on. Only those that apply are shown.
@@ -244,10 +245,15 @@ fun ResultsScreen(
                     if (standalone) explanation.meaning.firstOrNull()?.let {
                         Notice(it.pick(lang), kind = if (r.band == ScoreBand.INCONCLUSIVE) NoticeKind.CAUTION else NoticeKind.INFO)
                     }
-                    if (!b.meta.sample && b.meta.timingProfile != AuditTimingPolicy.NORMAL) {
+                    // A background watch says what it checked, so it never reads as a test of the consent popup.
+                    val watch = com.dpdpxray.core.model.BackgroundWatches.of(b.sessions)
+                    if (watch != null) {
+                        val (en, hi) = com.dpdpxray.core.model.BackgroundWatches.whatWasChecked(b.meta.targetLabel, watch)
+                        Notice(Bi(en, hi).pick(lang), kind = NoticeKind.INFO)
+                    } else if (!b.meta.sample && b.meta.timingProfile != AuditTimingPolicy.NORMAL) {
                         Notice(AuditTimingPolicy.coverageHint(b.meta.timingProfile), kind = if (preview) NoticeKind.CAUTION else NoticeKind.INFO)
                     }
-                    if (!b.meta.sample && !preview && !rejectTested) Notice(ResultCopy.rejectNotTested.pick(lang), kind = NoticeKind.CAUTION)
+                    if (!b.meta.sample && !preview && !rejectTested && watch == null) Notice(ResultCopy.rejectNotTested.pick(lang), kind = NoticeKind.CAUTION)
                     gaps.forEach { Notice(it, kind = NoticeKind.CAUTION) }
                     freshHint?.let { Notice(it, kind = NoticeKind.CAUTION) }
                 }
@@ -471,12 +477,16 @@ internal fun webHeadline(findings: List<Finding>): String {
     }
 }
 
-private fun headline(findings: List<Finding>): String {
+internal fun headline(findings: List<Finding>, sessions: List<com.dpdpxray.core.model.AuditSession> = emptyList()): String {
     val c1 = findings.firstOrNull { it.checkId == CheckId.C1 }
     val c2 = findings.firstOrNull { it.checkId == CheckId.C2 }
     val v0 = findings.any { it.checkId == CheckId.V0 }
     val answered = findings.firstOrNull { it.checkId == CheckId.U1 && it.declared }
+    val watch = com.dpdpxray.core.model.BackgroundWatches.of(sessions)
     return when {
+        // What a quiet watch observed, not a generic "too little": the app itself made almost no connections.
+        v0 && watch != null -> "In ${com.dpdpxray.core.model.BackgroundWatches.length(watch)} of watching, ${sessions.first().targetLabel} made " +
+            "almost no connections. Why, and what to try next, is just below."
         v0 -> "Too few lookups were captured to judge this app. Why, and what to try next, is just below."
         c1 != null && c1.declared ->
             "Based on your answer, hosts of ${c1.entities.size} tracker${if (c1.entities.size == 1) " was" else "s were"} looked up although you never agreed: ${c1.entities.joinToString()}."
