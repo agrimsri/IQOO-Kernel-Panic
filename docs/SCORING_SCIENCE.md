@@ -233,6 +233,25 @@ readings were confirmed. That is why the interval is shown: Ready is often decid
 - `traceveil-ci check`: a `Range:` line and a `robustness` JSON object next to `currentResult` ([CI mode](CI_MODE.md)).
 - The copilot's score answer ends with the same range sentence.
 
+### 6a. Consent history unknown: the bounded verdict
+
+A plan that kept the app's data and showed no consent screen cannot see whether the person agreed earlier (U1 naming
+trackers, ι above). Instead of a bare Inconclusive the rules engine scores the same sessions twice, both with
+`ScoreCalculator.compute`:
+
+- **high** ("if you agreed earlier") = s and b of F \ {U1}: the U1 lookups stay unpenalised; every other check as recorded;
+- **low** ("if you never agreed") = s and b of the findings when the kept plans are judged as a fresh plan would be
+  (the same checks run again with their history known: C1, NC, C10, C14, C11 fire as they would after a reset).
+
+The stored result keeps no score (ι still holds) and carries `historyBounds {lowScore, lowBand, highScore, highBand}`.
+The best band it can reach is **high's band, except that Ready needs both ends Ready** (an unchecked answer never makes
+a pass; with U1 naming trackers the low end always has an OBSERVED C1, so in practice a range is never Ready). When
+low's band equals that best band the verdict holds either way ("Needs work either way · 65–99") and nothing is asked;
+otherwise the result shows "At best Needs work · 35–69" and asks one question. "No, never" gives exactly the low end,
+"Yes, I agreed" exactly the high end (Ready closed by U1 marked `declared`), "Not sure" keeps the range. Answers are
+stored in `historyBounds.answer`, findings that rest on them are marked `declared`, and `traceveil-ci check` re-applies
+the stored answer. LeakyShop's fresh-reset regressions (21, 8, 100) never have bounds.
+
 ## 7. Sensitivity analysis
 
 All on the 209,952 assignments (`ScoreSensitivityTest`).
