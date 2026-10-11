@@ -10,6 +10,8 @@ import com.dpdpxray.app.ai.BenchResult
 import com.dpdpxray.app.ai.Explanation
 import com.dpdpxray.app.ai.Explanations
 import com.dpdpxray.app.ai.LlmStatus
+import com.dpdpxray.app.audit.AccessNeeds
+import com.dpdpxray.app.audit.AccessPrompt
 import com.dpdpxray.app.audit.AuditConfig
 import com.dpdpxray.app.capture.CaptureBus
 import com.dpdpxray.app.consent.ConsentAccessibilityService
@@ -108,11 +110,30 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    fun prepareAudit(): Boolean {
+    /** The permission a check is waiting on, with what to do once it is on. Shown as a dialog by [AccessPromptHost]. */
+    private val _access = MutableStateFlow<AccessPrompt?>(null)
+    val access = _access.asStateFlow()
+    fun dismissAccess() { _access.value = null }
+
+    /**
+     * Whether a check can start now. When it cannot, the reason is offered as a dialog with a button to the right
+     * settings page, and [resume] runs by itself once the permission is on and the person is back.
+     */
+    fun prepareAudit(resume: (() -> Unit)? = null): Boolean {
         refreshPreflight()
-        val problem = AuditStartReadiness.problem(_preflight.value)
-        if (problem != null) _toast.value = problem
+        val pf = _preflight.value
+        val problem = AuditStartReadiness.problem(pf)
+        if (problem != null) {
+            _toast.value = problem
+            AccessNeeds.forCheck(pf)?.let { _access.value = AccessPrompt(it, resume) }
+        }
         return problem == null
+    }
+
+    /** A check that was stopped by a missing permission, started again once it is on. */
+    fun retryAudit(config: AuditConfig): Boolean {
+        acknowledgeProgress()
+        return startAudit(config)
     }
 
     fun requestShizuku() = ShizukuBridge.requestPermission()
@@ -121,10 +142,11 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         _apps.value = withContext(Dispatchers.IO) { DeviceChecks.launchableApps(ctx) }
     }
 
-    fun startAudit(config: AuditConfig): Boolean {
+    /** [onStarted] also runs if the check had to wait for a permission and then began by itself. */
+    fun startAudit(config: AuditConfig, onStarted: (() -> Unit)? = null): Boolean {
         // One tunnel at a time: an audit would replace a running quarantine run's tunnel.
         if (com.dpdpxray.app.quarantine.QuarantineController.isActive) { _toast.value = "Stop the quarantine run before starting an audit."; return false }
-        if (!prepareAudit()) return false
+        if (!prepareAudit { if (startAudit(config)) onStarted?.invoke() }) return false
         graph.orchestrator.start(config)
         return true
     }

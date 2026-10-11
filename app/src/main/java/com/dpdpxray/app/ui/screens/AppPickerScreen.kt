@@ -164,7 +164,7 @@ fun AppPickerScreen(
             val quarantine = { selected = null; onQuarantine(app.packageName) }
             val start: (AuditConfig) -> Unit = { config ->
                 selected = null
-                if (vm.startAudit(config)) onStarted()
+                if (vm.startAudit(config, onStarted)) onStarted()
             }
             val ctx = androidx.compose.ui.platform.LocalContext.current
             val help = ShizukuHelp(

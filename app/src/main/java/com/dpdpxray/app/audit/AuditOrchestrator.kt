@@ -67,7 +67,8 @@ sealed interface AuditProgress {
         val sessionStartNanos: Long = 0,
     ) : AuditProgress
     data class Done(val auditId: String) : AuditProgress
-    data class Failed(val message: String) : AuditProgress
+    /** [need] is set when a missing permission or helper stopped the check; [config] lets it start again once that is fixed. */
+    data class Failed(val message: String, val need: AccessNeed? = null, val config: AuditConfig? = null) : AuditProgress
 }
 
 /**
@@ -95,7 +96,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             } catch (e: CancellationException) {
                 _progress.value = AuditProgress.Idle
             } catch (e: Exception) {
-                _progress.value = AuditProgress.Failed(e.message ?: e.javaClass.simpleName)
+                _progress.value = AuditProgress.Failed(e.message ?: e.javaClass.simpleName, (e as? AccessNeededException)?.need, config)
                 returnToXray()
             }
         }
@@ -201,8 +202,11 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             }
             true
         } ?: false
-        check(onScreen) {
-            "${config.targetLabel} did not come to the screen. Android may have blocked opening it from the background — start Shizuku, or keep TraceVeil open and retry."
+        if (!onScreen) {
+            val message = "${config.targetLabel} did not come to the screen. Android may have blocked opening it from the background — start Shizuku, or keep TraceVeil open and retry."
+            val need = if (ConsentAccessibilityService.instance == null) AccessNeed.WATCHER
+            else AccessNeeds.shizuku(ShizukuBridge.isRunning(), ShizukuBridge.hasPermission())
+            throw if (need != null) AccessNeededException(need, message) else IllegalStateException(message)
         }
 
         step("Waiting for a consent screen", t0)
@@ -216,16 +220,29 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             detectBlocker = { withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.blockerNow() } },
             trySkip = { withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.trySkipBlocker() } },
             onHandoff = { kind ->
-                step(BlockerCopy.waitingStep(kind), t0)
-                BlockerNotifier.post(context, config.targetLabel, kind)
+                // Say which field to fill in, using the app's own label for it, on screen and in the notification.
+                val hindi = graph.settings.settings.value.guideLanguage == "hi"
+                val fields = withContext(Dispatchers.Main.immediate) {
+                    val svc = ConsentAccessibilityService.instance
+                    val found = svc?.blockerFields().orEmpty()
+                    svc?.showBlockerPrompt(
+                        BlockerCopy.promptTitle(kind, found, hindi), BlockerCopy.promptBody(hindi),
+                        BlockerCopy.promptStop(hindi), BlockerCopy.promptHide(hindi),
+                    ) { this@AuditOrchestrator.cancel() }
+                    found
+                }
+                step(BlockerCopy.waitingStep(kind, fields), t0)
+                BlockerNotifier.post(context, config.targetLabel, kind, fields)
             },
             onResume = {
+                withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.hideBlockerPrompt() }
                 BlockerNotifier.clear(context)
                 step("Waiting for a consent screen", t0)
             },
             clockMs = SystemClock::elapsedRealtime, pause = { delay(it) },
             interactive = plan != AuditPlan.SILENT,
         ).await(t.waitConsentMs)
+        withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.hideBlockerPrompt() }
         BlockerNotifier.clear(context)
         notes += BlockerCopy.notes(waited, blocksPlan = plan != AuditPlan.SILENT)
         val appeared = waited.consent
@@ -330,7 +347,13 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             .onFailure { throw IllegalStateException("Could not start capture: ${it.message}") }
         val state = withTimeoutOrNull(6_000) { CaptureBus.state.first { it is CaptureState.Running || it is CaptureState.Error } }
         if (state !is CaptureState.Running) {
-            throw IllegalStateException((state as? CaptureState.Error)?.message ?: "Capture did not start — check VPN permission")
+            val message = (state as? CaptureState.Error)?.message ?: "Capture did not start — check VPN permission"
+            val need = when {
+                DeviceChecks.otherVpnActive(context) -> AccessNeed.OTHER_VPN
+                android.net.VpnService.prepare(context) != null -> AccessNeed.VPN
+                else -> null
+            }
+            throw if (need != null) AccessNeededException(need, message) else IllegalStateException(message)
         }
     }
 

@@ -72,8 +72,11 @@ import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.guide.GradientAction
 import com.dpdpxray.app.ui.guide.guideLang
+import com.dpdpxray.app.audit.AccessCopy
 import com.dpdpxray.app.ui.system.Notice
 import com.dpdpxray.app.ui.system.NoticeKind
+import com.dpdpxray.app.ui.system.WatchAccess
+import com.dpdpxray.app.ui.system.rememberAccessAction
 import com.dpdpxray.app.ui.guide.GuideFlow
 import com.dpdpxray.app.ui.guide.GuideStep
 import com.dpdpxray.app.ui.guide.GuideTone
@@ -114,6 +117,16 @@ fun LiveAuditScreen(vm: XrayViewModel, onDone: (String) -> Unit, onBack: () -> U
             is AuditProgress.Failed -> {
                 Text("The check stopped", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 32.dp).semantics { heading() })
                 Callout(p.message, Modifier.padding(vertical = 12.dp), color = Film.leak)
+                // A missing permission is named with the button that opens its page; once it is on, the check starts again.
+                p.need?.let { need ->
+                    val lang = guideLang()
+                    val act = rememberAccessAction(vm)
+                    WatchAccess(vm, need) { p.config?.let { if (!vm.retryAudit(it)) onBack() } }
+                    Notice(
+                        AccessCopy.reason(need).pick(lang), Modifier.padding(bottom = 8.dp), kind = NoticeKind.CAUTION,
+                        action = AccessCopy.button(need).pick(lang) to { act(need) },
+                    )
+                }
                 Notice(GuideCopy.failed.pick(guideLang()), Modifier.padding(bottom = 8.dp), kind = NoticeKind.CAUTION)
                 GradientAction("Back to Home", { vm.acknowledgeProgress(); onBack() }, Modifier.padding(top = 20.dp))
                 return@Column

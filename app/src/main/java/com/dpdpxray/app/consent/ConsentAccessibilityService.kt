@@ -22,6 +22,11 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
@@ -42,11 +47,21 @@ class ConsentAccessibilityService : AccessibilityService() {
     /** Read-only: Android's own permission dialogs while an audit is armed (check C14); it never taps. */
     private val permissionWatcher = PermissionDialogWatcher(this, main)
 
+    /** The glow along the top edge and the "fill this in" card, drawn over the audited app. */
+    private val overlay = InspectionOverlay(this)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     override fun onServiceConnected() {
         instance = this
+        // The glow follows the audit: on while an app is armed for inspection, off the moment it is not.
+        scope.launch {
+            ConsentBus.armedPackage.collect { pkg -> if (pkg == null) overlay.hideAll() else overlay.showGlow() }
+        }
     }
 
     override fun onDestroy() {
+        scope.cancel()
+        overlay.hideAll()
         if (instance === this) instance = null
         main.removeCallbacks(check)
         quarantineWatcher.cancel()
@@ -61,6 +76,10 @@ class ConsentAccessibilityService : AccessibilityService() {
         if (QuarantineBus.watchedPackage != null) quarantineWatcher.onEvent(event)
         val armed = ConsentBus.armedPackage.value ?: run { consentVisible = false; return }
         val pkg = event.packageName?.toString()
+        // The glow marks the inspected app: it steps aside while TraceVeil itself is in front and returns with the app.
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            if (pkg == armed) overlay.showGlow() else if (pkg == packageName) overlay.hideAll()
+        }
         if (pkg != armed) {
             // Android's permission dialog over the audited app is recorded (C14), never treated as its consent screen.
             if (pkg != null && QuarantineUiRules.isPermissionController(pkg) && event.eventType != AccessibilityEvent.TYPE_VIEW_CLICKED) {
@@ -164,8 +183,22 @@ class ConsentAccessibilityService : AccessibilityService() {
         }
     }
 
-    /** Screenshot on the accessibility framework, encoded off the main thread; the buffer is always released. */
+    /**
+     * Evidence screenshots are of the app alone: the glow is taken off the screen for the moment of the shot and put back.
+     * Callers use the main thread.
+     */
     private fun capture(file: File, done: (Boolean) -> Unit) {
+        val hadGlow = overlay.glowShowing
+        if (hadGlow) overlay.hideGlow()
+        val finish: (Boolean) -> Unit = { ok ->
+            if (hadGlow) main.post { if (ConsentBus.armedPackage.value != null) overlay.showGlow() }
+            done(ok)
+        }
+        if (hadGlow) main.postDelayed({ captureNow(file, finish) }, GLOW_CLEAR_MS) else captureNow(file, finish)
+    }
+
+    /** Screenshot on the accessibility framework, encoded off the main thread; the buffer is always released. */
+    private fun captureNow(file: File, done: (Boolean) -> Unit) {
         // Accessibility screenshots need Android 11; on Android 10 the audit uses the UI tree alone.
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) return done(false)
         try {
@@ -241,6 +274,19 @@ class ConsentAccessibilityService : AccessibilityService() {
         return BlockerLexicon.detect(tree)
     }
 
+    /** What the audited app's sign-in or code screen asks the person to fill in, as the app labels it. Main thread. */
+    fun blockerFields(): List<String> {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        val tree = NodeMapper.map(targetRoot()) ?: return emptyList()
+        return BlockerLexicon.fieldLabels(tree)
+    }
+
+    /** Shows the "fill this in" card over the audited app. Main thread. */
+    fun showBlockerPrompt(title: String, body: String, stopLabel: String, hideLabel: String, onStop: () -> Unit) =
+        overlay.showPrompt(title, body, stopLabel, hideLabel, onStop)
+
+    fun hideBlockerPrompt() = overlay.hidePrompt()
+
     /**
      * Taps a harmless skip button ("Skip", "Not now", "Continue as guest") on the audited app's screen and returns its
      * label, or null when there is none. It never types, and never taps a sign-in, social-login or sign-up button.
@@ -272,6 +318,8 @@ class ConsentAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val SETTLE_MS = 250L
+        /** Time for the removed glow window to leave the screen before a screenshot is taken. */
+        private const val GLOW_CLEAR_MS = 120L
 
         @Volatile
         var instance: ConsentAccessibilityService? = null

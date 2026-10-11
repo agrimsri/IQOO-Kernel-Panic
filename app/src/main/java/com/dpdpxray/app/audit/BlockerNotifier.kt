@@ -19,7 +19,7 @@ internal object BlockerNotifier {
     private const val CHANNEL = "audit_needs_you"
     private const val ID = 7301
 
-    fun post(context: Context, app: String, kind: BlockerKind) {
+    fun post(context: Context, app: String, kind: BlockerKind, fields: List<String> = emptyList()) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
@@ -32,12 +32,12 @@ internal object BlockerNotifier {
         )
         val open = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val tap = PendingIntent.getActivity(context, ID, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val text = BlockerCopy.notificationText(app, kind)
+        val text = BlockerCopy.notificationText(app, kind, fields)
         val n = Notification.Builder(context, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(BlockerCopy.notificationTitle(app))
             .setContentText(text)
-            .setStyle(Notification.BigTextStyle().bigText("$text\n${BlockerCopy.notificationTextHi(app, kind)}"))
+            .setStyle(Notification.BigTextStyle().bigText("$text\n${BlockerCopy.notificationTextHi(app, kind, fields)}"))
             .setContentIntent(tap)
             .setOnlyAlertOnce(true)
             .build()

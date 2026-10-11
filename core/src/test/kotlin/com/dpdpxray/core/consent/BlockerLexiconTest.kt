@@ -49,4 +49,27 @@ class BlockerLexiconTest {
         listOf("Log in", "Sign up", "Continue with Google", "Create account", "Skip the tutorial and buy", "Continue", "Allow", null, "")
             .forEach { assertFalse("$it must not be tapped", BlockerLexicon.isSkipLabel(it)) }
     }
+
+    private fun input(hint: String? = null, description: String? = null, typed: String? = null, password: Boolean = false) =
+        UiNode(className = "android.widget.EditText", text = typed, hint = hint, contentDescription = description, isEditable = true, isPassword = password)
+
+    @Test fun `field labels use the placeholder, then the description, then the text just before`() {
+        val tree = screen(
+            text("Welcome back"), input(hint = "Phone number"),
+            text("Your email"), input(),
+            input(description = "Referral code"),
+        )
+        assertEquals(listOf("Phone number", "Your email", "Referral code"), BlockerLexicon.fieldLabels(tree))
+    }
+
+    @Test fun `field labels never include what was typed and call a nameless password box Password`() {
+        val tree = screen(input(hint = "Email", typed = "me@example.com"), input(typed = "hunter2", password = true))
+        assertEquals(listOf("Email", "Password"), BlockerLexicon.fieldLabels(tree))
+    }
+
+    @Test fun `field labels are distinct, short and at most three`() {
+        val tree = screen(input(hint = "A"), input(hint = "A"), input(hint = "B"), input(hint = "C"), input(hint = "D"), input(hint = "x".repeat(60)))
+        assertEquals(listOf("A", "B", "C"), BlockerLexicon.fieldLabels(tree))
+        assertTrue(BlockerLexicon.fieldLabels(screen(text("Hello"), button("Go"))).isEmpty())
+    }
 }

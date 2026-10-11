@@ -61,6 +61,29 @@ object BlockerLexicon {
         }
     }
 
+    /**
+     * What the person is asked to fill in on this screen, as the app labels it ("Phone number", "Password"): for each
+     * field, its placeholder, else its description, else the nearest text just before it. A password field never gives up
+     * its content, and what was typed into any field is never read. At most [MAX_FIELDS] distinct, short labels.
+     */
+    fun fieldLabels(tree: UiNode): List<String> {
+        val nodes = tree.flatten()
+        val labels = mutableListOf<String>()
+        nodes.forEachIndexed { i, n ->
+            if (!(n.isEditable || n.isPassword || n.className.endsWith("EditText"))) return@forEachIndexed
+            val own = n.hint ?: n.contentDescription?.takeIf { it.isNotBlank() }
+            val before = nodes.subList(0, i).asReversed().firstOrNull { p ->
+                !p.isEditable && !p.isClickable && p.children.isEmpty() && p.text?.isNotBlank() == true && p.text!!.length <= MAX_LABEL
+            }?.text
+            val label = (own ?: before ?: if (n.isPassword) "Password" else null)?.trim()
+            if (!label.isNullOrEmpty() && label.length <= MAX_LABEL && label !in labels) labels += label
+        }
+        return labels.take(MAX_FIELDS)
+    }
+
+    private const val MAX_FIELDS = 3
+    private const val MAX_LABEL = 40
+
     /** True for a button that safely gets past a gate. Never true for sign-in, social-login or account-creation buttons. */
     fun isSkipLabel(label: String?): Boolean {
         val text = normalize(label ?: return false)

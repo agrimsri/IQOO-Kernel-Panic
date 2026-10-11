@@ -101,4 +101,31 @@ class ConsentWaitAssistTest {
         assertTrue("silent plans are not blocked by it", BlockerCopy.notes(blocked, blocksPlan = false).none { it.startsWith(BlockerCopy.BLOCKED_MARK) })
         assertTrue(BlockerCopy.notes(ConsentWaitAssist.Outcome(consent, null, emptyList(), false, 0)).isEmpty())
     }
+
+    @Test fun `the popup names the field to fill in, and falls back to the kind of screen`() {
+        assertEquals("Fill in “Phone number”", BlockerCopy.promptTitle(BlockerKind.SIGN_IN, listOf("Phone number")))
+        assertEquals("Fill in “Email” and “Password”", BlockerCopy.promptTitle(BlockerKind.SIGN_IN, listOf("Email", "Password")))
+        assertEquals("Enter the verification code", BlockerCopy.promptTitle(BlockerKind.OTP, emptyList()))
+        assertEquals("Solve the CAPTCHA", BlockerCopy.promptTitle(BlockerKind.CAPTCHA, emptyList()))
+        assertTrue(BlockerCopy.notificationText("Shop", BlockerKind.SIGN_IN, listOf("Phone number")).contains("“Phone number”"))
+        assertTrue(BlockerCopy.promptTitle(BlockerKind.SIGN_IN, listOf("Phone number"), hindi = true).contains("“Phone number”"))
+    }
+
+    @Test fun `access needs follow the order a check needs them and clear when met`() {
+        fun pf(vpn: Boolean = true, watcher: Boolean = true, other: Boolean = false, running: Boolean = true, granted: Boolean = true) =
+            com.dpdpxray.app.control.Preflight(vpn, watcher, running, granted, false, false, false, other)
+        assertNull(AccessNeeds.forCheck(pf()))
+        assertEquals(AccessNeed.OTHER_VPN, AccessNeeds.forCheck(pf(other = true, vpn = false, watcher = false)))
+        assertEquals(AccessNeed.VPN, AccessNeeds.forCheck(pf(vpn = false, watcher = false)))
+        assertEquals(AccessNeed.WATCHER, AccessNeeds.forCheck(pf(watcher = false)))
+        assertEquals(AccessNeed.SHIZUKU_RUNNING, AccessNeeds.shizuku(running = false, granted = false))
+        assertEquals(AccessNeed.SHIZUKU_PERMISSION, AccessNeeds.shizuku(running = true, granted = false))
+        assertNull(AccessNeeds.shizuku(running = true, granted = true))
+        assertTrue(AccessNeeds.met(AccessNeed.WATCHER, pf()))
+        assertFalse(AccessNeeds.met(AccessNeed.SHIZUKU_PERMISSION, pf(granted = false)))
+        AccessNeed.values().forEach { n ->
+            assertTrue(AccessCopy.reason(n).en.isNotBlank() && AccessCopy.reason(n).hi.isNotBlank())
+            assertTrue(AccessCopy.button(n).en.isNotBlank() && AccessCopy.title(n).hi.isNotBlank())
+        }
+    }
 }

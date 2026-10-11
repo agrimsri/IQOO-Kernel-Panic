@@ -22,13 +22,37 @@ internal object BlockerCopy {
     }
 
     /** The live "step" line while the person is asked to act. */
-    fun waitingStep(k: BlockerKind) = "Waiting for you: finish the ${kind(k)}, then TraceVeil continues"
+    fun waitingStep(k: BlockerKind, fields: List<String> = emptyList()) =
+        if (fields.isEmpty()) "Waiting for you: finish the ${kind(k)}, then TraceVeil continues"
+        else "Waiting for you: fill in ${quoted(fields)}, then TraceVeil continues"
 
     fun notificationTitle(app: String) = "$app needs you"
-    fun notificationText(app: String, k: BlockerKind) =
-        "Complete the ${kind(k)} in $app (or skip it). TraceVeil is still watching and continues the check by itself."
-    fun notificationTextHi(app: String, k: BlockerKind) =
-        "$app में ${kindHi(k)} पूरा करें (या छोड़ दें)। TraceVeil देख रहा है और जाँच अपने आप आगे बढ़ाएगा।"
+    fun notificationText(app: String, k: BlockerKind, fields: List<String> = emptyList()) =
+        if (fields.isEmpty()) "Complete the ${kind(k)} in $app (or skip it). TraceVeil is still watching and continues the check by itself."
+        else "Fill in ${quoted(fields)} in $app. TraceVeil is still watching and continues the check by itself."
+    fun notificationTextHi(app: String, k: BlockerKind, fields: List<String> = emptyList()) =
+        if (fields.isEmpty()) "$app में ${kindHi(k)} पूरा करें (या छोड़ दें)। TraceVeil देख रहा है और जाँच अपने आप आगे बढ़ाएगा।"
+        else "$app में ${quoted(fields)} भरें। TraceVeil देख रहा है और जाँच अपने आप आगे बढ़ाएगा।"
+
+    private fun quoted(fields: List<String>) = fields.joinToString(" and ") { "“$it”" }
+
+    /** The popup shown over the audited app while it waits for the person: names the field to fill in when it is known. */
+    fun promptTitle(k: BlockerKind, fields: List<String>, hindi: Boolean = false): String = when {
+        fields.isNotEmpty() -> if (hindi) "${quoted(fields).replace(" and ", " और ")} भरें" else "Fill in ${quoted(fields)}"
+        else -> when (k) {
+            BlockerKind.SIGN_IN -> if (hindi) "जारी रखने के लिए साइन इन करें" else "Sign in to continue"
+            BlockerKind.OTP -> if (hindi) "वेरिफ़िकेशन कोड डालें" else "Enter the verification code"
+            BlockerKind.CAPTCHA -> if (hindi) "कैप्चा हल करें" else "Solve the CAPTCHA"
+            BlockerKind.BIOMETRIC -> if (hindi) "फ़िंगरप्रिंट या PIN इस्तेमाल करें" else "Use your fingerprint or PIN"
+        }
+    }
+
+    fun promptBody(hindi: Boolean = false) =
+        if (hindi) "TraceVeil आपके लिए कुछ नहीं टाइप करता। आपके आगे बढ़ते ही जाँच अपने आप चलती रहेगी।"
+        else "TraceVeil never types for you. The check carries on by itself as soon as you are through."
+
+    fun promptStop(hindi: Boolean = false) = if (hindi) "जाँच रोकें" else "Stop check"
+    fun promptHide(hindi: Boolean = false) = if (hindi) "छिपाएँ" else "Hide"
 
     /** Notes for the audit record, from what the wait found. */
     fun notes(outcome: ConsentWaitAssist.Outcome, blocksPlan: Boolean = true): List<String> {

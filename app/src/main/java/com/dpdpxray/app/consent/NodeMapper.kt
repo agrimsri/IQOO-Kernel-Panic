@@ -30,6 +30,7 @@ object NodeMapper {
                 isClickable = n.isClickable,
                 isPassword = n.isPassword,
                 isEditable = n.isEditable,
+                hint = n.hintText?.toString()?.takeIf { it.isNotBlank() },
                 bounds = Bounds(r.left, r.top, r.right, r.bottom),
                 children = kids,
             )
