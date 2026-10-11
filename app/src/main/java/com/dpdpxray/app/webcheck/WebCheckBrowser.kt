@@ -163,22 +163,27 @@ class WebCheckBrowser(context: Context) {
     suspend fun clearProfile(): Boolean = withContext(Dispatchers.Main) {
         view.stopLoading()
         view.loadUrl("about:blank")
+        // The site's page keeps running (and writing cookies or storage) until the blank page replaces it: wait for that.
+        withTimeoutOrNull(3_000) { while (view.url != "about:blank" || view.progress < 100) delay(50) }
         val cm = CookieManager.getInstance()
-        suspendCancellableCoroutine { cont -> cm.removeAllCookies(ValueCallback { if (cont.isActive) cont.resume(Unit) }) }
-        cm.removeSessionCookies(null)
-        cm.flush()
-        WebStorage.getInstance().deleteAllData()
-        view.clearCache(true)
-        view.clearHistory()
-        view.clearFormData()
-        runCatching { WebViewDatabase.getInstance(app).clearHttpAuthUsernamePassword() }
-        // Storage is deleted in the background; confirm it is empty (up to about 3 seconds).
-        repeat(15) {
+        // Storage is deleted in the background, and a frame or worker of the old page can still write while it winds
+        // down, so each round clears again and then checks; up to about 8 seconds in all.
+        repeat(16) {
+            suspendCancellableCoroutine { cont -> cm.removeAllCookies(ValueCallback { if (cont.isActive) cont.resume(Unit) }) }
+            cm.removeSessionCookies(null)
+            cm.flush()
+            WebStorage.getInstance().deleteAllData()
+            view.clearCache(true)
+            view.clearHistory()
+            view.clearFormData()
+            runCatching { WebViewDatabase.getInstance(app).clearHttpAuthUsernamePassword() }
+            delay(500)
             val origins = suspendCancellableCoroutine<Map<*, *>?> { cont ->
                 WebStorage.getInstance().getOrigins(ValueCallback { m -> if (cont.isActive) cont.resume(m as? Map<*, *>) })
             }
-            if (!cm.hasCookies() && origins.isNullOrEmpty()) return@withContext true
-            delay(200)
+            // An origin can stay listed with nothing stored; only stored bytes count as left over.
+            val stored = origins.orEmpty().values.count { ((it as? WebStorage.Origin)?.usage ?: 1L) > 0L }
+            if (!cm.hasCookies() && stored == 0) return@withContext true
         }
         false
     }
