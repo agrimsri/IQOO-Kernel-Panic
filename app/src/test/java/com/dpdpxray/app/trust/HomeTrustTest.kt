@@ -75,6 +75,18 @@ class HomeTrustTest {
     }
 
     @Test
+    fun `VPN fact - says the checked app's connections are relayed whenever the deep check is on`() {
+        val detail = HomeTrust.facts(onlineVoiceOn = false, backupAllowed = false)[1].detail
+        val deepByDefault = source("capture/CaptureBus.kt").contains("@Volatile var deepCapture = true")
+        if (deepByDefault) {
+            assertFalse(detail.en, detail.en.contains("only that app's DNS lookups"))
+            assertTrue(detail.en, detail.en.contains("connections") && detail.en.contains("forwarded unchanged"))
+            assertTrue(detail.en, detail.en.contains("Nothing is decrypted"))
+            assertTrue(detail.hi.contains("कनेक्शन"))
+        }
+    }
+
+    @Test
     fun `screen fact - the watcher ignores every event unless a check or quarantine run is going`() {
         val svc = source("consent/ConsentAccessibilityService.kt")
         val body = svc.substringAfter("override fun onAccessibilityEvent(event: AccessibilityEvent) {").substringBefore("\n    }\n")

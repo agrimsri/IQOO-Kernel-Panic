@@ -85,7 +85,7 @@ object TrustText {
     /** Special access that is not a manifest permission: the check VPN. */
     val vpnAccess = Claim(
         "Local VPN, during a check",
-        "Local and per-app: only the app you chose (plus Google Play services, if you include them) is routed, and only its DNS lookups.",
+        "Local and per-app: only the app you chose (plus Google Play services, if you include them) is routed: its DNS lookups, and its connections, forwarded unchanged.",
         "Nothing is decrypted and no certificate is installed. Android asks before the first check. A quarantine run uses the same " +
             "VPN to cut that one app's internet while recording what it tries to reach.",
     )

@@ -45,8 +45,8 @@ object HomeTrust {
         Bi("VPN: only the checked app", "VPN: सिर्फ़ जाँचा गया ऐप"),
         Bi("VPN sees only the app you check", "VPN सिर्फ़ उसी ऐप को देखता है जिसकी आप जाँच करते हैं"),
         Bi(
-            "During a check, Android sends only that app's DNS lookups (and Google Play services', if you include them) through TraceVeil's local VPN. Nothing is decrypted. A quarantine run cuts only that app's internet.",
-            "जाँच के दौरान Android सिर्फ़ उसी ऐप के DNS लुकअप (और अगर आप शामिल करें तो Google Play services के) TraceVeil के लोकल VPN से भेजता है। कुछ भी डिक्रिप्ट नहीं होता। क्वारंटीन रन सिर्फ़ उसी ऐप का इंटरनेट काटता है।",
+            "During a check, Android sends only that app's traffic (and Google Play services', if you include them) through TraceVeil's local VPN: its DNS lookups, and its connections, which are forwarded unchanged to the servers it chose. TraceVeil reads who it contacts, never what it sends inside encrypted connections. Nothing is decrypted. A quarantine run cuts only that app's internet.",
+            "जाँच के दौरान Android सिर्फ़ उसी ऐप का ट्रैफ़िक (और अगर आप शामिल करें तो Google Play services का) TraceVeil के लोकल VPN से भेजता है: उसके DNS लुकअप, और उसके कनेक्शन, जो बिना बदले उन्हीं सर्वरों तक भेजे जाते हैं जिन्हें ऐप ने चुना। TraceVeil पढ़ता है कि ऐप किससे संपर्क करता है, एन्क्रिप्टेड कनेक्शन के अंदर क्या भेजा गया यह कभी नहीं। कुछ भी डिक्रिप्ट नहीं होता। क्वारंटीन रन सिर्फ़ उसी ऐप का इंटरनेट काटता है।",
         ),
     )
     private val screen = TrustFact(
