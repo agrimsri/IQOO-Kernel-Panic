@@ -22,9 +22,11 @@ import androidx.compose.ui.graphics.toArgb
  * What the person sees on top of the app being checked, drawn as accessibility overlays (no extra permission):
  *
  * - a soft glow along the top edge for as long as the app is under inspection, so it is always clear that TraceVeil is
- *   watching. It never takes touches or focus, and it stands still when the person has turned animations off;
+ *   watching. It never takes touches or focus, it stands still when the person has turned animations off, and it keeps
+ *   the screen on so the phone does not lock in the middle of a check;
  * - a small card, shown only while a check waits for the person, naming the field to fill in. It sits below the status bar
- *   so the keyboard and the field stay free, can be hidden, and offers to stop the check.
+ *   so the keyboard and the field stay free, can be hidden, offers to stop the check, and has a Continue for when the
+ *   person is through (the check also carries on by itself once the step is gone).
  *
  * Every call is made on the main thread. A window that cannot be added (for example while the screen is locked) is
  * ignored: the overlay is a cue, never something a check depends on.
@@ -58,7 +60,10 @@ internal class InspectionOverlay(private val service: AccessibilityService) {
             ViewGroup.LayoutParams.MATCH_PARENT, dp(GLOW_DP).toInt(),
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                // While an app is inspected the screen stays on: a phone that dims and locks mid-check pauses the app and
+                // hides its lookups. Removed with the glow when the check ends.
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
             PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.TOP or Gravity.START }
         val added = runCatching { wm.addView(view, params) }
@@ -82,8 +87,8 @@ internal class InspectionOverlay(private val service: AccessibilityService) {
         glow = null
     }
 
-    /** The card asking the person to fill something in. Replaces one already showing. */
-    fun showPrompt(title: String, body: String, stopLabel: String, hideLabel: String, onStop: () -> Unit) {
+    /** The card asking the person to fill something in. Replaces one already showing. Continue says they are through. */
+    fun showPrompt(title: String, body: String, stopLabel: String, hideLabel: String, continueLabel: String, onContinue: () -> Unit, onStop: () -> Unit) {
         hidePrompt()
         val p = palette
         val bg = GradientDrawable().apply { setColor(p.surfaceRaised.toArgb()); cornerRadius = dp(18f) }
@@ -118,7 +123,8 @@ internal class InspectionOverlay(private val service: AccessibilityService) {
             setOnClickListener { onClick() }
         }
         actions.addView(action(hideLabel, p.textSecondary.toArgb()) { hidePrompt() })
-        actions.addView(action(stopLabel, p.accent.toArgb()) { hidePrompt(); onStop() })
+        actions.addView(action(stopLabel, p.textSecondary.toArgb()) { hidePrompt(); onStop() })
+        actions.addView(action(continueLabel, p.accent.toArgb()) { hidePrompt(); onContinue() })
         column.addView(actions)
 
         val params = WindowManager.LayoutParams(

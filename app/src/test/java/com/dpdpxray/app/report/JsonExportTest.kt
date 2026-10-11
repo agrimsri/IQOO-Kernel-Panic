@@ -60,6 +60,32 @@ class JsonExportTest {
     }
 
     @Test
+    fun `the export can carry the SDK attribution, derived from the same audit`() {
+        val groups = com.dpdpxray.core.attribution.SdkAttribution(TrackerCatalog.loadDefault(), com.dpdpxray.core.fixes.FixCatalog.loadDefault())
+            .groups(result, sessions)
+        val export = com.dpdpxray.core.export.SdkAttributionExport(groups = groups)
+        val decoded = AuditBundles.decode(AuditBundles.encode(AuditJsonExport.build(bundle(), "1.1.0", sdkAttribution = export)))
+        assertEquals(export, decoded.sdkAttribution)
+        assertEquals(sessions, decoded.sessions)
+        assertNull(AuditBundles.decode(AuditBundles.encode(AuditJsonExport.build(bundle(), "1.1.0"))).sdkAttribution)
+    }
+
+    @Test
+    fun `the export can carry the dark-pattern signals, derived from the same sessions, without touching the result`() {
+        val export = com.dpdpxray.core.darkpattern.DarkPatternExport.of(sessions)
+        val text = AuditBundles.encode(AuditJsonExport.build(bundle(), "1.1.0", darkPatterns = export))
+        val decoded = AuditBundles.decode(text)
+        assertEquals(export, decoded.darkPatterns)
+        assertEquals(sessions, decoded.sessions)
+        assertEquals(result, decoded.result)
+        assertTrue("darkPatterns" in kotlinx.serialization.json.Json.parseToJsonElement(text).jsonObject)
+        // Absent unless the phone passes it: the shared v1 shape stays as it was.
+        val plain = AuditBundles.encode(AuditJsonExport.build(bundle(), "1.1.0"))
+        assertNull(AuditBundles.decode(plain).darkPatterns)
+        assertTrue("darkPatterns" !in kotlinx.serialization.json.Json.parseToJsonElement(plain).jsonObject)
+    }
+
+    @Test
     fun `missing upload readings are exported as null, not as an empty measurement`() {
         val text = AuditBundles.encode(AuditJsonExport.build(bundle(), "1.1.0"))
         assertEquals(JsonNull, kotlinx.serialization.json.Json.parseToJsonElement(text).jsonObject["networkReadings"])

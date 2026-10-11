@@ -19,6 +19,7 @@ class PolicyTest {
         assertEquals(false, p.allowInconclusive)
         assertEquals(false, p.allowNotEstablished)
         assertEquals(listOf(AuditPlan.ACCEPT, AuditPlan.REJECT, AuditPlan.SILENT), p.requirePlans)
+        assertEquals("a signature is reported, not required, unless the team asks for it", false, p.requireSignature)
         assertEquals(p, Policy.parse("{}"))
     }
 
@@ -39,10 +40,16 @@ class PolicyTest {
     }
 
     @Test
+    fun `requireSignature is read from the policy`() {
+        assertEquals(Policy(requireSignature = true), Policy.parse("""{"requireSignature": true}"""))
+        assertEquals(true, Policy.parse("""{"requireSignature": true}""").toJson()["requireSignature"].toString().toBoolean())
+    }
+
+    @Test
     fun `effective policy round-trips through its JSON`() {
         val p = Policy(
             failOn = listOf(CheckId.C1), minScore = 60, maxHigh = 2, requireFreshState = false, allowInconclusive = true,
-            allowNotEstablished = true, requirePlans = emptyList(),
+            allowNotEstablished = true, requirePlans = emptyList(), requireSignature = true,
         )
         assertEquals(p, Policy.parse(p.toJson().toString()))
     }
@@ -66,6 +73,7 @@ class PolicyTest {
         bad("""{"requireFreshState": "yes"}""", "true or false")
         bad("""{"allowNotEstablished": 1}""", "allowNotEstablished must be true or false")
         bad("""{"requirePlans": ["LATER"]}""", "unknown plan \"LATER\"")
+        bad("""{"requireSignature": "true"}""", "requireSignature must be true or false")
         bad("""[1]""", "JSON object")
         bad("""{broken""", "not valid JSON")
     }

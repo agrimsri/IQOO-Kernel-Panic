@@ -7,6 +7,9 @@ import com.dpdpxray.app.ui.guide.GuideStep
 import com.dpdpxray.app.ui.guide.GuideTone
 import com.dpdpxray.app.ui.guide.SetupKind
 import com.dpdpxray.core.model.ScoreBand
+import com.dpdpxray.core.update.AppVersion
+import com.dpdpxray.core.update.UpdateKind
+import com.dpdpxray.core.update.UpdatedApp
 
 /** Names of the two modes, shown in More, Settings and on the everyday Home. */
 object ModeCopy {
@@ -46,7 +49,7 @@ object EverydayCopy {
         "देखें कि कोई ऐप आपके फ़ोन पर क्या-क्या कर सकता है, और आपके 'ना' कहने पर वह मानता है या नहीं।",
     )
     val onPhone = Bi("Checks run on this phone", "जाँच इसी फ़ोन पर होती है")
-    val readsOnly = Bi("Reads app files, never installs them", "ऐप फ़ाइल सिर्फ़ पढ़ता है, इंस्टॉल नहीं करता")
+    val readsOnly = Bi("Checks app files before you install them", "ऐप फ़ाइलों को इंस्टॉल करने से पहले जाँचता है")
 
     val file = Card(
         Bi("Check a file someone sent me", "किसी की भेजी फ़ाइल जाँचें"),
@@ -132,6 +135,24 @@ object EverydayCopy {
     val sample = Bi("Sample", "नमूना")
     val partial = Bi("Partial check", "अधूरी जाँच")
 
+    // Update Watch on the everyday Home: an app the person checked now has a different version installed.
+    fun updatedTitle(n: Int) = if (n == 1) Bi("An app you checked has updated", "आपका जाँचा हुआ एक ऐप अपडेट हुआ है")
+    else Bi("$n apps you checked have updated", "आपके जाँचे हुए $n ऐप अपडेट हुए हैं")
+    val updatedNote = Bi(
+        "Your last result is about the old version. Check again to see what changed.",
+        "आपका पिछला नतीजा पुराने वर्ज़न का है। क्या बदला, यह देखने के लिए फिर से जाँचें।",
+    )
+    val checkAgain = Bi("Check again", "फिर से जाँचें")
+
+    /** "LeakyShop 1.0 → 1.1": the app and the versions Android reports, nothing about what changed inside it. */
+    fun updatedLine(item: UpdatedApp): Bi = when (item.kind) {
+        UpdateKind.UPDATED -> Bi("${item.label} ${item.versionChange}", "${item.label} ${item.versionChange}")
+        UpdateKind.DOWNGRADED -> Bi("${item.label} ${item.versionChange} (older version)", "${item.label} ${item.versionChange} (पुराना वर्ज़न)")
+        UpdateKind.VERSION_NOT_RECORDED -> AppVersion.label(item.newVersion).let { now ->
+            Bi("${item.label} · now $now", "${item.label} · अब $now")
+        }
+    }
+
     /** Plain names for a result's band: what was seen, never a verdict on the app. */
     fun band(b: ScoreBand) = when (b) {
         ScoreBand.READY -> Bi("Nothing flagged in this check", "इस जाँच में कुछ नहीं मिला")
@@ -144,12 +165,33 @@ object EverydayCopy {
     fun all(): List<Bi> = listOf(eyebrow, heroTitle, heroBody, onPhone, readsOnly) +
         listOf(file, apps, alerts, sayNo, trust).flatMap { listOf(it.title, it.body) } +
         listOf(ready, stepsFirst(1), stepsFirst(2), readiness, running, recentTitle, seeAll, emptyTitle, emptyBody, seeSample, sample, partial) +
+        listOf(updatedTitle(1), updatedTitle(2), updatedNote, checkAgain) +
         listOf(SetupKind.VPN, SetupKind.WATCHER, SetupKind.PRIVATE_DNS).flatMap { listOf(setupTitle(it), setupDetail(it)) } +
         listOf(otherVpnTitle, otherVpnDetail) +
         AlertStatus.entries.flatMap { listOf(alertLabel(it, false), alertLabel(it, true)) } +
         ScoreBand.entries.map { band(it) } +
         Audience.entries.flatMap { listOf(ModeCopy.name(it), ModeCopy.tagline(it), ModeCopy.title(it)) } +
         listOf(ModeCopy.note, ModeCopy.switchToDeveloper)
+}
+
+/** What the everyday Home's Update Watch card shows: a title, up to [EverydayUpdates.MAX_ROWS] apps, and how many more. */
+data class EverydayUpdateCard(val title: Bi, val rows: List<Row>, val more: Int) {
+    /** One updated app: its line and the package "Check again" opens the check for. */
+    data class Row(val packageName: String, val line: Bi)
+}
+
+/**
+ * The everyday Update Watch card, from the same list Developer Home and Reports use (XrayViewModel.updatedApps, in
+ * its order). Null, so nothing is shown, until at least one checked app has a different version installed.
+ */
+object EverydayUpdates {
+    const val MAX_ROWS = 3
+
+    fun card(items: List<UpdatedApp>): EverydayUpdateCard? = if (items.isEmpty()) null else EverydayUpdateCard(
+        title = EverydayCopy.updatedTitle(items.size),
+        rows = items.take(MAX_ROWS).map { EverydayUpdateCard.Row(it.packageName, EverydayCopy.updatedLine(it)) },
+        more = (items.size - MAX_ROWS).coerceAtLeast(0),
+    )
 }
 
 /** The everyday check sheet: one Quick check that says No, with Full and clearing folded under Advanced. */
@@ -168,9 +210,9 @@ object EverydaySheetCopy {
     val quickTitle = Bi("Quick check: say No", "जल्दी जाँच: 'ना' कहें")
     val quickDetail = Bi("Opens the app once, says No (Reject) to its consent popup, then watches for 15 seconds. The app keeps its data.",
         "ऐप एक बार खुलता है, कंसेंट पॉपअप पर 'ना' (Reject) कहा जाता है, फिर 15 सेकंड तक देखा जाता है। ऐप का डेटा नहीं हटता।")
-    /** Quick with clearing approved under Advanced: the same single No run, from a fresh start. */
-    val quickDetailFresh = Bi("Clears the app's data, opens it once, says No (Reject) to its consent popup, then watches for 15 seconds.",
-        "ऐप का डेटा साफ़ करके उसे एक बार खोलता है, कंसेंट पॉपअप पर 'ना' (Reject) कहा जाता है, फिर 15 सेकंड तक देखा जाता है।")
+    /** Quick with the Shizuku helper ready: the app is closed and opened again first, so it starts fresh. Nothing is deleted. */
+    val quickDetailRestart = Bi("Restarts the app (keeps your data), says No (Reject) to its consent popup, then watches for 15 seconds.",
+        "ऐप को रीस्टार्ट करता है (आपका डेटा बना रहता है), कंसेंट पॉपअप पर 'ना' (Reject) कहा जाता है, फिर 15 सेकंड तक देखा जाता है।")
     val agentTitle = Bi("Let TraceVeil tap No for me", "TraceVeil मेरे लिए 'ना' दबाए")
     val agentDetail = Bi("Off: you tap it yourself when the app asks.", "बंद: ऐप पूछे तो आप खुद दबाएँ।")
     val quickCaveat = Bi(
@@ -191,9 +233,9 @@ object EverydaySheetCopy {
         "नई शुरुआत से तीन रन: कोई जवाब नहीं, 'ना', फिर 'हाँ', और तीनों की तुलना। हर रन से पहले ऐप का डेटा साफ़ होता है।")
     val fullNeeds = Bi("Needs the Shizuku helper app and your OK to clear this app's data. Not for personal apps.",
         "इसके लिए Shizuku सहायक ऐप और इस ऐप का डेटा साफ़ करने की आपकी मंज़ूरी चाहिए। निजी ऐप के लिए नहीं।")
-    val resetTitle = Bi("Allow clearing this app's data", "इस ऐप का डेटा साफ़ करने दें")
-    val resetDetail = Bi("For your own test apps only. Removes its saved state, accounts and settings before each run.",
-        "सिर्फ़ आपके अपने टेस्ट ऐप के लिए। हर रन से पहले उसकी सहेजी स्थिति, अकाउंट और सेटिंग हटाता है।")
+    val resetTitle = Bi("Reset: clear this app's data", "रीसेट: इस ऐप का डेटा साफ़ करें")
+    val resetDetail = Bi("For your own test apps only. Removes its saved state, accounts and settings before each run. Off, TraceVeil only does a restart, which keeps your data.",
+        "सिर्फ़ आपके अपने टेस्ट ऐप के लिए। हर रन से पहले उसकी सहेजी स्थिति, अकाउंट और सेटिंग हटाता है। बंद होने पर TraceVeil सिर्फ़ रीस्टार्ट करता है, जिससे आपका डेटा बना रहता है।")
     val childTitle = Bi("This app is made for children", "यह ऐप बच्चों के लिए है")
     val childDetail = Bi("Adds the children's check: no tracking or targeted ads.", "बच्चों वाली जाँच जोड़ता है: कोई ट्रैकिंग या टारगेटेड विज्ञापन नहीं।")
     val gmsTitle = Bi("Include Google Play services lookups", "Google Play services के लुकअप भी शामिल करें")
@@ -204,6 +246,6 @@ object EverydaySheetCopy {
         "सिर्फ़ इस ऐप का इंटरनेट काटता है और दर्ज करता है कि यह कहाँ पहुँचने की कोशिश करता है और कौन-सी अनुमतियाँ माँगता है। यह ऐप के बारे में फ़ैसला नहीं देता।")
 
     fun all(): List<Bi> = listOf(title("App"), guide("App").title, guide("App").body, guide("App").spoken, quickTitle, quickDetail,
-        quickDetailFresh, agentTitle, agentDetail, quickCaveat, resetCaveat, start, advanced, advancedSummary, fullTitle, fullDetail, fullNeeds,
+        quickDetailRestart, agentTitle, agentDetail, quickCaveat, resetCaveat, start, advanced, advancedSummary, fullTitle, fullDetail, fullNeeds,
         resetTitle, resetDetail, childTitle, childDetail, gmsTitle, gmsDetail, quarantine, quarantineNote)
 }

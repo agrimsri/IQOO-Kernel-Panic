@@ -15,7 +15,9 @@ import android.provider.OpenableColumns
 import android.view.accessibility.AccessibilityManager
 import android.view.inputmethod.InputMethodManager
 import androidx.core.graphics.drawable.toBitmap
+import com.dpdpxray.core.apk.ApkCodeScanner
 import com.dpdpxray.core.apk.ApkFacts
+import com.dpdpxray.core.apk.CodeScanResult
 import com.dpdpxray.core.apk.InstallOrigin
 import com.dpdpxray.core.apk.InstallSource
 import com.dpdpxray.core.apk.InstallSources
@@ -40,22 +42,31 @@ data class InspectedApp(
     val fileName: String? = null,
     val fileSizeBytes: Long? = null,
     val fileSha256: String? = null,
+    /** SDK class names found in the APK file's code (static); null when the code was not read. */
+    val codeScan: CodeScanResult? = null,
+    /** Set when the file is a split bundle (.xapk, .apks, .apkm): [facts] are its base APK's. */
+    val bundle: BundleInfo? = null,
 )
 
 sealed interface ArchiveRead {
-    data class Ok(val app: InspectedApp) : ArchiveRead
+    /** [held] is the exact copy that was read, kept for "Install anyway"; null when it was not kept. */
+    data class Ok(val app: InspectedApp, val held: File? = null) : ArchiveRead
     data class Failed(val reason: String) : ArchiveRead
 }
 
 /**
  * Reads what Android shows about a package: declared permissions, declared services and receivers, signing
- * certificates, target SDK and install source. It only reads; it never installs, launches or changes anything.
+ * certificates, target SDK and install source. It only reads; it never installs, launches or changes anything, and it
+ * never runs code from an APK file (Android's getPackageArchiveInfo and a byte-level DEX string scan only).
  */
 object ApkInspector {
     /** Larger files are refused rather than copied; normal app APKs are far smaller. */
     const val MAX_FILE_BYTES = 400L * 1024 * 1024
     private const val CACHE_DIR = "apkguard"
     private const val STALE_COPY_MS = 10 * 60 * 1000L
+    /** Copies kept for "Install anyway" are deleted after this long even if the person never decides. */
+    const val HELD_COPY_MS = 60 * 60 * 1000L
+    private const val HELD_DIR = "held"
 
     private const val COMPONENT_FLAGS = PackageManager.GET_PERMISSIONS or PackageManager.GET_SERVICES or
         PackageManager.GET_RECEIVERS or PackageManager.MATCH_DISABLED_COMPONENTS
@@ -160,12 +171,22 @@ object ApkInspector {
 
     // --- APK files --------------------------------------------------------------------------------------------------
 
-    /** Copies the file to private cache, reads it with getPackageArchiveInfo and always deletes the copy. */
-    fun readArchive(context: Context, uri: Uri): ArchiveRead {
+    /** Where copies kept for "Install anyway" live (TraceVeil's private cache). */
+    fun heldDir(context: Context): File = File(File(context.cacheDir, CACHE_DIR), HELD_DIR)
+
+    /**
+     * Copies the file to private cache, reads it with getPackageArchiveInfo, scans its code for SDK class names, and
+     * deletes the copy, unless [hold] is given: then a successfully read copy is moved there and kept for
+     * "Install anyway", so exactly the bytes that were checked can be installed.
+     */
+    fun readArchive(context: Context, uri: Uri, hold: File? = null): ArchiveRead {
         val resolver = context.contentResolver
         val dir = File(context.cacheDir, CACHE_DIR).apply { mkdirs() }
         // Leftovers from an interrupted check; a copy that another check is reading right now is left alone.
-        dir.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > STALE_COPY_MS }?.forEach { it.delete() }
+        val now = System.currentTimeMillis()
+        dir.listFiles()?.filter { it.isFile && now - it.lastModified() > STALE_COPY_MS }?.forEach { it.delete() }
+        dir.listFiles()?.filter { it.isDirectory && it.name.startsWith("bundle-") && now - it.lastModified() > STALE_COPY_MS }?.forEach { it.deleteRecursively() }
+        heldDir(context).listFiles()?.filter { it.isFile && now - it.lastModified() > HELD_COPY_MS }?.forEach { it.delete() }
         val (name, declaredSize) = runCatching {
             resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
                 if (!c.moveToFirst()) null to null
@@ -175,6 +196,8 @@ object ApkInspector {
         if (declaredSize != null && declaredSize > MAX_FILE_BYTES) return ArchiveRead.Failed("This file is larger than ${ApkFactsMapper.size(MAX_FILE_BYTES)}, so APK Guard did not copy it.")
 
         val copy = File.createTempFile("check-", ".apk", dir)
+        val unpacked = File(dir, "bundle-${copy.nameWithoutExtension}")
+        var kept: File? = null
         try {
             val digest = MessageDigest.getInstance("SHA-256")
             var total = 0L
@@ -195,16 +218,28 @@ object ApkInspector {
             }
             val fileSha = digest.digest().joinToString("") { "%02X".format(it) }
             val pm = context.packageManager
-            val info = archiveInfo(pm, copy.path, COMPONENT_FLAGS or PackageManager.GET_SIGNING_CERTIFICATES)
-                ?: archiveInfo(pm, copy.path, PackageManager.GET_PERMISSIONS)
-                ?: return ArchiveRead.Failed("This file could not be read as an Android app (APK). App bundles such as .xapk or .apks are not supported.")
-            val signers = signers(info).ifEmpty { legacyArchiveSigners(pm, copy.path) }
-            val ai = info.applicationInfo?.apply { sourceDir = copy.path; publicSourceDir = copy.path }
+            fun parse(path: String) = archiveInfo(pm, path, COMPONENT_FLAGS or PackageManager.GET_SIGNING_CERTIFICATES)
+                ?: archiveInfo(pm, path, PackageManager.GET_PERMISSIONS)
+            var apk = copy
+            var codeFiles = listOf(copy)
+            var bundle: BundleOpen.Ok? = null
+            val info = parse(copy.path) ?: when (val opened = BundleReader.open(copy, unpacked, MAX_FILE_BYTES)) {
+                // A split bundle (.xapk, .apks, .apkm), read with the developer CLI's rules: the base APK's facts and
+                // the code of every APK inside.
+                is BundleOpen.Ok -> parse(opened.base.path)?.also { apk = opened.base; codeFiles = opened.apks; bundle = opened }
+                    ?: return ArchiveRead.Failed("Android could not read the base APK inside this app bundle.")
+                is BundleOpen.Failed -> return ArchiveRead.Failed(opened.reason)
+                BundleOpen.NotBundle -> return ArchiveRead.Failed("This file could not be read as an Android app (APK) or app bundle (.xapk, .apks, .apkm).")
+            }
+            val signers = signers(info).ifEmpty { legacyArchiveSigners(pm, apk.path) }
+            val ai = info.applicationInfo?.apply { sourceDir = apk.path; publicSourceDir = apk.path }
             val pkg = info.packageName
             val certs = signers.map { ApkFactsMapper.sha256Hex(it.toByteArray()) }
+            // Reads the DEX string tables as bytes; nothing from the file is loaded or run.
+            val code = runCatching { ApkCodeScanner.scan(codeFiles) }.getOrNull()
             val facts = ApkFacts(
                 packageName = pkg,
-                label = ai?.let { runCatching { it.loadLabel(pm).toString() }.getOrNull() },
+                label = ai?.let { runCatching { it.loadLabel(pm).toString() }.getOrNull() } ?: bundle?.meta?.name,
                 versionName = info.versionName,
                 versionCode = info.longVersionCode,
                 targetSdk = ai?.targetSdkVersion,
@@ -214,22 +249,35 @@ object ApkInspector {
                 origin = InstallOrigin(InstallSource.NOT_INSTALLED),
                 certSha256 = certs,
                 signerSubjects = signers.mapNotNull { subject(it) },
+                certHistorySha256 = signingHistory(info),
                 hasLauncherIcon = null,
                 installedTwin = installedTwin(context, pkg),
             )
+            val icon = ai?.let { runCatching { it.loadIcon(pm).toBitmap(128, 128) }.getOrNull() }
+            // A bundle is not kept: "Install anyway" hands over single APK files only.
+            if (hold != null && bundle == null) {
+                hold.parentFile?.mkdirs()
+                if (hold.exists()) hold.delete()
+                if (copy.renameTo(hold)) kept = hold
+            }
             return ArchiveRead.Ok(
-                InspectedApp(
-                    facts = facts,
-                    icon = ai?.let { runCatching { it.loadIcon(pm).toBitmap(128, 128) }.getOrNull() },
-                    fileName = name, fileSizeBytes = total, fileSha256 = fileSha,
-                ),
+                InspectedApp(facts = facts, icon = icon, fileName = name, fileSizeBytes = total, fileSha256 = fileSha, codeScan = code, bundle = bundle?.info),
+                held = kept,
             )
         } catch (e: Exception) {
             return ArchiveRead.Failed("APK Guard could not read this file (${e.javaClass.simpleName}).")
         } finally {
-            copy.delete()
+            if (kept == null) copy.delete()
+            unpacked.deleteRecursively()
         }
     }
+
+    /** SHA-256 of each certificate in a rotated signing history, oldest first; empty when there is no rotation. */
+    private fun signingHistory(info: PackageInfo): List<String> = runCatching {
+        val signing = info.signingInfo ?: return@runCatching emptyList()
+        if (!signing.hasPastSigningCertificates()) return@runCatching emptyList()
+        signing.signingCertificateHistory.orEmpty().map { ApkFactsMapper.sha256Hex(it.toByteArray()) }
+    }.getOrDefault(emptyList())
 
     private fun archiveInfo(pm: PackageManager, path: String, flags: Int): PackageInfo? = runCatching {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) pm.getPackageArchiveInfo(path, PackageManager.PackageInfoFlags.of(flags.toLong()))
@@ -244,7 +292,13 @@ object ApkInspector {
         val pm = context.packageManager
         val info = packageInfo(pm, pkg, PackageManager.GET_SIGNING_CERTIFICATES) ?: return null
         val label = info.applicationInfo?.let { runCatching { it.loadLabel(pm).toString() }.getOrNull() } ?: pkg
-        return InstalledTwin(label, signers(info).map { ApkFactsMapper.sha256Hex(it.toByteArray()) })
+        return InstalledTwin(label, signers(info).map { ApkFactsMapper.sha256Hex(it.toByteArray()) }, info.longVersionCode, info.versionName)
+    }
+
+    /** The APK files of an installed app (base and splits), for the static code scan. Empty when not reported. */
+    fun codeFiles(context: Context, pkg: String): List<File> {
+        val ai = packageInfo(context.packageManager, pkg, 0)?.applicationInfo ?: return emptyList()
+        return (listOfNotNull(ai.sourceDir) + ai.splitSourceDirs.orEmpty()).distinct().map(::File)
     }
 
     /**

@@ -1,0 +1,62 @@
+{
+  "v": 1,
+  "url": "https://fixture.example/generic-hindi.html",
+  "banner": {
+    "cmp": null,
+    "how": "generic",
+    "texts": [
+      "हम विश्लेषण और विज्ञापन के लिए कुकी का उपयोग करते हैं। आप अपनी सहमति कभी भी वापस ले सकते हैं। गोपनीयता नीति",
+      "सभी स्वीकार करें अस्वीकार करें"
+    ],
+    "controls": [
+      {
+        "i": 0,
+        "text": "गोपनीयता नीति",
+        "role": null,
+        "btn": false,
+        "vis": true,
+        "l2": false,
+        "x": 16,
+        "y": 788,
+        "w": 353,
+        "h": 42
+      },
+      {
+        "i": 1,
+        "text": "सभी स्वीकार करें",
+        "role": null,
+        "btn": true,
+        "vis": true,
+        "l2": false,
+        "x": 20,
+        "y": 850,
+        "w": 114,
+        "h": 45
+      },
+      {
+        "i": 2,
+        "text": "अस्वीकार करें",
+        "role": null,
+        "btn": true,
+        "vis": true,
+        "l2": false,
+        "x": 147,
+        "y": 850,
+        "w": 99,
+        "h": 45
+      }
+    ],
+    "boxes": []
+  },
+  "frames": [],
+  "vp": {
+    "w": 412,
+    "h": 915,
+    "dpr": 2.625
+  },
+  "ls": [],
+  "ss": [],
+  "fpc": [],
+  "res": [],
+  "clicks": []
+}

@@ -44,7 +44,7 @@ TrackerControl, PCAPdroid and Exodus references are idea/research inputs only. N
 | Material | Source / terms | Integration handling |
 | --- | --- | --- |
 | Optional GeoLite2 Country data | [MaxMind GeoLite EULA](https://www.maxmind.com/en/geolite/eula) and MaxMind's [display guidance](https://support.maxmind.com/knowledge-base/articles/sell-or-display-data-from-geolite-databases-and-web-services), both read 10 October 2026; details in [Yashvi's attribution notes](docs/ATTRIBUTION.md) | **Not in Git, the APK or any release.** Used only from a copy on the phone (`files/geo/GeoLite2-Country.mmdb`), and preferred when present; with no copy the bundled DB-IP Lite table below places countries. **Attribution is required** and is shown on the card whenever the data is used: "This product includes GeoLite Data created by MaxMind, available from https://www.maxmind.com". MaxMind's guidance also asks for it in documentation that mentions use of GeoLite data, which is why this line appears here. **Permission is conditional, not a blanket ban:** application use and display to outside users is allowed with attribution; copyrightable elements are under CC BY-SA 4.0; giving the database file to a third party beyond what that licence allows needs MaxMind's written consent and the same duties on the recipient (EULA §3, §6); no identifying households, individuals or street addresses (§5). **Update duty:** use the newest release and stop using and destroy versions older than 30 days after an update (§6), so the card shows the build date and warns past 30 days. **Version in use:** built 2026-09-29, 8,423,789 bytes, SHA-256 `ff539785596f72ac2a07048f08506b38134bcf3b568182fd65f4534817bf91d7`, taken from the TrackerControl checkout the team supplied, not downloaded under a project MaxMind account. Each user should obtain their own copy. |
-| Existing `geo/world.svg` | [amCharts SVG directory](https://www.amcharts.com/svg-maps/) and [GeoMap](https://github.com/takuseno/GeoMap); [CC BY-NC 4.0 legal code](https://creativecommons.org/licenses/by-nc/4.0/legalcode.en) | amCharts identifies its SVG maps as non-commercial. Geometry stays unchanged; visible credits name both sources, licence and styling change. Not cleared for commercial use or an assumed prize-competition exemption; reassess that scope before broader distribution. |
+| Earlier `geo/world.svg` (amCharts via GeoMap) | [amCharts SVG directory](https://www.amcharts.com/svg-maps/) and [GeoMap](https://github.com/takuseno/GeoMap); [CC BY-NC 4.0 legal code](https://creativecommons.org/licenses/by-nc/4.0/legalcode.en) | **Replaced on 11 October 2026** by Natural Earth country outlines (public domain, see below) to allow commercial distribution. It is no longer in the current tree or the APK. |
 | MaxMind format specification | [Primary specification](https://maxmind.github.io/MaxMind-DB/) | Yashvi wrote the reader; no added reader library or competitor implementation. |
 | Company facts / statutory context | A5's cited `trackers.json`; [official Act](https://www.indiacode.nic.in/bitstream/123456789/22037/2/a2023-22.pdf) and [commencement notification](https://upload.indiacode.nic.in/showfile?actid=AC_CEN_45_0_00003_2023-22_1763464807080&filename=c56ceae6c383460ca69577428d36828b.pdf&type=hindinotification) | Mount with the catalogue's single sourced owner mapping. DPDP context is jurisdiction-specific readiness, with commencement/exception warnings; no new corpus citation ID or applicability verdict. |
 
@@ -67,6 +67,44 @@ All read on 10 October 2026 and cited in the catalogue with their quotes; each s
 | [AppsFlyer Terms of Use](https://www.appsflyer.com/legal/terms-of-use/) | AppsFlyer (stated address; its terms name three contracting entities by customer country) |
 
 CleverTap is deliberately unresolved (three entities in three countries, no headquarters named). 22 catalogue entities were not researched and show "Not established".
+
+### Website trackers: the vendor pages behind the website-check additions
+
+Read on 11 October 2026. Each catalogue entry keeps its page in `domainSource`, and each path or cookie rule in `core/src/main/resources/web/web_trackers.json` keeps its page and a short quote. Only facts (a domain or cookie name and who uses it) are recorded; no list or dataset was imported. Company facts (headquarters, incorporation) were not researched for these entries and show "Not established", except Google Tag Manager, which reuses the Google facts above.
+
+| Vendor page | Supports |
+| --- | --- |
+| [Google tag install](https://developers.google.com/tag-platform/gtagjs/install) | Google Tag Manager (googletagmanager.com) |
+| [Meta Pixel get started](https://developers.facebook.com/docs/meta-pixel/get-started) | Meta's /tr pixel path on facebook.com |
+| [Meta fbp and fbc](https://developers.facebook.com/docs/marketing-api/conversions-api/parameters/fbp-and-fbc) | _fbp, _fbc |
+| [LinkedIn Insight Tag troubleshooting](https://www.linkedin.com/help/lms/answer/a425696) | LinkedIn Insight Tag domains |
+| [Pinterest tag](https://developers.pinterest.com/docs/track-conversions/pinterest-tag/) | ct.pinterest.com, s.pinimg.com/ct/ |
+| [Snap Conversions API](https://developers.snap.com/api/marketing-api/Conversions-API/UsingTheAPI) | tr.snapchat.com |
+| [Criteo OneTag](https://developers.criteo.com/retailer-integration/docs/onetag) | criteo.com |
+| [Taboola base pixel](https://developers.taboola.com/pixel/docs/add-the-base-pixel-manually) | taboola.com |
+| [Outbrain JavaScript guide](https://developer.outbrain.com/outbrain-javascript-implementation-guide/) | outbrain.com |
+| [Adobe ID service CSP](https://experienceleague.adobe.com/en/docs/id-service/using/reference/csp) | demdex.net, omtrdc.net |
+| [Microsoft Invest user ID syncing](https://learn.microsoft.com/en-us/xandr/invest/user-id-syncing-with-external-partners) | adnxs.com |
+| [The Trade Desk UID guidelines (PDF)](https://www.thetradedesk.com/assets/general/Unified-ID-Adoption-Guidelines-for-DSPs-v1.3.pdf) | adsrvr.org |
+| [Comscore privacy policy](https://www.comscore.com/About/Privacy-Policy) | scorecardresearch.com |
+| [Hotjar content security policies](https://help.hotjar.com/hc/en-us/articles/36820026388881-Content-Security-Policies) and [Hotjar cookies](https://help.hotjar.com/hc/en-us/articles/36819973371409-Cookies-Set-by-the-Hotjar-Tracking-Code) | hotjar.io; _hjSessionUser_*, _hjSession_* |
+| [Google Analytics cookie usage](https://support.google.com/analytics/answer/11397207) and [Google's ad products cookies](https://business.safety.google/adscookies/) | _ga, _ga_*, _gid, _gat, _gcl_au, _gcl_aw |
+| [Microsoft Clarity cookies](https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-cookies) | _clck, _clsk |
+| [TikTok Pixel cookies](https://ads.tiktok.com/help/article/using-cookies-with-tiktok-pixel?lang=en) | _ttp |
+| [Amplitude Browser SDK 2](https://amplitude.com/docs/sdks/analytics/browser/browser-sdk-2) | AMP_* |
+| [mixpanel-js persistence source](https://raw.githubusercontent.com/mixpanel/mixpanel-js/master/src/mixpanel-persistence.js) | mp_*_mixpanel |
+| [Segment Analytics.js persistence](https://www.twilio.com/docs/segment/connections/sources/catalog/libraries/website/javascript/cookie-validity-update) | ajs_anonymous_id, ajs_user_id |
+
+## Country outlines (Natural Earth) — 11 October 2026
+
+| Item | Detail |
+| --- | --- |
+| Material | Natural Earth [1:110m Admin 0 - Countries](https://www.naturalearthdata.com/downloads/110m-cultural-vectors/110m-admin-0-countries/), release v5.1.2, from the official repository [nvkelso/natural-earth-vector](https://github.com/nvkelso/natural-earth-vector) at commit `f1890d9f152c896d250a77557a5751a93d494776` (`geojson/ne_110m_admin_0_countries.geojson`, 838,726 bytes, SHA-256 `6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f`) |
+| Licence | Public domain. [Terms of use](https://www.naturalearthdata.com/about/terms-of-use/), read 11 October 2026: "All versions of Natural Earth raster + vector map data found on this website are in the public domain." "No permission is needed to use Natural Earth. Crediting the authors is unnecessary." The page also invites use "for personal, educational, and commercial purposes", and says the authors are not responsible for accuracy |
+| Notice | None required. The map card prints "Country outlines: Natural Earth (public domain)." |
+| Location | `core/src/main/resources/geo/world.svg` (108,595 bytes), generated by `tools/naturalearth_world_svg.py`; the download itself is not committed. Projection, ISO keys and the few merges and splits are listed in [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md) |
+| Intended use | Drawing country outlines on the endpoint map, highlighted by ISO 3166-1 alpha-2 code |
+| Decision | Replaces the amCharts/GeoMap outline (CC BY-NC 4.0) to allow commercial distribution. Open item: disputed boundaries follow Natural Earth's default depiction (Crimea is drawn with Ukraine); boundary depiction for India and other markets has not been reviewed |
 
 ## Bundled IP-to-country table (DB-IP Lite) — 10 October 2026
 
@@ -91,6 +129,7 @@ CleverTap is deliberately unresolved (three entities in three countries, no head
 | Switching it | `tools/push-api-env.sh online` pushes the flag and the key from the laptop's `.env` to the phone without printing it; `nokey`, `offline` and `remove` return to the offline voice. With no key (or a blank one) the script clears the phone's `api.env`, and the app also falls back on its own: the online voice needs `USE_API=true` (any letter case) **and** a key. |
 | Tested 10 October 2026 | Two real calls through the app's own `SarvamTts` code, with the real grounded answers: English (497 characters, request `20261010_73884898-bf84-475b-8666-9c7884686da7`, about 32 s of 22,050 Hz mono 16-bit WAV) and Hindi (101 characters, request `20261010_dc25fd6b-1ef9-452f-a25b-60059e3db971`, about 11 s). About 600 characters in total, roughly ₹1.8 at the listed price. Not yet confirmed on the phone: audible playback of the online voice. |
 | Not yet read | Sarvam's terms, data-retention and training policy. **No team sign-off is recorded.** Do not describe the product as "uploads nothing" while this is enabled, and do not enable it for a real-app audit. |
+| Release builds (11 October 2026) | Left out: `BuildConfig.ONLINE_VOICE_AVAILABLE` is false in release builds (true in debug builds); `-Ptraceveil.onlineVoice` overrides it. See [docs/RELEASE.md](docs/RELEASE.md). |
 
 ## Optional "Hey TraceVeil" wake word (Vosk) — 10 October 2026
 
@@ -124,7 +163,7 @@ ConsentLens-1 is TraceVeil's own string-role model (`app/src/main/assets/consent
 | Qualcomm AI Engine Direct delegate for LiteRT (`com.qualcomm.qti:qnn-litert-delegate`) | 2.50.0 | [Maven Central](https://repo1.maven.org/maven2/com/qualcomm/qti/qnn-litert-delegate/2.50.0/); proprietary Qualcomm Technologies licence. The POM names "Qualcomm AI Hub Model License" ([PDF](https://softwarecenter.qualcomm.com/api/download/software/licenses/ai_model_hub/v1/LICENSE.pdf)); the AAR carries its own `LICENSE.pdf` | Runtime dependency; bundles `libQnnTFLiteDelegate.so` and `libqnn_delegate_jni.so` (arm64-v8a only). |
 | Qualcomm QNN runtime (`com.qualcomm.qti:qnn-runtime`) | 2.50.0 (must equal the delegate version) | [Maven Central](https://repo1.maven.org/maven2/com/qualcomm/qti/qnn-runtime/2.50.0/); the AAR's `LICENSE.pdf` is Qualcomm's **"AI Stack License"** (Terms and Conditions of Use); third-party notices in the AAR's `NOTICE.txt` | Bundles the HTP backend (`libQnnHtp.so`, `libQnnHtpPrepare.so`, `libQnnSystem.so`) and the HTP V69/V73/V75/V79/V81 stub and skel libraries. The DSP and GPU backends and HTP V68 are excluded from the APK (`app/build.gradle.kts`); ConsentLens never selects them. |
 
-**Licence decision (as relayed in the ConsentLens work brief, 10 October 2026):** the product owner approved accepting Qualcomm's AI Stack License for the QNN runtime and the LiteRT QNN delegate from Maven Central, including redistribution inside the TraceVeil app. The agent that integrated them did not accept anything on anyone's behalf beyond that recorded approval; the owner should confirm it in this register. What the runtime licence text (read from the 2.50.0 AAR) grants and requires, in short: use and copy to develop your applications, and **distribute only in object code as incorporated in your application** (never standalone); no reverse engineering; keep Qualcomm's proprietary notices; comply with third-party notices; it lists prohibited uses (none of which is consent-screen text classification). Open items before a public release: read the delegate AAR's own `LICENSE.pdf` (its text could not be extracted locally) and ship Qualcomm's `NOTICE.txt` third-party notices with the app.
+**Licence decision (as relayed in the ConsentLens work brief, 10 October 2026):** the product owner approved accepting Qualcomm's AI Stack License for the QNN runtime and the LiteRT QNN delegate from Maven Central, including redistribution inside the TraceVeil app. The agent that integrated them did not accept anything on anyone's behalf beyond that recorded approval; the owner should confirm it in this register. What the runtime licence text (read from the 2.50.0 AAR) grants and requires, in short: use and copy to develop your applications, and **distribute only in object code as incorporated in your application** (never standalone); no reverse engineering; keep Qualcomm's proprietary notices; comply with third-party notices; it lists prohibited uses (none of which is consent-screen text classification). Open items before a public release: read the delegate AAR's own `LICENSE.pdf` (its text could not be extracted locally) and ship Qualcomm's `NOTICE.txt` third-party notices with the app. **Update, 11 October 2026:** the delegate AAR's `LICENSE.pdf` text has now been extracted and read: it is Qualcomm Innovation Center's "Terms and Conditions of Use, AI Model Hub License", with the same object-code-in-your-application distribution grant, termination without cause on notice, indemnity, export-control and California-law terms as the runtime licence. Nothing was accepted on anyone's behalf by reading it. `NOTICE.txt` is still not shipped; see [docs/LICENSES_FOR_SALE.md](docs/LICENSES_FOR_SALE.md).
 
 **Training data (all real, openly licensed UI strings; the processed set is committed as `ml/consentlens/data/consentlens_dataset.jsonl` with source, file, string key and language per row, and pinned revisions in `ml/consentlens/data/sources.json`):**
 
@@ -137,3 +176,16 @@ ConsentLens-1 is TraceVeil's own string-role model (`app/src/main/assets/consent
 | TraceVeil's own lexicon and LeakyShop dialog strings | this repository | MIT | Ours. |
 
 The model weights are derived from these strings; no source string is shipped in the APK except the hand-written demo phrases in `consentlens_meta.json`.
+
+## Hardware-signed evidence — 11 October 2026
+
+No library was added. The signing and verification code uses only the JDK's `java.security` and the existing kotlinx serialization; the DER reader is TraceVeil's own.
+
+| Material | Source / terms | Handling |
+| --- | --- | --- |
+| Google hardware attestation root certificates (`core/src/main/resources/evidence/google-attestation-roots.json`) | Google's published root list, downloaded unmodified on 11 October 2026 from https://android.googleapis.com/attestation/root, the list that [Android's key attestation page](https://developer.android.com/privacy-and-security/security-key-attestation#root_certificate) says to use as trust anchors. SHA-256 `b79beef96dd68073f1975bab90970ae85d1ae56d451a819ece6bff3d4e253ab4` | Public certificates, used only as verification trust anchors. Recheck the list when Google adds a root; details in [docs/SIGNED_EVIDENCE.md](docs/SIGNED_EVIDENCE.md) |
+| Three real attestation chains (`core/src/test/resources/evidence/keyattestation/`) | [android/keyattestation](https://github.com/android/keyattestation) `testdata/`, commit `3f550f94a9e3c010dda7cdcad8bca764cd76d4f4`, [Apache License 2.0](https://github.com/android/keyattestation/blob/3f550f94a9e3c010dda7cdcad8bca764cd76d4f4/LICENSE) | Test inputs only, not in the APK or the CLI. Kept unmodified, with the licence copied next to them and a SOURCE.txt naming each file |
+
+## Licence texts shipped for the open-source notices screen — 11 October 2026
+
+The APK now carries the licence and notice texts of everything it bundles in `app/src/main/assets/licenses/`, shown by the in-app "Open-source notices" screen (More › About TraceVeil, and the trust screen). Nothing was added to the app's dependencies. Texts come from apache.org, creativecommons.org, the upstream repositories of Archivo (google/fonts) and Shizuku-API, and, unchanged, from inside the Qualcomm QNN 2.50.0, LiteRT 1.4.2 and LiteRT-LM 0.17.1 AARs (Qualcomm `NOTICE.txt` and both `LICENSE.pdf` files). Sources, revisions and SHA-256 values are in [docs/LICENSES_FOR_SALE.md](docs/LICENSES_FOR_SALE.md) section 5. Shipping the Qualcomm files does not record anyone's acceptance of Qualcomm's licences; that confirmation is still the owner's (see the ConsentLens section above).

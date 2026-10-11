@@ -174,6 +174,17 @@ class CheckCommandTest {
     }
 
     @Test
+    fun `an inconclusive low-visibility capture names its likely cause and the fix`() {
+        val notRestarted = com.dpdpxray.core.model.PlanConditions(startMode = com.dpdpxray.core.model.StartMode.NOT_RESTARTED, runningBeforeStart = true)
+        val quiet = SampleBundles.fixed().let { b -> b.copy(sessions = b.sessions.map { it.copy(netEvents = emptyList(), conditions = notRestarted) }) }
+        write(dir, "quiet2.json", quiet)
+        val r = run(dir, "check", "quiet2.json")
+        assertEquals(r.toString(), Exit.VIOLATION, r.exit)
+        assertTrue(r.out, r.out.contains("likely cause: the app was already running (not restarted)"))
+        assertTrue(r.out, r.out.contains("watch it in the background for 10 minutes or longer"))
+    }
+
+    @Test
     fun `stored and re-evaluated results are both reported when they differ`() {
         val stale = SampleBundles.leaky().copy(result = SampleBundles.fixed().result)
         write(dir, "stale.json", stale)
@@ -288,6 +299,10 @@ class CheckCommandTest {
         assertTrue(outputs[0].out, outputs[0].out.contains("Score:    100/100 · 85–100 band"))
         assertEquals("85–100 band", Wording.band(com.dpdpxray.core.model.ScoreBand.READY))
         assertEquals("60–84 band", Wording.band(com.dpdpxray.core.model.ScoreBand.NEEDS_WORK))
+        // 85 points with an observed High or Critical finding is Needs work: the range must not claim 60–84.
+        assertEquals("60–84 band", Wording.band(com.dpdpxray.core.model.ScoreBand.NEEDS_WORK, 72))
+        assertEquals("below the 85–100 band: a High or Critical finding was observed",
+            Wording.band(com.dpdpxray.core.model.ScoreBand.NEEDS_WORK, 85))
         assertEquals("below 60", Wording.band(com.dpdpxray.core.model.ScoreBand.AT_RISK))
         assertEquals("inconclusive", Wording.band(com.dpdpxray.core.model.ScoreBand.INCONCLUSIVE))
     }

@@ -13,7 +13,7 @@ enum class QuarantineStopReason(val label: String) {
 }
 
 @Serializable
-enum class TimelineKind { APP_ON_SCREEN, LOOKUP, BLOCKED, PERMISSION_DIALOG, SETTINGS_SCREEN }
+enum class TimelineKind { APP_ON_SCREEN, LOOKUP, BLOCKED, PERMISSION_DIALOG, SETTINGS_SCREEN, CONNECTION }
 
 /** One line of the behaviour timeline; [atMs] is measured from the start of the run. */
 @Serializable
@@ -57,7 +57,13 @@ object QuarantineReports {
             "services (for example Android's download manager or push messaging) are neither blocked nor seen.",
         "After quarantine ends the app has its normal internet again and may then send what it could not send now.",
         "Apps that wait longer than this run, need a login, or wait for a remote command may show little or nothing.",
-        "Encrypted DNS inside the app (DNS over HTTPS) shows only as blocked connections to an address, not as names.",
+        "Encrypted DNS inside the app (DNS over HTTPS) shows as a connection to the resolver (its name read from the TLS " +
+            "hello), never as the names looked up through it.",
+        "To see which server a connection was for, TraceVeil answers the app's connections on the phone itself and closes " +
+            "them right after the first message; nothing is forwarded. HTTPS contents are never readable (no certificate is " +
+            "installed): only the server name in the TLS or QUIC hello, and for plain HTTP the request line and a few headers, " +
+            "with every value replaced by its kind. Request bodies are not read.",
+        "IPv6 connections, and connections to the DNS ports 53 and 853, are recorded only by address, port and protocol.",
         "Every lookup is answered \"does not exist\", so the app may give up early or try other addresses. " +
             "Attempts are not proof that any data would have been sent.",
         "If the app was already open before the run, it may reuse addresses or connections from before.",
@@ -137,6 +143,11 @@ object QuarantineTimeline {
                 at(p.firstNanos), TimelineKind.PERMISSION_DIALOG,
                 "Permission dialog$whose: \"${p.text}\"${times(p.timesShown.toLong(), "times")}", QuarantineEvidence.OBSERVED,
             )
+        }
+        o.connections.forEach { f ->
+            val text = QuarantineConnections.timelineText(f) ?: return@forEach
+            val t = f.http.firstOrNull()?.tNanos?.takeIf { it > 0 } ?: f.startNanos
+            entries += t to TimelineEntry(at(t), TimelineKind.CONNECTION, text, QuarantineEvidence.OBSERVED)
         }
         o.settingsScreens.forEach { s ->
             entries += s.firstNanos to TimelineEntry(

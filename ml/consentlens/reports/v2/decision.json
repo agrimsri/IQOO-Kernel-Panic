@@ -1,0 +1,55 @@
+{
+ "shipped": false,
+ "hold_basis": "external",
+ "summary_html": "<p>The wider candidate s2_w160 passed every internal ship criterion (macro-F1 +0.060 on seen languages and +0.058 on never-seen languages, mean of 3 seeds, every role up), but it is not shipped: on the only external labelled data (Bouhoula et al., USENIX Security 2024: 2,204 real, mostly English cookie-banner button strings) its Reject F1 fell from 0.513 to 0.415 (precision 0.51 to 0.32), and in the app&#x27;s layered decision it would emit 134 wrong Reject labels at its calibrated threshold 0.68 (79 at 0.90) against 47 for ConsentLens-1, for example &quot;Cookie preferences&quot; and &quot;Configurar cookies&quot;. A wrong Reject on a settings button makes an audit infer a visible reject option and hides the most common consent dark pattern, so v2 is not genuinely better for TraceVeil yet (and a new file would need a fresh NPU check on the phone). The app keeps ConsentLens-1.</p>",
+ "threshold_in_app": "0.90",
+ "reproduction": {
+  "lolo_int8_macro_f1": 0.5207,
+  "lolo_float_macro_f1": 0.5225,
+  "lolo_agreement": 0.9887,
+  "seen_int8_macro_f1": 0.671,
+  "statement": "Seed 42 through ConsentLens-1's own training and conversion code reproduces every fold of the published metrics.json to 4 decimals (macro-F1 float and INT8, agreement, lexicon baseline)."
+ },
+ "tried_html": "<p><b>Screened on the dev split</b> (one seed each; see the table):</p><ul><li><b>Optimisation</b> (<code>s1</code>): cosine learning-rate decay, an exponential moving average of the weights (EMA 0.999), 40 epochs.</li><li><b>Regularisation</b> (<code>s2</code>): byte-noise augmentation on half the rows each epoch (character drop / duplicate / swap, diacritics stripped, punctuation and spacing changes, same-class same-language concatenation for notices) plus embedding and pool dropout.</li><li><b>Capacity</b> (<code>s2_w160</code>): 64-dim embedding, Conv 160×3 + Conv 160×7, Dense 160 (272 KB, 11 ops).</li><li><b>Ensembling:</b> every pair of screened models, averaged, beat its better member on both dev splits (+0.012 to +0.056). <code>pk2_mix_k33</code> <b>packs two members into one graph</b>: embeddings side by side, block-diagonal conv and dense kernels, last layer averages the logits; same 11 op types as v1, 389 KB.</li><li><b>Logit adjustment</b> (foldable into the last bias): no gain on dev; the square-root class weights already balance the roles.</li></ul><p><b>Built and op-checked but not screened (no laptop time left):</b> three conv layers, dilation (written as one CONV_2D; Keras's own dilated Conv1D adds 3 new op types), stride 2. <b>Not tried:</b> label smoothing, focal loss, full inverse-frequency weights, language-balanced sampling, knowledge distillation. Nothing is claimed about them.</p><p><b>Pre-registered rule</b> (fixed before any candidate's test numbers existed): the packed ensemble is the candidate if its dev macro-F1 is at least the best single model's on both dev splits; otherwise the best single model is. <b>Outcome:</b> the packed ensemble lost on the seen-language dev split (see table), so the wider single network <code>s2_w160</code> is the candidate. The ensemble's outer run, started early to save time, was stopped; its two finished folds (0.646 and 0.557 vs v1's 0.574 and 0.500, seed 1, held-out languages) are incomplete and were not used for any decision.</p>",
+ "recipe_notes": {
+  "v1": "ConsentLens-1 recipe (constant LR 2e-3, 30 epochs, sqrt class weights)",
+  "s1": "v1 network; cosine LR decay, weight EMA (0.999), 40 epochs",
+  "s2": "s1 + byte-noise augmentation (50% of rows per epoch) + embedding/pool dropout",
+  "s3": "s2 + label smoothing 0.1",
+  "s2_inv": "s2 with full inverse-frequency class weights",
+  "s2_w160": "s2, wider: 64-dim embedding, Conv 160×3 + Conv 160×7, Dense 160 (272 KB)",
+  "s2_d3": "s2, three conv layers 128×3 / 128×5 / 128×5 dilation 2",
+  "s2_s3": "s2, three conv layers with stride 2 (128/160/192)",
+  "pk2_mix_k33": "packed ensemble of 2 members (s1 and s2 recipes, Conv 128×3 + 128×3 each) in one graph",
+  "pk2_k33": "packed ensemble of 2 s1 members (Conv 128×3 + 128×3)"
+ },
+ "criteria": {
+  "Macro-F1 gain >= 0.03, seen languages": {
+   "value": "+0.060",
+   "pass": true,
+   "delta": 0.0597
+  },
+  "Macro-F1 gain >= 0.03, held-out languages": {
+   "value": "+0.058",
+   "pass": true,
+   "delta": 0.0584
+  },
+  "No role's F1 drops by more than 0.05": {
+   "value": "worst +0.011 (OTHER, seen)",
+   "pass": true
+  },
+  "Op types are a subset of v1's": {
+   "value": "no new op type",
+   "pass": true
+  },
+  "INT8 vs float agreement >= 98%": {
+   "value": "98.9% lowest seed and protocol (lowest single fold 98.7%)",
+   "pass": true
+  },
+  "Size <= 400 KB": {
+   "value": "271,720 bytes",
+   "pass": true
+  }
+ },
+ "phone_checks_html": "<ol><li>AI lab → ConsentLens → <b>Load</b>: chip says “Running on the NPU”, logcat <code>planNodes=1/11 fullyDelegated=true</code> (the whole graph on the QNN HTP).</li><li><b>Benchmark</b> (1,000 runs): read NPU and CPU median/p95 from the card or logcat; <code>npuCpuAgree</code> and <code>matchesPythonInt8</code> should be 24/24 or close.</li><li><b>Try samples</b>: the 24 phrases' roles should match the Python INT8 reference stored in <code>consentlens_meta.json</code>.</li><li>Only after these hold, say “runs fully on the Hexagon NPU”. Until then say “built for the NPU, CPU fallback”.</li></ol>"
+}

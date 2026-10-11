@@ -27,7 +27,11 @@ import com.dpdpxray.app.data.AuditComparisonResult
 import com.dpdpxray.app.data.LegalLensSetting
 import com.dpdpxray.app.data.LensChoice
 import com.dpdpxray.app.data.SampleAudit
+import com.dpdpxray.app.data.CheckBackups
 import com.dpdpxray.app.BuildConfig
+import com.dpdpxray.app.evidence.AndroidEvidenceKey
+import com.dpdpxray.app.evidence.EvidenceFiles
+import com.dpdpxray.app.evidence.EvidenceSigning
 import com.dpdpxray.app.graph
 import com.dpdpxray.app.report.AuditJsonExport
 import com.dpdpxray.app.report.ExportManager
@@ -35,7 +39,21 @@ import com.dpdpxray.app.report.EvidenceReport
 import com.dpdpxray.app.report.HtmlExporter
 import com.dpdpxray.app.report.PdfExporter
 import com.dpdpxray.app.report.SampleReport
+import com.dpdpxray.core.attribution.SdkAttribution
+import com.dpdpxray.core.attribution.SdkGroup
 import com.dpdpxray.core.audit.PhaseAssigner
+import com.dpdpxray.core.datasafety.DataSafetyParser
+import com.dpdpxray.core.datasafety.PlayLabelCheck
+import com.dpdpxray.core.datasafety.PlayLabelComparator
+import com.dpdpxray.core.datasafety.PlayLabelExport
+import com.dpdpxray.core.datasafety.PlayLabelRecord
+import com.dpdpxray.core.datasafety.PlayLabelReport
+import com.dpdpxray.core.export.AuditBackups
+import com.dpdpxray.core.export.AuditBundles
+import com.dpdpxray.core.export.BackupFormatException
+import com.dpdpxray.core.darkpattern.DarkPatternExport
+import com.dpdpxray.core.export.SdkAttributionExport
+import com.dpdpxray.core.evidence.EvidenceSignatures
 import com.dpdpxray.core.dpdp.Passage
 import com.dpdpxray.core.fixes.FixTemplate
 import com.dpdpxray.core.law.LegalLens
@@ -70,6 +88,25 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     val liveNet = CaptureBus.events
     val liveConsent = ConsentBus.events
 
+    private val _updatedApps = MutableStateFlow<List<com.dpdpxray.core.update.UpdatedApp>>(emptyList())
+
+    /** Update Watch: checked apps whose installed version differs from their latest check (empty until read). */
+    val updatedApps: StateFlow<List<com.dpdpxray.core.update.UpdatedApp>> = _updatedApps.asStateFlow()
+
+    /** Re-reads the installed versions of checked apps (on this phone, read-only). */
+    fun refreshUpdates() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { com.dpdpxray.app.autoguard.UpdateWatchSource.updates(ctx) }.onSuccess { _updatedApps.value = it }
+        }
+    }
+
+    init {
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(audits, com.dpdpxray.app.autoguard.UpdateWatchSource.changes) { a, c -> a.map { it.id } to c }
+                .collect { refreshUpdates() }
+        }
+    }
+
     private val _preflight = MutableStateFlow(Preflight(false, false, false, false, false, false, false))
     val preflight = _preflight.asStateFlow()
 
@@ -91,6 +128,11 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _cameraResult = MutableStateFlow<CameraCheckState>(CameraCheckState.Idle)
     val cameraResult = _cameraResult.asStateFlow()
+
+    /** The last audit-data export's signing line, as (audit id, line), for the Report screen. */
+    private val _evidenceLine = MutableStateFlow<Pair<String, String>?>(null)
+    val evidenceLine = _evidenceLine.asStateFlow()
+    private val evidenceKey by lazy { AndroidEvidenceKey(ctx) }
 
     private val _toast = MutableStateFlow<String?>(null)
     val toast = _toast.asStateFlow()
@@ -130,6 +172,48 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         return problem == null
     }
 
+    /**
+     * The result's one-tap "Check again": the same check of the same app, started fresh. A restart keeps the app's data
+     * and needs the Shizuku helper (without it the person is asked to turn it on, and the check starts once it is). A
+     * reset clears the data and is only ever started for an app [resetEligible] allows, after the person confirmed it.
+     */
+    fun checkAgain(
+        bundle: com.dpdpxray.app.data.AuditBundle, mode: com.dpdpxray.app.audit.CheckAgain.Mode, onStarted: () -> Unit,
+        restart: com.dpdpxray.app.audit.RestartPolicy = com.dpdpxray.app.audit.RestartPolicy.AUTO,
+    ) {
+        if (mode == com.dpdpxray.app.audit.CheckAgain.Mode.RESET && !resetEligible(bundle.meta.targetPackage)) {
+            _toast.value = "A reset is only offered for an app you develop. Check again with a restart instead."
+            return
+        }
+        val config = com.dpdpxray.app.audit.CheckAgain.config(bundle.meta, bundle.sessions, mode, restart)
+        val begin = { if (startAudit(config, onStarted)) onStarted() }
+        // A background watch restarts nothing, so it does not wait for the Shizuku helper.
+        if (!config.isWatch && !ShizukuBridge.hasPermission()) {
+            refreshPreflight()
+            val need = AccessNeeds.shizuku(ShizukuBridge.isRunning(), granted = false)
+            if (need != null) { _access.value = AccessPrompt(need) { begin() }; return }
+        }
+        begin()
+    }
+
+    /**
+     * Whether "Check again with a reset" may be offered for [pkg]: an app the person develops (a debuggable build, the
+     * LeakyShop demo, or one on the developer-runner reset list), never a system app.
+     */
+    fun resetEligible(pkg: String): Boolean {
+        val facts = DeviceChecks.appFacts(ctx, pkg) ?: return false
+        val allowlisted = runCatching { pkg in com.dpdpxray.app.automation.AutomationStore.get(ctx).settings.value.resetAllowlist }.getOrDefault(false)
+        return com.dpdpxray.app.audit.CheckAgain.resetAllowed(facts.debuggable, pkg in com.dpdpxray.app.audit.CheckAgain.CONTROLLED_DEMOS, allowlisted, facts.system)
+    }
+
+    /**
+     * What restarting [pkg] would switch off right now (its accessibility service, VPN, keyboard, ...), read without
+     * changing anything; null when it could not be read. The check sheet warns with it before Start.
+     */
+    suspend fun restartSideEffects(pkg: String): List<com.dpdpxray.app.audit.FoundSideEffect>? = withContext(Dispatchers.IO) {
+        runCatching { com.dpdpxray.app.audit.RestartSideEffects.detect(pkg, com.dpdpxray.app.audit.AndroidSideEffectProbe(ctx)) }.getOrNull()
+    }
+
     /** A check that was stopped by a missing permission, started again once it is on. */
     fun retryAudit(config: AuditConfig): Boolean {
         acknowledgeProgress()
@@ -151,6 +235,19 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         return true
     }
     fun cancelAudit() = graph.orchestrator.cancel()
+
+    /**
+     * Starts a background watch of [pkg] for [minutes]: the capture records only this app while the person uses the phone
+     * as usual or locks it. Nothing is restarted, opened, tapped or cleared, so it needs no Shizuku and no confirmation.
+     * [onStarted] shows the live check.
+     */
+    fun startWatch(pkg: String, label: String, minutes: Int, includeGms: Boolean = false, onStarted: () -> Unit) {
+        val config = com.dpdpxray.app.ui.modes.CheckSheet.watchConfig(pkg, label, minutes, includeGms)
+        if (startAudit(config, onStarted)) onStarted()
+    }
+
+    /** Ends the running background watch early; what it saw is saved and scored. */
+    fun stopWatch() = graph.orchestrator.stopWatch()
     fun acknowledgeProgress() = graph.orchestrator.acknowledge()
 
     fun markConsentNow() = viewModelScope.launch {
@@ -178,16 +275,185 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
 
     fun open(id: String) = viewModelScope.launch {
         if (_bundle.value?.meta?.id != id) _bundle.value = graph.repository.load(id)
+        // A kept-data check saved before results carried a consent-history range gets its range (and nothing else).
+        val b = _bundle.value?.takeIf { it.meta.id == id } ?: return@launch
+        val catalog = graph.catalog()
+        val ranged = withContext(Dispatchers.Default) {
+            runCatching { com.dpdpxray.app.data.ConsentAnswers.rangeFor(b) { s, h -> RulesEngine(catalog).evaluate(s, h) } }.getOrNull()
+        } ?: return@launch
+        val meta = b.meta.copy(historyBounds = ranged.historyBounds)
+        saveRescored(b, meta, ranged)
+    }
+
+    /**
+     * The person's answer about their consent history for a kept-data check: re-scores the same sessions with it
+     * ([answer] null clears it) and saves the new result, report and metadata. Called only from a tap on the result.
+     */
+    fun answerConsentHistory(bundle: AuditBundle, answer: com.dpdpxray.core.model.ConsentHistory?) = viewModelScope.launch {
+        if (com.dpdpxray.app.data.ConsentAnswers.state(bundle) == com.dpdpxray.app.data.ConsentAnswers.State.NONE) return@launch
+        val catalog = graph.catalog()
+        val (meta, result) = withContext(Dispatchers.Default) {
+            com.dpdpxray.app.data.ConsentAnswers.apply(bundle, answer) { s, h -> RulesEngine(catalog).evaluate(s, h) }
+        }
+        saveRescored(bundle, meta, result)
+        _toast.value = when (answer) {
+            null -> "Answer cleared. The result is a range again."
+            com.dpdpxray.core.model.ConsentHistory.NOT_SURE -> "Saved: not sure. The result stays a range."
+            else -> "Saved as your answer. You can change it on the result."
+        }
+    }
+
+    private suspend fun saveRescored(b: AuditBundle, meta: AuditMeta, result: com.dpdpxray.core.model.AuditResult) {
+        val catalog = graph.catalog()
+        val md = withContext(Dispatchers.Default) {
+            runCatching {
+                EvidenceReport.annotate(MarkdownReport.build(result, b.sessions, graph.fixCatalog.fixesFor(result, catalog), graph.citations()), b.sessions, meta.timingProfile)
+            }.getOrDefault("")
+        }
+        runCatching { graph.repository.updateResult(meta, result, md) }.onFailure { _toast.value = "Could not save the change"; return }
+        _bundle.update { cur -> if (cur?.meta?.id == meta.id) cur.copy(meta = meta, result = result) else cur }
     }
 
     fun delete(id: String) = viewModelScope.launch { graph.repository.delete(id) }
 
-    fun fixesFor(bundle: AuditBundle): List<FixTemplate> = graph.fixCatalog.fixesFor(bundle.result, graph.catalog())
+    /** App checks get the SDK and screen fix templates; a website check gets the website ones (Android SDK settings do not apply to a site). */
+    fun fixesFor(bundle: AuditBundle): List<FixTemplate> =
+        if (com.dpdpxray.core.web.WebAudit.isWeb(bundle.sessions)) com.dpdpxray.core.web.WebFixes.forResult(bundle.result)
+        else graph.fixCatalog.fixesFor(bundle.result, graph.catalog())
 
-    suspend fun previousComparison(bundle: AuditBundle): AuditComparisonResult {
+    /** "Which SDK caused this?": the audit's lookups grouped by catalogue service, in order of the findings' weight. */
+    fun sdkGroups(bundle: AuditBundle): List<SdkGroup> =
+        runCatching { SdkAttribution(graph.catalog(), graph.fixCatalog).groups(bundle.result, bundle.sessions) }.getOrDefault(emptyList())
+
+    fun fixTemplate(id: String): FixTemplate? = graph.fixCatalog.template(id)
+
+    /**
+     * "Play label vs what we saw": the attached Play Data safety label set against this audit's SDK groups. Offline and
+     * deterministic; it is never part of the score or the findings.
+     */
+    fun playLabelCheck(record: PlayLabelRecord, groups: List<SdkGroup>): PlayLabelCheck =
+        PlayLabelComparator(graph.catalog()).compare(record.parsed, groups)
+
+    /** Saves [text] (pasted, read from a file, or the demo label) as this check's Play label. Nothing is fetched or sent. */
+    fun attachPlayLabel(bundle: AuditBundle, text: String, source: String) = viewModelScope.launch {
+        val trimmed = text.trim().take(DataSafetyParser.MAX_CHARS)
+        if (trimmed.isEmpty()) { _toast.value = "The label text is empty"; return@launch }
+        val record = PlayLabelRecord(trimmed, source, System.currentTimeMillis())
+        val saved = withContext(Dispatchers.IO) { runCatching { graph.repository.savePlayLabel(bundle.meta.id, record) }.isSuccess }
+        if (!saved) { _toast.value = "Could not save the label with this check"; return@launch }
+        _bundle.update { b -> if (b?.meta?.id == bundle.meta.id) b.copy(playLabel = record) else b }
+        _toast.value = if (record.parsed.readable) "Label saved with this check" else "Saved, but no Data safety statement was found in that text"
+    }
+
+    /** Reads a text file the person picked with Android's file picker (at most 256 KB) and attaches it as the label. */
+    fun attachPlayLabelFile(bundle: AuditBundle, uri: android.net.Uri) = viewModelScope.launch {
+        val text = withContext(Dispatchers.IO) {
+            runCatching { ctx.contentResolver.openInputStream(uri)?.use { CheckBackups.readBounded(it, MAX_LABEL_FILE_BYTES) }?.toString(Charsets.UTF_8) }.getOrNull()
+        }
+        if (text == null) { _toast.value = "Could not read that file as text (the limit is 256 KB)"; return@launch }
+        attachPlayLabel(bundle, text, PlayLabelRecord.FILE)
+    }
+
+    fun removePlayLabel(bundle: AuditBundle) = viewModelScope.launch {
+        withContext(Dispatchers.IO) { runCatching { graph.repository.deletePlayLabel(bundle.meta.id) } }
+        _bundle.update { b -> if (b?.meta?.id == bundle.meta.id) b.copy(playLabel = null) else b }
+        _toast.value = "Label removed from this check"
+    }
+
+    /** The attached label with its comparison for exports; the label alone if the comparison cannot be built. */
+    private fun playLabelExport(bundle: AuditBundle, groups: List<SdkGroup>): PlayLabelExport? = bundle.playLabel?.let { rec ->
+        runCatching { PlayLabelExport.of(rec, playLabelCheck(rec, groups)) }.getOrElse { PlayLabelExport.of(rec, null) }
+    }
+
+    private val _backup = MutableStateFlow<BackupUi>(BackupUi.Idle)
+    /** Progress and outcome of the last "Back up my checks" or "Restore from a backup". */
+    val backup = _backup.asStateFlow()
+
+    /** Writes every saved check into the file the person created with Android's file picker. Never uploads anything. */
+    fun backupTo(uri: android.net.Uri) = viewModelScope.launch {
+        if (_backup.value is BackupUi.Working) return@launch
+        _backup.value = BackupUi.Working("Backing up your checks…")
+        graph.repository.refresh()
+        val ids = audits.value.map { it.id }
+        val outcome = withContext(Dispatchers.IO) {
+            runCatching {
+                val stream = runCatching { ctx.contentResolver.openOutputStream(uri, "wt") }.getOrNull()
+                    ?: ctx.contentResolver.openOutputStream(uri, "w")
+                    ?: error("no output stream")
+                stream.use { out -> CheckBackups.write(graph.repository, ids, out, BuildConfig.VERSION_NAME, AuditBundles.now()) }
+            }
+        }
+        _backup.value = outcome.fold(
+            { BackupUi.Done(it.message) },
+            { BackupUi.Failed("Could not write the backup file. Nothing on this phone was changed.") },
+        )
+        _toast.value = (_backup.value as? BackupUi.Done)?.message ?: (_backup.value as BackupUi.Failed).message
+    }
+
+    /** Checks a backup the person picked, then adds the checks that are not on this phone yet. */
+    fun restoreFrom(uri: android.net.Uri) = viewModelScope.launch {
+        if (_backup.value is BackupUi.Working) return@launch
+        _backup.value = BackupUi.Working("Checking the backup…")
+        val read: Result<com.dpdpxray.core.export.BackupContents> = withContext(Dispatchers.IO) { readBackup(uri) }
+        val contents = read.getOrElse {
+            _backup.value = BackupUi.Failed(it.message ?: "Could not read this file. Nothing was restored.")
+            _toast.value = (_backup.value as BackupUi.Failed).message
+            return@launch
+        }
+        graph.repository.refresh()
+        val plan = AuditBackups.plan(contents, audits.value.map { it.id }.toSet())
+        _backup.value = BackupUi.Working("Restoring ${plan.toRestore.size} checks…")
+        val outcome = withContext(Dispatchers.IO) { CheckBackups.restore(graph.repository, plan, ::restoredReport) }
+        _backup.value = BackupUi.Done(outcome.message)
+        _toast.value = outcome.message
+    }
+
+    /** Size limit, then the bounded read, then core's schema, hash and audit checks. Never throws. */
+    private fun readBackup(uri: android.net.Uri): Result<com.dpdpxray.core.export.BackupContents> = try {
+        val size = runCatching {
+            ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+                if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null
+            }
+        }.getOrNull()
+        AuditBackups.sizeProblem(size)?.let { throw BackupFormatException(it) }
+        val bytes = ctx.contentResolver.openInputStream(uri)?.use { CheckBackups.readBounded(it, AuditBackups.MAX_BYTES) }
+            ?: throw BackupFormatException(AuditBackups.sizeProblem(AuditBackups.MAX_BYTES + 1)!!)
+        Result.success(AuditBackups.read(bytes.toString(Charsets.UTF_8)))
+    } catch (e: BackupFormatException) {
+        Result.failure(e)
+    } catch (e: OutOfMemoryError) {
+        Result.failure(BackupFormatException("This backup is too large to check on this phone. Nothing was restored."))
+    } catch (e: Exception) {
+        Result.failure(BackupFormatException("Could not read this file. Nothing was restored."))
+    }
+
+    /** The saved report for a restored audit, built the same way as when an audit is saved; empty if that fails. */
+    private fun restoredReport(meta: AuditMeta, sessions: List<AuditSession>, result: com.dpdpxray.core.model.AuditResult): String =
+        runCatching {
+            val built = MarkdownReport.build(result, sessions, graph.fixCatalog.fixesFor(result, graph.catalog()), graph.citations())
+            EvidenceReport.annotate(if (meta.sample) SampleReport.annotate(built, sessions) else built, sessions, meta.timingProfile, sample = meta.sample)
+        }.getOrDefault("")
+
+    suspend fun previousComparison(bundle: AuditBundle): AuditComparisonResult = beforeAfter(bundle).comparison
+
+    /** The "Before / after" card: the comparison with the previous audit, and the version update between them if any. */
+    data class BeforeAfter(val comparison: AuditComparisonResult, val update: com.dpdpxray.app.data.VersionUpdate?, val previousTimeMs: Long?)
+
+    suspend fun beforeAfter(bundle: AuditBundle): BeforeAfter {
         val previousId = AuditComparison.previousId(bundle.meta, audits.value)
         val previous = previousId?.let { graph.repository.load(it) }
-        return AuditComparison.compare(bundle, previous)
+        return BeforeAfter(AuditComparison.compare(bundle, previous), AuditComparison.update(bundle, previous), previous?.meta?.createdAtMs)
+    }
+
+    /** Opens Android's share sheet with [text]; never sends anything by itself. */
+    fun shareText(subject: String, text: String) {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        runCatching { ctx.startActivity(Intent.createChooser(send, subject).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .onFailure { _toast.value = "No sharing app is available." }
     }
 
     private val citationCache = java.util.concurrent.ConcurrentHashMap<String, List<Passage>>()
@@ -320,6 +586,9 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
                 HtmlExporter.build(
                     bundle.result, bundle.sessions, bundle.meta.timingProfile, bundle.meta.sample, fixesFor(bundle), graph.citations(), graph.catalog(),
                     profile = lensProfile(),
+                    playLabelSection = bundle.playLabel?.let { rec ->
+                        runCatching { PlayLabelReport.html(rec, playLabelCheck(rec, sdkGroups(bundle))) }.getOrNull()
+                    }.orEmpty(),
                 )
             }
             withContext(Dispatchers.IO) { HtmlExporter.write(html, File(bundle.dir, "TraceVeil-${bundle.meta.targetLabel.filter { it.isLetterOrDigit() }}.html")) }
@@ -331,14 +600,33 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Audit data as a traceveil.audit.v1 JSON bundle for TraceVeil CI; it leaves the phone only when saved or shared. */
+    /**
+     * Audit data as a traceveil.audit.v1 JSON bundle for TraceVeil CI; it leaves the phone only when saved or shared. The
+     * file's exact bytes are also signed with this install's hardware key (<file>.sig.json next to it) when the phone
+     * can; otherwise the export goes ahead unsigned and says so.
+     */
     fun exportAuditJson(bundle: AuditBundle, share: Boolean) = viewModelScope.launch {
-        val file = runCatching { withContext(Dispatchers.IO) { AuditJsonExport.write(bundle, BuildConfig.VERSION_NAME, lensProfile().name) } }
+        val groups = withContext(Dispatchers.Default) { sdkGroups(bundle) }
+        val label = withContext(Dispatchers.Default) { playLabelExport(bundle, groups) }
+        val darkPatterns = withContext(Dispatchers.Default) { DarkPatternExport.of(bundle.sessions) }
+        val file = runCatching {
+            withContext(Dispatchers.IO) {
+                AuditJsonExport.write(bundle, BuildConfig.VERSION_NAME, lensProfile().name, SdkAttributionExport(groups = groups), playLabel = label, darkPatterns = darkPatterns)
+            }
+        }
             .getOrElse { _toast.value = "Could not build the audit data export"; return@launch }
-        if (share) ExportManager.share(ctx, file, AuditJsonExport.MIME)
+        val signing = withContext(Dispatchers.IO) { EvidenceFiles.signNextTo(file, evidenceKey, BuildConfig.VERSION_NAME) }
+        _evidenceLine.value = bundle.meta.id to signing.line
+        val sig = (signing as? EvidenceSigning.Signed)?.file
+        if (share) ExportManager.share(ctx, listOfNotNull(file, sig), AuditJsonExport.MIME)
         else {
-            val ok = withContext(Dispatchers.IO) { ExportManager.saveToDownloads(ctx, file, file.name, AuditJsonExport.MIME) }
-            _toast.value = if (ok) "Audit data (JSON) saved to Downloads/TraceVeil" else "Could not save the audit data"
+            val saved = withContext(Dispatchers.IO) { ExportManager.saveToDownloads(ctx, file, file.name, AuditJsonExport.MIME) }
+            val sigSaved = sig?.let { withContext(Dispatchers.IO) { ExportManager.saveToDownloads(ctx, it, it.name, EvidenceSignatures.MIME) } }
+            _toast.value = when {
+                !saved -> "Could not save the audit data"
+                sigSaved == false -> "Audit data (JSON) saved to Downloads/TraceVeil, but its signature file could not be saved"
+                else -> "Audit data (JSON) saved to Downloads/TraceVeil · ${signing.line}"
+            }
         }
     }
 
@@ -352,7 +640,11 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
             val built = MarkdownReport.build(bundle.result, bundle.sessions, fixesFor(bundle), graph.citations(), profile)
             if (bundle.meta.sample) SampleReport.annotate(built, bundle.sessions) else built
         }.getOrElse { graph.repository.markdownFile(bundle.meta.id).takeIf { it.exists() }?.readText().orEmpty() }
-        return EvidenceReport.annotate(md, bundle.sessions, bundle.meta.timingProfile, sample = bundle.meta.sample)
+        // "Play label vs what we saw", when a label is attached: its own section, separate from the findings and score.
+        val withLabel = bundle.playLabel?.let { rec ->
+            runCatching { PlayLabelReport.insertInto(md, PlayLabelReport.markdown(rec, playLabelCheck(rec, sdkGroups(bundle)))) }.getOrNull()
+        } ?: md
+        return EvidenceReport.annotate(withLabel, bundle.sessions, bundle.meta.timingProfile, sample = bundle.meta.sample)
     }
 
     fun copy(label: String, text: String) {
@@ -361,6 +653,17 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateSettings(transform: (com.dpdpxray.app.data.XraySettings) -> com.dpdpxray.app.data.XraySettings) = graph.settings.update(transform)
+}
+
+/** Largest text file accepted as a Play label (a label is a few hundred characters). */
+private const val MAX_LABEL_FILE_BYTES = 256L * 1024
+
+/** "Back up my checks" / "Restore from a backup" progress, shown on the card that started it. */
+sealed interface BackupUi {
+    data object Idle : BackupUi
+    data class Working(val message: String) : BackupUi
+    data class Done(val message: String) : BackupUi
+    data class Failed(val message: String) : BackupUi
 }
 
 sealed interface CameraCheckState {

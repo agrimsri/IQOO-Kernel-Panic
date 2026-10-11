@@ -56,6 +56,13 @@ object DeterministicScreenAuditor {
         "Gujarati" to listOf("gujarati", "ગુજરાતી"),
     )
 
+    /**
+     * A button's own label, or, when the tappable node has none (Compose puts the text on a child), the text of its
+     * descendants. Long text such as a whole dialog wrapped in one clickable container is rejected by classifyButton.
+     */
+    private fun buttonLabel(node: UiNode): String =
+        node.label.ifBlank { node.flatten().drop(1).map { it.label }.filter { it.isNotBlank() }.joinToString(" ") }
+
     fun audit(root: UiNode): ScreenAudit {
         val nodes = root.flatten()
         val labels = nodes.map { it.label }.filter { it.isNotBlank() }
@@ -66,7 +73,7 @@ object DeterministicScreenAuditor {
         val preTicked = checkables.any { it.isChecked }
         observed += "preTicked"
 
-        val kinds = nodes.filter { it.isClickable }.mapNotNull { ConsentLexicon.classifyButton(it.label) }
+        val kinds = nodes.filter { it.isClickable }.mapNotNull { ConsentLexicon.classifyButton(buttonLabel(it)) }
         val rejectOption = when {
             ConsentKind.REJECT in kinds -> RejectOption.VISIBLE
             ConsentKind.SETTINGS in kinds -> RejectOption.HIDDEN

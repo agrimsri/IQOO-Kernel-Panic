@@ -1,0 +1,35 @@
+<!doctype html>
+<!-- Test fixture: a news page with a OneTrust-style banner (element ids as OneTrust's banner uses them). Synthetic. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fixture: OneTrust banner</title>
+<style>
+  body { font-family: sans-serif; margin: 0; }
+  #onetrust-banner-sdk { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 16px; box-shadow: 0 -2px 8px #0003; }
+  #onetrust-button-group button { display: block; width: 100%; margin-top: 8px; padding: 12px; }
+  #onetrust-pc-sdk { display: none; }
+</style></head>
+<body>
+<main><h1>Morning news</h1><p>Article text that is not part of the banner.</p></main>
+<div id="onetrust-consent-sdk">
+  <div id="onetrust-banner-sdk" role="region" aria-label="Cookie banner">
+    <div id="onetrust-policy">
+      <h2 id="onetrust-policy-title">We value your privacy</h2>
+      <p id="onetrust-policy-text">We and our partners store and access information on your device, such as cookies, to personalise ads and content and to measure audiences. You can withdraw your consent at any time. <a href="https://news.example/cookie-policy">Cookie Policy</a></p>
+    </div>
+    <div id="onetrust-button-group">
+      <button id="onetrust-pc-btn-handler">Cookies Settings</button>
+      <button id="onetrust-reject-all-handler">Reject All</button>
+      <button id="onetrust-accept-btn-handler">Accept All Cookies</button>
+    </div>
+  </div>
+  <div id="onetrust-pc-sdk" role="dialog" aria-label="Privacy Preference Center">
+    <h2>Privacy Preference Center</h2>
+    <button id="accept-recommended-btn-handler">Allow All</button>
+    <div><input type="checkbox" id="ot-group-id-C0001" checked disabled><label for="ot-group-id-C0001">Strictly Necessary Cookies</label></div>
+    <div><input type="checkbox" id="ot-group-id-C0002" checked><label for="ot-group-id-C0002">Performance Cookies</label></div>
+    <div><input type="checkbox" id="ot-group-id-C0004"><label for="ot-group-id-C0004">Targeting Cookies</label></div>
+    <button class="ot-pc-refuse-all-handler">Reject All</button>
+    <button class="save-preference-btn-handler onetrust-close-btn-handler">Confirm My Choices</button>
+  </div>
+</div>
+</body></html>

@@ -15,12 +15,13 @@ import com.dpdpxray.app.quarantine.QuarantineNet
 import com.dpdpxray.core.dns.DnsAnswers
 import com.dpdpxray.core.dns.DnsPacketCodec
 import com.dpdpxray.core.model.NetEvent
+import com.dpdpxray.core.netcapture.SinkholeConnector
 import com.dpdpxray.core.netcapture.TunRelay
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.delay
 import com.dpdpxray.core.quarantine.IpAddresses
-import com.dpdpxray.core.quarantine.IpHeaders
 import com.dpdpxray.core.quarantine.QuarantineStopReason
+import com.dpdpxray.core.quarantine.SinkholeTap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -40,7 +41,10 @@ class XrayVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
     private var scope: CoroutineScope? = null
 
-    /** The full-relay engine of the current audit tunnel; null in DNS-only mode and quarantine. */
+    /**
+     * The relay of the current tunnel: forwarding in a full-relay audit, a sinkhole (answers on the phone, forwards
+     * nothing) in quarantine; null in a DNS-only audit.
+     */
     private var relay: TunRelay? = null
 
     /** The tunnel opened in quarantine mode, and its run; an audit START replaces [tun] and leaves this stale. */
@@ -67,6 +71,12 @@ class XrayVpnService : VpnService() {
                 startQuarantineNotice(intent.getStringExtra(EXTRA_LABEL) ?: pkg)
                 startQuarantine(pkg, runId)
             }
+            // The background watch's Stop: the watch ends early and keeps what it saw; the orchestrator closes the tunnel.
+            ACTION_WATCH_STOP -> {
+                com.dpdpxray.app.audit.WatchControl.requestStop()
+                // A late tap after the watch ended must not leave a stray service behind.
+                if (synchronized(this) { tun == null }) stopSelfResult(startId)
+            }
             ACTION_QUARANTINE_STOP -> {
                 // Only the quarantine tunnel is ever closed here, never an audit's capture tunnel.
                 val ended = endQuarantine(if (intent.getBooleanExtra(EXTRA_BY_USER, false)) QuarantineStopReason.USER else null)
@@ -82,8 +92,10 @@ class XrayVpnService : VpnService() {
     /**
      * Quarantine mode: ALL traffic of [pkg] (IPv4 and IPv6) enters the tunnel and nothing is ever forwarded. DNS
      * questions are recorded and answered locally with NXDOMAIN; every other packet is recorded from its IP/transport
-     * headers (destination, port, protocol) and dropped. Only this one app loses its internet; closing the tunnel
-     * restores it.
+     * headers (destination, port, protocol). IPv4 TCP connections and QUIC datagrams are also answered on the phone by
+     * a sinkhole relay ([SinkholeConnector]), which reads only the first message (TLS or QUIC server name, redacted
+     * HTTP request head) and closes the connection; everything else is dropped. Only this one app loses its internet;
+     * closing the tunnel restores it.
      */
     private fun startQuarantine(pkg: String, runId: Long) {
         stopTunnel()
@@ -111,19 +123,32 @@ class XrayVpnService : VpnService() {
             return
         }
         val s = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val output = FileOutputStream(fd.fileDescriptor)
+        val sinkhole = QuarantineBus.flowTracker(runId)?.let { tracker ->
+            TunRelay(
+                toTun = { pkt -> synchronized(output) { runCatching { output.write(pkt) } } },
+                connector = SinkholeConnector(),
+                tracker = tracker,
+                clock = SystemClock::elapsedRealtimeNanos,
+                executor = Dispatchers.IO.asExecutor(),
+                maxTcpFlows = SINKHOLE_MAX_TCP,
+            )
+        }
         synchronized(this) {
             tun = fd
             scope = s
+            relay = sinkhole
             quarantineTun = fd
             quarantineRunId = runId
         }
         QuarantineBus.tunnelRunning(runId, pkg)
-        s.launch { quarantineLoop(fd, s, runId) }
+        if (sinkhole != null) s.launch { while (isActive) { delay(15_000); sinkhole.sweep(SINKHOLE_IDLE_NANOS) } }
+        s.launch { quarantineLoop(fd, s, runId, sinkhole, output) }
     }
 
-    private fun quarantineLoop(fd: ParcelFileDescriptor, s: CoroutineScope, runId: Long) {
+    private fun quarantineLoop(fd: ParcelFileDescriptor, s: CoroutineScope, runId: Long, sinkhole: TunRelay?, output: FileOutputStream) {
         val input = FileInputStream(fd.fileDescriptor)
-        val output = FileOutputStream(fd.fileDescriptor)
+        val tap = SinkholeTap(sinkhole, QuarantineNet.RESOLVERS) { t, header -> QuarantineBus.dropped(runId, t, header) }
         val buffer = ByteArray(32767)
         try {
             while (s.isActive) {
@@ -139,10 +164,12 @@ class XrayVpnService : VpnService() {
                 if (query != null) {
                     QuarantineBus.lookup(runId, t, query.hostname, query.queryType, IpAddresses.format(query.dstAddress))
                     // Answered here, never forwarded: the name "does not exist" for this app during the run.
-                    runCatching { output.write(DnsPacketCodec.buildResponse(query, DnsPacketCodec.nxDomain(query.dnsPayload))) }
+                    val answer = DnsPacketCodec.buildResponse(query, DnsPacketCodec.nxDomain(query.dnsPayload))
+                    synchronized(output) { runCatching { output.write(answer) } }
                 } else {
-                    // Dropped. Only the IP/transport headers are read, for destination, port and protocol.
-                    QuarantineBus.dropped(runId, t, IpHeaders.parse(buffer, n))
+                    // Recorded from its IP/transport headers; IPv4 connections are also answered on the phone (never
+                    // forwarded) so their first message names the server. Everything else is dropped.
+                    tap.onPacket(t, buffer, n)
                 }
             }
         } finally {
@@ -316,11 +343,14 @@ class XrayVpnService : VpnService() {
         private const val EXTRA_INCLUDE_GMS = "gms"
         private const val EXTRA_FULL_RELAY = "fullRelay"
         private val FAKE_DNS_BYTES = byteArrayOf(10, 111, 0, 53)
+        private const val SINKHOLE_MAX_TCP = 128
+        private const val SINKHOLE_IDLE_NANOS = 30_000_000_000L
         private const val VPN_ADDRESS = "10.111.0.2"
         private const val DNS_ADDRESS = "10.111.0.53"
         private const val MTU = 1500
-        private const val CHANNEL = "capture"
-        private const val NOTIFICATION_ID = 7
+        internal const val CHANNEL = "capture"
+        internal const val NOTIFICATION_ID = 7
+        private const val ACTION_WATCH_STOP = "com.dpdpxray.capture.WATCH_STOP"
         const val GMS_PACKAGE = "com.google.android.gms"
         private const val ACTION_QUARANTINE = "com.dpdpxray.capture.QUARANTINE"
         private const val ACTION_QUARANTINE_STOP = "com.dpdpxray.capture.QUARANTINE_STOP"
@@ -343,6 +373,33 @@ class XrayVpnService : VpnService() {
         fun stop(context: Context) {
             if (CaptureBus.state.value is CaptureState.Idle) return
             context.startService(Intent(context, XrayVpnService::class.java).setAction(ACTION_STOP))
+        }
+
+        /**
+         * Replaces the capture's ongoing notification with the background watch's: [title] with the time left, [text], and
+         * a Stop action that ends the watch early and keeps what it saw. Same channel, id and foreground-service type as the
+         * capture it belongs to, so it stays while the screen is locked and TraceVeil is in the background.
+         */
+        fun showWatchNotice(context: Context, title: String, text: String, stopLabel: String) {
+            val nm = context.getSystemService(NotificationManager::class.java) ?: return
+            val stop = PendingIntent.getService(
+                context, 3, Intent(context, XrayVpnService::class.java).setAction(ACTION_WATCH_STOP),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            val open = context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
+                PendingIntent.getActivity(context, 4, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            }
+            val n = Notification.Builder(context, CHANNEL)
+                .setSmallIcon(android.R.drawable.ic_menu_view)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(Notification.BigTextStyle().bigText(text))
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .apply { if (open != null) setContentIntent(open) }
+                .addAction(Notification.Action.Builder(null, stopLabel, stop).build())
+                .build()
+            runCatching { nm.notify(NOTIFICATION_ID, n) }
         }
 
         /** Starts a quarantine run's tunnel for [targetPackage]; progress is reported on [QuarantineBus.tunnel]. */

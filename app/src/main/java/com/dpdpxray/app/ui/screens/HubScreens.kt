@@ -43,6 +43,8 @@ import com.dpdpxray.app.BuildConfig
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.data.SampleAudit
+import com.dpdpxray.app.controls.ControlsCopy
+import com.dpdpxray.app.notices.OpenSourceNotices
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.ChipFlow
 import com.dpdpxray.app.ui.components.FoldText
@@ -81,19 +83,30 @@ import java.util.Locale
 
 /** The Reports tab: every saved check, newest first, with a band filter. */
 @Composable
-fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit) {
+fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit, onRecheck: (String) -> Unit = {}) {
     val audits by vm.audits.collectAsState()
+    // Update Watch: checked apps whose installed version changed since their last check (same list as Home).
+    val updated by vm.updatedApps.collectAsState()
     val lang = guideLang()
     var filter by rememberSaveable { mutableIntStateOf(0) }
     val bands = listOf(null, ScoreBand.AT_RISK, ScoreBand.NEEDS_WORK, ScoreBand.READY)
-    val shown = remember(audits, filter) { bands[filter].let { b -> if (b == null) audits else audits.filter { it.band == b } } }
+    // A consent-history range is filed under its worse band (RecentChecks.listBand), so it is never hidden as "Inconclusive".
+    val shown = remember(audits, filter) { bands[filter].let { b -> if (b == null) audits else audits.filter { RecentChecks.listBand(it) == b } } }
     Column(Modifier.fillMaxSize()) {
         TopBar("Reports", onBack = null)
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (updated.isNotEmpty()) item(key = "updated") { UpdatedSinceCard(updated, onRecheck, Modifier.padding(bottom = 16.dp)) }
             if (audits.isNotEmpty()) item(key = "filter") {
                 SegmentedControl(
                     listOf("All", ScoreBand.AT_RISK.label, ScoreBand.NEEDS_WORK.label, ScoreBand.READY.label), filter, { filter = it },
                     Modifier.padding(bottom = 8.dp),
+                )
+            }
+            // Where the list comes from and how many checks fall in each band (one line under the filter).
+            if (audits.isNotEmpty()) item(key = "counts") {
+                Text(
+                    ReportsCopy.summary(audits.map { RecentChecks.listBand(it) }), style = MaterialTheme.typography.bodySmall, color = Film.boneDim,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
                 )
             }
             if (audits.isEmpty()) item(key = "empty") {
@@ -109,7 +122,17 @@ fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit) {
             itemsIndexed(shown, key = { _, a -> a.id }) { _, a ->
                 Box(Modifier.animateItem().cardSurface(Radii.row)) { CheckRow(a, lang) { onOpen(a.id) } }
             }
+            // Back up / restore: also reachable on a new phone, when the list above is still empty.
+            item(key = "backup") { BackupRestoreCard(vm, Modifier.padding(top = 24.dp)) }
         }
+    }
+}
+
+/** The line under the Reports filter: where the checks live, then a count per score band (bands with none are left out). */
+object ReportsCopy {
+    fun summary(bands: List<ScoreBand>): String {
+        val counts = ScoreBand.entries.mapNotNull { b -> bands.count { it == b }.takeIf { it > 0 }?.let { "$it ${b.label}" } }
+        return (listOf("Saved on this phone, newest first") + counts).joinToString(" · ")
     }
 }
 
@@ -124,6 +147,10 @@ fun MoreScreen(
     onHowItWorks: () -> Unit,
     onOpen: (String) -> Unit,
     onTrust: (() -> Unit)? = null,
+    /** "Open-source notices"; null hides the row. */
+    onNotices: (() -> Unit)? = null,
+    /** "Permissions & background" (everything TraceVeil uses, to switch off); null hides the row. */
+    onControls: (() -> Unit)? = null,
 ) {
     val audits by vm.audits.collectAsState()
     val llm by vm.llmStatus.collectAsState()
@@ -145,6 +172,11 @@ fun MoreScreen(
             }
             Group(Modifier.reveal(1), title = "App") {
                 MoreRow("Settings", "Mode, text size, voice, your domains and privacy", Glyph.SETTINGS, onSettings)
+                if (onControls != null) {
+                    GroupDivider(54.dp)
+                    val lang = guideLang()
+                    MoreRow(ControlsCopy.pageTitle.pick(lang), ControlsCopy.pageRow.pick(lang), Glyph.VPN, onControls)
+                }
                 GroupDivider(54.dp)
                 MoreRow("AI lab", aiStatusLine(llm), Glyph.AI, onLab)
             }
@@ -157,6 +189,10 @@ fun MoreScreen(
             ) {
                 if (onTrust != null) {
                     MoreRow("Why you can trust TraceVeil", "What stays on the phone, its permissions and network use", Glyph.LOCK, onTrust)
+                    GroupDivider(54.dp)
+                }
+                if (onNotices != null) {
+                    MoreRow(OpenSourceNotices.TITLE, OpenSourceNotices.ROW_DETAIL, Glyph.BOOK, onNotices)
                     GroupDivider(54.dp)
                 }
                 ListRow("Version", trailing = { Text(BuildConfig.VERSION_NAME, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim) })
@@ -209,7 +245,7 @@ internal fun SampleFixturesDialog(vm: XrayViewModel, onOpen: (String) -> Unit, o
  */
 @Composable
 internal fun RecentCheckCard(meta: AuditMeta, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val color = bandColor(meta.band)
+    val color = bandColor(RecentChecks.listBand(meta))
     val shape = RoundedCornerShape(Radii.tile)
     Row(
         modifier.fillMaxWidth().heightIn(min = 80.dp)
@@ -231,7 +267,7 @@ internal fun RecentCheckCard(meta: AuditMeta, modifier: Modifier = Modifier, onC
             }
             Text(
                 buildAnnotatedString {
-                    withStyle(SpanStyle(color = color)) { append(meta.band.label) }
+                    withStyle(SpanStyle(color = color)) { append(RecentChecks.listBand(meta).label) }
                     append(" · ")
                     append(if (meta.findingCount == 1) "1 finding" else "${meta.findingCount} findings")
                 },

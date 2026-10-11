@@ -1,6 +1,7 @@
 package com.dpdpxray.app.voice
 
 import android.content.Context
+import com.dpdpxray.app.BuildConfig
 import java.io.File
 
 /**
@@ -12,13 +13,34 @@ import java.io.File
  */
 class ApiConfig internal constructor(val useApi: Boolean, val sarvamKey: String?) {
     override fun toString() = "ApiConfig(useApi=$useApi, sarvamKey=${if (sarvamKey == null) "absent" else "present"})"
+
+    companion object {
+        /** The online voice is off: what a build without it always uses. */
+        val OFF = ApiConfig(useApi = false, sarvamKey = null)
+    }
 }
 
 object ApiEnv {
     const val FILE_NAME = "api.env"
 
-    fun load(context: Context): ApiConfig =
-        parse(runCatching { File(context.getExternalFilesDir(null), FILE_NAME).takeIf { it.isFile }?.readText() }.getOrNull())
+    /**
+     * Whether this build includes the optional online voice at all (Gradle's ONLINE_VOICE_AVAILABLE: on in debug builds,
+     * off in release builds unless `-Ptraceveil.onlineVoice=true`). Without it `api.env` is never read.
+     */
+    val ONLINE_VOICE_AVAILABLE: Boolean = BuildConfig.ONLINE_VOICE_AVAILABLE
+
+    /** The online voice as it applies now: off when the person switched it off ([OnlineVoiceSwitch]); then the file is not read. */
+    fun load(context: Context): ApiConfig = load(ONLINE_VOICE_AVAILABLE && OnlineVoiceSwitch.get(context).allowed.value) { readFile(context) }
+
+    /** Whether `api.env` on this phone turns the online voice on, before the person's own switch. */
+    fun setUp(context: Context): Boolean =
+        SpeechOutputChoice.choose(load(ONLINE_VOICE_AVAILABLE) { readFile(context) }) == SpeechOutputChoice.ONLINE
+
+    private fun readFile(context: Context): String? =
+        runCatching { File(context.getExternalFilesDir(null), FILE_NAME).takeIf { it.isFile }?.readText() }.getOrNull()
+
+    /** [read] returns the file's text (null when absent); it is not called at all when the build has no online voice. */
+    fun load(onlineVoiceAvailable: Boolean, read: () -> String?): ApiConfig = if (onlineVoiceAvailable) parse(read()) else ApiConfig.OFF
 
     fun parse(text: String?): ApiConfig {
         val values = text.orEmpty().lineSequence()

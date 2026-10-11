@@ -59,12 +59,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.data.AuditBundle
+import com.dpdpxray.app.webcheck.WebCheckCopy
+import com.dpdpxray.app.webcheck.WebEvidenceCard
+import com.dpdpxray.core.web.WebAudit
+import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.audit.AuditPlanCoverage
 import com.dpdpxray.app.audit.AuditTimingPolicy
 import com.dpdpxray.app.data.AuditNetworkReadings
 import com.dpdpxray.app.data.AuditComparisonResult
+import com.dpdpxray.app.data.UpdateDiffWording
 import com.dpdpxray.app.data.LensChoice
 import com.dpdpxray.app.netproof.NetworkProofCard
 import com.dpdpxray.app.ui.XrayViewModel
@@ -77,6 +83,7 @@ import com.dpdpxray.app.ui.components.FoldText
 import com.dpdpxray.app.ui.components.GradientRule
 import com.dpdpxray.app.ui.components.IconBadge
 import com.dpdpxray.app.ui.components.KeyCaveat
+import com.dpdpxray.app.ui.components.RangeRing
 import com.dpdpxray.app.ui.components.ScoreRing
 import com.dpdpxray.app.ui.components.SkeletonCard
 import com.dpdpxray.app.ui.components.SkeletonLines
@@ -116,11 +123,13 @@ import com.dpdpxray.app.ui.guide.ResultGuide
 import com.dpdpxray.app.ui.guide.GuideLang
 import com.dpdpxray.app.ui.guide.guideLang
 import com.dpdpxray.app.ui.guide.lessLabel
+import com.dpdpxray.app.ui.guide.moreLabel
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
 import com.dpdpxray.app.ui.theme.bandColor
 import com.dpdpxray.app.ui.theme.severityColor
+import com.dpdpxray.core.attribution.SdkAttribution
 import com.dpdpxray.core.law.LawRelation
 import com.dpdpxray.core.law.LegalLens
 import com.dpdpxray.core.law.LegalProfile
@@ -162,6 +171,10 @@ fun ResultsScreen(
     vm: XrayViewModel, id: String, onBack: () -> Unit, onFinding: (CheckId) -> Unit, onFixes: () -> Unit, onReport: () -> Unit, onAsk: () -> Unit,
     /** Starts a new check from the app picker; when null, "Check again" falls back to going back. */
     onCheckAgain: (() -> Unit)? = null,
+    /** Shows the live check started by a one-tap "Check again with a restart" (or a confirmed reset). */
+    onLive: () -> Unit = {},
+    /** Opens the internet-cut-off run for this app, which lists the addresses it tries. */
+    onQuarantine: (String) -> Unit = {},
 ) {
     WithBundle(vm, id) { b ->
         val r = b.result
@@ -181,43 +194,82 @@ fun ResultsScreen(
                 }
             })
             Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-                val grade = remember(b.meta.id) { if (b.meta.sample) null else ConfidenceGrader.gradeAudit(b.sessions) }
+                // A website check has no DNS capture health to grade; its own card says what the browser saw.
+                val web = remember(b.meta.id) { WebAudit.isWeb(b.sessions) }
+                val grade = remember(b.meta.id) { if (b.meta.sample || web) null else ConfidenceGrader.gradeAudit(b.sessions) }
                 val lensSettings by vm.settings.collectAsState()
                 val choice = remember(lensSettings.legalProfile) { vm.lensChoice(lensSettings.legalProfile) }
                 val view = remember(b.meta.id, choice.profile) { vm.legal.view(r, choice.profile) }
                 val gaps = AuditPlanCoverage.gaps(b.sessions)
                 val freshHint = AuditPlanCoverage.freshStateHint(b.sessions)
+                // Before / after (and Update Watch's version change) is read once and shared by the notice and the card.
+                val beforeAfter by produceState<XrayViewModel.BeforeAfter?>(null, b.meta.id) { value = vm.beforeAfter(b) }
                 val fixCount = vm.fixesFor(b).size
                 val facts = ResultFacts(
                     band = r.band, score = r.score, findingCount = r.findings.size, fixCount = fixCount,
                     coverageGaps = gaps.isNotEmpty(), rejectPlanned = b.sessions.any { it.plan == AuditPlan.REJECT },
                     fastPreview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW, sample = b.meta.sample,
                     inconclusiveReason = com.dpdpxray.core.rules.Inconclusive.reason(r.findings),
+                    bounds = r.historyBounds?.takeIf { r.score == null },
+                    web = web,
+                    watchMinutes = com.dpdpxray.core.model.BackgroundWatches.of(b.sessions)?.plannedMinutes,
                 )
                 val explanation = remember(facts) { ResultGuide.explain(facts) }
                 // The visible step banner is gone; people who use read-aloud still hear the same step.
                 SpeakStep(ResultGuide.step(facts))
 
-                ScoreHero(b, lang, Modifier.reveal(0))
-                Text(headline(r.findings), style = MaterialTheme.typography.bodyLarge, color = Film.bone, modifier = Modifier.padding(top = 20.dp).reveal(1))
+                ScoreHero(b, grade, lang, Modifier.reveal(0))
+                // A consent-history range has its own verdict line (never "Inconclusive"); everything else keeps the headline.
+                val head = r.historyBounds?.takeIf { r.score == null }?.let { ConsentHistoryCopy.headline(it).pick(lang) }
+                    ?: quietWatchHeadline(r.findings, b.sessions)?.pick(lang)
+                    ?: if (web) webHeadline(r.findings) else headline(r.findings)
+                Text(head, style = MaterialTheme.typography.bodyLarge, color = Film.bone, modifier = Modifier.padding(top = 20.dp).reveal(1))
 
                 // Caveats that must stay in view, above anything the reader might act on. Only those that apply are shown.
                 val preview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW
                 val rejectTested = b.sessions.any { it.plan == AuditPlan.REJECT }
-                val standalone = r.band == ScoreBand.READY || r.band == ScoreBand.INCONCLUSIVE
+                // A consent-history range says its meaning in the headline and its own section; its first line folds below.
+                val standalone = (r.band == ScoreBand.READY || r.band == ScoreBand.INCONCLUSIVE) && !(r.historyBounds != null && r.score == null)
                 Column(Modifier.padding(top = 12.dp).reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (b.meta.sample) Notice(ResultCopy.sample.pick(lang), kind = NoticeKind.CAUTION)
+                    if (web) Notice(WebCheckCopy.notice.pick(lang), kind = NoticeKind.INFO)
+                    // "Restart anyway" switched something off (its accessibility service...): say so, with the screen to turn it on.
+                    val ctx = androidx.compose.ui.platform.LocalContext.current
+                    com.dpdpxray.app.audit.RestartReminder.toTurnBackOn(b.sessions).firstOrNull()?.let { k ->
+                        val c = com.dpdpxray.app.audit.RestartSafeguardCopy
+                        Notice(c.reminder(b.meta.targetLabel, k).pick(lang), kind = NoticeKind.CAUTION,
+                            action = c.settingsLabel(k)?.let { it.pick(lang) to { com.dpdpxray.app.control.DeviceChecks.openTurnBackOn(ctx, k, b.meta.targetPackage) } })
+                    }
+                    // Update Watch: this check is of a different version than the previous one; the full diff is in Before / after.
+                    beforeAfter?.update?.let { u -> Notice(UpdateDiffWording.banner(u, beforeAfter?.comparison), kind = NoticeKind.INFO) }
                     // For a quiet or inconclusive result the first meaning line is itself a caveat (not a certificate; unknown stays unknown).
                     if (standalone) explanation.meaning.firstOrNull()?.let {
                         Notice(it.pick(lang), kind = if (r.band == ScoreBand.INCONCLUSIVE) NoticeKind.CAUTION else NoticeKind.INFO)
                     }
-                    if (!b.meta.sample && b.meta.timingProfile != AuditTimingPolicy.NORMAL) {
+                    // A background watch says what it checked, so it never reads as a test of the consent popup.
+                    val watch = com.dpdpxray.core.model.BackgroundWatches.of(b.sessions)
+                    if (watch != null) {
+                        val (en, hi) = com.dpdpxray.core.model.BackgroundWatches.whatWasChecked(b.meta.targetLabel, watch)
+                        Notice(Bi(en, hi).pick(lang), kind = NoticeKind.INFO)
+                    } else if (!b.meta.sample && b.meta.timingProfile != AuditTimingPolicy.NORMAL) {
                         Notice(AuditTimingPolicy.coverageHint(b.meta.timingProfile), kind = if (preview) NoticeKind.CAUTION else NoticeKind.INFO)
                     }
-                    if (!b.meta.sample && !preview && !rejectTested) Notice(ResultCopy.rejectNotTested.pick(lang), kind = NoticeKind.CAUTION)
+                    if (!b.meta.sample && !preview && !rejectTested && watch == null) Notice(ResultCopy.rejectNotTested.pick(lang), kind = NoticeKind.CAUTION)
                     gaps.forEach { Notice(it, kind = NoticeKind.CAUTION) }
                     freshHint?.let { Notice(it, kind = NoticeKind.CAUTION) }
                 }
+
+                // Kept data and no consent screen: the range, and the one question when the answer can change the band.
+                val resetOk = remember(b.meta.targetPackage) { !b.meta.sample && vm.resetEligible(b.meta.targetPackage) }
+                ConsentHistorySection(
+                    b, lang, everyday = lensSettings.audience == Audience.USER, resetOk = resetOk,
+                    onAnswer = { vm.answerConsentHistory(b, it) }, onReset = { vm.checkAgain(b, com.dpdpxray.app.audit.CheckAgain.Mode.RESET, onLive) },
+                    modifier = Modifier.padding(top = 20.dp),
+                )
+                // Why there is no score and what one tap can try next; then which steps needed the person.
+                NoScoreSection(vm, b, lang, onLive, onQuarantine, Modifier.padding(top = 20.dp))
+                BlockedStepsSection(b, lang, Modifier.padding(top = 20.dp))
+                val noScorePrimary = remember(b.meta.id) { NoScoreHelp.hasPrimary(b) }
 
                 val act: (NextAction) -> Unit = { action ->
                     when (action) {
@@ -228,7 +280,11 @@ fun ResultsScreen(
                         NextAction.REPORT -> onReport()
                     }
                 }
-                ResultActions(explanation.next, lang, act, Modifier.padding(top = 20.dp).reveal(2))
+                ResultActions(
+                    // The section above already offers checking again, as the one filled button.
+                    if (noScorePrimary) explanation.next.filterNot { it.action == NextAction.CHECK_AGAIN } else explanation.next,
+                    lang, act, Modifier.padding(top = 20.dp).reveal(2), primary = !noScorePrimary,
+                )
 
                 GroupHeader(ResultCopy.findings.pick(lang)) {
                     if (r.findings.isNotEmpty()) Text("${r.findings.size}", style = MaterialTheme.typography.labelLarge, color = Film.boneDim)
@@ -238,18 +294,66 @@ fun ResultsScreen(
                     r.findings.forEachIndexed { i, f ->
                         if (i > 0) GroupDivider()
                         ListRow(
-                            f.title, subtitle = findingSubtitle(f), subtitleMaxLines = 3,
+                            f.title, subtitle = findingSubtitle(f, ResultSources.of(f, b.sessions)), subtitleMaxLines = 3,
                             leading = { StatusDot(severityColor(f.severity)) },
                             onClick = { onFinding(f.checkId) },
                         )
                     }
                 }
+                // After the findings: "Which SDK caused this?", "Play label vs what we saw" and the dark-pattern signals
+                // (India CCPA 2023), none of them part of the score. Developer mode shows each as a card; everyday mode shows
+                // one plain line each, grouped, and only the lines that have something to say.
+                val sdkGroups = remember(b.meta.id, lensSettings.firstPartyDomains) { vm.sdkGroups(b) }
+                if (lensSettings.audience == Audience.DEVELOPER) {
+                    Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SdkAttributionCard(vm, b, sdkGroups, web = web)
+                        // A Play label belongs to an app; a website check has none.
+                        if (!web) PlayLabelCard(vm, b, sdkGroups)
+                        DarkPatternCard(b.sessions)
+                    }
+                } else {
+                    val sdkLine = remember(sdkGroups) { SdkAttribution.headline(sdkGroups, byCompany = true) }
+                    val playLine = if (web) null else playLabelEverydayLine(vm, b, sdkGroups)
+                    val darkLine = remember(b.meta.id) { DarkPatternView.of(b.sessions).everydayLine }
+                    val lines = listOfNotNull(sdkLine, playLine, darkLine)
+                    if (lines.isNotEmpty()) Group(Modifier.padding(top = 12.dp)) {
+                        lines.forEachIndexed { i, line ->
+                            if (i > 0) GroupDivider()
+                            Text(line, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp))
+                        }
+                    }
+                }
+
+                // The server map has its own open section, so nobody has to find it inside "Evidence and limits".
+                GroupHeader("Where it connects")
+                CollapsibleCard(
+                    "Server map",
+                    summary = when {
+                        b.meta.sample -> "Synthetic sample: example IPs do not establish real locations."
+                        web -> WebCheckCopy.mapSummary.pick(lang)
+                        else -> "Which countries answered this app's lookups, and who runs those services"
+                    },
+                    summaryColor = if (b.meta.sample) Film.warn else Film.boneDim,
+                    glyph = Glyph.PRIVATE_DNS,
+                    initiallyOpen = !b.meta.sample,
+                ) {
+                    if (b.meta.sample) Note("Synthetic sample: example IPs do not establish real locations.", Film.warn)
+                    if (web) Note(WebCheckCopy.mapNote.pick(lang))
+                    val mapSettings by vm.settings.collectAsState()
+                    val mapCatalog = remember(vm, mapSettings.firstPartyDomains) { vm.graph.catalog() }
+                    val mapOwners = remember(mapCatalog) { EndpointMapIntegration.owners(mapCatalog) }
+                    EndpointMapCard(b.sessions, mapCatalog, owners = mapOwners)
+                }
+                // Connections beyond DNS: this audit's own (full-relay checks) and the latest quarantine run's, if any.
+                AuditConnectionsCard(b.sessions, vm, Modifier.padding(top = 12.dp))
+                if (!b.meta.sample) QuarantineConnectionsCard(b.meta.targetPackage, vm, Modifier.padding(top = 12.dp))
 
                 NetworkFindingsSection(b.sessions, vm)
 
                 GroupHeader(ResultCopy.evidence.pick(lang))
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CollapsibleCard(
+                    if (web) WebEvidenceCard(b.sessions)
+                    if (!web) CollapsibleCard(
                         "Evidence coverage",
                         summary = if (b.meta.sample) "Synthetic sample: capture confidence was not measured." else grade?.summary,
                         summaryColor = if (b.meta.sample) Film.warn else Film.boneDim,
@@ -261,34 +365,35 @@ fun ResultsScreen(
                         NetworkProofCard(AuditNetworkReadings.proof(b.sessions, b.networkReadings))
                     }
 
-                    CollapsibleCard(
-                        "Endpoint evidence",
-                        summary = if (b.meta.sample) "Synthetic sample: example IPs do not establish real locations." else "Where lookups were answered, and who runs those services",
-                        summaryColor = if (b.meta.sample) Film.warn else Film.boneDim,
-                        glyph = Glyph.PRIVATE_DNS,
-                    ) {
-                        if (b.meta.sample) Note("Synthetic sample: example IPs do not establish real locations.", Film.warn)
-                        val mapSettings by vm.settings.collectAsState()
-                        val mapCatalog = remember(vm, mapSettings.firstPartyDomains) { vm.graph.catalog() }
-                        val mapOwners = remember(mapCatalog) { EndpointMapIntegration.owners(mapCatalog) }
-                        EndpointMapCard(b.sessions, mapCatalog, owners = mapOwners)
-                    }
 
-                    val comparison by produceState<AuditComparisonResult?>(null, b.meta.id) { value = vm.previousComparison(b) }
-                    val change = comparison
+                    val change = beforeAfter?.comparison
+                    val update = beforeAfter?.update
+                    // Update Watch: across an app update the card opens by itself and lists what changed between the two
+                    // checks. Keyed so it opens once the comparison (read from disk) arrives.
+                    androidx.compose.runtime.key(update != null) {
                     CollapsibleCard(
                         "Before / after",
-                        summary = when (change) {
-                            null -> "Checking earlier saved audits…"
-                            is AuditComparisonResult.Unavailable -> change.reason
-                            is AuditComparisonResult.Available -> "${if (change.scoreDelta > 0) "+${change.scoreDelta}" else change.scoreDelta.toString()} points since the previous audit"
+                        summary = when {
+                            change == null -> "Checking earlier saved audits…"
+                            update != null && change is AuditComparisonResult.Available -> UpdateDiffWording.summary(update, change)
+                            update != null && change is AuditComparisonResult.Unavailable -> "${UpdateDiffWording.title(update)} · ${change.reason}"
+                            change is AuditComparisonResult.Unavailable -> change.reason
+                            change is AuditComparisonResult.Available -> "${if (change.scoreDelta > 0) "+${change.scoreDelta}" else change.scoreDelta.toString()} points since the previous audit"
+                            else -> ""
                         },
                         glyph = Glyph.RESET,
+                        initiallyOpen = update != null,
                     ) {
-                        when (change) {
-                            null -> SkeletonLines(2, label = "Checking earlier saved audits")
-                            is AuditComparisonResult.Unavailable -> Note(change.reason)
-                            is AuditComparisonResult.Available -> {
+                        when {
+                            change == null -> SkeletonLines(2, label = "Checking earlier saved audits")
+                            update != null && change is AuditComparisonResult.Available -> UpdateDiff(update, change, b.meta.targetLabel, vm)
+                            update != null && change is AuditComparisonResult.Unavailable -> {
+                                Text(UpdateDiffWording.title(update), style = MaterialTheme.typography.titleMedium)
+                                Note(change.reason)
+                                beforeAfter?.previousTimeMs?.let { Note(UpdateDiffWording.honest(update, it)) }
+                            }
+                            change is AuditComparisonResult.Unavailable -> Note(change.reason)
+                            change is AuditComparisonResult.Available -> {
                                 val delta = if (change.scoreDelta > 0) "+${change.scoreDelta}" else change.scoreDelta.toString()
                                 Text("$delta points since the previous audit", style = MaterialTheme.typography.titleMedium)
                                 Note("Same package and audit plans. Previous audit: ${java.time.Instant.ofEpochMilli(change.previousTimeMs).atZone(java.time.ZoneId.systemDefault())}.")
@@ -298,6 +403,7 @@ fun ResultsScreen(
                                 KeyCaveat("Capture coverage can differ. A finding not repeated is not proof it was fixed or that the app is safe.")
                             }
                         }
+                    }
                     }
 
                     CollapsibleCard("Legal lens · ${view.profile.name}", summary = view.scoreLine, glyph = Glyph.BOOK) {
@@ -310,7 +416,7 @@ fun ResultsScreen(
 
                     CollapsibleCard(
                         "Timeline",
-                        summary = "Each run's lookups, with the moment of the consent choice marked",
+                        summary = if (web) WebCheckCopy.timelineSummary.pick(lang) else "Each run's lookups, with the moment of the consent choice marked",
                         glyph = Glyph.CLOCK,
                     ) {
                         PlanTimelines(vm, b)
@@ -327,7 +433,8 @@ fun ResultsScreen(
                 // The one-line lookup caveat stays in view; the remaining notes fold behind one link.
                 val caveat = if (r.findings.isNotEmpty()) explanation.meaning.getOrNull(1) else null
                 caveat?.let { KeyCaveat(it.pick(lang), Modifier.padding(top = 20.dp), color = Film.boneDim) }
-                val rest = explanation.meaning.drop(if (caveat != null) 2 else 1)
+                // Everything else "What this means" said, including its first line when no notice above showed it.
+                val rest = explanation.meaning.filterIndexed { i, _ -> !(i == 0 && standalone) && !(i == 1 && caveat != null) }
                 if (rest.isNotEmpty()) {
                     LearnMore(
                         Modifier.padding(top = 4.dp),
@@ -357,12 +464,45 @@ object ResultCopy {
 
 private val SCREEN_CHECKS = setOf(CheckId.C3, CheckId.C4, CheckId.C5, CheckId.C6, CheckId.C7, CheckId.C8)
 
-private fun headline(findings: List<Finding>): String {
+/** The one-sentence verdict of a website check: the same order as [headline], in the words of requests and banners. */
+internal fun webHeadline(findings: List<Finding>): String {
+    val c1 = findings.firstOrNull { it.checkId == CheckId.C1 }
+    val c2 = findings.firstOrNull { it.checkId == CheckId.C2 }
+    return when {
+        findings.any { it.checkId == CheckId.V0 } -> "Almost nothing was seen, so this site cannot be judged. See the first finding."
+        c2 != null -> "The site contacted trackers after the user refused consent: ${c2.entities.joinToString()}."
+        c1 != null -> "The site contacted ${c1.entities.size} tracker${if (c1.entities.size == 1) "" else "s"} before any consent choice: ${c1.entities.joinToString()}."
+        findings.isEmpty() -> "No tracker requests before consent and no banner problems in this check."
+        findings.all { it.severity == Severity.INFO } -> "No tracker requests before consent and no scored banner problems in this check. See the information notes."
+        else -> "No tracker requests before consent, but the consent banner needs work."
+    }
+}
+
+/**
+ * A background watch that saw almost nothing says what it observed, not a generic "too little was captured": the app
+ * itself made almost no connections in N minutes. null for every other result.
+ */
+internal fun quietWatchHeadline(findings: List<Finding>, sessions: List<com.dpdpxray.core.model.AuditSession>): Bi? {
+    val watch = com.dpdpxray.core.model.BackgroundWatches.of(sessions) ?: return null
+    if (findings.none { it.checkId == CheckId.V0 }) return null
+    val app = sessions.first().targetLabel
+    return Bi(
+        "In ${com.dpdpxray.core.model.BackgroundWatches.length(watch)} of watching, $app made almost no connections. Why, and what to try next, is just below.",
+        "${com.dpdpxray.core.model.BackgroundWatches.lengthHi(watch)} की निगरानी में $app ने लगभग कोई कनेक्शन नहीं बनाया। क्यों, और आगे क्या आज़माएँ, यह नीचे है।",
+    )
+}
+
+internal fun headline(findings: List<Finding>): String {
     val c1 = findings.firstOrNull { it.checkId == CheckId.C1 }
     val c2 = findings.firstOrNull { it.checkId == CheckId.C2 }
     val v0 = findings.any { it.checkId == CheckId.V0 }
+    val answered = findings.firstOrNull { it.checkId == CheckId.U1 && it.declared }
     return when {
-        v0 -> "Too few lookups were captured to judge this app. See the first finding for how to re-run."
+        v0 -> "Too few lookups were captured to judge this app. Why, and what to try next, is just below."
+        c1 != null && c1.declared ->
+            "Based on your answer, hosts of ${c1.entities.size} tracker${if (c1.entities.size == 1) " was" else "s were"} looked up although you never agreed: ${c1.entities.joinToString()}."
+        answered != null && c1 == null && c2 == null ->
+            "Checked as after you agreed: its tracker lookups are not counted as before consent. Other checks are below."
         com.dpdpxray.core.rules.Inconclusive.reason(findings) == com.dpdpxray.core.rules.Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN ->
             "No score: this app kept its data, so whether consent came before its tracker lookups is unknown " +
                 "(${findings.first { it.checkId == CheckId.U1 }.entities.joinToString()}). Run a Full check on a test install."
@@ -383,17 +523,47 @@ private fun headline(findings: List<Finding>): String {
  * and one line of severity counts. Inconclusive shows "?" in a dashed ring, never a zero.
  */
 @Composable
-private fun ScoreHero(b: AuditBundle, lang: GuideLang, modifier: Modifier = Modifier) {
+private fun ScoreHero(b: AuditBundle, grade: ConfidenceGrade?, lang: GuideLang, modifier: Modifier = Modifier) {
     val r = b.result
-    val color = bandColor(r.band)
+    val range = r.historyBounds?.takeIf { r.score == null }
+    val color = bandColor(range?.lowBand ?: r.band)
     Column(modifier.fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        ScoreRing(if (r.band == ScoreBand.INCONCLUSIVE) null else r.score, r.band, ringSize = 176.dp, key = b.meta.id)
-        Text(r.band.label, style = MaterialTheme.typography.titleLarge, color = color, modifier = Modifier.padding(top = 12.dp))
+        if (range != null) {
+            // Consent history unknown: the two ends and the band the range allows, never "Inconclusive".
+            RangeRing(range, ringSize = 176.dp, hindi = lang == GuideLang.HI)
+            Text(range.verdict(hindi = lang == GuideLang.HI).substringBefore(" · "), style = MaterialTheme.typography.titleLarge, color = color,
+                modifier = Modifier.padding(top = 12.dp))
+        } else {
+            ScoreRing(if (r.band == ScoreBand.INCONCLUSIVE) null else r.score, r.band, ringSize = 176.dp, key = b.meta.id)
+            Text(r.band.label, style = MaterialTheme.typography.titleLarge, color = color, modifier = Modifier.padding(top = 12.dp))
+            if (r.historyBounds?.answer?.declared == true) {
+                Text(ConsentHistoryCopy.basedOnAnswer.pick(lang), style = MaterialTheme.typography.bodySmall, color = Film.warn)
+            }
+        }
+        Text("Consent readiness", style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
         val counts = Severity.entries.map { s -> s to r.findings.count { it.severity == s } }.filter { it.second > 0 }
         if (counts.isNotEmpty()) {
             Text(
                 counts.joinToString(" · ") { (s, n) -> "$n ${s.label.lowercase()}" },
                 style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        // How sure the capture is, in words (the full grade is in Evidence and limits); a sample was never measured.
+        val confidence = when {
+            b.meta.sample -> "Confidence not measured"
+            grade != null -> "Evidence confidence: ${grade.level.label}"
+            else -> null
+        }
+        val capture = if (!b.meta.sample && b.meta.timingProfile == AuditTimingPolicy.NORMAL) "Normal capture" else null
+        listOfNotNull(confidence, capture).takeIf { it.isNotEmpty() }?.let {
+            Text(it.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = Film.boneDim, modifier = Modifier.padding(top = 2.dp))
+        }
+        // How far AI and documentation readings could move this score; shown only when they can move it at all.
+        ScoreRobustnessLine.of(r)?.let { rob ->
+            FoldText(
+                ScoreRobustnessLine.text(rob, lang), Modifier.padding(top = 10.dp),
+                style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
+                color = if (rob.bandStable) Film.boneDim else Film.warn, moreLabel = lang.moreLabel, lessLabel = lang.lessLabel,
             )
         }
     }
@@ -429,23 +599,44 @@ private fun nextGlyph(a: NextAction) = when (a) {
  * first, recommended step is the one filled button; the rest are plain rows in one group.
  */
 @Composable
-private fun ResultActions(next: List<NextStep>, lang: GuideLang, onAction: (NextAction) -> Unit, modifier: Modifier = Modifier) {
+private fun ResultActions(next: List<NextStep>, lang: GuideLang, onAction: (NextAction) -> Unit, modifier: Modifier = Modifier, primary: Boolean = true) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        next.firstOrNull()?.let { PrimaryButton(it.title.pick(lang), { onAction(it.action) }) }
+        if (!primary) {
+            // Another section holds the screen's one filled action: every step is a plain row.
+            if (next.isNotEmpty()) Group {
+                next.forEachIndexed { i, step ->
+                    if (i > 0) GroupDivider()
+                    ListRow(step.title.pick(lang), subtitle = step.reason.pick(lang), onClick = { onAction(step.action) })
+                }
+            }
+            return@Column
+        }
+        next.firstOrNull()?.let {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                PrimaryButton(it.title.pick(lang), { onAction(it.action) })
+                Text(
+                    it.reason.pick(lang), style = MaterialTheme.typography.bodySmall, color = Film.boneDim, textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 6.dp, start = 8.dp, end = 8.dp),
+                )
+            }
+        }
         if (next.size > 1) Group {
             next.drop(1).forEachIndexed { i, step ->
                 if (i > 0) GroupDivider()
-                ListRow(step.title.pick(lang), onClick = { onAction(step.action) })
+                ListRow(step.title.pick(lang), subtitle = step.reason.pick(lang), onClick = { onAction(step.action) })
             }
         }
     }
 }
 
-/** A finding's second line: severity word first (the dot only repeats it), then who was contacted, then how sure we are. */
-private fun findingSubtitle(f: Finding): String = buildString {
+/**
+ * A finding's second line: severity word first (the dot only repeats it), then who was contacted, then where the
+ * finding comes from (observed on the device, AI-inferred or inferred from documentation).
+ */
+private fun findingSubtitle(f: Finding, source: ResultSource): String = buildString {
     append(f.severity.label)
     if (f.entities.isNotEmpty()) append(" · ").append(f.entities.joinToString())
-    if (f.evidenceType != EvidenceType.OBSERVED) append(" · Inferred")
+    append(" · ").append(if (source == ResultSource.OBSERVED) "Observed on device" else source.label)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -649,6 +840,7 @@ private fun sourceColor(s: ResultSource) = when (s) {
     ResultSource.AI_INFERRED -> Brand.rose
     ResultSource.INFERRED -> Film.warn
     ResultSource.FALLBACK -> Film.boneDim
+    ResultSource.DECLARED -> Film.warn
 }
 
 private fun screenshotFor(b: AuditBundle, f: Finding): String? {
@@ -706,6 +898,10 @@ fun ReportScreen(vm: XrayViewModel, id: String, onBack: () -> Unit) {
                     SecondaryAction("Save interactive report (HTML)", { vm.exportHtml(b, share = false) }, Modifier.fillMaxWidth())
                     Spacer(Modifier.height(10.dp))
                     SecondaryAction("Export audit data (JSON)", { vm.exportAuditJson(b, share = false) }, Modifier.fillMaxWidth())
+                    val evidence by vm.evidenceLine.collectAsState()
+                    evidence?.takeIf { it.first == b.meta.id }?.let { (_, line) ->
+                        Text(line, style = MaterialTheme.typography.labelMedium, color = Film.scan, modifier = Modifier.padding(top = 8.dp))
+                    }
                     Spacer(Modifier.height(10.dp))
                     FoldText("Saved files land in Downloads/TraceVeil, ready to share or move to your laptop. The HTML report opens offline in any browser.")
                 }

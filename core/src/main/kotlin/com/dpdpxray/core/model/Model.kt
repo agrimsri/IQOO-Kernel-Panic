@@ -1,5 +1,8 @@
 package com.dpdpxray.core.model
 
+import com.dpdpxray.core.web.WebEvidence
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /**
@@ -49,6 +52,13 @@ enum class ConsentKind {
      * armed; [ConsentEvent.nodeText] holds its visible text. Never a consent choice and never a consent screen.
      */
     PERMISSION_DIALOG,
+
+    /**
+     * The audited app's consent screen was shown again after the plan's recorded Accept/Reject (nagging evidence for the
+     * dark-pattern signals); [ConsentEvent.tree] holds the screen shown again. Never a choice and never the plan's first
+     * consent screen, so no phase or score reads it.
+     */
+    REPROMPT,
 }
 
 /** The three audit plans: accept the consent, reject it, or never touch the app. */
@@ -100,6 +110,13 @@ data class NetEvent(
     val answerStatus: AnswerStatus? = null,
     /** DNS RCODE of a matching reply (0 = no error, 3 = NXDOMAIN). null when no matching reply was read. */
     val rcode: Int? = null,
+    /**
+     * true: not a DNS lookup but a connection whose server name a deeper capture read (see rules `ConnectionSource`); the
+     * rules engine adds these only for a plan that saw too few lookups, and words them "connected". Never saved by the
+     * DNS capture, and written only when true.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val fromConnection: Boolean = false,
 )
 
 @Serializable
@@ -230,12 +247,32 @@ data class AuditSession(
     /** Allow-listed facts read from the audited app's installed manifest at audit start. null = not read. */
     val manifestFacts: AppManifestFacts? = null,
     /**
+     * How the app was started for this plan and what the phone looked like around it (restart, Private DNS, other VPN,
+     * network, lock, crash, the app's own network use, blockers). null = not recorded (audits saved before it existed).
+     * Written only when recorded, so older sessions and exports stay exactly as before.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val conditions: PlanConditions? = null,
+    /**
      * Connections seen by the full-relay capture, labelled with their consent phase. Empty when the audit ran DNS-only
      * or was saved before this existed: see [captureDepth]; empty never means "no connections".
      */
     val flows: List<com.dpdpxray.core.netcapture.FlowRecord> = emptyList(),
     /** "dns-only" or "full-relay"; null = not recorded (older audits, DNS-only). */
     val captureDepth: String? = null,
+    /**
+     * Website check evidence (requests with full URLs, cookies, storage keys, the consent banner). null for app audits,
+     * and never written for them, so app audit files and exports stay exactly as before.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val web: WebEvidence? = null,
+    /**
+     * Set when this plan was a background watch ([BackgroundWatch]): a long capture of the app running in the background,
+     * with no launch, restart or tap. null for every other plan, and never written for them, so their files and exports
+     * stay exactly as before.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val watch: BackgroundWatch? = null,
 ) {
     val consentChoice: ConsentEvent?
         get() = consentEvents.firstOrNull { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }
@@ -320,6 +357,31 @@ enum class CheckId(val code: String, val title: String) {
      * lookups). INFO, no score impact: unknown stays unknown. Legal note: none; it qualifies every other finding.
      */
     V1("V1", "Some lookups may be hidden from TraceVeil"),
+
+    /**
+     * The connection capture (full-relay audits) saw a plain-HTTP request whose address or headers carried fields that
+     * look like personal data. HIGH: OBSERVED when a value itself had the shape (an e-mail address, a phone number, an ID
+     * under an ID field name), INFERRED when only field names matched. Values are never stored. The scored, legally
+     * mapped form of the network finding "Sensitive value in an unencrypted request". Legal note: DPDP s.8(5)
+     * (reasonable security safeguards; the DPDP Rules 2025 name encryption among them); elsewhere security-of-processing
+     * rules such as GDPR Art. 32.
+     */
+    C16("C16", "Personal data in an unencrypted (HTTP) request"),
+
+    /**
+     * Website checks only: cookies of a catalogued tracker (kept for a tracker host, or named as the vendor documents for
+     * its tracking script) were already in TraceVeil's browser before any consent choice. INFO: the requests that set them
+     * are already scored under C1 (one tracker activity is scored once). Legal note: DPDP s.6(1) (consent before
+     * processing) is context; rules on storing information on a person's device (such as the EU ePrivacy rules) fit more
+     * closely.
+     */
+    W1("W1", "Tracking cookies stored before consent"),
+
+    /**
+     * Website checks only: tracking cookies were written, or written again, after the user chose Reject. INFO: the
+     * requests are scored under C2. Legal note: as W1.
+     */
+    W2("W2", "Tracking cookies stored after the user refused"),
 }
 
 @Serializable
@@ -335,6 +397,13 @@ data class Finding(
     val penaltyBand: PenaltyBand,
     val confidence: Double = 1.0,
     val entities: List<String> = emptyList(),
+    /**
+     * true: this finding rests on the person's own answer about their consent history ([ConsentHistory]) as well as on
+     * what the phone recorded, and its wording says so ("based on your answer"). TraceVeil cannot check the answer.
+     * Written only when true, so older results read and write exactly as before.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val declared: Boolean = false,
 )
 
 @Serializable
@@ -350,4 +419,11 @@ data class AuditResult(
     val findings: List<Finding>,
     val score: Int?,
     val band: ScoreBand,
+    /**
+     * When the consent history is unknown (U1): the verdict bounded by the two answers the person could give, and their
+     * answer once given. [score] stays null until an answer picks an end. null = history known, or a result saved before
+     * this existed. Written only when set.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val historyBounds: HistoryBounds? = null,
 )

@@ -4,11 +4,21 @@ import com.dpdpxray.core.model.CheckId
 import com.dpdpxray.core.model.ScoreBand
 import com.dpdpxray.app.audit.AuditPlanCoverage
 import com.dpdpxray.app.audit.AuditTimingPolicy
+import com.dpdpxray.core.update.AppVersion
 
 sealed interface AuditComparisonResult {
-    data class Available(val previousId: String, val previousTimeMs: Long, val scoreDelta: Int, val noLongerRecorded: Set<CheckId>, val newlyRecorded: Set<CheckId>) : AuditComparisonResult
+    data class Available(
+        val previousId: String, val previousTimeMs: Long, val scoreDelta: Int, val noLongerRecorded: Set<CheckId>, val newlyRecorded: Set<CheckId>,
+        /** Checks recorded in both audits. */
+        val stillRecorded: Set<CheckId> = emptySet(),
+        val previousScore: Int? = null,
+        val currentScore: Int? = null,
+    ) : AuditComparisonResult
     data class Unavailable(val reason: String) : AuditComparisonResult
 }
+
+/** The audited app's version differed between the previous audit ([from]) and this one ([to]); both were recorded. */
+data class VersionUpdate(val from: AppVersion, val to: AppVersion)
 
 internal object AuditComparison {
     fun previousId(current: AuditMeta, history: List<AuditMeta>): String? = history
@@ -42,6 +52,20 @@ internal object AuditComparison {
         val oldChecks = old.result.findings.map { it.checkId }.toSet()
         val newChecks = current.result.findings.map { it.checkId }.toSet()
         return AuditComparisonResult.Available(old.meta.id, old.meta.createdAtMs, after - before,
-            oldChecks - newChecks, newChecks - oldChecks)
+            oldChecks - newChecks, newChecks - oldChecks, oldChecks intersect newChecks, before, after)
+    }
+
+    /** The version each audit recorded: the meta (new audits), else the sessions' manifest facts (older audits). */
+    fun version(bundle: AuditBundle): AppVersion? = CheckedApps.version(bundle.meta) ?: AppVersion.ofSessions(bundle.sessions)
+
+    /**
+     * Non-null when both audits recorded a version code and the codes differ: the app was updated (or downgraded)
+     * between the two checks. Unrecorded versions are never called an update.
+     */
+    fun update(current: AuditBundle, previous: AuditBundle?): VersionUpdate? {
+        val old = previous?.let(::version) ?: return null
+        val now = version(current) ?: return null
+        if (old.code == null || now.code == null || old.code == now.code) return null
+        return VersionUpdate(old, now)
     }
 }

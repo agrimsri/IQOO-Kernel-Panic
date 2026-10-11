@@ -1,6 +1,8 @@
 package com.dpdpxray.core.report
 
 import com.dpdpxray.core.audit.PhaseAssigner
+import com.dpdpxray.core.darkpattern.DarkPatternScanner
+import com.dpdpxray.core.darkpattern.DarkPatternText
 import com.dpdpxray.core.dpdp.CitationService
 import com.dpdpxray.core.fixes.FixTemplate
 import com.dpdpxray.core.law.LawRelation
@@ -100,7 +102,8 @@ object HtmlReport {
             val n = attempts.getValue(s.plan).size
             val k = (seen[s.plan] ?: 0) + 1
             seen[s.plan] = k
-            Lane(s, timeline(s, catalog), if (n > 1) "${s.plan.label} · attempt $k of $n" else s.plan.label, i)
+            val name = com.dpdpxray.core.model.BackgroundWatches.label(s)
+            Lane(s, timeline(s, catalog), if (n > 1) "$name · attempt $k of $n" else name, i)
         }
         val first = sessions.firstOrNull()
         val label = first?.targetLabel ?: "Unknown app"
@@ -121,6 +124,7 @@ object HtmlReport {
             timelineSection(lanes)
             constellationSection(lanes)
             findingsSection(result, fixes, citations, catalog, lanes, view, lens)
+            darkPatternSection(sessions)
             networkSection(lanes)
             methodSection(view)
             append("<footer class=\"foot\"><p class=\"disclaimer\">").append(esc(MarkdownReport.DISCLAIMER)).append("</p>")
@@ -142,7 +146,7 @@ object HtmlReport {
         append("<path d=\"M9 13h14M11 17h10M13 21h6\" stroke=\"url(#bg)\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>TraceVeil</span>")
         append("<nav aria-label=\"Report sections\">")
         for ((id, name) in listOf("coverage" to "Coverage", "summary" to "Summary", "timeline" to "Timeline", "constellation" to "Constellation",
-            "findings" to "Findings", "network" to "Network", "method" to "Method")) {
+            "findings" to "Findings", "darkpatterns" to "Dark patterns", "network" to "Network", "method" to "Method")) {
             append("<a href=\"#").append(id).append("\">").append(name).append("</a>")
         }
         append("</nav></div></header>\n")
@@ -167,7 +171,9 @@ object HtmlReport {
     private fun StringBuilder.hero(result: AuditResult, sessions: List<AuditSession>, c: HtmlCoverage, zone: ZoneId, view: LensView) {
         val first = sessions.firstOrNull()
         val lookups = sessions.sumOf { it.netEvents.size }
-        val band = bandClass(result.band)
+        val bounds = result.historyBounds
+        val range = bounds?.takeIf { result.score == null }
+        val band = bandClass(range?.let { it.verdictBand ?: it.lowBand } ?: result.band)
         append("<section id=\"summary\" class=\"hero\" aria-labelledby=\"app-title\"><div class=\"hero-main\">")
         append("<p class=\"eyebrow\">Consent evidence report</p>")
         append("<h1 id=\"app-title\">").append(esc(first?.targetLabel ?: "Unknown app")).append("</h1>")
@@ -176,7 +182,11 @@ object HtmlReport {
             meta("Audited", date(first.startedAtEpochMs, zone))
             if (first.deviceModel.isNotBlank()) meta("Device", "${first.deviceModel} · Android ${first.androidVersion}")
         }
-        meta("Plans", sessions.joinToString { it.plan.label }.ifEmpty { "None recorded" })
+        meta("Plans", sessions.joinToString { com.dpdpxray.core.model.BackgroundWatches.label(it) }.ifEmpty { "None recorded" })
+        // A background watch says what it checked, so it never reads as a test of the consent popup.
+        com.dpdpxray.core.model.BackgroundWatches.of(sessions)?.let { w ->
+            meta("What was checked", com.dpdpxray.core.model.BackgroundWatches.whatWasChecked(first?.targetLabel ?: "the app", w).first.removePrefix("What was checked: ").replaceFirstChar { it.uppercase() })
+        }
         meta("Lookups", "$lookups DNS ${if (lookups == 1) "lookup" else "lookups"} across ${sessions.size} ${if (sessions.size == 1) "session" else "sessions"}")
         meta("Legal lens", "${view.profile.title} (${view.id.name})")
         append("</dl><div class=\"sevstrip\" aria-label=\"Findings by severity\">")
@@ -192,14 +202,19 @@ object HtmlReport {
         val score = result.score ?: 0
         val circ = 2 * PI * 52
         append("<div class=\"dial\"><svg viewBox=\"0 0 132 132\" role=\"img\" aria-label=\"")
-        append(if (inconclusive) "Score inconclusive" else "Score $score out of 100, ${esc(result.band.label)}").append("\">")
+        append(when {
+            range != null -> "Score between ${range.lowScore} and ${range.highScore}, depending on consent history: ${esc(range.verdict())}"
+            inconclusive -> "Score inconclusive"
+            else -> "Score $score out of 100, ${esc(result.band.label)}"
+        }).append("\">")
         append("<circle cx=\"66\" cy=\"66\" r=\"60\" class=\"dial-halo\"/><circle cx=\"66\" cy=\"66\" r=\"52\" class=\"dial-track\"/>")
         if (!inconclusive) {
             append("<circle cx=\"66\" cy=\"66\" r=\"52\" class=\"dial-arc\" stroke-dasharray=\"").append(f1(circ * score / 100.0))
                 .append(' ').append(f1(circ)).append("\" transform=\"rotate(-90 66 66)\"/>")
         }
-        append("</svg><span class=\"dial-num\">").append(if (inconclusive) "?" else score.toString()).append("</span></div>")
-        append("<p class=\"band\">").append(esc(result.band.label)).append("</p>")
+        append("</svg><span class=\"dial-num\">").append(range?.range ?: if (inconclusive) "?" else score.toString()).append("</span></div>")
+        append("<p class=\"band\">").append(esc(range?.verdict()?.substringBefore(" · ") ?: result.band.label)).append("</p>")
+        if (bounds != null) append("<p class=\"dim small\">").append(esc(MarkdownReport.historyLine(bounds))).append("</p>")
         append("<p class=\"dim small\">Consent readiness out of 100 · not a safety or compliance certificate</p>")
         append("<p class=\"lens-score small\" data-lens=\"").append(view.id.name).append("\"><strong>").append(esc(view.scoreLine)).append("</strong> ")
             .append(esc(view.scoreNote)).append("</p>")
@@ -573,9 +588,31 @@ object HtmlReport {
             .append(id).append("\">Copy</button></div><pre id=\"").append(id).append("\"><code>").append(esc(text)).append("</code></pre></div>")
     }
 
+    /** Dark-pattern signals (India CCPA 2023): a separate plate, never findings and never in the score. */
+    private fun StringBuilder.darkPatternSection(sessions: List<AuditSession>) {
+        val signals = DarkPatternScanner.scan(sessions)
+        val summary = DarkPatternText.summary(signals, DarkPatternScanner.screensChecked(sessions))
+        sectionHead("darkpatterns", "04", DarkPatternText.CARD_TITLE, "$summary. ${DarkPatternText.FOOTER}")
+        if (signals.isEmpty()) append("<div class=\"plate empty\"><p>").append(esc(summary)).append(".</p></div>")
+        for (s in signals) {
+            append("<article class=\"plate dp\" id=\"dp-").append(s.pattern.number).append("\"><header class=\"f-head\">")
+            if (s.evidenceType == EvidenceType.OBSERVED) append("<span class=\"chip ev-observed\">Observed</span>")
+            else append("<span class=\"chip ev-inferred\">AI-inferred</span>")
+            append("<span class=\"f-meta\">").append(esc(DarkPatternText.plans(s))).append("</span></header>")
+            append("<h3>").append(esc(DarkPatternText.rowTitle(s))).append("</h3><p>").append(esc(DarkPatternText.resembles(s))).append("</p>")
+            append("<div class=\"f-block\"><h4>Evidence</h4><ul class=\"evidence\">")
+            s.evidence.forEach { append("<li>").append(esc(it)).append("</li>") }
+            append("</ul></div><blockquote><p>").append(esc(s.pattern.definition)).append("</p><footer>— ")
+                .append(esc("${DarkPatternText.SOURCE_TITLE} #${s.pattern.number}")).append(" · ").append(link(DarkPatternText.SOURCE_URL))
+                .append("</footer></blockquote></article>")
+        }
+        if (signals.any { it.evidenceType == EvidenceType.INFERRED }) append("<p class=\"dim small\">").append(esc(DarkPatternText.AI_NOTE)).append("</p>")
+        append("</section>\n")
+    }
+
     private fun StringBuilder.networkSection(lanes: List<Lane>) {
         val total = lanes.sumOf { minOf(it.events.size, MAX_LOOKUPS_PER_SESSION) }
-        sectionHead("network", "04", "Network timeline",
+        sectionHead("network", "05", "Network timeline",
             "Every recorded DNS lookup, per session, in time order. $LOOKUP_CAVEAT")
         append("<div class=\"plate net\"><div class=\"net-tools\"><label>Search <input type=\"search\" id=\"net-q\" placeholder=\"host or entity\" autocomplete=\"off\"></label>")
         append("<label>Session <select id=\"net-plan\"><option value=\"\">All</option>")
@@ -603,7 +640,7 @@ object HtmlReport {
     }
 
     private fun StringBuilder.methodSection(view: LensView) {
-        sectionHead("method", "05", "Method and limitations", "What this evidence can and cannot show.")
+        sectionHead("method", "06", "Method and limitations", "What this evidence can and cannot show.")
         append("<div class=\"plate\"><ul class=\"method\">")
         listOf(
             "Network evidence is the DNS lookups made by the audited app, captured by a local per-app VPN on the phone. A lookup shows the app tried to contact a server; payloads are not decrypted and no TLS certificate is installed.",
@@ -756,6 +793,7 @@ object HtmlReport {
         ConsentKind.SETTINGS -> "Settings or Manage opened"
         ConsentKind.MANUAL_MARK -> "Consent moment marked by hand"
         ConsentKind.PERMISSION_DIALOG -> "Android permission dialog shown"
+        ConsentKind.REPROMPT -> "Consent screen shown again after the choice"
     }
 
     private fun relationClass(r: LawRelation) = when (r) {

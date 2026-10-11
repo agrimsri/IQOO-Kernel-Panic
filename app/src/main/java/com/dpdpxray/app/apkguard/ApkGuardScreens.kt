@@ -130,6 +130,8 @@ fun ApkGuardHubScreen(
     onBack: (() -> Unit)?, onOpenApp: (String) -> Unit, onOpenFile: (String) -> Unit, onCheckup: (() -> Unit)? = null,
     /** Shows the Live check / APK Guard switch under the title; null hides it. */
     onSwitchToLive: (() -> Unit)? = null,
+    /** Adds "Website" to that switch; null leaves it out. */
+    onSwitchToWeb: (() -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
     val store = remember(ctx) { ctx.graph.settings }
@@ -154,7 +156,10 @@ fun ApkGuardHubScreen(
         TopBar("APK Guard", onBack)
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
             if (onSwitchToLive != null) item(key = "switch") {
-                SegmentedControl(listOf("Live check", "APK Guard"), 1, { if (it == 0) onSwitchToLive() }, Modifier.padding(top = 4.dp, bottom = 16.dp))
+                SegmentedControl(
+                    listOf("Live check", "APK Guard") + listOfNotNull(onSwitchToWeb?.let { com.dpdpxray.app.webcheck.WebCheckCopy.segment.pick(com.dpdpxray.app.ui.guide.guideLang()) }), 1,
+                    { when (it) { 0 -> onSwitchToLive(); 2 -> onSwitchToWeb?.invoke() } }, Modifier.padding(top = 4.dp, bottom = 16.dp),
+                )
             }
             item(key = "intro") {
                 // One lead line, the main action, one footnote. How it works is a single disclosure.
@@ -167,15 +172,18 @@ fun ApkGuardHubScreen(
                     Spacer(Modifier.height(16.dp))
                     PrimaryButton("Choose a file", { picker.launch(arrayOf(IncomingApk.APK_MIME, "application/octet-stream")) })
                     Text(
-                        "Not an antivirus. It never installs anything.",
+                        "Not an antivirus. It reads the file; it installs only if you tap Install anyway and confirm in Android's installer. What it finds stays on this phone.",
                         style = MaterialTheme.typography.bodySmall, color = Film.boneDim, modifier = Modifier.padding(top = 12.dp),
                     )
                     LearnMore(Modifier.padding(top = 4.dp), label = "How APK Guard works") {
                         Note("Reads permissions, special services, where an app came from and who signed it.")
                         Note("APK Guard explains what an app can do from what Android shows about it: permissions, special services, where it came from and who signed it. It is not an antivirus and cannot say whether an app is harmful. Keep Google Play Protect on as well (Play Store › your profile › Play Protect).")
-                        Note("Got an app file on WhatsApp or in Files? Tap it and choose TraceVeil, or share it to TraceVeil. TraceVeil only reads the file; it never installs it.")
+                        Note("Downloaded an APK in Chrome, or got one on WhatsApp or in Files? Tap it and choose TraceVeil (Always, to check every APK first), or share it to TraceVeil. TraceVeil checks it first; Android installs it only if you tap Install anyway and confirm.")
                     }
                 }
+            }
+            item(key = "before-install") {
+                BeforeInstallGroup(settings.checkApkDownloads, resumes, Modifier.padding(top = 16.dp).reveal(1))
             }
             if (onCheckup != null) item(key = "checkup") {
                 Group(Modifier.padding(top = 16.dp).reveal(1)) {
@@ -205,7 +213,7 @@ fun ApkGuardHubScreen(
                         Callout("Notifications are off for TraceVeil, so new-install alerts cannot appear.")
                     }
                     LearnMore(label = "When alerts arrive") {
-                        Note("While TraceVeil is open, Android tells it at once when a new app is installed, and opening TraceVeil checks at once for apps installed while it was closed. When TraceVeil is closed, Android runs its background check about every 15 minutes; Android decides the exact time, and battery saving can delay it, more so if TraceVeil has not been opened for a while. If TraceVeil is force-stopped (by you or by the phone's battery manager), Android pauses the check until TraceVeil is opened again. Each install is alerted once, never for updates or apps that came with the phone. The check reads only what Android shows about the app, on this phone. TraceVeil never starts an audit, a VPN or anything else by itself.")
+                        Note("While TraceVeil is open, Android tells it at once when a new app is installed, and opening TraceVeil checks at once for apps installed while it was closed. When TraceVeil is closed, Android runs its background check about every 15 minutes; Android decides the exact time, it waits while the battery is low, and battery saving can delay it, more so if TraceVeil has not been opened for a while. If TraceVeil is force-stopped (by you or by the phone's battery manager), Android pauses the check until TraceVeil is opened again. Each install is alerted once, never for apps that came with the phone. An update is alerted only for an app you checked before, once per version, and the alert only offers a re-check. The check reads only what Android shows about the app, on this phone. TraceVeil never starts an audit, a VPN or anything else by itself.")
                     }
                     Hairline()
                     SwitchRow(
@@ -221,6 +229,10 @@ fun ApkGuardHubScreen(
                 Column(Modifier.reveal(3)) {
                     GroupHeader("Installed apps", trailing = { if (shown != null) CountChip(shown.size) })
                     SearchField(query, { query = it }, "Search by name or package")
+                    Text(
+                        "Newest installs first. Apps without a launcher screen are listed too.",
+                        style = MaterialTheme.typography.bodySmall, color = Film.boneDim, modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                    )
                     SwitchRow("Show system apps", "Apps that came with the phone.", showSystem, { showSystem = it })
                     Spacer(Modifier.height(8.dp))
                 }
@@ -230,7 +242,7 @@ fun ApkGuardHubScreen(
                 items(3, key = { "loading-$it" }) { i -> SkeletonCard(Modifier.padding(bottom = 8.dp), label = if (i == 0) "Loading installed apps…" else "Loading") }
             } else {
                 if (shown.isEmpty()) item(key = "none") { EmptyHint("No matching apps.", glyph = Glyph.SEARCH) }
-                items(shown, key = { it.packageName }) { app -> InstalledRow(app, Modifier.padding(bottom = 8.dp)) { onOpenApp(app.packageName) } }
+                items(shown, key = { it.packageName }) { app -> InstalledRow(app, showPackage = query.isNotBlank(), Modifier.padding(bottom = 8.dp)) { onOpenApp(app.packageName) } }
             }
         }
     }
@@ -242,9 +254,12 @@ private fun CountChip(n: Int) {
     Box(Modifier.clearAndSetSemantics { contentDescription = "$n apps" }) { Tag("$n", Film.boneDim) }
 }
 
-/** One installed app: icon, name, and a second line only when something is worth saying (system app, no launcher screen). */
+/**
+ * One installed app: icon, name, and one quiet line with when it was installed (the list is newest first) or that it came
+ * with the phone, plus "No launcher screen" when that applies. The package name shows while searching, as in the picker.
+ */
 @Composable
-private fun InstalledRow(app: ApkInspector.ListedApp, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun InstalledRow(app: ApkInspector.ListedApp, showPackage: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val ctx = LocalContext.current
     val icon by produceState<ImageBitmap?>(null, app.packageName) {
         value = withContext(Dispatchers.IO) {
@@ -252,11 +267,14 @@ private fun InstalledRow(app: ApkInspector.ListedApp, modifier: Modifier = Modif
         }
     }
     val shape = RoundedCornerShape(Radii.row)
-    val note = when {
-        app.isSystem -> "Came with the phone"
-        !app.hasLauncher -> "No launcher screen"
-        else -> null
-    }
+    val note = listOfNotNull(
+        when {
+            app.isSystem -> "Came with the phone"
+            ApkInspector.plausibleInstallTime(app.firstInstallTime) -> "Installed ${date(app.firstInstallTime)}"
+            else -> "Install date not reported (preloaded)"
+        },
+        "No launcher screen".takeIf { !app.hasLauncher },
+    ).joinToString(" · ")
     Row(
         modifier.fillMaxWidth().heightIn(min = 64.dp)
             .pressClickable(shape = shape, onClick = onClick)
@@ -269,7 +287,8 @@ private fun InstalledRow(app: ApkInspector.ListedApp, modifier: Modifier = Modif
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(app.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (note != null) Text(note, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+            if (showPackage) Text(app.packageName, fontFamily = Mono, fontSize = 12.sp, color = Film.boneDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(note, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
         }
         Spacer(Modifier.width(6.dp))
         GlyphIcon(Glyph.CHEVRON_RIGHT, Film.graphic, size = 16.dp)
@@ -316,7 +335,7 @@ fun ApkGuardResultScreen(
                     Spacer(Modifier.height(12.dp))
                     OutlineAction("Back", onBack)
                 }
-                is ResultState.Ready -> ReadyResult(s.app, s.report, hindi, onAudit, onOpenInstalled, onQuarantine)
+                is ResultState.Ready -> ReadyResult(s.app, s.report, hindi, onAudit, onOpenInstalled, onQuarantine, (subject as? ApkGuardSubject.File)?.key, onBack)
             }
         }
     }
@@ -328,7 +347,7 @@ private suspend fun load(ctx: Context, subject: ApkGuardSubject): ResultState = 
         ?.let { ResultState.Ready(it, ApkGuardModel.withModelCard(ApkRiskRules.evaluate(it.facts))) }
         ?: ResultState.Failed("This app is not installed, or Android did not let TraceVeil read it.")
     is ApkGuardSubject.File -> when (val r = ApkFileChecks.await(subject.key)) {
-        null -> ResultState.Failed("This file check is no longer in memory, for example because TraceVeil was closed. Open the APK file again from WhatsApp or Files.")
+        null -> ResultState.Failed("This file check is no longer in memory, for example because TraceVeil was closed. Open the APK file again from Files, Chrome's downloads or WhatsApp.")
         is ArchiveRead.Failed -> ResultState.Failed(r.reason)
         is ArchiveRead.Ok -> ResultState.Ready(r.app, ApkGuardModel.withModelCard(ApkRiskRules.evaluate(r.app.facts)))
     }
@@ -357,14 +376,22 @@ private fun ReadyResult(
     onAudit: (String) -> Unit,
     onOpenInstalled: (String) -> Unit,
     onQuarantine: ((String) -> Unit)?,
+    fileKey: String?,
+    onBack: () -> Unit,
 ) {
     val ctx = LocalContext.current
     val facts = app.facts
     val isFile = facts.origin.source == InstallSource.NOT_INSTALLED
 
     VerdictCard(app, report, hindi, Modifier.reveal(0))
+    if (isFile && fileKey != null) {
+        // Check before install: the decision sits right under the verdict, the evidence follows.
+        PreInstallPanel(fileKey, report, hindi, app.bundle, onConsentCheck = onAudit, onOpenInstalled = onOpenInstalled, onBack = onBack, modifier = Modifier.padding(top = 16.dp))
+    }
     Spacer(Modifier.height(12.dp))
     DetailsCard(app, hindi, Modifier.reveal(1))
+    if (isFile) CodeFoundGroup(app.codeScan, hindi, Modifier.padding(top = 16.dp))
+    else InstalledCodeGroup(facts.packageName, hindi, Modifier.padding(top = 16.dp))
 
     var order = 2
     ApkSeverity.entries.forEach { severity ->
@@ -415,13 +442,8 @@ private fun ReadyResult(
             facts.installedTwin?.let {
                 OutlineAction("Check the installed \"${it.label}\"", { onOpenInstalled(facts.packageName) }, glyph = Glyph.APK)
             }
-            CollapsibleCard(
-                if (hindi) "अगर आपको अब भी इस फ़ाइल पर भरोसा है" else "If you still trust this file",
-                summary = if (hindi) "TraceVeil ऐप इंस्टॉल नहीं करता। आगे कैसे बढ़ें, यह देखें।" else "TraceVeil does not install apps. See how to continue, if you choose to.",
-                glyph = Glyph.INFO,
-            ) {
-                Note(CONTINUE_WITH_INSTALLER.pick(hindi), Film.bone)
-            }
+            // The install decision (Install anyway / Don't install) is in the "Before you install" group above.
+            Note(if (hindi) "इंस्टॉल का फ़ैसला ऊपर \"इंस्टॉल करने से पहले\" में है।" else "The install decision is above, under Before you install.")
         }
     }
     Spacer(Modifier.height(20.dp))
@@ -434,11 +456,6 @@ private fun ReadyResult(
         Note("APK Guard rules v${ApkRiskRules.VERSION}. Sources: Google Play Protect developer guidance; CERT-In advisory CICA-2026-3492; Cyber Swachhta Kendra SpyMax alert; McAfee Labs SpyLoan research. Nothing about this check leaves the phone.")
     }
 }
-
-private val CONTINUE_WITH_INSTALLER = Bilingual(
-    "TraceVeil does not install apps. If, after this check, you still trust the file: go back to the app where you found it (for example WhatsApp or Files), tap the file again and choose Android's package installer. Android may ask you to allow installs from that app; you can switch that off again in Settings › Apps › Special app access › Install unknown apps. Better still, get the app from Google Play or the official website.",
-    "TraceVeil ऐप इंस्टॉल नहीं करता। अगर इस जाँच के बाद भी आपको फ़ाइल पर भरोसा है: उस ऐप में वापस जाएँ जहाँ फ़ाइल मिली थी (जैसे WhatsApp या Files), फ़ाइल पर फिर टैप करें और Android का पैकेज इंस्टॉलर चुनें। Android उस ऐप से इंस्टॉल की अनुमति माँग सकता है; बाद में इसे सेटिंग्स › ऐप्स › ख़ास ऐप ऐक्सेस › अनजान ऐप इंस्टॉल करें में फिर से बंद कर सकते हैं। सबसे अच्छा है कि ऐप Google Play या आधिकारिक वेबसाइट से लें।",
-)
 
 /** Attention colour for the verdict card: orange when something needs careful review, amber for "worth knowing". */
 private fun toneOf(report: ApkGuardReport): Color = when {
@@ -504,6 +521,9 @@ private fun DetailsCard(app: InspectedApp, hindi: Boolean, modifier: Modifier = 
         Hairline(Modifier.padding(vertical = 4.dp))
         Field("Built for Android API", facts.targetSdk?.toString() ?: "Not reported")
         if (app.fileSizeBytes != null) Field("File", listOfNotNull(app.fileName, ApkFactsMapper.size(app.fileSizeBytes)).joinToString(" · "))
+        app.bundle?.let { b ->
+            Field("App bundle", "${b.apkCount} APK files" + if (b.splitNames.isEmpty()) "" else ": base + " + b.splitNames.joinToString(", "))
+        }
         Fingerprints("Signing certificate SHA-256", facts.certSha256)
         app.fileSha256?.let { Fingerprints("File SHA-256", listOf(it)) }
     }

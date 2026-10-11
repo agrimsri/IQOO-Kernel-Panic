@@ -1,13 +1,22 @@
 package com.dpdpxray.cli
 
+import com.dpdpxray.core.web.WebAudit
 import com.dpdpxray.core.law.LawRelation
 import com.dpdpxray.core.law.LensView
 import com.dpdpxray.core.model.AuditResult
+import com.dpdpxray.core.model.AuditSession
+import com.dpdpxray.core.model.BackgroundWatches
+import com.dpdpxray.core.model.ConsentHistory
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.EvidenceType
 import com.dpdpxray.core.model.Finding
+import com.dpdpxray.core.model.HistoryBounds
 import com.dpdpxray.core.model.ScoreBand
+import com.dpdpxray.core.netcapture.ConnectionSummary
+import com.dpdpxray.core.rules.ScoreCalculator
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -20,18 +29,70 @@ object Wording {
     const val SCOPE_CAVEAT = "Findings come from DNS lookups and consent-screen review on one phone during one run. " +
         "This is an automated technical check, not legal advice or a compliance certificate."
 
-    fun score(r: AuditResult): String =
-        if (r.band == ScoreBand.INCONCLUSIVE || r.score == null) "Inconclusive (score not established)" else "${r.score}/100 · ${band(r.band)}"
+    /** Added when a bundle is a website check (target.kind "web"): its evidence is requests, not DNS lookups. */
+    const val WEB_CAVEAT = "Website checks: findings come from the requests a page made in TraceVeil's own browser on the phone " +
+        "(full addresses) and from its consent banner; a request is an attempt to contact a host, not proof of what data was sent."
 
-    /** The score band as a plain range; never a readiness or compliance label. Thresholds as in the core rules engine. */
-    fun band(b: ScoreBand): String = when (b) {
+    fun anyWeb(checks: List<BundleCheck>): Boolean = checks.any { WebAudit.isWeb(it.source.bundle.sessions) }
+
+    fun score(r: AuditResult): String {
+        val b = r.historyBounds
+        val score = r.score
+        val answered = b?.answer?.declared == true
+        return when {
+            b != null && score == null -> range(b)
+            r.band == ScoreBand.INCONCLUSIVE || score == null -> "Inconclusive (score not established)"
+            else -> "$score/100 · ${band(r.band, score, answered)}" +
+                if (answered && !(r.band == ScoreBand.NEEDS_WORK && score >= 85)) " · based on the person's answer about consent history" else ""
+        }
+    }
+
+    /** A consent-history range: "65–99 depending on consent history · 60–84 band either way". */
+    fun range(b: HistoryBounds): String = "${b.range} depending on consent history · " +
+        if (b.bandSettled) "${band(b.lowBand, b.lowScore)} either way" else "at best the ${band(b.bestBand)}"
+
+    /** What the range rests on and both ends, or the person's answer that picked one. */
+    fun history(b: HistoryBounds): String = when (b.answer) {
+        ConsentHistory.DECLARED_NEVER, ConsentHistory.DECLARED_AGREED -> "${b.answer?.line()} (TraceVeil cannot check it)"
+        ConsentHistory.NOT_SURE -> "consent history unknown: the app kept its data and showed no consent screen; asked, the person is not sure"
+        else -> "consent history unknown: the app kept its data and showed no consent screen"
+    } + "; never agreed → ${b.lowScore} (${band(b.lowBand, b.lowScore)}), agreed earlier → ${b.highScore} (${band(b.bestBand, b.highScore, answered = b.bestBand != b.highBand)})"
+
+    /**
+     * The score band as a plain range; never a readiness or compliance label. Thresholds as in the core rules engine,
+     * where an observed High or Critical finding keeps even 85+ points out of the top band.
+     */
+    fun band(b: ScoreBand, score: Int? = null, answered: Boolean = false): String = when (b) {
         ScoreBand.READY -> "85–100 band"
-        ScoreBand.NEEDS_WORK -> "60–84 band"
+        ScoreBand.NEEDS_WORK -> if (score != null && score >= 85) {
+            if (answered) "below the 85–100 band: it rests on the person's unchecked answer about consent history"
+            else "below the 85–100 band: a High or Critical finding was observed"
+        } else "60–84 band"
         ScoreBand.AT_RISK -> "below 60"
         ScoreBand.INCONCLUSIVE -> "inconclusive"
     }
 
     fun evidence(t: EvidenceType): String = t.name
+
+    /**
+     * How far AI and documentation readings (INFERRED findings) could move the result: worst case every one confirmed,
+     * best case every one wrong. Computed from the findings by the core calculator; the score itself never changes.
+     */
+    fun robustness(r: AuditResult): String {
+        val rob = ScoreCalculator.robustness(r.findings) ?: return "not established (the result is inconclusive)"
+        val codes = rob.inferred.joinToString { it.code }
+        return when {
+            rob.movable -> "AI and documentation readings (INFERRED: $codes) can move this between ${rob.worstCase} and ${rob.bestCase} · " +
+                if (rob.bandStable) "the band stays ${band(rob.band, rob.score)}"
+                else "the band could change (worst case: ${band(rob.worstBand, rob.worstCase)}; best case: ${band(rob.bestBand, rob.bestCase)})"
+            rob.inferred.isEmpty() -> "fixed: no INFERRED finding carries points, so AI and documentation readings cannot move this score"
+            else -> "fixed at ${rob.score}: the OBSERVED findings alone give ${rob.bestCase}, so the INFERRED findings ($codes) cannot move it"
+        }
+    }
+
+    const val ROBUSTNESS_MEANING = "worstCase: every INFERRED finding (AI screen review or SDK documentation) confirmed, at full weight, " +
+        "and an inferred High or Critical then closes the 85-100 band like an observed one; bestCase: every INFERRED finding wrong " +
+        "and dropped. Computed from the current result's findings; it never changes the score."
 
     fun evidenceMeaning(t: EvidenceType): String = when (t) {
         EvidenceType.OBSERVED -> "OBSERVED evidence"
@@ -54,6 +115,36 @@ object Wording {
         c.choice == ConsentKind.REJECT -> "Reject recorded"
         c.consentScreenSeen -> "consent screen seen, no choice"
         else -> "no consent screen seen"
+    }
+
+    /**
+     * The connection capture in one line, or null when the bundle's plans did not record their capture depth (older
+     * exports: unknown, so nothing is claimed).
+     */
+    fun network(n: ConnectionSummary?): String? {
+        if (n == null) return null
+        if (!n.captured) return "DNS only: connections were not captured"
+        val parts = mutableListOf(
+            "connection capture: ${n.connections} connections (${n.named} named from TLS, QUIC or HTTP; " +
+                "${n.cleartextRequests} plain-HTTP requests, ${n.personalDataRequests} with personal-data fields)",
+        )
+        if (n.namesWithoutLookup.isNotEmpty()) {
+            val shown = n.namesWithoutLookup.take(5).joinToString()
+            parts += "names without a lookup: $shown" + if (n.namesWithoutLookup.size > 5) " and ${n.namesWithoutLookup.size - 5} more" else ""
+        }
+        if (n.encryptedClientHello > 0) parts += "${n.encryptedClientHello} offered Encrypted Client Hello"
+        if (n.quicUnnamed > 0) parts += "${n.quicUnnamed} QUIC unnamed"
+        return parts.joinToString(" · ")
+    }
+
+    /**
+     * A background watch in one line: its length and that no consent screen was driven, so the result is never read as a
+     * test of the consent popup. null when the bundle is not a watch.
+     */
+    fun watch(sessions: List<AuditSession>): String? {
+        val w = BackgroundWatches.of(sessions) ?: return null
+        return "background watch of ${BackgroundWatches.length(w)}: what the app sends while it runs in the background; " +
+            "the app was not opened, restarted or tapped, so its consent screen was not tested"
     }
 
     fun fresh(c: List<PlanCoverage>): String {
@@ -86,6 +177,7 @@ object CheckText {
         else appendLine("Overall: FAIL ($failed of ${plural(checks.size, "bundle")} violated the policy, ${plural(violations, "violation")}; exit 1)")
         appendLine(Wording.LOOKUP_CAVEAT)
         appendLine(Wording.SCOPE_CAVEAT)
+        if (Wording.anyWeb(checks)) appendLine(Wording.WEB_CAVEAT)
         if (policy.failOn.isEmpty() && policy.minScore == null && policy.maxHigh == null) {
             appendLine("Note: this policy fails on no finding and sets no score threshold.")
         }
@@ -96,9 +188,15 @@ object CheckText {
         appendLine("== ${c.source.displayPath}")
         appendLine("App:      ${b.app.label} · ${b.app.packageName}")
         appendLine("Exported: ${b.exportedAt} by ${b.tool.name} ${b.tool.version}")
+        c.signature?.let { s ->
+            val hint = if (s.state == SignatureStatus.State.FAILED) " · traceveil-ci verify shows every check" else ""
+            appendLine("Signature: ${s.summary}${s.path?.let { " · $it" } ?: ""}$hint")
+        }
         c.warnings.forEach { appendLine("Warning:  $it") }
         appendLine("Plans:    " + if (c.coverage.isEmpty()) "none" else c.coverage.joinToString(" | ") { "${it.plan.label}: ${Wording.choice(it)}" })
+        Wording.watch(b.sessions)?.let { appendLine("Watch:    $it") }
         appendLine("Fresh:    ${Wording.fresh(c.coverage)}")
+        Wording.network(ConnectionSummary.of(b.sessions))?.let { appendLine("Network:  $it") }
         if (c.resultChanged) {
             appendLine("Score:    ${Wording.score(c.current)} (re-evaluated with current rules)")
             appendLine("Stored:   ${Wording.score(c.stored)} (score saved on the phone; differs from today's rules)")
@@ -107,6 +205,8 @@ object CheckText {
         } else {
             appendLine("Score:    ${Wording.score(c.current)} (re-evaluated; same as stored in the bundle)")
         }
+        c.current.historyBounds?.let { appendLine("History:  ${Wording.history(it)}") }
+        appendLine("Range:    ${Wording.robustness(c.current)}")
         lens(c)
         appendLine()
         findingsTable(c.current.findings)
@@ -136,7 +236,8 @@ object CheckText {
         }
         appendLine("CHECK  SEVERITY  EVIDENCE  FINDING")
         for (f in findings) {
-            appendLine("${f.checkId.code.padEnd(5)}  ${f.severity.label.padEnd(8)}  ${Wording.evidence(f.evidenceType).padEnd(8)}  ${f.title}")
+            appendLine("${f.checkId.code.padEnd(5)}  ${f.severity.label.padEnd(8)}  ${Wording.evidence(f.evidenceType).padEnd(8)}  ${f.title}" +
+                if (f.declared) " [based on the person's answer]" else "")
             appendLine("${" ".repeat(27)}first evidence: ${Wording.firstEvidence(f)}")
         }
     }
@@ -157,7 +258,7 @@ object CheckJson {
         put("exitCode", if (checks.all { it.passed }) Exit.PASS else Exit.VIOLATION)
         put("violations", checks.sumOf { it.violations.size })
         put("bundles", JsonArray(checks.map(::bundle)))
-        put("caveat", "${Wording.LOOKUP_CAVEAT} ${Wording.SCOPE_CAVEAT}")
+        put("caveat", "${Wording.LOOKUP_CAVEAT} ${Wording.SCOPE_CAVEAT}" + if (Wording.anyWeb(checks)) " ${Wording.WEB_CAVEAT}" else "")
     }
 
     private fun bundle(c: BundleCheck): JsonObject = buildJsonObject {
@@ -170,6 +271,7 @@ object CheckJson {
         put("note", b.note)
         put("storedResult", result(c.stored))
         put("currentResult", result(c.current))
+        put("robustness", robustness(c.current))
         put("resultChanged", c.resultChanged)
         put("plans", buildJsonArray {
             c.coverage.forEach { p ->
@@ -183,12 +285,37 @@ object CheckJson {
             }
         })
         put("findings", JsonArray(c.current.findings.map(::finding)))
+        // Only for a background watch, so the output of every other bundle stays as it was.
+        BackgroundWatches.of(b.sessions)?.let { w ->
+            put("backgroundWatch", buildJsonObject {
+                put("plannedMinutes", w.plannedMinutes)
+                put("watchedMs", w.watchedMs)
+                put("stoppedEarly", w.stoppedEarly)
+                put("consentScreenDriven", false)
+                put("text", Wording.watch(b.sessions))
+            })
+        }
+        ConnectionSummary.of(b.sessions)?.let { n -> put("network", network(n)) }
         put("rules", buildJsonArray {
             c.outcomes.forEach { o -> add(buildJsonObject { put("rule", o.rule); put("status", o.status.name); put("message", o.message) }) }
         })
         put("legalLens", lens(c))
+        put("signature", c.signature?.toJson() ?: JsonNull)
         put("warnings", JsonArray(c.warnings.map(::JsonPrimitive)))
         put("passed", c.passed)
+    }
+
+    /** Counts and names only: never a request value (requests are stored redacted). */
+    private fun network(n: ConnectionSummary) = buildJsonObject {
+        put("depth", n.depth)
+        put("connections", n.connections)
+        put("named", n.named)
+        put("cleartextRequests", n.cleartextRequests)
+        put("personalDataRequests", n.personalDataRequests)
+        put("namesWithoutLookup", JsonArray(n.namesWithoutLookup.map(::JsonPrimitive)))
+        put("encryptedClientHello", n.encryptedClientHello)
+        put("quicUnnamed", n.quicUnnamed)
+        put("text", Wording.network(n))
     }
 
     private fun lens(c: BundleCheck) = buildJsonObject {
@@ -200,7 +327,7 @@ object CheckJson {
         put("source", c.lensSource.name.lowercase())
         put("score", v.score)
         put("band", v.band.name)
-        put("bandText", Wording.band(v.band))
+        put("bandText", Wording.band(v.band, v.score))
         put("notApplicable", JsonArray(v.notApplicable.map { JsonPrimitive(it.finding.checkId.code) }))
         put("relations", buildJsonArray {
             v.findings.forEach { lf ->
@@ -216,11 +343,43 @@ object CheckJson {
         put("caveat", Wording.LENS_CAVEAT)
     }
 
+    /** The robustness interval of [r] (null when inconclusive); see Wording.robustness. */
+    private fun robustness(r: AuditResult): JsonElement {
+        val rob = ScoreCalculator.robustness(r.findings) ?: return JsonNull
+        return buildJsonObject {
+            put("score", rob.score)
+            put("worstCase", rob.worstCase)
+            put("bestCase", rob.bestCase)
+            put("band", rob.band.name)
+            put("worstBand", rob.worstBand.name)
+            put("bestBand", rob.bestBand.name)
+            put("bandStable", rob.bandStable)
+            put("movable", rob.movable)
+            put("inferred", JsonArray(rob.inferred.map { JsonPrimitive(it.code) }))
+            put("text", Wording.robustness(r))
+            put("meaning", Wording.ROBUSTNESS_MEANING)
+        }
+    }
+
     private fun result(r: AuditResult) = buildJsonObject {
         put("score", r.score)
         put("band", r.band.name)
-        put("bandText", Wording.band(r.band))
+        val bounds = r.historyBounds
+        put("bandText", if (r.score == null && bounds != null) Wording.range(bounds) else Wording.band(r.band, r.score, answered = bounds?.answer?.declared == true))
         put("checks", JsonArray(r.findings.map { JsonPrimitive(it.checkId.code) }))
+        r.historyBounds?.let { b ->
+            put("historyBounds", buildJsonObject {
+                put("lowScore", b.lowScore)
+                put("lowBand", b.lowBand.name)
+                put("highScore", b.highScore)
+                put("highBand", b.highBand.name)
+                put("bestBand", b.bestBand.name)
+                put("bandSettled", b.bandSettled)
+                put("answer", (b.answer ?: ConsentHistory.UNKNOWN).name)
+                put("consentHistory", (b.answer ?: ConsentHistory.UNKNOWN).line())
+                put("text", Wording.history(b))
+            })
+        }
     }
 
     fun finding(f: Finding) = buildJsonObject {
@@ -234,5 +393,6 @@ object CheckJson {
         put("entities", JsonArray(f.entities.map(::JsonPrimitive)))
         put("dpdpRefs", JsonArray(f.dpdpRefs.map(::JsonPrimitive)))
         put("explanation", f.explanation)
+        if (f.declared) put("basedOnPersonsAnswer", true)
     }
 }

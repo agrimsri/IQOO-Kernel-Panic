@@ -24,6 +24,10 @@ object LensText {
         " DPDP requires an option to access it in English or any Eighth Schedule language." to "",
         " DPDP bars tracking, behavioural monitoring and targeted advertising directed at children, and requires verifiable " +
             "parental consent." to "",
+        " DPDP s.8(5) requires a Data Fiduciary to protect personal data with reasonable security safeguards to prevent a " +
+            "personal data breach, and the DPDP Rules 2025 name encryption among those safeguards; whether this request falls " +
+            "short of that is a question for a qualified reviewer, not a verdict." to
+            " Whether this request falls short of a law's security requirements is a question for a qualified reviewer, not a verdict.",
     )
 
     private val INDIA_MARKERS = listOf("DPDP", "Data Fiduciary", "Rule 3", "Eighth Schedule", "the Board")

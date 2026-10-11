@@ -4,6 +4,7 @@ import android.app.job.JobParameters
 import android.app.job.JobService
 import android.content.Context
 import android.util.Log
+import com.dpdpxray.app.graph
 import com.dpdpxray.app.apkguard.ApkAlertSpeaker
 import com.dpdpxray.app.apkguard.InstallAlert
 import kotlinx.coroutines.CancellationException
@@ -30,8 +31,25 @@ internal const val AUTOGUARD_LOG = "TraceVeilAutoGuard"
 class NewAppCheckJobService : AutoGuardJobService() {
     override suspend fun work(jobId: Int) {
         val outcome = NewAppCheck.run(applicationContext, fromJob = true)
-        Log.i(AUTOGUARD_LOG, "new-app check job=$jobId read=${outcome?.read ?: "switched off"} alerted=${outcome?.alerted?.size ?: 0}")
+        Log.i(AUTOGUARD_LOG, "new-app check job=$jobId read=${outcome?.read ?: "switched off"} alerted=${outcome?.alerted?.size ?: 0} updated=${outcome?.updated?.size ?: 0}")
         outcome?.speak?.let { speakAndWait(applicationContext, it) }
+    }
+}
+
+/**
+ * Runs the downloads watcher ([DownloadAlerts]) for job id [AutoGuardJobs.DOWNLOADS_TRIGGER], with the MediaStore
+ * Downloads URIs Android reports as changed, and schedules the next trigger once it has finished.
+ */
+class DownloadsJobService : AutoGuardJobService() {
+    override suspend fun work(params: JobParameters) {
+        val uris = params.triggeredContentUris?.map { it.toString() }
+        val alerted = DownloadAlerts.run(applicationContext, uris)
+        Log.i(AUTOGUARD_LOG, "downloads job changed=${uris?.size ?: "many"} alerted=$alerted")
+    }
+
+    override fun afterFinished(params: JobParameters) {
+        val enabled = runCatching { applicationContext.graph.settings.settings.value.checkApkDownloads }.getOrDefault(true)
+        AutoGuardJobs.syncDownloads(applicationContext, enabled, again = true)
     }
 }
 
@@ -52,13 +70,19 @@ abstract class AutoGuardJobService : JobService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val running = ConcurrentHashMap<Int, Job>()
 
-    protected abstract suspend fun work(jobId: Int)
+    protected open suspend fun work(jobId: Int) = Unit
+
+    /** The job's work; by default [work] with its id. */
+    protected open suspend fun work(params: JobParameters) = work(params.jobId)
+
+    /** Runs after Android was told the job finished (or was stopped), for example to schedule a one-shot job again. */
+    protected open fun afterFinished(params: JobParameters) = Unit
 
     override fun onStartJob(params: JobParameters): Boolean {
         // Registered before it starts, so a very fast job cannot finish before it is tracked.
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                work(params.jobId)
+                work(params)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -67,6 +91,7 @@ abstract class AutoGuardJobService : JobService() {
             } finally {
                 running.remove(params.jobId, coroutineContext.job)
                 jobFinished(params, false)
+                runCatching { afterFinished(params) }
             }
         }
         running[params.jobId] = job

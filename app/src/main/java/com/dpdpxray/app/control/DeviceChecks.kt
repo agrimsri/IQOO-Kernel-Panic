@@ -51,6 +51,19 @@ object DeviceChecks {
     }
 
     /** Android's VPN settings, where the user can turn their own VPN off before a check. */
+    /** The Settings screen where [kind] is turned on again after a restart the person chose; the app itself for a stopped service. */
+    fun openTurnBackOn(context: Context, kind: com.dpdpxray.app.audit.RestartSideEffect, pkg: String) {
+        val action = when (kind) {
+            com.dpdpxray.app.audit.RestartSideEffect.ACCESSIBILITY -> Settings.ACTION_ACCESSIBILITY_SETTINGS
+            com.dpdpxray.app.audit.RestartSideEffect.VPN -> Settings.ACTION_VPN_SETTINGS
+            com.dpdpxray.app.audit.RestartSideEffect.KEYBOARD -> Settings.ACTION_INPUT_METHOD_SETTINGS
+            com.dpdpxray.app.audit.RestartSideEffect.NOTIFICATION_LISTENER -> Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
+            com.dpdpxray.app.audit.RestartSideEffect.HOME, com.dpdpxray.app.audit.RestartSideEffect.SMS -> Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS
+            else -> null
+        }
+        if (action == null || runCatching { context.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isFailure) launch(context, pkg)
+    }
+
     fun openVpnSettings(context: Context) {
         runCatching { context.startActivity(Intent(Settings.ACTION_VPN_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
@@ -65,6 +78,39 @@ object DeviceChecks {
     fun privateDnsActive(context: Context): Boolean {
         val cm = context.getSystemService(ConnectivityManager::class.java)
         return runCatching { cm.getLinkProperties(cm.activeNetwork)?.isPrivateDnsActive == true }.getOrDefault(false)
+    }
+
+    /** Whether the phone has a working (validated) internet connection now; null when it cannot be read. */
+    fun networkOnline(context: Context): Boolean? = runCatching {
+        val cm = context.getSystemService(ConnectivityManager::class.java) ?: return null
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork ?: return false) ?: return false
+        caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }.getOrNull()
+
+    /** The phone is locked or its screen is off, so an app cannot be opened or seen working in front. */
+    fun phoneLocked(context: Context): Boolean = runCatching {
+        val keyguard = context.getSystemService(android.app.KeyguardManager::class.java)
+        val power = context.getSystemService(android.os.PowerManager::class.java)
+        keyguard?.isKeyguardLocked == true || power?.isInteractive == false
+    }.getOrDefault(false)
+
+    /** Install facts about [pkg]; null when it is not installed. */
+    data class AppFacts(val uid: Int, val system: Boolean, val debuggable: Boolean, val launchable: Boolean)
+
+    fun appFacts(context: Context, pkg: String): AppFacts? = runCatching {
+        val ai = context.packageManager.getApplicationInfo(pkg, 0)
+        AppFacts(
+            uid = ai.uid,
+            system = ai.flags and ApplicationInfo.FLAG_SYSTEM != 0,
+            debuggable = ai.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
+            launchable = context.packageManager.getLaunchIntentForPackage(pkg) != null,
+        )
+    }.getOrNull()
+
+    /** Android's Wi-Fi and mobile data settings, for a check that ran without a working connection. */
+    fun openInternetSettings(context: Context) {
+        runCatching { context.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
     fun openAccessibilitySettings(context: Context) {

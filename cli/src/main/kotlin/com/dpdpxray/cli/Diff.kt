@@ -4,6 +4,7 @@ import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.Finding
 import com.dpdpxray.core.model.ScoreBand
 import com.dpdpxray.core.model.Severity
+import com.dpdpxray.core.update.AppVersion
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -64,6 +65,12 @@ object DiffText {
         side("Old", d.old)
         side("New", d.new)
         if (d.packageMismatch) appendLine("Warning: the bundles are for different packages (${d.old.bundle.app.packageName} → ${d.new.bundle.app.packageName})")
+        // The audited app's version, as each capture read it from the installed manifest; printed only when both recorded one.
+        val oldVersion = AppVersion.ofSessions(d.old.bundle.sessions)
+        val newVersion = AppVersion.ofSessions(d.new.bundle.sessions)
+        if (oldVersion != null && newVersion != null) {
+            appendLine(if (oldVersion == newVersion) "Version: ${oldVersion.label()} (same in both)" else "Version: ${AppVersion.change(oldVersion, newVersion)}")
+        }
         val delta = d.scoreDelta?.let { if (it >= 0) " (+$it)" else " ($it)" } ?: ""
         appendLine("Score: ${Wording.score(d.oldResult)} → ${Wording.score(d.newResult)}$delta")
         section("Resolved", d.resolved.map { row(it) })
@@ -131,7 +138,7 @@ object DiffJson {
         put("sample", b.sample)
         put("score", r.score)
         put("band", r.band.name)
-        put("bandText", Wording.band(r.band))
+        put("bandText", Wording.band(r.band, r.score))
         put("storedScore", b.bundle.result.score)
         put("checks", JsonArray(r.findings.map { JsonPrimitive(it.checkId.code) }))
     }

@@ -14,6 +14,8 @@ import com.dpdpxray.cli.FakePhone.Companion.refused
 import com.dpdpxray.cli.FakePhone.Companion.running
 import com.dpdpxray.core.automation.AutomationMode
 import com.dpdpxray.core.automation.RefusalCode
+import com.dpdpxray.core.evidence.TestPki
+import com.dpdpxray.core.evidence.TrustedRoot
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonArray
@@ -51,8 +53,12 @@ class RunCommandTest {
         phone.bundleText = FakePhone.leakyBundle()
     }
 
-    private fun run(vararg args: String, env: Map<String, String> = mapOf("TRACEVEIL_TOKEN" to TOKEN), adbPaths: MutableList<String> = mutableListOf()) =
-        runDevice(cwd, phone, *args, clock = clock, env = env, adbPaths = adbPaths)
+    private fun run(
+        vararg args: String,
+        env: Map<String, String> = mapOf("TRACEVEIL_TOKEN" to TOKEN),
+        adbPaths: MutableList<String> = mutableListOf(),
+        roots: List<TrustedRoot>? = null,
+    ) = runDevice(cwd, phone, *args, clock = clock, env = env, adbPaths = adbPaths, roots = roots)
 
     @Test fun `a leaky full run fails the default policy with exit 1 and saves the evidence`() {
         leakyRun()
@@ -82,9 +88,13 @@ class RunCommandTest {
                 AdbCommands.packagePath(SERIAL, "com.dpdpxray.app"), AdbCommands.packagePath(SERIAL, LEAKY),
                 expectedStart, readStatus, readStatus, readStatus, readStatus, readStatus,
                 AdbCommands.pullBundle(SERIAL, RUN_ID, File(saved, "bundle.json").absolutePath),
+                AdbCommands.pullSignature(SERIAL, RUN_ID, File(saved, "bundle.json.sig.json").absolutePath),
             ),
             phone.calls,
         )
+        assertTrue(r.out, r.out.contains("Signature: none on the phone"))
+        assertTrue(r.out, r.out.contains("Signature: absent (no bundle.json.sig.json or bundle.sig.json next to the bundle)"))
+        assertFalse(File(saved, "bundle.json.sig.json").exists())
         assertEquals(listOf(2000L, 2000L, 2000L, 2000L), clock.sleeps)
     }
 
@@ -97,6 +107,61 @@ class RunCommandTest {
         assertTrue(r.out, r.out.contains("Overall: PASS"))
         assertTrue(r.out, r.out.contains("TraceVeil Runner: PASS (exit 0)"))
         assertFalse("no readiness or compliance label", r.out.contains("DPDP-ready"))
+    }
+
+    @Test fun `the phone's hardware signature is copied next to bundle json and verified before gating`() {
+        val chain = TestPki.chain()
+        val bundle = FakePhone.fixedBundle()
+        phone.statuses = listOf(running("Starting", pkg = FIXED), done(100, "READY", 0, pkg = FIXED, bundle = bundle))
+        phone.bundleText = bundle
+        phone.signatureText = CliHarness.signature(bundle.toByteArray(Charsets.UTF_8), chain, "bundle.json")
+        val r = run("run", "--package", FIXED, "--policy", policyFile, "--require-signature", roots = listOf(chain.trustedRoot))
+        assertEquals(r.toString(), Exit.PASS, r.exit)
+        val saved = File(cwd, "traceveil-out/$RUN_ID")
+        assertTrue(File(saved, "bundle.json.sig.json").isFile)
+        assertEquals(
+            AdbCommands.pullSignature(SERIAL, RUN_ID, File(saved, "bundle.json.sig.json").absolutePath),
+            listOf("-s", SERIAL, "pull", "/sdcard/Android/data/com.dpdpxray.app/files/automation/$RUN_ID/bundle.json.sig.json", File(saved, "bundle.json.sig.json").absolutePath),
+        )
+        assertTrue(r.out, r.out.contains("Saved:    traceveil-out/$RUN_ID/bundle.json, traceveil-out/$RUN_ID/status.json, traceveil-out/$RUN_ID/bundle.json.sig.json"))
+        assertTrue(r.out, r.out.contains("Signature: verified (StrongBox, chain ends at TraceVeil test root (not Google)) · traceveil-out/$RUN_ID/bundle.json.sig.json"))
+        assertTrue(r.out, r.out.contains("Policy:   policy file") && r.out.contains("+ --require-signature"))
+        assertTrue(r.out, Regex("PASS\\s+requireSignature\\s+verified: StrongBox key").containsMatchIn(r.out))
+        assertTrue(r.out, r.out.contains("TraceVeil Runner: PASS (exit 0)"))
+
+        val j = run("run", "--package", FIXED, "--policy", policyFile, "--require-signature", "--format", "json", roots = listOf(chain.trustedRoot))
+        val o = Json.parseToJsonElement(j.out).jsonObject
+        assertEquals("traceveil-out/$RUN_ID/bundle.json.sig.json", o["signatureFile"]!!.jsonPrimitive.content)
+        val sig = o["check"]!!.jsonObject["bundles"]!!.jsonArray.single().jsonObject["signature"]!!.jsonObject
+        assertEquals("verified", sig["status"]!!.jsonPrimitive.content)
+    }
+
+    @Test fun `with --require-signature a run fails when the phone wrote no signature or it does not verify`() {
+        val chain = TestPki.chain()
+        val bundle = FakePhone.fixedBundle()
+        phone.statuses = listOf(done(100, "READY", 0, pkg = FIXED, bundle = bundle))
+        phone.bundleText = bundle
+        val none = run("run", "--package", FIXED, "--policy", policyFile, "--require-signature", roots = listOf(chain.trustedRoot))
+        assertEquals(none.toString(), Exit.VIOLATION, none.exit)
+        assertTrue(none.out, Regex("FAIL\\s+requireSignature\\s+no signature file next to the bundle").containsMatchIn(none.out))
+        assertTrue(none.out, none.out.contains("TraceVeil Runner: FAIL (policy violation; exit 1)"))
+        // Without the flag the same run passes: the signature is reported, not required.
+        assertEquals(Exit.PASS, run("run", "--package", FIXED, "--policy", policyFile, roots = listOf(chain.trustedRoot)).exit)
+
+        // A signature made for other bytes (e.g. an earlier run's bundle) does not verify.
+        phone.signatureText = CliHarness.signature(FakePhone.leakyBundle().toByteArray(Charsets.UTF_8), chain, "bundle.json")
+        val wrong = run("run", "--package", FIXED, "--policy", policyFile, "--require-signature", roots = listOf(chain.trustedRoot))
+        assertEquals(wrong.toString(), Exit.VIOLATION, wrong.exit)
+        assertTrue(wrong.out, wrong.out.contains("Signature: NOT verified (2 checks failed: Bundle unchanged, Signature)"))
+        assertTrue(wrong.out, Regex("FAIL\\s+requireSignature\\s+the signature did not verify").containsMatchIn(wrong.out))
+    }
+
+    @Test fun `losing the phone while copying the signature is exit 2`() {
+        leakyRun()
+        phone.signaturePullResult = LOST
+        val r = run("run", "--package", LEAKY)
+        assertEquals(r.toString(), Exit.USAGE, r.exit)
+        assertTrue(r.err, r.err.contains("Lost contact with $SERIAL while copying bundle.json.sig.json"))
     }
 
     @Test fun `a refusal on the phone is exit 2 with the reason and the fix`() {

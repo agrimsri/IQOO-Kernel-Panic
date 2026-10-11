@@ -10,6 +10,7 @@ import com.dpdpxray.core.automation.RefusalCode
 import com.dpdpxray.core.automation.RunDecision
 import com.dpdpxray.core.automation.RunRequest
 import com.dpdpxray.core.automation.RunRequestInput
+import com.dpdpxray.core.evidence.EvidenceSignatures
 import com.dpdpxray.core.export.AuditBundleV1
 import com.dpdpxray.core.export.AuditBundles
 import com.dpdpxray.core.export.BundleMeta
@@ -43,7 +44,12 @@ class FakePhone(private val clock: FakeClock = FakeClock()) : Adb {
     var statuses: List<ExecResult> = listOf(NOT_YET)
         set(value) { field = value; polls = 0 }
     var bundleText: String? = null
+    /** Answer to pulling bundle.json (null: copy [bundleText]). */
     var pullResult: ExecResult? = null
+    /** bundle.json.sig.json in the run folder, as the phone writes it when it can sign; null: the phone wrote none. */
+    var signatureText: String? = null
+    /** Answer to pulling bundle.json.sig.json (null: copy [signatureText], or adb's missing-file error). */
+    var signaturePullResult: ExecResult? = null
     var polls = 0
         private set
 
@@ -61,6 +67,10 @@ class FakePhone(private val clock: FakeClock = FakeClock()) : Adb {
             rest.take(2) == listOf("install", "-r") -> { if (installResult.ok) installAdds?.let { installed += it }; installResult }
             rest.take(3) == listOf("shell", "am", "start") -> startResult
             rest.take(2) == listOf("shell", "cat") -> statuses[minOf(polls++, statuses.lastIndex)]
+            rest.first() == "pull" && rest[1].endsWith(EvidenceSignatures.SUFFIX) -> signaturePullResult ?: signatureText?.let { text ->
+                File(rest[2]).apply { parentFile?.mkdirs() }.writeText(text, Charsets.UTF_8)
+                ExecResult(0, "${rest[1]}: 1 file pulled, 0 skipped.\n")
+            } ?: ExecResult(1, "", "adb: error: failed to stat remote object '${rest[1]}': No such file or directory\n")
             rest.first() == "pull" -> pullResult ?: run {
                 val text = checkNotNull(bundleText) { "no bundle on the fake phone" }
                 File(rest[2]).apply { parentFile?.mkdirs() }.writeText(text, Charsets.UTF_8)

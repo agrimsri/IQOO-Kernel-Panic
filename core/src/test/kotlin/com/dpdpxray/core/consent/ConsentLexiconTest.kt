@@ -39,6 +39,27 @@ class ConsentLexiconTest {
     }
 
     @Test
+    fun `website consent tools' refusal wording, including phrases that start with accept or continue`() {
+        for (label in listOf(
+            "Continue without agreeing", "Continue without agreeing →", "Do not consent", "I do not accept", "I do not agree",
+            "Necessary cookies only", "Accept necessary cookies", "Accept only essential cookies", "Allow necessary cookies",
+            "Allow only essential cookies", "Reject all cookies", "Deny", "सभी अस्वीकार करें",
+        )) {
+            assertEquals(label, ConsentKind.REJECT, ConsentLexicon.classifyButton(label))
+        }
+    }
+
+    @Test
+    fun `website consent tools' settings and accept wording`() {
+        for (label in listOf("Cookie settings", "Cookies Settings", "Cookie preferences", "Privacy settings")) {
+            assertEquals(label, ConsentKind.SETTINGS, ConsentLexicon.classifyButton(label))
+        }
+        for (label in listOf("Accept All Cookies", "Allow all", "Agree and close", "Accept & continue", "सभी स्वीकार करें")) {
+            assertEquals(label, ConsentKind.ACCEPT, ConsentLexicon.classifyButton(label))
+        }
+    }
+
+    @Test
     fun `long sentences and unrelated labels are not buttons`() {
         assertNull(ConsentLexicon.classifyButton("By continuing you agree to the terms that you accept when you use this application"))
         assertNull(ConsentLexicon.classifyButton("Add to cart"))

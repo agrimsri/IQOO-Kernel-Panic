@@ -1,10 +1,13 @@
 package com.dpdpxray.cli.samples
 
+import com.dpdpxray.core.attribution.SdkAttribution
 import com.dpdpxray.core.export.AuditBundleV1
 import com.dpdpxray.core.export.AuditBundles
 import com.dpdpxray.core.export.BundleApp
 import com.dpdpxray.core.export.BundleMeta
 import com.dpdpxray.core.export.QuarantineBundleV1
+import com.dpdpxray.core.export.SdkAttributionExport
+import com.dpdpxray.core.fixes.FixCatalog
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.AuditSource
@@ -28,7 +31,8 @@ import java.io.File
 /**
  * Synthetic sample bundles for docs/samples (the CI docs and the web console use the same files). Every bundle is test
  * data copied from existing core test fixtures, marked synthetic in its "note" and in meta.sample; none is a device
- * observation. Results are computed by the current rules engine, never typed in. Regenerate with
+ * observation. Results are computed by the current rules engine and the SDK groups (sdkAttribution, as in a phone
+ * export) by core SdkAttribution, never typed in. Regenerate with
  * `./gradlew :cli:writeSamples`; SampleBundlesTest fails when the committed files drift from these fixtures.
  */
 object SampleBundles {
@@ -43,6 +47,7 @@ object SampleBundles {
     const val QUARANTINE = "riskdemo-quarantine_sample.json"
 
     private val engine = RulesEngine(TrackerCatalog.loadDefault())
+    private val attribution = SdkAttribution(TrackerCatalog.loadDefault(), FixCatalog.loadDefault())
 
     private fun net(t: Double, host: String, cname: List<String> = emptyList()) =
         NetEvent(tNanos = (t * S).toLong(), hostname = host, cnameChain = cname)
@@ -145,6 +150,8 @@ object SampleBundles {
             meta = AuditBundles.json.encodeToJsonElement(BundleMeta.serializer(), meta).jsonObject,
             sessions = sessions, result = result, networkReadings = null, toolVersion = TOOL_VERSION,
             exportedAt = EXPORTED_AT, note = note,
+            // As the phone's Report-screen export does: derived from these sessions and findings, no new evidence.
+            sdkAttribution = SdkAttributionExport(groups = attribution.groups(result, sessions)),
         )
     }
 

@@ -1,0 +1,51 @@
+{
+  "v": 1,
+  "url": "https://fixture.example/generic-hidden-reject.html",
+  "banner": {
+    "cmp": null,
+    "how": "generic",
+    "texts": [
+      "We use cookies for analytics and personalised advertising. By continuing you agree to our use of cookies.",
+      "Accept & continue",
+      "Manage options"
+    ],
+    "controls": [
+      {
+        "i": 0,
+        "text": "Accept & continue",
+        "role": null,
+        "btn": true,
+        "vis": true,
+        "l2": false,
+        "x": 16,
+        "y": 820,
+        "w": 380,
+        "h": 61
+      },
+      {
+        "i": 1,
+        "text": "Manage options",
+        "role": null,
+        "btn": false,
+        "vis": true,
+        "l2": false,
+        "x": 16,
+        "y": 885,
+        "w": 78,
+        "h": 12
+      }
+    ],
+    "boxes": []
+  },
+  "frames": [],
+  "vp": {
+    "w": 412,
+    "h": 915,
+    "dpr": 2.625
+  },
+  "ls": [],
+  "ss": [],
+  "fpc": [],
+  "res": [],
+  "clicks": []
+}

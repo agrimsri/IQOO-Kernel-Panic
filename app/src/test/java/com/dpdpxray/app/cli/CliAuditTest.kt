@@ -90,6 +90,25 @@ class CliAuditTest {
         assertEquals("REJECT", obj["sessions"]!!.jsonArray.single().jsonObject["consentChoice"]!!.jsonPrimitive.content)
     }
 
+    @Test fun `an inconclusive low-visibility report carries its diagnosis and each plan's start mode`() {
+        val quiet = AuditSession("s1", "com.reskill.hacktracker", "HackTracker", AuditPlan.REJECT, endedAtNanos = 40_000_000_000,
+            conditions = com.dpdpxray.core.model.PlanConditions(startMode = com.dpdpxray.core.model.StartMode.NOT_RESTARTED,
+                runningBeforeStart = true, restartProblem = "the Shizuku helper is not running or not allowed"))
+        val result = com.dpdpxray.core.rules.RulesEngine(TrackerCatalog.loadDefault()).evaluate(listOf(quiet))
+        val meta = AuditMeta("audit-2", "com.reskill.hacktracker", "HackTracker", 1000L, null, ScoreBand.INCONCLUSIVE, result.findings.size, listOf("Plan B · Reject"))
+        val obj = Json.parseToJsonElement(CliAuditReport.build("r2", AuditBundle(meta, listOf(quiet), result, File(".")))).jsonObject
+        assertEquals("diagnosis", obj.keys.last())
+        val d = obj["diagnosis"]!!.jsonArray.first().jsonObject
+        assertEquals("ALREADY_RUNNING", d["cause"]!!.jsonPrimitive.content)
+        assertEquals("WATCH_LONGER", d["action"]!!.jsonPrimitive.content)
+        assertTrue(d["sentence"]!!.jsonPrimitive.content.contains("restart"))
+        assertEquals("watch it in the background for 10 minutes or longer (TraceVeil does not open, restart or tap it; its data stays)", d["hint"]!!.jsonPrimitive.content)
+        assertEquals("the app was already running (not restarted)", d["phrase"]!!.jsonPrimitive.content)
+        assertTrue(d["evidence"]!!.jsonArray.isNotEmpty())
+        assertEquals("NOT_RESTARTED", obj["sessions"]!!.jsonArray.single().jsonObject["startMode"]!!.jsonPrimitive.content)
+        assertFalse("a conclusive report has no diagnosis", "diagnosis" in Json.parseToJsonElement(CliAuditReport.build("r1", bundle(21))).jsonObject)
+    }
+
     @Test fun `observed trackers list every catalogue entity looked up, by phase, only when a catalogue is given`() {
         val catalog = TrackerCatalog(listOf(TrackerEntry("AppsFlyer", Category.ATTRIBUTION, listOf("appsflyer.com"))))
         val b = bundle(21).let { b ->
@@ -99,7 +118,8 @@ class CliAuditTest {
         }
         assertFalse("observedTrackers" in Json.parseToJsonElement(CliAuditReport.build("r1", b)).jsonObject)
         val obj = Json.parseToJsonElement(CliAuditReport.build("r1", b, catalog)).jsonObject
-        assertEquals(listOf("observedTrackers", "network"), obj.keys.toList().takeLast(2))
+        assertTrue("observedTrackers" in obj.keys)
+        assertTrue("network" in obj.keys)
         val t = obj["observedTrackers"]!!.jsonArray.single().jsonObject
         assertEquals("AppsFlyer", t["entity"]!!.jsonPrimitive.content)
         assertEquals("ATTRIBUTION", t["category"]!!.jsonPrimitive.content)
@@ -118,6 +138,26 @@ class CliAuditTest {
         val ev = dated["lookupEvents"]!!.jsonArray.single().jsonObject
         assertEquals(99_000L, ev["atMs"]!!.jsonPrimitive.long)
         assertEquals("AFTER_REJECT", ev["phase"]!!.jsonPrimitive.content)
+    }
+
+    @Test fun `dns answers list each looked-up name with its addresses and catalogue entity`() {
+        val catalog = TrackerCatalog(listOf(TrackerEntry("AppsFlyer", Category.ATTRIBUTION, listOf("appsflyer.com"))))
+        val b = bundle(21).let { b ->
+            b.copy(sessions = b.sessions.map { s ->
+                s.copy(netEvents = listOf(
+                    NetEvent(0, "T.appsflyer.com.", answerIps = listOf("192.0.2.1")),
+                    NetEvent(1, "t.appsflyer.com", answerIps = listOf("192.0.2.2", "192.0.2.1")),
+                    NetEvent(2, "api.x.example"),
+                ))
+            })
+        }
+        val obj = Json.parseToJsonElement(CliAuditReport.build("r1", b, catalog)).jsonObject
+        assertEquals("dnsAnswers", obj.keys.last())
+        val rows = obj["dnsAnswers"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(listOf("api.x.example", "t.appsflyer.com"), rows.map { it["host"]!!.jsonPrimitive.content })
+        assertEquals(JsonNull, rows[0]["entity"])
+        assertEquals("AppsFlyer", rows[1]["entity"]!!.jsonPrimitive.content)
+        assertEquals(listOf("192.0.2.1", "192.0.2.2"), rows[1]["ips"]!!.jsonArray.map { it.jsonPrimitive.content })
     }
 
     @Test fun `unknown score stays null and is never turned into zero`() {

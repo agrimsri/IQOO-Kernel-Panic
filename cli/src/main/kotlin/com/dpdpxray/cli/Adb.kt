@@ -1,6 +1,7 @@
 package com.dpdpxray.cli
 
 import com.dpdpxray.core.automation.AutomationContract
+import com.dpdpxray.core.evidence.EvidenceSignatures
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
@@ -101,6 +102,10 @@ object AdbCommands {
     fun readStatus(serial: String, runId: String) = listOf("-s", serial, "shell", "cat", DeviceShell.quote(AutomationContract.deviceStatusPath(runId)))
 
     fun pullBundle(serial: String, runId: String, localPath: String) = listOf("-s", serial, "pull", AutomationContract.deviceBundlePath(runId), localPath)
+
+    /** bundle.json.sig.json: the phone's hardware signature over bundle.json, written only when the phone can sign. */
+    fun pullSignature(serial: String, runId: String, localPath: String) =
+        listOf("-s", serial, "pull", EvidenceSignatures.fileNameFor(AutomationContract.deviceBundlePath(runId)), localPath)
 
     /** The command as text for logs, with the pairing token replaced. */
     fun display(adb: String, args: List<String>): String {

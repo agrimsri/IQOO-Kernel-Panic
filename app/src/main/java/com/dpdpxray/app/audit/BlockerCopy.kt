@@ -1,6 +1,7 @@
 package com.dpdpxray.app.audit
 
 import com.dpdpxray.core.consent.BlockerKind
+import com.dpdpxray.core.model.BlockedStep
 
 /** Words for sign-in and verification blockers: audit notes, the live step line and the hand-off notification. */
 internal object BlockerCopy {
@@ -13,7 +14,11 @@ internal object BlockerCopy {
         BlockerKind.CAPTCHA -> "CAPTCHA"
         BlockerKind.BIOMETRIC -> "fingerprint or PIN prompt"
         BlockerKind.FORM -> "details form"
+        BlockerKind.PERMISSION -> "Android permission request"
     }
+
+    /** "a sign-in screen", "an Android permission request". */
+    private fun aKind(k: BlockerKind) = kind(k).let { if (it.first().lowercaseChar() in "aeiou") "an $it" else "a $it" }
 
     fun kindHi(k: BlockerKind): String = when (k) {
         BlockerKind.SIGN_IN -> "साइन-इन स्क्रीन"
@@ -21,6 +26,7 @@ internal object BlockerCopy {
         BlockerKind.CAPTCHA -> "कैप्चा"
         BlockerKind.BIOMETRIC -> "फ़िंगरप्रिंट या PIN"
         BlockerKind.FORM -> "जानकारी फ़ॉर्म"
+        BlockerKind.PERMISSION -> "Android अनुमति अनुरोध"
     }
 
     /** The live "step" line while the person is asked to act. */
@@ -30,10 +36,12 @@ internal object BlockerCopy {
 
     fun notificationTitle(app: String) = "$app needs you"
     fun notificationText(app: String, k: BlockerKind, fields: List<String> = emptyList()) =
-        if (fields.isEmpty()) "Complete the ${kind(k)} in $app (or skip it). TraceVeil is still watching and continues the check by itself."
+        if (k == BlockerKind.PERMISSION) "Android is asking whether $app may use something. Choose Allow or Don't allow yourself; TraceVeil never answers it and continues the check by itself."
+        else if (fields.isEmpty()) "Complete the ${kind(k)} in $app (or skip it). TraceVeil is still watching and continues the check by itself."
         else "Fill in ${quoted(fields)} in $app. TraceVeil is still watching and continues the check by itself."
     fun notificationTextHi(app: String, k: BlockerKind, fields: List<String> = emptyList()) =
-        if (fields.isEmpty()) "$app में ${kindHi(k)} पूरा करें (या छोड़ दें)। TraceVeil देख रहा है और जाँच अपने आप आगे बढ़ाएगा।"
+        if (k == BlockerKind.PERMISSION) "Android पूछ रहा है कि $app को किसी चीज़ की अनुमति मिले या नहीं। Allow या Don't allow खुद चुनें; TraceVeil इसका जवाब कभी नहीं देता और जाँच अपने आप आगे बढ़ाएगा।"
+        else if (fields.isEmpty()) "$app में ${kindHi(k)} पूरा करें (या छोड़ दें)। TraceVeil देख रहा है और जाँच अपने आप आगे बढ़ाएगा।"
         else "$app में ${quoted(fields)} भरें। TraceVeil देख रहा है और जाँच अपने आप आगे बढ़ाएगा।"
 
     private fun quoted(fields: List<String>) = fields.joinToString(" and ") { "“$it”" }
@@ -47,16 +55,26 @@ internal object BlockerCopy {
             BlockerKind.CAPTCHA -> if (hindi) "कैप्चा हल करें" else "Solve the CAPTCHA"
             BlockerKind.BIOMETRIC -> if (hindi) "फ़िंगरप्रिंट या PIN इस्तेमाल करें" else "Use your fingerprint or PIN"
             BlockerKind.FORM -> if (hindi) "फ़ॉर्म भरें" else "Fill in the form"
+            BlockerKind.PERMISSION -> if (hindi) "Android की अनुमति का जवाब दें" else "Answer Android's permission request"
         }
     }
 
-    /** [why] is the reason TraceVeil could not carry on by itself, when it knows one. */
-    fun promptBody(hindi: Boolean = false, why: String? = null): String {
-        val base = if (hindi) "TraceVeil पासवर्ड, कोड या निजी जानकारी कभी नहीं भरता। आपके आगे बढ़ते ही जाँच अपने आप चलती रहेगी।"
-        else "TraceVeil never types a password, code or personal detail. The check carries on by itself as soon as you are through."
+    /**
+     * What the person does on the card, then Continue (the check also carries on by itself once they are through). [why]
+     * is the reason TraceVeil, or its on-device model, could not carry on by itself, when it knows one.
+     */
+    fun promptBody(k: BlockerKind = BlockerKind.SIGN_IN, hindi: Boolean = false, why: String? = null): String {
+        val base = when {
+            k == BlockerKind.PERMISSION && hindi -> "Allow या Don't allow खुद चुनें, फिर Continue दबाएँ। TraceVeil अनुमति के अनुरोधों का जवाब कभी नहीं देता।"
+            k == BlockerKind.PERMISSION -> "Choose Allow or Don't allow yourself, then tap Continue. TraceVeil never answers permission requests."
+            hindi -> "यह ऐप में खुद पूरा करें, फिर Continue दबाएँ। TraceVeil पासवर्ड, कोड या निजी जानकारी कभी नहीं भरता।"
+            else -> "Do this in the app yourself, then tap Continue. TraceVeil never types a password, code or personal detail."
+        }
         val reason = why?.let { (if (hindi) "रुकने का कारण: " else "Why TraceVeil stopped: ") + it }
         return listOfNotNull(base, reason).joinToString("\n")
     }
+
+    fun promptContinue(hindi: Boolean = false) = if (hindi) "जारी रखें" else "Continue"
 
     fun promptStop(hindi: Boolean = false) = if (hindi) "जाँच रोकें" else "Stop check"
     fun promptHide(hindi: Boolean = false) = if (hindi) "छिपाएँ" else "Hide"
@@ -68,13 +86,20 @@ internal object BlockerCopy {
             if (outcome.skipped.isNotEmpty()) {
                 add("A ${kind(kind)} appeared before the consent screen; the agent took these steps to continue: ${outcome.skipped.joinToString("; ") { "“$it”" }}.")
             }
-            if (outcome.handedOff) {
+            if (outcome.handedOff && kind == BlockerKind.PERMISSION) {
+                add("An Android permission request appeared before the consent screen; TraceVeil never answers these and waited ${outcome.blockedMs / 1000} s for the person.")
+            } else if (outcome.handedOff) {
                 add("A ${kind(kind)} could not be skipped; TraceVeil waited ${outcome.blockedMs / 1000} s for the person to complete it.")
             }
             if (outcome.consent == null && blocksPlan) {
-                add("$BLOCKED_MARK a ${kind(kind)}: the app's consent screen was never reached, so this plan could not test consent.")
+                add("$BLOCKED_MARK ${aKind(kind)}: the app's consent screen was never reached, so this plan could not test consent.")
             }
         }
+    }
+
+    /** The plan's first blocker as a saved record for the result's summary; null when nothing stood in the way. */
+    fun step(outcome: ConsentWaitAssist.Outcome): BlockedStep? = outcome.blocker?.let {
+        BlockedStep(it.name, outcome.skipped, outcome.handedOff, outcome.blockedMs, consentReached = outcome.consent != null)
     }
 
     /** The one coverage line shown on the result when a plan was blocked. */

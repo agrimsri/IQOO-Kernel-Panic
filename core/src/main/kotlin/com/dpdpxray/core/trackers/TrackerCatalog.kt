@@ -24,6 +24,11 @@ data class TrackerEntry(
      * `app_owners.json` to recognise same-company traffic. null = not grouped; never guessed from a domain name.
      */
     val company: String? = null,
+    /**
+     * The vendor's own page that shows these domains in use by its tracking tag (read 11 October 2026 for the website
+     * trackers added with the website check). null for older entries, which predate this field.
+     */
+    val domainSource: String? = null,
 ) {
     /** Headquarters country, only when a cited source describes the place as headquarters; never a registration. */
     val hqCountry: String? get() = location?.takeIf { it.basis == CompanyBasis.HEADQUARTERS }?.country

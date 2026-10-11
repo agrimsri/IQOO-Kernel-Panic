@@ -40,14 +40,26 @@ object SetupSteps {
 
 /** Plain labels for the Recent checks cards, from saved metadata only (no audit files are opened). */
 object RecentChecks {
-    fun scoreText(meta: AuditMeta): String = if (meta.band == ScoreBand.INCONCLUSIVE) "?" else meta.score?.toString() ?: "?"
+    /** A consent-history range not yet settled by an answer: the list shows the range, never "?". */
+    private fun range(meta: AuditMeta) = meta.historyBounds?.takeIf { meta.score == null }
+
+    fun scoreText(meta: AuditMeta): String = range(meta)?.range
+        ?: if (meta.band == ScoreBand.INCONCLUSIVE) "?" else meta.score?.toString() ?: "?"
+
+    /** The band a list files the check under: a consent-history range goes under its worse (never-agreed) band. */
+    fun listBand(meta: AuditMeta): ScoreBand = range(meta)?.lowBand ?: meta.band
 
     fun coverageWarning(meta: AuditMeta): String? = when {
         meta.sample -> null
+        range(meta) != null -> "Consent history unknown: score range"
+        meta.historyBounds?.answer?.declared == true -> "Score based on your answer"
         meta.band == ScoreBand.INCONCLUSIVE ->
             if (meta.inconclusiveReason == "CONSENT_HISTORY_UNKNOWN") "Inconclusive: app kept its data, consent history unknown"
+            else if (meta.timingProfile == AuditTimingPolicy.BACKGROUND_WATCH) "Background watch: almost no connections seen"
             else "Inconclusive: too little was captured"
         meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW -> "Fast Preview: limited evidence"
+        // A watch drives no consent screen at all, so "Reject not tested" would undersell what was not tested.
+        meta.timingProfile == AuditTimingPolicy.BACKGROUND_WATCH -> "Background watch: consent screen not tested"
         AuditPlan.REJECT.label !in meta.plans -> "Single run: Reject not tested"
         meta.timingProfile == null -> "Timing not recorded"
         else -> null

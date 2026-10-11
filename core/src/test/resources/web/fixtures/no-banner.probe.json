@@ -1,0 +1,30 @@
+{
+  "v": 1,
+  "url": "https://fixture.example/no-banner.html",
+  "banner": null,
+  "frames": [],
+  "vp": {
+    "w": 412,
+    "h": 915,
+    "dpr": 2.625
+  },
+  "ls": [
+    {
+      "k": "theme",
+      "n": 4
+    },
+    {
+      "k": "visitor_id",
+      "n": 12
+    }
+  ],
+  "ss": [
+    {
+      "k": "tab",
+      "n": 1
+    }
+  ],
+  "fpc": [],
+  "res": [],
+  "clicks": []
+}

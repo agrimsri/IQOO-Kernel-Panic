@@ -1,5 +1,7 @@
 package com.dpdpxray.core.report
 
+import com.dpdpxray.core.darkpattern.DarkPatternScanner
+import com.dpdpxray.core.darkpattern.DarkPatternText
 import com.dpdpxray.core.dpdp.CitationService
 import com.dpdpxray.core.fixes.FixTemplate
 import com.dpdpxray.core.law.LegalLens
@@ -9,8 +11,14 @@ import com.dpdpxray.core.law.LensText
 import com.dpdpxray.core.law.PassageKind
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
+import com.dpdpxray.core.model.BackgroundWatches
 import com.dpdpxray.core.model.ConsentKind
+import com.dpdpxray.core.model.EvidenceType
+import com.dpdpxray.core.model.ConsentHistory
+import com.dpdpxray.core.model.HistoryBounds
 import com.dpdpxray.core.model.ScoreBand
+import com.dpdpxray.core.web.WebAudit
+import com.dpdpxray.core.web.WebSites
 import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.time.ZoneId
@@ -53,19 +61,30 @@ object MarkdownReport {
         val first = sessions.firstOrNull()
         val view = lens.view(result, profile)
         val p = view.profile
-        appendLine("# TraceVeil report — ${first?.targetLabel ?: "Unknown app"} (`${first?.targetPackage ?: "?"}`)")
+        val web = WebAudit.isWeb(sessions)
+        if (web) appendLine("# TraceVeil website check — ${first?.targetLabel}")
+        else appendLine("# TraceVeil report — ${first?.targetLabel ?: "Unknown app"} (`${first?.targetPackage ?: "?"}`)")
         appendLine()
-        val score = if (result.band == ScoreBand.INCONCLUSIVE) "Inconclusive" else "Score: ${result.score}/100 · ${result.band.label}"
+        val bounds = result.historyBounds
+        val score = when {
+            bounds != null && result.score != null -> "Score: ${result.score}/100 · ${result.band.label} · based on your answer about consent history"
+            bounds != null -> "Consent history unknown · ${bounds.verdict()}"
+            result.band == ScoreBand.INCONCLUSIVE -> "Inconclusive"
+            else -> "Score: ${result.score}/100 · ${result.band.label}"
+        }
         appendLine("**$score**")
         appendLine()
         appendLine("- $SCORE_STANDARD")
+        if (bounds != null) appendLine("- ${historyLine(bounds)}")
         appendLine("- Legal lens: ${p.title} (`${profile.name}`). ${p.status}")
         appendLine("- ${view.scoreLine}. ${view.scoreNote}")
         if (first != null) {
-            appendLine("- Audited: ${date(first.startedAtEpochMs)} · ${sessions.joinToString { it.plan.label }}")
+            appendLine("- Audited: ${date(first.startedAtEpochMs)} · ${sessions.joinToString { BackgroundWatches.label(it) }}")
+            // A background watch never reads as a test of the consent popup: it says what it checked, and for how long.
+            BackgroundWatches.of(sessions)?.let { appendLine("- ${BackgroundWatches.whatWasChecked(first.targetLabel, it).first}") }
             if (first.deviceModel.isNotBlank()) appendLine("- Device: ${first.deviceModel} · Android ${first.androidVersion}")
         }
-        appendLine("- $PRIVACY_LINE")
+        appendLine("- ${if (web) WEB_PRIVACY_LINE else PRIVACY_LINE}")
         appendLine()
 
         appendLine("## Summary")
@@ -113,6 +132,8 @@ object MarkdownReport {
             }
         }
 
+        darkPatternSection(sessions)
+
         if (fixes.isNotEmpty()) {
             appendLine()
             appendLine("## How to fix")
@@ -127,13 +148,32 @@ object MarkdownReport {
             }
         }
 
+        if (web) {
+            webSections(sessions)
+            appendLine()
+            appendLine("## Method and limitations")
+            appendLine("- ${WebAudit.METHOD}")
+            appendLine("- ${WebAudit.REQUEST_CAVEAT}")
+            appendLine("- ${WebSites.RULE}")
+            WebAudit.LIMITS.forEach { appendLine("- $it") }
+            appendLine("- *Observed* findings come from the requests, cookies and banner recorded in TraceVeil's browser. W1 and W2 are notes that do not change the score.")
+            appendLine("- $LENS_METHOD")
+            p.limitations.forEach { appendLine("- $it") }
+            appendLine()
+            appendLine("---")
+            appendLine("*$DISCLAIMER*")
+            return@buildString
+        }
+
         appendLine()
         appendLine("## Network timeline")
         for (s in sessions) {
             val bg = s.backgroundStartedNanos
+            val w = s.watch
             appendLine()
-            appendLine("**${s.plan.label}** — ${s.netEvents.size} lookups${s.consentChoice?.let { c -> ", user chose ${c.kind.name.lowercase()} at ${secs(c.tNanos - s.startedAtNanos)} s" } ?: ""}" +
-                (bg?.let { ", app in the background from ${secs(it - s.startedAtNanos)} s" } ?: ""))
+            appendLine("**${BackgroundWatches.label(s)}** — ${s.netEvents.size} lookups${s.consentChoice?.let { c -> ", user chose ${c.kind.name.lowercase()} at ${secs(c.tNanos - s.startedAtNanos)} s" } ?: ""}" +
+                (if (w != null) ", watched ${BackgroundWatches.length(w)}; the app was not opened or tapped" else "") +
+                (bg?.let { if (w != null) ", first seen off screen at ${secs(it - s.startedAtNanos)} s" else ", app in the background from ${secs(it - s.startedAtNanos)} s" } ?: ""))
             s.consentEvents.filter { it.kind == ConsentKind.PERMISSION_DIALOG }.forEach {
                 appendLine()
                 appendLine("- Android permission dialog at ${secs(it.tNanos - s.startedAtNanos)} s: \"${it.nodeText.orEmpty()}\"")
@@ -142,7 +182,7 @@ object MarkdownReport {
             appendLine("| t (s) | Host |")
             appendLine("|---|---|")
             s.netEvents.sortedBy { it.tNanos }.take(60).forEach {
-                appendLine("| ${secs(it.tNanos - s.startedAtNanos)} | ${it.hostname}${if (bg != null && it.tNanos >= bg) " (app in background)" else ""} |")
+                appendLine("| ${secs(it.tNanos - s.startedAtNanos)} | ${it.hostname}${if (BackgroundWatches.inBackground(s, it.tNanos)) " (app in background)" else ""} |")
             }
         }
 
@@ -150,11 +190,109 @@ object MarkdownReport {
         appendLine("## Method and limitations")
         appendLine("- Network evidence is DNS lookups made by the audited app (captured by a local, per-app VPN). A lookup shows the app tried to contact a server; payloads are not decrypted.")
         appendLine("- *Observed* findings come from captured traffic or the screen's accessibility tree. *Inferred* findings come from SDK documentation or the on-device AI's reading of the screen, and count half in the score.")
+        if (BackgroundWatches.of(sessions) != null) appendLine("- ${BackgroundWatches.LIMIT}")
         appendLine("- $LENS_METHOD")
         p.limitations.forEach { appendLine("- $it") }
         appendLine()
         appendLine("---")
         appendLine("*$DISCLAIMER*")
+    }
+
+    /** Website check: each plan's requests (full addresses), then its cookies and storage keys. */
+    private fun StringBuilder.webSections(sessions: List<AuditSession>) {
+        appendLine()
+        appendLine("## Requests")
+        for (s in sessions) {
+            val w = s.web ?: continue
+            val trackers = w.requests.count { it.trackerEntity != null }
+            appendLine()
+            appendLine("**${s.plan.label}** — ${w.requests.size} requests, $trackers to catalogued trackers" +
+                (s.consentChoice?.let { c -> ", user chose ${c.kind.name.lowercase()} at ${secs(c.tNanos - s.startedAtNanos)} s" } ?: "") +
+                (if (w.requestsDropped > 0) ", ${w.requestsDropped} more not kept (limit reached)" else ""))
+            appendLine()
+            appendLine("| t (s) | Method | Type | Address | Tracker |")
+            appendLine("|---|---|---|---|---|")
+            w.requests.take(WEB_ROWS).forEach { r ->
+                appendLine("| ${secs(r.tNanos - s.startedAtNanos)} | ${r.method} | ${r.type.label} | ${cell(clip(r.url, 120))} | ${r.trackerEntity?.let(::cell) ?: ""} |")
+            }
+            if (w.requests.size > WEB_ROWS) {
+                appendLine()
+                appendLine("…and ${w.requests.size - WEB_ROWS} more requests in the exported audit data (JSON).")
+            }
+        }
+        appendLine()
+        appendLine("## Cookies and storage")
+        appendLine()
+        appendLine("Cookie values are never stored; only their length. Expiry is known only for first-party cookies the page itself can read.")
+        for (s in sessions) {
+            val w = s.web ?: continue
+            appendLine()
+            appendLine("**${s.plan.label}** — ${w.cookies.size} cookies (${w.cookies.count { it.thirdParty }} third-party), ${w.storage.size} storage keys")
+            if (w.cookies.isNotEmpty()) {
+                appendLine()
+                appendLine("| Cookie | Party | Site | Tracker | First seen | At the end |")
+                appendLine("|---|---|---|---|---|---|")
+                w.cookies.take(WEB_ROWS).forEach { c ->
+                    appendLine("| ${cell(c.name)} | ${if (c.thirdParty) "third" else "first"} | ${c.site} | ${c.trackerEntity?.let(::cell) ?: ""} | " +
+                        "${secs(c.firstSeenNanos - s.startedAtNanos)} s (${c.firstSeenAt.label}) | ${if (c.presentAtEnd) "present" else "removed"} |")
+                }
+            }
+            if (w.storage.isNotEmpty()) {
+                appendLine()
+                appendLine("Storage keys: " + w.storage.take(WEB_ROWS).joinToString { "${cell(it.key)} (${it.area}, ${it.valueLength} characters)" })
+            }
+        }
+    }
+
+    private const val WEB_ROWS = 80
+
+    const val WEB_PRIVACY_LINE = "The check opened the site over the internet in TraceVeil's own browser on this phone. The analysis " +
+        "and this report were produced on the phone; no audit data was sent anywhere."
+
+    private fun cell(s: String) = s.replace("|", "\\|").replace('\n', ' ')
+
+    private fun clip(s: String, max: Int) = if (s.length <= max) s else s.take(max - 1) + "…"
+
+    /**
+     * The consent-history line of a bounded result: why it is a range (or whose answer picked the score) and both ends.
+     * Shared by the reports so they say it the same way.
+     */
+    fun historyLine(b: HistoryBounds): String {
+        val why = when (b.answer) {
+            ConsentHistory.DECLARED_NEVER, ConsentHistory.DECLARED_AGREED -> "${b.answer?.line()}, which TraceVeil cannot check."
+            else -> "Consent history unknown: the app kept its data and showed no consent screen, so whether the person agreed to " +
+                "tracking earlier cannot be seen" + (if (b.answer == ConsentHistory.NOT_SURE) " (asked; the person is not sure)." else ".")
+        }
+        return "$why ${b.ends()}"
+    }
+
+    /** Dark-pattern signals (India CCPA 2023): their own section, apart from the scored findings. */
+    private fun StringBuilder.darkPatternSection(sessions: List<AuditSession>) {
+        val signals = DarkPatternScanner.scan(sessions)
+        val summary = DarkPatternText.summary(signals, DarkPatternScanner.screensChecked(sessions))
+        appendLine()
+        appendLine("## ${DarkPatternText.CARD_TITLE}")
+        appendLine()
+        appendLine(if (signals.isEmpty()) "$summary." else "$summary. Not counted in the score.")
+        for (s in signals) {
+            appendLine()
+            appendLine("### ${DarkPatternText.rowTitle(s)}")
+            appendLine("*${DarkPatternText.chip(s)} · ${DarkPatternText.plans(s)}*")
+            appendLine()
+            appendLine(DarkPatternText.resembles(s))
+            appendLine()
+            s.evidence.forEach { appendLine("- $it") }
+            appendLine()
+            appendLine("> ${s.pattern.definition}")
+            appendLine(">")
+            appendLine("> — ${DarkPatternText.SOURCE_TITLE} #${s.pattern.number} (${DarkPatternText.SOURCE_URL})")
+        }
+        if (signals.any { it.evidenceType == EvidenceType.INFERRED }) {
+            appendLine()
+            appendLine("*${DarkPatternText.AI_NOTE}*")
+        }
+        appendLine()
+        appendLine("*${DarkPatternText.FOOTER}*")
     }
 
     private fun StringBuilder.quote(c: LensPassage) {

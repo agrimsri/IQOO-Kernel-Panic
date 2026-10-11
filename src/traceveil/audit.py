@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, access, adb, laws
+from . import EXIT_DEVICE, EXIT_FINDINGS, EXIT_INCONCLUSIVE, EXIT_PASS, EXIT_TIMEOUT, EXIT_USAGE, access, adb, fixes, laws, netwatch, sdks
 from .colors import PLAIN, Style
 from .netenv import OWN_PACKAGE
 
@@ -22,6 +22,7 @@ RECEIVER = f"{OWN_PACKAGE}/.cli.DebugAuditReceiver"
 REMOTE_REPORTS = f"/sdcard/Android/data/{OWN_PACKAGE}/files/reports"
 SCHEMA_VERSION = 1
 SEVERITY_ORDER = ["info", "low", "medium", "high", "critical"]
+NET_SAMPLE_S = 1.0  # socket sampling interval while an audit runs
 REQUIRED_KEYS = ("schemaVersion", "requestId", "auditId", "target", "score", "band", "findings", "sessions")
 
 
@@ -103,11 +104,92 @@ def validate_report(text: str, request_id: str) -> tuple[dict | None, str]:
     return rep, ""
 
 
-def exit_for_report(rep: dict, fail_on: str, min_score: int) -> tuple[int, list[str]]:
-    if rep.get("score") is None or rep.get("band") == "INCONCLUSIVE":
-        return EXIT_INCONCLUSIVE, ["audit result is inconclusive (no score)"]
+BAND_LABEL = {"READY": "Ready", "NEEDS_WORK": "Needs work", "AT_RISK": "At risk", "INCONCLUSIVE": "Inconclusive"}
+ANSWER_LINE = {"UNKNOWN": "unknown (not answered)", "DECLARED_NEVER": "declared by the person: never agreed",
+               "DECLARED_AGREED": "declared by the person: agreed earlier", "NOT_SURE": "the person is not sure (unknown)"}
+
+
+def _best_band(b: dict) -> str:
+    """`HistoryBounds.bestBand`: the agreed-earlier end's band, never Ready unless the never-agreed end is too."""
+    return "NEEDS_WORK" if b.get("highBand") == "READY" and b.get("lowBand") != "READY" else str(b.get("highBand"))
+
+
+def history_verdict(b: dict) -> str:
+    """`HistoryBounds.verdict` in the app: "Needs work either way · 65–99", "At best Needs work · 41–77", or the answered end."""
+    rng = f"{b.get('lowScore')}–{b.get('highScore')}"
+    if b.get("answer") == "DECLARED_NEVER":
+        return f"{b.get('lowScore')} · {BAND_LABEL.get(b.get('lowBand'), b.get('lowBand'))} · based on your answer"
+    if b.get("answer") == "DECLARED_AGREED":
+        return f"{b.get('highScore')} · {BAND_LABEL.get(_best_band(b))} · based on your answer"
+    if b.get("lowBand") == _best_band(b):
+        return f"{BAND_LABEL.get(b.get('lowBand'), b.get('lowBand'))} either way · {rng}"
+    return f"At best {BAND_LABEL.get(_best_band(b))} · {rng}"
+
+
+def history_lines(rep: dict, style: Style = PLAIN) -> list[str]:
+    """The consent-history range of a kept-data audit (report key "historyBounds", when present), or the answer that picked an end."""
+    b = rep.get("historyBounds")
+    if not isinstance(b, dict):
+        return []
+    answer = b.get("answer")
+    if answer in ("DECLARED_NEVER", "DECLARED_AGREED"):
+        return [f"  {style.warn('Consent history:')} {ANSWER_LINE[answer]} (not checkable) -> {history_verdict(b)}"]
+    why = "asked, the person is not sure" if answer == "NOT_SURE" else "the app kept its data and showed no consent screen"
+    return [f"  {style.warn('consent history unknown:')} {history_verdict(b)}  ({why}; "
+            f"never agreed -> {b.get('lowScore')}, agreed earlier -> {b.get('highScore')})"]
+
+
+def _minutes(ms) -> int:
+    return int((int(ms or 0) + 30_000) // 60_000)
+
+
+def _duration(ms) -> str:
+    total = max(int(ms or 0) // 1000, 0)
+    m, s = divmod(total, 60)
+    return f"{s} s" if m == 0 else f"{m} min" if s == 0 else f"{m} min {s} s"
+
+
+def background_watch(sessions) -> dict | None:
+    """The app's background watch (a session's "watch", `BackgroundWatch` in the app), or None when the audit is not one."""
+    for s in sessions or []:
+        w = s.get("watch") if isinstance(s, dict) else None
+        if isinstance(w, dict):
+            planned = _minutes(w.get("plannedMs"))
+            early = bool(w.get("stoppedEarly"))
+            length = f"{_duration(w.get('watchedMs'))} of a planned {planned} minutes (stopped early)" if early else f"{planned} minutes"
+            return {"plannedMinutes": planned, "watchedMs": w.get("watchedMs"), "stoppedEarly": early, "consentScreenDriven": False,
+                    "text": f"background watch of {length}: what the app sends while it runs in the background; "
+                            "the app was not opened, restarted or tapped, so its consent screen was not tested"}
+    return None
+
+
+def watch_lines(rep: dict, style: Style = PLAIN) -> list[str]:
+    """One line for a background watch (report key "backgroundWatch", when present)."""
+    w = rep.get("backgroundWatch")
+    return [f"  {style.warn('watch:')} {w.get('text')}"] if isinstance(w, dict) and w.get("text") else []
+
+
+def _range_reasons(b: dict, fail_on: str, min_score: int) -> list[str]:
+    """A range is judged by its never-agreed end: a gate never passes on a consent history nobody could check."""
     reasons = []
-    if rep["score"] < min_score:
+    rng = f"{b.get('lowScore')}–{b.get('highScore')}"
+    if b.get("highScore", 0) < min_score:
+        reasons.append(f"score range {rng}: even if the person agreed earlier it is below min_score {min_score}")
+    elif b.get("lowScore", 0) < min_score:
+        reasons.append(f"score range {rng}: min_score {min_score} is met only if the person agreed earlier (consent history unknown)")
+    if fail_on in SEVERITY_ORDER and SEVERITY_ORDER.index(fail_on) <= SEVERITY_ORDER.index("high"):
+        reasons.append(f"consent history unknown: if the person never agreed, tracker lookups count as before consent (C1, high; range {rng})")
+    return reasons
+
+
+def exit_for_report(rep: dict, fail_on: str, min_score: int) -> tuple[int, list[str]]:
+    bounds = rep.get("historyBounds")
+    reasons = []
+    if rep.get("score") is None and isinstance(bounds, dict):
+        reasons += _range_reasons(bounds, fail_on, min_score)
+    elif rep.get("score") is None or rep.get("band") == "INCONCLUSIVE":
+        return EXIT_INCONCLUSIVE, ["audit result is inconclusive (no score)"]
+    elif rep["score"] < min_score:
         reasons.append(f"score {rep['score']} is below min_score {min_score}")
     if fail_on in SEVERITY_ORDER:
         bar = SEVERITY_ORDER.index(fail_on)
@@ -124,6 +206,20 @@ MAX_NAMES = 4
 def _names(entities: list, style: Style) -> str:
     shown = ", ".join(style.tracker(e) for e in entities[:MAX_NAMES])
     return shown + (style.dim(f" (+{len(entities) - MAX_NAMES} more)") if len(entities) > MAX_NAMES else "")
+
+
+def diagnosis_lines(rep: dict, style: Style = PLAIN) -> list[str]:
+    """Why an inconclusive report has no score, from the phone's own diagnosis (report key "diagnosis", when present):
+    the main cause in a sentence, the other causes in a phrase, and the one thing most likely to help."""
+    items = [d for d in (rep.get("diagnosis") or []) if isinstance(d, dict)]
+    if not items:
+        return []
+    lines = [f"  {style.warn('why no score:')} {items[0].get('sentence') or items[0].get('cause', '?')}"]
+    lines += [f"       also: {d.get('phrase') or d.get('cause', '?')}" for d in items[1:]]
+    hint = next((d.get("hint") for d in items if d.get("action") not in (None, "NONE") and d.get("hint")), None)
+    if hint:
+        lines.append(f"  {style.warn('try:')} {hint}")
+    return lines
 
 
 def network_lines(net: dict, style: Style = PLAIN) -> list[str]:
@@ -152,25 +248,53 @@ def network_lines(net: dict, style: Style = PLAIN) -> list[str]:
     return lines
 
 
+def sdk_lines(inv: dict, style: Style = PLAIN) -> list[str]:
+    """Bundled SDKs, the ones also looked up live first; the full rows (with actions) are under sdkInventory."""
+    rows = sorted(inv.get("sdks", []), key=lambda r: (r["status"] != "in-apk-and-live", r["status"] != "live-only", r["entity"]))
+    c = inv.get("counts", {})
+    lines = [f"  {style.bold('SDKs')}  {c.get('in-apk-and-live', 0)} bundled and looked up, {c.get('in-apk-only', 0)} bundled only, "
+             f"{c.get('live-only', 0)} looked up without a matching SDK"]
+    label = {"in-apk-and-live": style.warn("bundled+live"), "in-apk-only": style.dim("bundled    "), "live-only": "live only   "}
+    for r in rows:
+        phases = ", ".join(p.lower() for p in (r.get("observed") or {}).get("phases", []))
+        lines.append(f"    {label.get(r['status'], r['status'])} {r['entity']:<30} {r['category'].lower():<12} {style.dim(phases)}")
+    return lines
+
+
 def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) -> str:
     t = rep["target"]
-    lines = [f"Traceveil audit  {style.bold(t.get('label', '?'))} ({t.get('package', '?')})  "
-             f"score {style.score(rep['score'], rep['band'])} / {style.band(rep['band'])}  findings {len(rep['findings'])}"]
+    bounded = rep.get("score") is None and isinstance(rep.get("historyBounds"), dict)
+    verdict = f"range {history_verdict(rep['historyBounds'])}" if bounded else f"score {style.score(rep['score'], rep['band'])} / {style.band(rep['band'])}"
+    lines = [f"Traceveil audit  {style.bold(t.get('label', '?'))} ({t.get('package', '?')})  {verdict}  findings {len(rep['findings'])}"]
+    lines += watch_lines(rep, style)
+    lines += history_lines(rep, style)
+    plan = {i["check"]: i for i in rep.get("fixPlan", {}).get("issues", [])}
     for f in rep["findings"]:
         sev = str(f.get("severity", "?"))
         tag = style.dim(" inferred") if str(f.get("evidenceType", "")).upper() == "INFERRED" else ""
+        if f.get("declared"):
+            tag += style.dim(" based on your answer")
         lines.append(f"  {f.get('check', '?'):<4} {style.severity(sev, 8)} {f.get('title', '')}{tag}")
         if f.get("entities"):
             lines.append(f"       {style.dim('trackers:')} {_names(f['entities'], style)}")
+        if f.get("check") in plan:
+            lines += fixes.summary_lines({**rep["fixPlan"], "issues": [plan[f["check"]]]}, style, compact=True)
+    lines += diagnosis_lines(rep, style)
     if rep.get("network") is not None:
         lines += network_lines(rep["network"], style)
     if rep.get("dataAccess") is not None:
         lines += access.lines(rep["dataAccess"], style)
+    if rep.get("sdkInventory"):
+        lines += sdk_lines(rep["sdkInventory"], style)
     if rep.get("lenses"):
         lines += laws.table(rep["lenses"], style)
+    if rep.get("socketWatch"):
+        lines += netwatch.summary_lines(rep["socketWatch"], style)
     for r in reasons:
         lines.append(f"  {style.warn('policy:')} {r}")
     lines.append(f"  report saved: {saved}")
+    if rep.get("fixPlan", {}).get("fixes"):
+        lines.append(style.dim("  fixes are in the report's fixPlan (give the JSON to a coding agent); --format md prints them as Markdown"))
     return "\n".join(lines)
 
 
@@ -199,8 +323,9 @@ def _wait_for_device(dev, io: Io, deadline: list[float], request_id: str) -> boo
 
 
 def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_drive: bool, reset: bool, wait_s: float,
-              resume: str | None, as_json: bool, out_file: str | None, request_id: str | None = None,
-              fail_on_override: str | None = None, lenses=None, policy: str | None = None) -> int:
+              resume: str | None, as_json: bool, out_file: str | None, request_id: str | None = None, as_md: bool = False,
+              fail_on_override: str | None = None, lenses=None, policy: str | None = None,
+              watch_network: bool | None = None, fail_on_hidden: bool = False, app_file=None) -> int:
     request_id = resume or request_id or new_request_id()
     package = package or cfg["target"]["package"]
     if not resume and not package:
@@ -216,9 +341,20 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
     except adb.AdbDisconnected as e:
         return _fail(io, f"device disconnected before the audit started ({e}); reconnect and run again", EXIT_DEVICE)
 
+    sampler = None
+    if not resume and (cfg["audit"].get("watch_network", True) if watch_network is None else watch_network):
+        try:
+            uid = netwatch.uid_of(dev, package)
+            sampler = netwatch.Sampler(dev, uid, io.clock) if uid is not None else None
+        except adb.AdbError:
+            sampler = None
+    poll_s = min(io.poll_s, NET_SAMPLE_S) if sampler else io.poll_s
+
     deadline = [io.clock() + wait_s]
     last_step = ""
     while True:
+        if sampler:
+            sampler.sample()  # first, so even an audit that is already done gets one sample
         try:
             raw = dev.shell_checked(f"cat {shlex.quote(_remote(request_id, 'status.json'))}")
             state = _json_or_none(raw)
@@ -235,7 +371,7 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
         if io.clock() >= deadline[0]:
             return _fail(io, f"timed out after {wait_s:.0f}s (last step: {last_step or 'unknown'}). The audit was not cancelled; "
                              f"fetch it later with: traceveil audit --resume {request_id}", EXIT_TIMEOUT)
-        io.sleep(io.poll_s)
+        io.sleep(poll_s)
 
     try:
         text = dev.shell_checked(f"cat {shlex.quote(_remote(request_id, 'report.json'))}")
@@ -251,17 +387,41 @@ def run_audit(dev, cfg: dict, io: Io, *, package: str, plans: str | None, auto_d
     if data_access is not None:
         rep["dataAccess"] = data_access
     try:
-        rep["lenses"] = laws.assess_all(rep, lenses or cfg["audit"]["lenses"], policy or cfg["audit"]["policy"])
+        policy = policy or cfg["audit"]["policy"]
+        rep["lenses"] = laws.assess_all(rep, lenses or cfg["audit"]["lenses"], policy)
+        rep["fixPlan"] = fixes.build(rep, laws.assess_all(rep, "all", policy))  # every country, whatever lenses are shown
     except ValueError as e:
         return _fail(io, str(e), EXIT_USAGE)
+    if app_file is not None:  # audited from a file: say which build it was and what SDKs ship inside it
+        rep["apk"] = app_file.describe()
+        try:
+            perms = sdks.parse_requested_permissions(dev.shell_checked(f"dumpsys package {shlex.quote(app_file.package)}"))
+        except adb.AdbError:
+            perms = None
+        try:
+            rep["sdkInventory"] = sdks.build(app_file.base, sdks.load_signatures(), rep, perms)
+        except sdks.ApkError as e:
+            print(f"warning: SDK scan of {app_file.base.name} failed: {e}", file=io.err)
+    if sampler:
+        try:
+            vpn = netwatch.declares_vpn_service(dev.shell_checked(f"dumpsys package {shlex.quote(package)}"))
+        except adb.AdbError:
+            vpn = None
+        rep["socketWatch"] = netwatch.analyze(sampler.seen, rep, sampler.as_dict(poll_s), vpn)
     out_dir = Path(cfg["output"]["dir"])
     out_dir.mkdir(parents=True, exist_ok=True)
     saved = out_dir / f"{request_id}.json"
     saved.write_text(json.dumps(rep, indent=2), encoding="utf-8")
-    if out_file:
+    if out_file:  # a .md path gets the fix plan as Markdown; anything else the JSON report, fixPlan included
         Path(out_file).parent.mkdir(parents=True, exist_ok=True)
-        Path(out_file).write_text(json.dumps(rep, indent=2), encoding="utf-8")
+        Path(out_file).write_text(fixes.markdown(rep["fixPlan"]) if out_file.endswith(".md") else json.dumps(rep, indent=2),
+                                  encoding="utf-8")
     code, reasons = exit_for_report(laws.policy_view(rep["lenses"]), fail_on_override or cfg["audit"]["fail_on"],
                                     int(cfg["audit"]["min_score"]))
-    print(json.dumps(rep, indent=2) if as_json else summary(rep, reasons, saved, Style(io.color_out)), file=io.out)
+    if fail_on_hidden and rep.get("socketWatch") and netwatch.hidden(rep["socketWatch"]):
+        reasons.append("the app made connections the DNS capture could not see (--fail-on-hidden)")
+        code = code if code != EXIT_PASS else EXIT_FINDINGS
+    text = (json.dumps(rep, indent=2) if as_json else fixes.markdown(rep["fixPlan"]) if as_md
+            else summary(rep, reasons, saved, Style(io.color_out)))
+    print(text, file=io.out)
     return code

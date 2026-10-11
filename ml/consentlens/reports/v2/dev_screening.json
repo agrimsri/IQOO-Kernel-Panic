@@ -1,0 +1,57 @@
+{
+ "pk2_mix_k33": {
+  "lolo_dev_macro_f1": [
+   0.4956
+  ],
+  "seen_dev_macro_f1": [
+   0.6786
+  ],
+  "seeds": [
+   1
+  ]
+ },
+ "s2_w160": {
+  "lolo_dev_macro_f1": [
+   0.4918
+  ],
+  "seen_dev_macro_f1": [
+   0.6843
+  ],
+  "seeds": [
+   1
+  ]
+ },
+ "s1": {
+  "lolo_dev_macro_f1": [
+   0.4893
+  ],
+  "seen_dev_macro_f1": [
+   0.6473
+  ],
+  "seeds": [
+   1
+  ]
+ },
+ "s2": {
+  "lolo_dev_macro_f1": [
+   0.4813
+  ],
+  "seen_dev_macro_f1": [
+   0.6741
+  ],
+  "seeds": [
+   1
+  ]
+ },
+ "v1": {
+  "lolo_dev_macro_f1": [
+   0.4513
+  ],
+  "seen_dev_macro_f1": [
+   0.6486
+  ],
+  "seeds": [
+   1
+  ]
+ }
+}

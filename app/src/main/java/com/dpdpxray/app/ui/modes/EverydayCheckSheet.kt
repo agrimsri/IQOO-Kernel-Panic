@@ -59,8 +59,9 @@ import com.dpdpxray.app.ui.theme.Radii
 
 /**
  * Everyday check sheet. Opens on one Quick check that says No (a single Reject run that keeps the app's data), with
- * the agent-tap switch beside it. Full, clearing app data, the children and Play-services options and the
- * internet-cut-off run fold under Advanced. Same engine and safeguards as the developer sheet: data is cleared only
+ * the agent-tap switch beside it, and a background watch (the app only watched while it runs in the background, for a
+ * chosen length). Full, clearing app data, the children and Play-services options and the internet-cut-off run fold
+ * under Advanced. Same engine and safeguards as the developer sheet: data is cleared only
  * with explicit approval and Shizuku, and a quiet result is never called a pass.
  *
  * Text diet: each explanation shows its first sentence; the rest folds behind More (in the guide language).
@@ -73,6 +74,8 @@ internal fun EverydayCheckSetup(
     shizukuHelp: ShizukuHelp,
     onQuarantine: () -> Unit,
     onStart: (AuditConfig) -> Unit,
+    /** What restarting the app would switch off (null while it is being read, or unreadable). */
+    effects: List<com.dpdpxray.app.audit.FoundSideEffect>? = null,
 ) {
     val lang = guideLang()
     val c = EverydaySheetCopy
@@ -82,28 +85,55 @@ internal fun EverydayCheckSetup(
     var agent by remember { mutableStateOf(initial.agentTaps) }
     var child by remember { mutableStateOf(false) }
     var gms by remember { mutableStateOf(false) }
+    var watchMinutes by remember { mutableStateOf(com.dpdpxray.core.model.BackgroundWatches.DEFAULT_MINUTES) }
     val freshReset = allowReset && shizukuReady
+    // The safe option is the default: an app a restart would disturb is checked without restarting it.
+    var restartAnyway by remember { mutableStateOf(false) }
+    // Only a Full check clears data; Quick keeps it even with the switch on.
+    val clears = freshReset && choice == CheckChoice.FULL
+    val leftRunning = shizukuReady && !clears && !effects.isNullOrEmpty() && !restartAnyway
+    // Clearing any app other than the demo apps is confirmed first; choosing Full never turns it on by itself.
+    val confirmFirst = CheckSheet.resetNeedsConfirmation(app.packageName)
+    var askReset by remember { mutableStateOf(false) }
+    if (askReset) ResetConfirmDialog(app.label, lang,
+        onConfirm = { askReset = false; allowReset = true; choice = CheckChoice.FULL },
+        onDismiss = { askReset = false; if (!allowReset && choice == CheckChoice.FULL) choice = CheckChoice.QUICK })
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CheckSheetTitle(c.title(app.label).pick(lang))
-        SpeakStep(c.guide(app.label))
+        val step = c.guide(app.label)
+        SpeakStep(step)
+        // What to do once the check starts (say No when the app asks), as one quiet line; read-aloud speaks it too.
+        Text(step.body.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
         Column(Modifier.padding(top = 4.dp).reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             PlanOption(
-                c.quickTitle.pick(lang), (if (freshReset) c.quickDetailFresh else c.quickDetail).pick(lang),
+                c.quickTitle.pick(lang), (if (shizukuReady && !leftRunning) c.quickDetailRestart else c.quickDetail).pick(lang),
                 selected = choice == CheckChoice.QUICK, enabled = true, lang = lang,
             ) { choice = CheckChoice.QUICK }
-            SwitchRow(c.agentTitle.pick(lang), c.agentDetail.pick(lang), agent, { agent = it })
-            SheetCaveat((if (freshReset) c.resetCaveat else c.quickCaveat).pick(lang), lang)
+            if (choice != CheckChoice.WATCH) SwitchRow(c.agentTitle.pick(lang), c.agentDetail.pick(lang), agent, { agent = it })
+            PlanOption(
+                com.dpdpxray.app.audit.WatchCopy.optionTitle.pick(lang), com.dpdpxray.app.audit.WatchCopy.optionDetail(watchMinutes).pick(lang),
+                selected = choice == CheckChoice.WATCH, enabled = true, lang = lang,
+            ) { choice = CheckChoice.WATCH }
+            if (choice == CheckChoice.WATCH) WatchLengthChips(watchMinutes, { watchMinutes = it }, lang)
+            SheetCaveat(when {
+                choice == CheckChoice.WATCH -> com.dpdpxray.app.audit.WatchCopy.caveat
+                clears -> c.resetCaveat
+                else -> c.quickCaveat
+            }.pick(lang), lang)
         }
 
         CollapsibleCard(
             c.advanced.pick(lang), Modifier.padding(top = 8.dp).reveal(2),
             summary = c.advancedSummary.pick(lang), glyph = Glyph.SETTINGS, initiallyOpen = choice == CheckChoice.FULL,
         ) {
-            PlanOption(c.fullTitle.pick(lang), c.fullDetail.pick(lang), selected = choice == CheckChoice.FULL, enabled = shizukuReady, lang = lang) { choice = CheckChoice.FULL; allowReset = true }
+            PlanOption(c.fullTitle.pick(lang), c.fullDetail.pick(lang), selected = choice == CheckChoice.FULL, enabled = shizukuReady, lang = lang) {
+                choice = CheckChoice.FULL
+                if (!confirmFirst) allowReset = true else if (!allowReset) askReset = true
+            }
             if (!shizukuReady) ShizukuAccessNotice(shizukuHelp.running, shizukuHelp.onAllow, shizukuHelp.onOpenShizuku)
             if (shizukuReady) SwitchRow(c.resetTitle.pick(lang), c.resetDetail.pick(lang), allowReset, { on ->
-                allowReset = on
+                if (on && confirmFirst) askReset = true else allowReset = on
                 if (!on && choice == CheckChoice.FULL) choice = CheckChoice.QUICK
             })
             Hairline()
@@ -115,8 +145,12 @@ internal fun EverydayCheckSetup(
             FoldText(c.quarantineNote.pick(lang), moreLabel = lang.moreLabel, lessLabel = lang.lessLabel)
         }
 
-        GradientAction(c.start.pick(lang), {
-            onStart(CheckSheet.config(Audience.USER, app.packageName, app.label, choice, allowReset, shizukuReady, agent, child, gms))
+        // A watch never restarts the app, so there is nothing a restart would switch off.
+        if (choice != CheckChoice.WATCH) RestartWarning(app.label, effects, canStop = shizukuReady, reset = clears, restartAnyway = restartAnyway, onChange = { restartAnyway = it }, lang = lang)
+
+        GradientAction((if (choice == CheckChoice.WATCH) com.dpdpxray.app.audit.WatchCopy.start else c.start).pick(lang), {
+            onStart(CheckSheet.config(Audience.USER, app.packageName, app.label, choice, allowReset, shizukuReady, agent, child, gms,
+                CheckSheet.restartPolicy(effects.takeIf { shizukuReady }, restartAnyway), watchMinutes))
         }, Modifier.padding(top = 12.dp).reveal(3), glyph = Glyph.PLAY, sweep = true)
     }
 }

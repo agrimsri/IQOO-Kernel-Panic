@@ -47,6 +47,14 @@ class ExplanationTest {
     }
 
     @Test
+    fun `a model answer that gives a verdict is replaced by rules text and says why`() {
+        val verdict = Explanations.fromModel("AppsFlyer was reached before consent, so the app is non-compliant [s6(1)].", c1, law, false, "m")
+        assertEquals(ResultSource.FALLBACK, verdict.source)
+        assertTrue(verdict.detail.contains("\"non-compliant\""))
+        assertTrue(verdict.text.startsWith("C1: Tracker hosts looked up before consent."))
+    }
+
+    @Test
     fun `hindi fallback is in Devanagari and keeps the evidence`() {
         val e = Explanations.fallback(c1, hindi = true, reason = "the model is not loaded")
         assertEquals(ResultSource.FALLBACK, e.source)

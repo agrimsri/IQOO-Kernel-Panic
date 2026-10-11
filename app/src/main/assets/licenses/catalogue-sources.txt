@@ -1,0 +1,22 @@
+Tracker catalogue and company facts: sources
+
+TraceVeil's tracker catalogue, app-owner list, fix templates and SDK signatures
+(trackers/, fixes/, sdk/) are TraceVeil's own data under its MIT licence. Company facts in the
+catalogue quote short passages from the documents below; each fact in the app keeps its source
+address and the date it was read (10 October 2026).
+
+  Alphabet Inc., Form 10-K for fiscal year 2023 (sec.gov)
+  Google Terms of Service (policies.google.com/terms)
+  Meta Platforms, Inc., Form 10-K for fiscal year 2025 (sec.gov)
+  Microsoft Corporation, Form 10-K for fiscal year 2025 (sec.gov)
+  Braze, Inc., Form 10-K for fiscal year 2026 (sec.gov)
+  Unity Software Inc., Form 10-K for fiscal year 2025 (sec.gov)
+  AppLovin Corporation, SEC filing (sec.gov)
+  Amplitude, Inc., Form 10-K for fiscal year 2025 (sec.gov)
+  AppsFlyer Terms of Use (www.appsflyer.com/legal/terms-of-use/)
+
+Website trackers (web/web_trackers.json and the catalogue's domainSource fields) cite the vendors'
+own documentation pages, read on 11 October 2026, for each domain, tracking path and cookie name;
+ATTRIBUTIONS.md lists them.
+
+Company names are used only to identify the companies; TraceVeil is not affiliated with them.

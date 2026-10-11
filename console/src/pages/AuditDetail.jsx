@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { ClipboardCheck, Gauge as GaugeIcon, Waypoints, ListChecks, Globe2, Smartphone, GitCompareArrows, ChevronDown, ChevronRight, Wrench, ExternalLink, CheckCircle2, AlertTriangle, HelpCircle, FlaskConical, ScanEye, Trash2, Scale } from "lucide-react";
+import { Fragment, useState } from "react";
+import { ClipboardCheck, Gauge as GaugeIcon, Waypoints, ListChecks, Globe2, Smartphone, GitCompareArrows, ChevronDown, ChevronRight, Wrench, ExternalLink, CheckCircle2, AlertTriangle, HelpCircle, FlaskConical, ScanEye, Trash2, Scale, Boxes, FileKey } from "lucide-react";
 import { Card, PageHead, Fade, Hud, Sheet, toast } from "../ui";
 import { Gauge } from "../ui/charts";
 import { EvidenceChip, SeverityBadge, BandBadge, PlanTag, SampleBadge, CodeBlock, DownloadButton, EmptyState, Truth, Meta, AppMark } from "../ui/tv";
 import ConsentLanes from "../components/ConsentLanes";
 import { useData } from "../data/DataContext";
 import { flattenTree } from "../data/derive";
-import { sevInfo, bandInfo, fmtDate, fmtS, plural, fixesForFinding, passageFor, refLabel, CATEGORY_LABEL, PHASE, planInfo, LENS, LENS_ORDER, lensMapping, relationLabel, lensPassageFor, lensExplanation, lensScore, PASSAGE_KIND } from "../data/model";
+import { sevInfo, bandInfo, fmtDate, fmtS, plural, fixesForFinding, passageFor, refLabel, CATEGORY_LABEL, PHASE, planInfo, LENS, LENS_ORDER, lensMapping, relationLabel, lensPassageFor, lensExplanation, lensScore, PASSAGE_KIND, CHECKS, TRACKING, fixTemplate, sdkFirstSeenLine, sdkHeadline, SDK_LOOKUP_CAVEAT, SDK_BEFORE_CONSENT, SDK_AFTER_REJECT } from "../data/model";
 import { navigate } from "../lib/router";
 
 export default function AuditDetail({ id }) {
@@ -26,9 +26,9 @@ export default function AuditDetail({ id }) {
   return (
     <div>
       <PageHead
-        kicker={<span className="row" style={{ gap: 8, display: "inline-flex" }}>Consent audit {a.sample && <SampleBadge info={a.sampleInfo} />}</span>}
+        kicker={<span className="row" style={{ gap: 8, display: "inline-flex" }}>Consent audit {a.sample && <SampleBadge info={a.sampleInfo} />}{a.signatureFile && <SignatureBadge a={a} />}</span>}
         title={<span className="row" style={{ gap: 12, display: "inline-flex" }}><AppMark label={a.label} size="lg" />{a.label}</span>}
-        sub={<Meta items={[<span className="mono-s" key="p">{a.pkg}</span>, a.device && <span key="d"><Smartphone size={13} />{a.device}{a.android ? ` · Android ${a.android}` : ""}</span>, <span key="t">{fmtDate(a.createdAtMs)}</span>, <span key="l">{plural(a.lookups, "lookup")}</span>]} />}
+        sub={<Meta items={[<span className="mono-s" key="p">{a.pkg}</span>, a.device && <span key="d"><Smartphone size={13} />{a.device}{a.android ? ` · Android ${a.android}` : ""}</span>, <span key="t">{fmtDate(a.createdAtMs)}</span>, a.versionName && <span key="v">Version {a.versionName}{a.versionCode != null ? ` (${a.versionCode})` : ""}</span>, <span key="l">{plural(a.lookups, "lookup")}</span>]} />}
         right={(
           <div className="row wrap">
             {compareTo && <button className="btn sm" onClick={() => navigate(`/compare?a=${encodeURIComponent(a.id)}&b=${encodeURIComponent(compareTo.id)}`)}><GitCompareArrows size={15} />Compare</button>}
@@ -44,6 +44,8 @@ export default function AuditDetail({ id }) {
           <div>{!/^sample/i.test(a.sampleInfo.note) && <b>Sample data. </b>}<span className="text-2">{a.sampleInfo.note}</span>{a.sampleInfo.sources?.length > 0 && <div className="pill-src" style={{ marginTop: 6 }}>Sources: {a.sampleInfo.sources.join(" · ")}</div>}</div>
         </div>
       )}
+
+      {a.signatureFile && <SignatureNote a={a} />}
 
       <div className="grid g-12">
         <Fade className="span-8"><Coverage a={a} /></Fade>
@@ -85,6 +87,7 @@ export default function AuditDetail({ id }) {
             </div>
           </Card>
         </div>
+        {a.sdkGroups && <Fade className="span-12"><SdkCard a={a} /></Fade>}
         <Fade className="span-12"><HostsCard a={a} /></Fade>
       </div>
 
@@ -207,19 +210,123 @@ function FindingCard({ f, index, onRef, lens }) {
         {fixes.length > 0 && (
           <div className="fix">
             <button className="fix-toggle" onClick={() => setFixOpen(!fixOpen)}>{fixOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}<Wrench size={15} />How to fix · {fixes.length}</button>
-            {fixOpen && fixes.map((t) => (
-              <div key={t.id} className="fix-item">
-                <div className="row between wrap"><b>{t.title}</b>{!t.verified && <span className="status dev">check your SDK version</span>}</div>
-                {t.manifest && <CodeBlock title="AndroidManifest.xml" code={t.manifest} />}
-                {t.code && <CodeBlock title="Kotlin" code={t.code} />}
-                {t.steps?.length > 0 && <ul>{t.steps.map((x, i) => <li key={i}>{x}</li>)}</ul>}
-                {t.docUrl && <a className="link small row" style={{ gap: 6 }} href={t.docUrl} target="_blank" rel="noreferrer noopener"><ExternalLink size={13} />Vendor documentation</a>}
-              </div>
-            ))}
+            {fixOpen && fixes.map((t) => <FixItem key={t.id} t={t} />)}
           </div>
         )}
       </div>
     </section>
+  );
+}
+
+function FixItem({ t }) {
+  return (
+    <div className="fix-item">
+      <div className="row between wrap"><b>{t.title}</b>{!t.verified && <span className="status dev">check your SDK version</span>}</div>
+      {t.manifest && <CodeBlock title="AndroidManifest.xml" code={t.manifest} />}
+      {t.code && <CodeBlock title="Kotlin" code={t.code} />}
+      {t.steps?.length > 0 && <ul>{t.steps.map((x, i) => <li key={i}>{x}</li>)}</ul>}
+      {t.docUrl && <a className="link small row" style={{ gap: 6 }} href={t.docUrl} target="_blank" rel="noreferrer noopener"><ExternalLink size={13} />Vendor documentation</a>}
+    </div>
+  );
+}
+
+/** A <file>.sig.json was imported with this export. Present is all the console can say; it never verifies it. */
+function SignatureBadge({ a }) {
+  return (
+    <span className="sig-badge" title={`${a.signatureFile.fileName} was imported with this export. Not verified in this browser: use traceveil-ci verify.`}>
+      <FileKey size={12} />Signature file present
+    </span>
+  );
+}
+
+function SignatureNote({ a }) {
+  const file = a.rec.fileName || "the exported file";
+  return (
+    <div className="callout sig-note" style={{ marginBottom: 16 }}>
+      <FileKey size={17} color="var(--scan)" style={{ flex: "none", marginTop: 2 }} />
+      <div className="text-2">
+        <b>Signature file present.</b> {a.signatureFile.fileName} (the phone's hardware signature) was imported with {file}. It is not verified in this browser.
+        Verify it on a laptop with <code className="mono-s">traceveil-ci verify {file}</code>, using the original file: it checks the exact bytes, the
+        secure-hardware key and the Google attestation root. This console's Export JSON writes new bytes, which the signature does not cover.
+      </div>
+    </div>
+  );
+}
+
+/** "Which SDK caused this?": the export's sdkAttribution groups (core SdkAttribution), shown as exported. */
+function SdkCard({ a }) {
+  const groups = a.sdkGroups;
+  const known = groups.filter((g) => g.known !== false);
+  const linked = known.filter((g) => (g.checks || []).length > 0);
+  const quiet = known.filter((g) => !(g.checks || []).length);
+  const unknown = groups.find((g) => g.known === false);
+  const summary = sdkHeadline(groups) || (groups.length ? "No finding in this audit names a catalogued SDK." : "No lookups were captured in this audit.");
+  return (
+    <Card title="Which SDK caused this?" icon={Boxes} tour="sdk" right={<Hud>{plural(known.length, "catalogued service")} · from the export</Hud>}>
+      <p className="small text-2" style={{ margin: "0 0 10px" }}>{summary}</p>
+      <Truth>{SDK_LOOKUP_CAVEAT}</Truth>
+      {linked.length > 0 && <div className="sdk-groups">{linked.map((g) => <SdkGroupRow key={g.name} g={g} findings={a.findings} />)}</div>}
+      {quiet.length > 0 && (
+        <details className="sdk-more">
+          <summary className="small muted"><ChevronRight size={14} className="chev" /><span>Also contacted, no finding ({quiet.length})</span></summary>
+          <div className="sdk-groups">{quiet.map((g) => <SdkGroupRow key={g.name} g={g} findings={a.findings} />)}</div>
+        </details>
+      )}
+      {unknown && <div className="sdk-groups"><SdkGroupRow g={unknown} findings={a.findings} /></div>}
+      {a.sdkBasis && <p className="pill-src" style={{ marginTop: 10 }}>{a.sdkBasis}</p>}
+    </Card>
+  );
+}
+
+function SdkGroupRow({ g, findings }) {
+  const isKnown = g.known !== false;
+  const first = sdkFirstSeenLine(g);
+  const early = isKnown && (first.endsWith(SDK_BEFORE_CONSENT) || first.endsWith(SDK_AFTER_REJECT));
+  const hosts = Array.isArray(g.hosts) ? g.hosts : [];
+  const lookups = hosts.reduce((n, h) => n + (h.lookups || 0), 0);
+  const fixes = (g.fixIds || []).map((id) => fixTemplate(id) || { id, title: id, verified: true });
+  const tone = !isKnown ? "var(--lav)" : TRACKING.has(g.category) ? "var(--sev-high)" : "var(--scan)";
+  const who = [g.company && `Company: ${g.company}`, g.sameCompanyAsApp && "same company as the app"].filter(Boolean).join(" · ");
+  return (
+    <div className="sdk-group" style={{ "--c": tone }}>
+      <div className="row between wrap" style={{ gap: 8 }}>
+        <b className="sdk-name">{g.name}</b>
+        <span className="lens-rel">{isKnown ? CATEGORY_LABEL[g.category] || g.category : "Not in catalogue"}</span>
+      </div>
+      {who && <div className="small muted">{who}</div>}
+      {first && <div className="small" style={{ color: early ? "var(--sev-medium)" : "var(--text-2)" }}>{first}</div>}
+      <div className="f-tags">
+        {(g.checks || []).length > 0 && <span className="small muted">Checks:</span>}
+        {(g.checks || []).map((id) => {
+          const f = findings.find((x) => x.checkId === id);
+          return <span key={id} className={`sev-badge sev-${String(f?.severity || "info").toLowerCase()}`} title={f?.title || CHECKS[id] || id}>{id}</span>;
+        })}
+        <EvidenceChip type={g.evidence} small />
+        {g.evidence === "OBSERVED" && <span className="pill-src">{plural(lookups, "lookup")}</span>}
+      </div>
+      {hosts.length > 0 && (
+        <ul className="sdk-hosts">
+          {hosts.map((h) => (
+            <li key={h.host}>
+              <span className="host">{h.host}</span>{" "}
+              <span className="pill-src">
+                {plural(h.lookups || 0, "lookup")} · first {fmtS(h.firstSeenSeconds)} after launch, {h.firstRelation} ({planInfo(h.firstPlan).label})
+                {(h.relations || []).filter((r) => r !== h.firstRelation).length > 0 ? ` · also ${(h.relations || []).filter((r) => r !== h.firstRelation).join(", ")}` : ""}
+                {h.viaAlias ? ` · through the alias ${h.viaAlias}` : ""}
+                {h.viaPackage ? ` · looked up by ${h.viaPackage}` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {g.catalogueMatch && <p className="small text-2" style={{ margin: 0 }}>{g.catalogueMatch}</p>}
+      {fixes.length > 0 && (
+        <details className="sdk-fix">
+          <summary className="small"><ChevronRight size={14} className="chev" /><Wrench size={13} /><span>How to fix: {fixes.map((t, i) => <Fragment key={t.id}>{i > 0 ? " · " : ""}{t.title}</Fragment>)}</span></summary>
+          {fixes.map((t) => <FixItem key={t.id} t={t} />)}
+        </details>
+      )}
+    </div>
   );
 }
 

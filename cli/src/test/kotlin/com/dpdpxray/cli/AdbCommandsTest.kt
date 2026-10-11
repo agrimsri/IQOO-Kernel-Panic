@@ -86,6 +86,11 @@ class AdbCommandsTest {
         assertEquals("device offline", AdbOutput.transportProblem(ExecResult(1, "", "adb: device offline")))
         assertEquals("no devices/emulators found", AdbOutput.transportProblem(ExecResult(1, "", "adb: no devices/emulators found")))
         assertTrue(AdbOutput.isPermissionDenied(ExecResult(1, "", "cat: /sdcard/Android/data/x: Permission denied")))
+        // A split APK lists one path per file; every one is kept, so an update of any split is noticed.
+        val split = ExecResult(0, listOf("base.apk", "split_config.arm64_v8a.apk", "split_config.xxhdpi.apk")
+            .joinToString(System.lineSeparator()) { "package:/data/app/~~a==/com.reskill.hacktracker-b==/$it" })
+        assertEquals(3, AdbOutput.installedPaths(split).size)
+        assertTrue(AdbOutput.installedPaths(split).first().endsWith("/base.apk"))
         assertEquals(listOf("/data/app/~~x==/com.dpdpxray.app-1/base.apk"), AdbOutput.installedPaths(ExecResult(0, "package:/data/app/~~x==/com.dpdpxray.app-1/base.apk\n")))
         assertTrue(AdbOutput.installedPaths(ExecResult(1, "")).isEmpty())
         assertTrue("a failed call lists nothing", AdbOutput.installedPaths(ExecResult(1, "package:/x/base.apk")).isEmpty())

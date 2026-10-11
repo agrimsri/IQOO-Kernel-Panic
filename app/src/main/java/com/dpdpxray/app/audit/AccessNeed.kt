@@ -62,12 +62,12 @@ object AccessCopy {
             "TraceVeil जाँचे जा रहे ऐप की सहमति स्क्रीन Android की एक्सेसिबिलिटी सेवा से पढ़ता है, और Accept या Reject तभी दबाता है जब आप कहें। सूची में TraceVeil ढूँढें, उसे चालू करें, फिर वापस आएँ।",
         )
         AccessNeed.SHIZUKU_RUNNING -> Bi(
-            "Full check starts the app fresh each time, which needs the Shizuku helper app to be running. Open Shizuku, start it, then come back.",
-            "पूरी जाँच हर बार ऐप को नए सिरे से शुरू करती है, जिसके लिए Shizuku सहायक ऐप का चालू होना ज़रूरी है। Shizuku खोलें, उसे शुरू करें, फिर वापस आएँ।",
+            "To start the app fresh, TraceVeil closes and reopens it before each run (a restart: your data stays; a Full check also clears a test app's data). That needs the Shizuku helper app running. Open Shizuku, start it, then come back.",
+            "ऐप को नए सिरे से शुरू करने के लिए TraceVeil हर रन से पहले उसे बंद करके फिर खोलता है (रीस्टार्ट: आपका डेटा बना रहता है; पूरी जाँच टेस्ट ऐप का डेटा भी साफ़ करती है)। इसके लिए Shizuku सहायक ऐप का चालू होना ज़रूरी है। Shizuku खोलें, उसे शुरू करें, फिर वापस आएँ।",
         )
         AccessNeed.SHIZUKU_PERMISSION -> Bi(
-            "Full check starts the app fresh each time, which needs Shizuku's permission. Shizuku is running; allow TraceVeil to use it.",
-            "पूरी जाँच हर बार ऐप को नए सिरे से शुरू करती है, जिसके लिए Shizuku की अनुमति चाहिए। Shizuku चल रहा है; TraceVeil को इसे इस्तेमाल करने दें।",
+            "To start the app fresh, TraceVeil closes and reopens it before each run (a restart: your data stays; a Full check also clears a test app's data). That needs Shizuku's permission. Shizuku is running; allow TraceVeil to use it.",
+            "ऐप को नए सिरे से शुरू करने के लिए TraceVeil हर रन से पहले उसे बंद करके फिर खोलता है (रीस्टार्ट: आपका डेटा बना रहता है; पूरी जाँच टेस्ट ऐप का डेटा भी साफ़ करती है)। इसके लिए Shizuku की अनुमति चाहिए। Shizuku चल रहा है; TraceVeil को इसे इस्तेमाल करने दें।",
         )
     }
 

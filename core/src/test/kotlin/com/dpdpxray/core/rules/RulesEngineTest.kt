@@ -159,7 +159,8 @@ class RulesEngineTest {
         val high = fake(Severity.HIGH, EvidenceType.OBSERVED)
         val crit = fake(Severity.CRITICAL, EvidenceType.OBSERVED)
         val medInf = fake(Severity.MEDIUM, EvidenceType.INFERRED)
-        assertEquals(85 to ScoreBand.READY, ScoreCalculator.compute(listOf(high)))
+        // 85 points, but a High problem was seen on the phone, so it is not Ready.
+        assertEquals(85 to ScoreBand.NEEDS_WORK, ScoreCalculator.compute(listOf(high)))
         assertEquals(51 to ScoreBand.AT_RISK, ScoreCalculator.compute(listOf(high, crit, medInf)))
         assertEquals(0 to ScoreBand.AT_RISK, ScoreCalculator.compute(List(5) { crit }))
         // 15 + 8 + 1.5 + 4 = 28.5 → 71.5 → rounds to 72

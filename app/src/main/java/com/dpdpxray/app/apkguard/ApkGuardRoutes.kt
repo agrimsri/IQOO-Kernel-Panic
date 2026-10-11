@@ -11,6 +11,9 @@ object ApkGuardRoutes {
     const val APP = "apkguard/app/{pkg}"
     const val FILE = "apkguard/file/{key}"
 
+    /** A tapped "New APK downloaded" alert for a file TraceVeil cannot open itself: pick it from Downloads. */
+    const val DOWNLOADS = "apkguard/downloads"
+
     /** The existing audit app picker; TraceVeil has no per-package audit setup route. */
     const val AUDIT_PICKER = "pick"
 
@@ -33,6 +36,15 @@ object ApkGuardRoutes {
     fun auditPicker(pkg: String): String {
         require(isPackageName(pkg)) { "A valid package name is required" }
         return "$AUDIT_PICKER?q=$pkg"
+    }
+
+    /**
+     * The audit picker searched for [pkg] with that app selected, so its check sheet opens at once (Update Watch
+     * "Re-check"). Nothing starts by itself: the person still taps Start.
+     */
+    fun recheckPicker(pkg: String): String {
+        require(isPackageName(pkg)) { "A valid package name is required" }
+        return "$AUDIT_PICKER?q=$pkg&select=$pkg"
     }
 
     /**

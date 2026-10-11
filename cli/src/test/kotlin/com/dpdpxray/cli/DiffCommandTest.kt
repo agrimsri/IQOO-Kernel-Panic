@@ -4,6 +4,7 @@ import com.dpdpxray.cli.CliHarness.run
 import com.dpdpxray.cli.CliHarness.samples
 import com.dpdpxray.cli.CliHarness.write
 import com.dpdpxray.cli.samples.SampleBundles
+import com.dpdpxray.core.model.AppManifestFacts
 import com.dpdpxray.core.model.AuditPlan
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -110,6 +111,24 @@ class DiffCommandTest {
         assertTrue(json["resolved"]!!.jsonArray.isEmpty())
         assertEquals("C2", json["notEstablished"]!!.jsonArray.single().jsonObject["checkId"]!!.jsonPrimitive.content)
         assertEquals("true", json["regression"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `a diff across two app versions names both versions`() {
+        fun at(name: String, code: Long) = SampleBundles.leaky().let { b ->
+            b.copy(sessions = b.sessions.map { it.copy(manifestFacts = AppManifestFacts(versionName = name, versionCode = code)) })
+        }
+        write(dir, "v10.json", at("1.0", 1))
+        write(dir, "v11.json", at("1.1", 2))
+        val r = run(dir, "diff", "v10.json", "v11.json")
+        assertTrue(r.out, r.out.contains("Version: 1.0 → 1.1\n"))
+
+        // Only one side recorded its version: nothing is printed rather than a guess.
+        val one = run(dir, "diff", SampleBundles.LEAKY, "v11.json")
+        assertFalse(one.out, one.out.contains("Version:"))
+        // Same version on both sides.
+        val same = run(dir, "diff", "v10.json", "v10.json")
+        assertTrue(same.out, same.out.contains("Version: 1.0 (same in both)\n"))
     }
 
     @Test

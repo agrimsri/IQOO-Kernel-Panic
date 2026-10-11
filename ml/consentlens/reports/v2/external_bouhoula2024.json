@@ -1,0 +1,879 @@
+{
+ "source": "Bouhoula et al., USENIX Security 2024, github.com/bouhoula/alsacnc data/interactive_elements.csv (GPLv3)",
+ "sha256": "ce1152b5963ecd2b65dfc9e13bf26c4f950e1758059ae7732cfc67d2d3f96f42",
+ "rows": 2356,
+ "label_counts": {
+  "Other": 1529,
+  "Close/Continue without accepting": 51,
+  "Accept": 232,
+  "Save cookie settings": 101,
+  "Reject": 153,
+  "Cookies settings": 290
+ },
+ "scored_rows": 2204,
+ "rows_whose_normalized_text_is_in_our_training_data": 73,
+ "mapping": {
+  "Accept": "ACCEPT",
+  "Reject": "REJECT",
+  "Cookies settings": "MANAGE",
+  "Other": "NOT_A_CHOICE"
+ },
+ "models": {
+  "v1": {
+   "file_sha256": "5802e3dff77f70ee10778384cb548f7c832389ffdd52f8754c308d91a03fa6c2",
+   "argmax": {
+    "n": 2204,
+    "accuracy": 0.7464,
+    "macro_f1_4": 0.5576,
+    "macro_f1_choices_only": 0.4599,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.4638,
+      "recall": 0.4698,
+      "f1": 0.4668,
+      "support": 232
+     },
+     "REJECT": {
+      "precision": 0.5097,
+      "recall": 0.5163,
+      "f1": 0.513,
+      "support": 153
+     },
+     "MANAGE": {
+      "precision": 0.78,
+      "recall": 0.269,
+      "f1": 0.4,
+      "support": 290
+     },
+     "NOT_A_CHOICE": {
+      "precision": 0.8046,
+      "recall": 0.9019,
+      "f1": 0.8504,
+      "support": 1529
+     }
+    },
+    "confusion_rows_true_cols_pred": [
+     [
+      109,
+      17,
+      3,
+      103
+     ],
+     [
+      15,
+      79,
+      0,
+      59
+     ],
+     [
+      18,
+      21,
+      78,
+      173
+     ],
+     [
+      93,
+      38,
+      19,
+      1379
+     ]
+    ]
+   },
+   "argmax_novel_strings_only": {
+    "n": 2134,
+    "accuracy": 0.7413,
+    "macro_f1_4": 0.5276,
+    "macro_f1_choices_only": 0.42,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.414,
+      "recall": 0.4198,
+      "f1": 0.4169,
+      "support": 212
+     },
+     "REJECT": {
+      "precision": 0.4643,
+      "recall": 0.4851,
+      "f1": 0.4745,
+      "support": 134
+     },
+     "MANAGE": {
+      "precision": 0.764,
+      "recall": 0.2429,
+      "f1": 0.3686,
+      "support": 280
+     },
+     "NOT_A_CHOICE": {
+      "precision": 0.8047,
+      "recall": 0.9019,
+      "f1": 0.8505,
+      "support": 1508
+     }
+    },
+    "confusion_rows_true_cols_pred": [
+     [
+      89,
+      17,
+      3,
+      103
+     ],
+     [
+      15,
+      65,
+      0,
+      54
+     ],
+     [
+      18,
+      21,
+      68,
+      173
+     ],
+     [
+      93,
+      37,
+      18,
+      1360
+     ]
+    ]
+   },
+   "layered_lexicon_then_model": {
+    "threshold": 0.9,
+    "n": 2204,
+    "accuracy": 0.8149,
+    "macro_f1_4": 0.6689,
+    "macro_f1_choices_only": 0.5951,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.6951,
+      "recall": 0.7371,
+      "f1": 0.7155,
+      "support": 232
+     },
+     "REJECT": {
+      "precision": 0.6525,
+      "recall": 0.6013,
+      "f1": 0.6259,
+      "support": 153
+     },
+     "MANAGE": {
+      "precision": 0.914,
+      "recall": 0.2931,
+      "f1": 0.4439,
+      "support": 290
+     },
+     "NOT_A_CHOICE": {
+      "precision": 0.8399,
+      "recall": 0.947,
+      "f1": 0.8903,
+      "support": 1529
+     }
+    },
+    "confusion_rows_true_cols_pred": [
+     [
+      171,
+      2,
+      0,
+      59
+     ],
+     [
+      20,
+      92,
+      0,
+      41
+     ],
+     [
+      10,
+      19,
+      85,
+      176
+     ],
+     [
+      45,
+      28,
+      8,
+      1448
+     ]
+    ]
+   },
+   "unscored_label_predictions": {
+    "Save cookie settings": {
+     "ACCEPT": 17,
+     "MANAGE": 25,
+     "OTHER": 40,
+     "PRIVACY_LINK": 4,
+     "REJECT": 3,
+     "PURPOSE_NOTICE": 11,
+     "WITHDRAW_INFO": 1
+    },
+    "Close/Continue without accepting": {
+     "OTHER": 36,
+     "REJECT": 9,
+     "PURPOSE_NOTICE": 3,
+     "MANAGE": 1,
+     "ACCEPT": 2
+    }
+   },
+   "layered_model_decided_false_reject": {
+    "count": 47,
+    "by_true_label": {
+     "MANAGE": 17,
+     "ACCEPT": 2,
+     "NOT_A_CHOICE": 28
+    },
+    "examples": [
+     [
+      "choose cookie level",
+      "MANAGE",
+      0.95
+     ],
+     [
+      "choose which cookies to accept",
+      "MANAGE",
+      0.9
+     ],
+     [
+      "choose which cookies we use",
+      "MANAGE",
+      0.95
+     ],
+     [
+      "choose which cookies we use here",
+      "MANAGE",
+      1.0
+     ],
+     [
+      "close and agree to cookies",
+      "ACCEPT",
+      0.95
+     ],
+     [
+      "cookie choices",
+      "MANAGE",
+      1.0
+     ],
+     [
+      "cookie consent explained",
+      "NOT_A_CHOICE",
+      0.9
+     ],
+     [
+      "cookie details",
+      "MANAGE",
+      0.99
+     ],
+     [
+      "cookie disclosure",
+      "NOT_A_CHOICE",
+      0.94
+     ],
+     [
+      "cookie law",
+      "NOT_A_CHOICE",
+      1.0
+     ],
+     [
+      "cookiehub",
+      "NOT_A_CHOICE",
+      1.0
+     ],
+     [
+      "cookies we use",
+      "NOT_A_CHOICE",
+      1.0
+     ]
+    ]
+   }
+  },
+  "v2": {
+   "file_sha256": "ce033aa749a106ceb55469de1ba3e959ec23c33102d8600201dc3d834ea64c79",
+   "argmax": {
+    "n": 2204,
+    "accuracy": 0.7359,
+    "macro_f1_4": 0.5633,
+    "macro_f1_choices_only": 0.4686,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.6281,
+      "recall": 0.5388,
+      "f1": 0.58,
+      "support": 232
+     },
+     "REJECT": {
+      "precision": 0.3172,
+      "recall": 0.6013,
+      "f1": 0.4153,
+      "support": 153
+     },
+     "MANAGE": {
+      "precision": 0.6493,
+      "recall": 0.3,
+      "f1": 0.4104,
+      "support": 290
+     },
+     "NOT_A_CHOICE": {
+      "precision": 0.8336,
+      "recall": 0.862,
+      "f1": 0.8476,
+      "support": 1529
+     }
+    },
+    "confusion_rows_true_cols_pred": [
+     [
+      125,
+      25,
+      5,
+      77
+     ],
+     [
+      20,
+      92,
+      1,
+      40
+     ],
+     [
+      20,
+      37,
+      87,
+      146
+     ],
+     [
+      34,
+      136,
+      41,
+      1318
+     ]
+    ]
+   },
+   "argmax_novel_strings_only": {
+    "n": 2134,
+    "accuracy": 0.7296,
+    "macro_f1_4": 0.5349,
+    "macro_f1_choices_only": 0.4309,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.5866,
+      "recall": 0.4953,
+      "f1": 0.5371,
+      "support": 212
+     },
+     "REJECT": {
+      "precision": 0.2784,
+      "recall": 0.5672,
+      "f1": 0.3735,
+      "support": 134
+     },
+     "MANAGE": {
+      "precision": 0.626,
+      "recall": 0.275,
+      "f1": 0.3821,
+      "support": 280
+     },
+     "NOT_A_CHOICE": {
+      "precision": 0.8332,
+      "recall": 0.8614,
+      "f1": 0.8471,
+      "support": 1508
+     }
+    },
+    "confusion_rows_true_cols_pred": [
+     [
+      105,
+      25,
+      5,
+      77
+     ],
+     [
+      20,
+      76,
+      1,
+      37
+     ],
+     [
+      20,
+      37,
+      77,
+      146
+     ],
+     [
+      34,
+      135,
+      40,
+      1299
+     ]
+    ]
+   },
+   "layered_lexicon_then_model": {
+    "threshold": 0.68,
+    "n": 2204,
+    "accuracy": 0.7949,
+    "macro_f1_4": 0.6525,
+    "macro_f1_choices_only": 0.5774,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.7706,
+      "recall": 0.7672,
+      "f1": 0.7689,
+      "support": 232
+     },
+     "REJECT": {
+      "precision": 0.4163,
+      "recall": 0.634,
+      "f1": 0.5026,
+      "support": 153
+     },
+     "MANAGE": {
+      "precision": 0.7966,
+      "recall": 0.3241,
+      "f1": 0.4608,
+      "support": 290
+     },
+     "NOT_A_CHOICE": {
+      "precision": 0.8527,
+      "recall": 0.9045,
+      "f1": 0.8778,
+      "support": 1529
+     }
+    },
+    "confusion_rows_true_cols_pred": [
+     [
+      178,
+      5,
+      2,
+      47
+     ],
+     [
+      20,
+      97,
+      0,
+      36
+     ],
+     [
+      11,
+      29,
+      94,
+      156
+     ],
+     [
+      22,
+      102,
+      22,
+      1383
+     ]
+    ]
+   },
+   "unscored_label_predictions": {
+    "Save cookie settings": {
+     "ACCEPT": 23,
+     "MANAGE": 20,
+     "OTHER": 42,
+     "REJECT": 3,
+     "PURPOSE_NOTICE": 9,
+     "WITHDRAW_INFO": 2,
+     "PRIVACY_LINK": 2
+    },
+    "Close/Continue without accepting": {
+     "OTHER": 29,
+     "ACCEPT": 5,
+     "PURPOSE_NOTICE": 2,
+     "REJECT": 13,
+     "MANAGE": 2
+    }
+   },
+   "layered_model_decided_false_reject": {
+    "count": 134,
+    "by_true_label": {
+     "NOT_A_CHOICE": 102,
+     "ACCEPT": 5,
+     "MANAGE": 27
+    },
+    "examples": [
+     [
+      "about cookie control",
+      "NOT_A_CHOICE",
+      0.96
+     ],
+     [
+      "about cookies",
+      "NOT_A_CHOICE",
+      1.0
+     ],
+     [
+      "about this tool",
+      "NOT_A_CHOICE",
+      0.74
+     ],
+     [
+      "about uclan cookies",
+      "NOT_A_CHOICE",
+      0.89
+     ],
+     [
+      "about uclan's cookies",
+      "NOT_A_CHOICE",
+      0.98
+     ],
+     [
+      "additional cookies",
+      "NOT_A_CHOICE",
+      1.0
+     ],
+     [
+      "block",
+      "NOT_A_CHOICE",
+      0.78
+     ],
+     [
+      "carry on using cookies",
+      "ACCEPT",
+      0.91
+     ],
+     [
+      "click here to learn more about cookies",
+      "NOT_A_CHOICE",
+      0.93
+     ],
+     [
+      "configure cookies",
+      "MANAGE",
+      0.95
+     ],
+     [
+      "control how cookies are used here",
+      "MANAGE",
+      0.87
+     ],
+     [
+      "controlling and deleting cookies",
+      "NOT_A_CHOICE",
+      0.83
+     ]
+    ]
+   }
+  },
+  "v2_at_0.90": {
+   "file_sha256": "ce033aa749a106ceb55469de1ba3e959ec23c33102d8600201dc3d834ea64c79",
+   "argmax": {
+    "n": 2204,
+    "accuracy": 0.7359,
+    "macro_f1_4": 0.5633,
+    "macro_f1_choices_only": 0.4686,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.6281,
+      "recall": 0.5388,
+      "f1": 0.58,
+      "support": 232
+     },
+     "REJECT": {
+      "precision": 0.3172,
+      "recall": 0.6013,
+      "f1": 0.4153,
+      "support": 153
+     },
+     "MANAGE": {
+      "precision": 0.6493,
+      "recall": 0.3,
+      "f1": 0.4104,
+      "support": 290
+     },
+     "NOT_A_CHOICE": {
+      "precision": 0.8336,
+      "recall": 0.862,
+      "f1": 0.8476,
+      "support": 1529
+     }
+    },
+    "confusion_rows_true_cols_pred": [
+     [
+      125,
+      25,
+      5,
+      77
+     ],
+     [
+      20,
+      92,
+      1,
+      40
+     ],
+     [
+      20,
+      37,
+      87,
+      146
+     ],
+     [
+      34,
+      136,
+      41,
+      1318
+     ]
+    ]
+   },
+   "argmax_novel_strings_only": {
+    "n": 2134,
+    "accuracy": 0.7296,
+    "macro_f1_4": 0.5349,
+    "macro_f1_choices_only": 0.4309,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.5866,
+      "recall": 0.4953,
+      "f1": 0.5371,
+      "support": 212
+     },
+     "REJECT": {
+      "precision": 0.2784,
+      "recall": 0.5672,
+      "f1": 0.3735,
+      "support": 134
+     },
+     "MANAGE": {
+      "precision": 0.626,
+      "recall": 0.275,
+      "f1": 0.3821,
+      "support": 280
+     },
+     "NOT_A_CHOICE": {
+      "precision": 0.8332,
+      "recall": 0.8614,
+      "f1": 0.8471,
+      "support": 1508
+     }
+    },
+    "confusion_rows_true_cols_pred": [
+     [
+      105,
+      25,
+      5,
+      77
+     ],
+     [
+      20,
+      76,
+      1,
+      37
+     ],
+     [
+      20,
+      37,
+      77,
+      146
+     ],
+     [
+      34,
+      135,
+      40,
+      1299
+     ]
+    ]
+   },
+   "layered_lexicon_then_model": {
+    "threshold": 0.9,
+    "n": 2204,
+    "accuracy": 0.8135,
+    "macro_f1_4": 0.671,
+    "macro_f1_choices_only": 0.5996,
+    "per_class": {
+     "ACCEPT": {
+      "precision": 0.8537,
+      "recall": 0.7543,
+      "f1": 0.8009,
+      "support": 232
+     },
+     "REJECT": {
+      "precision": 0.5179,
+      "recall": 0.5686,
+      "f1": 0.5421,
+      "support": 153
+     },
+     "MANAGE": {
+      "precision": 0.8571,
+      "recall": 0.3103,
+      "f1": 0.4557,
+      "support": 290
+     },
+     "NOT_A_CHOICE": {
+      "precision": 0.8349,
+      "recall": 0.9424,
+      "f1": 0.8854,
+      "support": 1529
+     }
+    },
+    "confusion_rows_true_cols_pred": [
+     [
+      175,
+      2,
+      2,
+      53
+     ],
+     [
+      18,
+      87,
+      0,
+      48
+     ],
+     [
+      3,
+      13,
+      90,
+      184
+     ],
+     [
+      9,
+      66,
+      13,
+      1441
+     ]
+    ]
+   },
+   "unscored_label_predictions": {
+    "Save cookie settings": {
+     "ACCEPT": 23,
+     "MANAGE": 20,
+     "OTHER": 42,
+     "REJECT": 3,
+     "PURPOSE_NOTICE": 9,
+     "WITHDRAW_INFO": 2,
+     "PRIVACY_LINK": 2
+    },
+    "Close/Continue without accepting": {
+     "OTHER": 29,
+     "ACCEPT": 5,
+     "PURPOSE_NOTICE": 2,
+     "REJECT": 13,
+     "MANAGE": 2
+    }
+   },
+   "layered_model_decided_false_reject": {
+    "count": 79,
+    "by_true_label": {
+     "NOT_A_CHOICE": 66,
+     "ACCEPT": 2,
+     "MANAGE": 11
+    },
+    "examples": [
+     [
+      "about cookie control",
+      "NOT_A_CHOICE",
+      0.96
+     ],
+     [
+      "about cookies",
+      "NOT_A_CHOICE",
+      1.0
+     ],
+     [
+      "about uclan's cookies",
+      "NOT_A_CHOICE",
+      0.98
+     ],
+     [
+      "additional cookies",
+      "NOT_A_CHOICE",
+      1.0
+     ],
+     [
+      "carry on using cookies",
+      "ACCEPT",
+      0.91
+     ],
+     [
+      "click here to learn more about cookies",
+      "NOT_A_CHOICE",
+      0.93
+     ],
+     [
+      "configure cookies",
+      "MANAGE",
+      0.95
+     ],
+     [
+      "controlling cookies",
+      "NOT_A_CHOICE",
+      0.96
+     ],
+     [
+      "cookie law",
+      "NOT_A_CHOICE",
+      0.92
+     ],
+     [
+      "cookie preference tool",
+      "MANAGE",
+      0.99
+     ],
+     [
+      "cookiefirst",
+      "NOT_A_CHOICE",
+      0.92
+     ],
+     [
+      "cookiehub",
+      "NOT_A_CHOICE",
+      0.95
+     ]
+    ]
+   }
+  }
+ },
+ "lexicon_only": {
+  "n": 2204,
+  "accuracy": 0.8167,
+  "macro_f1_4": 0.6317,
+  "macro_f1_choices_only": 0.5461,
+  "per_class": {
+   "ACCEPT": {
+    "precision": 0.884,
+    "recall": 0.6897,
+    "f1": 0.7748,
+    "support": 232
+   },
+   "REJECT": {
+    "precision": 0.9667,
+    "recall": 0.3791,
+    "f1": 0.5446,
+    "support": 153
+   },
+   "MANAGE": {
+    "precision": 1.0,
+    "recall": 0.1897,
+    "f1": 0.3188,
+    "support": 290
+   },
+   "NOT_A_CHOICE": {
+    "precision": 0.8003,
+    "recall": 0.9987,
+    "f1": 0.8886,
+    "support": 1529
+   }
+  },
+  "confusion_rows_true_cols_pred": [
+   [
+    160,
+    0,
+    0,
+    72
+   ],
+   [
+    17,
+    58,
+    0,
+    78
+   ],
+   [
+    2,
+    2,
+    55,
+    231
+   ],
+   [
+    2,
+    0,
+    0,
+    1527
+   ]
+  ]
+ }
+}

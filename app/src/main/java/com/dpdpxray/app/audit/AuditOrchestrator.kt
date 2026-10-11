@@ -13,6 +13,7 @@ import com.dpdpxray.app.capture.CaptureState
 import com.dpdpxray.app.capture.XrayVpnService
 import com.dpdpxray.app.consent.ConsentAccessibilityService
 import com.dpdpxray.app.consent.ConsentBus
+import com.dpdpxray.app.consent.ConsentReappearance
 import com.dpdpxray.app.control.DeviceChecks
 import com.dpdpxray.app.control.ShizukuBridge
 import com.dpdpxray.app.data.AuditMeta
@@ -22,8 +23,11 @@ import com.dpdpxray.app.report.EvidenceReport
 import com.dpdpxray.core.model.AppManifestFacts
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditSession
+import com.dpdpxray.core.model.BackgroundWatch
 import com.dpdpxray.core.model.ConsentEvent
 import com.dpdpxray.core.model.ConsentKind
+import com.dpdpxray.core.model.PlanConditions
+import com.dpdpxray.core.consent.BlockerKind
 import com.dpdpxray.core.report.MarkdownReport
 import com.dpdpxray.core.rules.RulesEngine
 import kotlinx.coroutines.CancellationException
@@ -51,12 +55,28 @@ data class AuditConfig(
     /** Explicit developer-test approval; never inferred from Shizuku being available. */
     val resetAppData: Boolean = false,
     val fastPreview: Boolean = false,
+    /**
+     * What to do when restarting the app would switch something off (its accessibility service, VPN, keyboard...).
+     * AUTO, the default, leaves such an app running; only the person's "Restart anyway" (ALWAYS) stops it.
+     */
+    val restart: RestartPolicy = RestartPolicy.AUTO,
+    /**
+     * Set for a background watch: one long plan of this length in which TraceVeil keeps capturing the app without opening,
+     * restarting or tapping it (see BackgroundWatchRun). null for every other check.
+     */
+    val watchMs: Long? = null,
 ) {
     init {
         require(!fastPreview || plans == listOf(AuditPlan.ACCEPT)) {
             "Fast Preview is a single Accept-plan check, not a Full audit."
         }
+        require(watchMs == null || (plans == listOf(AuditPlan.SILENT) && !resetAppData && !fastPreview && watchMs > 0)) {
+            "A background watch is one plan that never clears data and has a length."
+        }
     }
+
+    /** This check is a background watch. */
+    val isWatch: Boolean get() = watchMs != null
 }
 
 sealed interface AuditProgress {
@@ -74,9 +94,16 @@ sealed interface AuditProgress {
 }
 
 /**
- * Runs audit plans end to end: capture → (load AI) → per plan: reset app → launch → consent detection → AI review →
- * agent or user choice → observe → evaluate → report. Runs in the application scope so it survives the UI going to
- * the background; capture stays up for the whole audit (see [startCapture]).
+ * Runs audit plans end to end: capture → (load AI) → per plan: restart the app (or reset it, if approved) → launch →
+ * consent detection → AI review → agent or user choice → observe → evaluate → report. Runs in the application scope so
+ * it survives the UI going to the background; capture stays up for the whole audit (see [startCapture]).
+ *
+ * Around each plan it records the conditions a low-visibility result needs to explain itself (PlanConditions): how the
+ * app was started, Private DNS, another VPN, the network, the lock screen, a crash dialog, the app's own network use
+ * and the first blocker. A check that loses its app or its capture between plans keeps the plans already captured.
+ *
+ * A background watch ([AuditConfig.watchMs]) is one long plan instead: no restart, launch, consent wait or tap, only the
+ * capture of this one app while the person uses the phone as usual (see [runWatch]).
  */
 class AuditOrchestrator(private val context: Context, private val graph: AppGraph) {
     private val _progress = MutableStateFlow<AuditProgress>(AuditProgress.Idle)
@@ -85,11 +112,28 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
 
     private val planCapture = PlanCaptureRecorder(UidTx::now, CaptureBus::reset, CaptureBus::snapshot, SystemClock::elapsedRealtimeNanos)
 
+    /** A restart (data kept) before every plan when Shizuku can; a reset only when the person approved it. */
+    private val appStart = AppStart(
+        shizukuReady = { ShizukuBridge.hasPermission() },
+        processRunning = { ShizukuBridge.processRunning(it) },
+        forceStop = { ShizukuBridge.forceStop(it) },
+        clearData = { ShizukuBridge.clearAppData(it) },
+    )
+
     private data class CapturedPlan(val session: AuditSession, val upload: SessionNetworkReadings)
 
     @Synchronized
     fun start(config: AuditConfig) {
         if (_progress.value is AuditProgress.Running) return
+        // TraceVeil itself, a missing app or one with no screen cannot be checked: say so before anything starts.
+        val facts = DeviceChecks.appFacts(context, config.targetPackage)
+        AuditTargets.refusal(
+            config.targetPackage, config.targetLabel, context.packageName,
+            AuditTargets.Facts(installed = facts != null, launchable = facts?.launchable == true, system = facts?.system == true),
+        )?.let {
+            _progress.value = AuditProgress.Failed(it)
+            return
+        }
         // Set before launching so a double tap cannot start two audits.
         _progress.value = AuditProgress.Running(config, 0, config.plans.first(), "Starting")
         job = graph.scope.launch {
@@ -114,6 +158,12 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         if (_progress.value !is AuditProgress.Running) _progress.value = AuditProgress.Idle
     }
 
+    /** Ends a running background watch early; it is saved with what it saw. Does nothing for other checks. */
+    fun stopWatch() {
+        val running = _progress.value as? AuditProgress.Running ?: return
+        if (running.config.isWatch) WatchControl.requestStop()
+    }
+
     private suspend fun run(config: AuditConfig) {
         val auditId = "audit-${System.currentTimeMillis()}"
         val dir = graph.repository.newAuditDir(auditId)
@@ -122,26 +172,49 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             // foreground service, and the running capture service keeps TraceVeil allowed to work between plans.
             _progress.value = AuditProgress.Running(config, 0, config.plans.first(), "Starting per-app DNS capture")
             startCapture(config)
-            if (graph.settings.settings.value.autoLoadModel && graph.llm.status.value is LlmStatus.NotLoaded) {
+            // A watch reviews no consent screen, so it never loads the model.
+            if (!config.isWatch && graph.settings.settings.value.autoLoadModel && graph.llm.status.value is LlmStatus.NotLoaded) {
                 _progress.value = AuditProgress.Running(config, 0, config.plans.first(), "Loading on-device AI model")
                 graph.llm.load(BackendKind.GPU)
             }
             // C13: allow-listed SDK facts from the installed manifest, read once (read-only; null when unreadable).
             val manifest = withContext(Dispatchers.IO) { runCatching { ManifestFactsReader.read(context, config.targetPackage) }.getOrNull() }
-            config.plans.mapIndexed { i, plan ->
-                ConsentPlanRetry.capture(plan, config.targetPackage, { config.resetAppData && ShizukuBridge.hasPermission() }, { it.session }) { attempt ->
-                    runPlan(config, plan, i, auditId, dir, attempt, manifest)
-                }.let { attempts ->
-                    if (attempts.size == 1) attempts else attempts.mapIndexed { attempt, captured ->
-                        val note = if (attempt == 0) "Consent screen missed; first attempt retained and one fresh-state demo retry requested."
-                            else "Bounded fresh-state demo retry (1 of 1); the failed first attempt remains in this audit."
-                        captured.copy(session = captured.session.copy(notes = captured.session.notes + note))
+            val facts = DeviceChecks.appFacts(context, config.targetPackage)
+            // What stopping the app would switch off (its accessibility service, VPN, keyboard...), read once before the
+            // first plan, while it is all still on. null = could not be read.
+            // A watch never restarts the app, so it has nothing to decide here.
+            val sideEffects = if (config.isWatch) null else withContext(Dispatchers.IO) {
+                runCatching { RestartSideEffects.detect(config.targetPackage, AndroidSideEffectProbe(context)) }.getOrNull()
+            }
+            val done = mutableListOf<CapturedPlan>()
+            var stopNote: String? = null
+            if (config.isWatch) done += runWatch(config, auditId, manifest, facts)
+            else for ((i, plan) in config.plans.withIndex()) {
+                try {
+                    done += ConsentPlanRetry.capture(plan, config.targetPackage, { config.resetAppData && ShizukuBridge.hasPermission() }, { it.session }) { attempt ->
+                        runPlan(config, plan, i, auditId, dir, attempt, manifest, facts, sideEffects)
+                    }.let { attempts ->
+                        if (attempts.size == 1) attempts else attempts.mapIndexed { attempt, captured ->
+                            val note = if (attempt == 0) "Consent screen missed; first attempt retained and one fresh-state demo retry requested."
+                                else "Bounded fresh-state demo retry (1 of 1); the failed first attempt remains in this audit."
+                            captured.copy(session = captured.session.copy(notes = captured.session.notes + note))
+                        }
                     }
+                } catch (e: PlanStopped) {
+                    // The app was uninstalled, the capture stopped or the phone stayed locked: keep what was captured.
+                    when (val stop = AuditTargets.stop(done.size, e.message.orEmpty())) {
+                        is AuditTargets.Stop.Fail -> throw IllegalStateException(stop.message)
+                        is AuditTargets.Stop.KeepPartial -> stopNote = stop.note
+                    }
+                    break
                 }
-            }.flatten()
+            }
+            stopNote?.let { note -> done[done.lastIndex] = done.last().let { it.copy(session = it.session.copy(notes = it.session.notes + note)) } }
+            done.toList()
         } finally {
             runCatching { XrayVpnService.stop(context) }
             ConsentBus.disarm()
+            BlockerNotifier.clear(context)
         }
 
         val sessions = capturedPlans.map { it.session }
@@ -158,14 +231,147 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             findingCount = result.findings.size, plans = config.plans.map { it.label },
             timingProfile = timingProfile,
             inconclusiveReason = com.dpdpxray.core.rules.Inconclusive.reason(result.findings)?.name,
-        )
+            autoDrive = config.autoDrive, includeGms = config.includeGms,
+            historyBounds = result.historyBounds,
+        ).let { m ->
+            // Update Watch: the version this audit saw, so a later update of the app can be noticed and compared.
+            val version = com.dpdpxray.core.update.AppVersion.ofSessions(sessions)
+            m.copy(targetVersionName = version?.name, targetVersionCode = version?.code)
+        }
         graph.repository.save(meta, sessions, result, markdown, capturedPlans.map { it.upload })
         _progress.value = AuditProgress.Done(auditId)
-        returnToXray()
+        // After a watch the person may be busy in another app: a notification says it is done instead of jumping in front.
+        if (config.isWatch) WatchNotifier.finished(context, config.targetLabel, graph.settings.settings.value.guideLanguage == "hi")
+        else returnToXray()
+    }
+
+    /**
+     * A background watch: the capture records only this app for the chosen length while the person uses the phone as
+     * usual or locks it. Nothing is restarted, launched or tapped, and the consent watcher is not armed, so no consent
+     * screen is driven or recorded. The ongoing notification shows the time left and can stop the watch early; what was
+     * seen until then is kept. Locking the phone is expected here and is not a problem.
+     */
+    private suspend fun runWatch(
+        config: AuditConfig, auditId: String, manifest: AppManifestFacts?, facts: DeviceChecks.AppFacts?,
+    ): CapturedPlan {
+        val plannedMs = requireNotNull(config.watchMs)
+        val pkg = config.targetPackage
+        val label = config.targetLabel
+        val plan = config.plans.single()
+        val hindi = graph.settings.settings.value.guideLanguage == "hi"
+        fun step(s: String, start: Long = 0) {
+            _progress.value = AuditProgress.Running(config, 0, plan, s, start)
+        }
+        AuditTargets.beforePlan(label, installed = DeviceChecks.appFacts(context, pkg) != null,
+            captureRunning = CaptureBus.state.value is CaptureState.Running)?.let { throw IllegalStateException(it) }
+
+        val notes = mutableListOf(WatchCopy.startNote(label, (plannedMs / 60_000).toInt()))
+        val privateDnsAtStart = DeviceChecks.privateDnsActive(context)
+        val networkAtStart = DeviceChecks.networkOnline(context)
+        // Read only, never acted on: a watch does not stop the app.
+        val runningBefore = if (ShizukuBridge.hasPermission()) runCatching { ShizukuBridge.processRunning(pkg) }.getOrNull() else null
+        val trafficStart = AppTrafficReader.mark(facts?.uid)
+        val connectionSamples = mutableListOf<Int>()
+        var locked = false
+        var lastConnectionRead = 0L
+
+        WatchControl.reset()
+        val captureStart = planCapture.start()
+        val t0 = SystemClock.elapsedRealtimeNanos()
+        val epoch = System.currentTimeMillis()
+        var shown: String? = null
+        val outcome = WatchLoop(
+            clockNanos = SystemClock::elapsedRealtimeNanos,
+            pause = { delay(it) },
+            stopRequested = { WatchControl.stopRequested },
+            captureRunning = { CaptureBus.state.value is CaptureState.Running },
+            screen = {
+                // About once a minute, the app's open connections (a count only), for the plan's conditions.
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastConnectionRead >= 60_000) {
+                    lastConnectionRead = now
+                    withContext(Dispatchers.IO) { AppTrafficReader.connections(facts?.uid) }?.let { connectionSamples += it }
+                }
+                if (DeviceChecks.phoneLocked(context)) {
+                    locked = true
+                    ScreenSample.OFF
+                } else when (withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.packageOnScreen(pkg) }) {
+                    false -> ScreenSample.OFF
+                    true -> ScreenSample.ON
+                    null -> ScreenSample.UNKNOWN
+                }
+            },
+            onTick = { left ->
+                val line = WatchCopy.step(left)
+                if (line != shown) {
+                    shown = line
+                    step(line, t0)
+                    WatchNotifier.progress(context, label, left, hindi)
+                }
+            },
+        ).run(plannedMs)
+
+        val capturedBoundary = planCapture.finish("$auditId-WATCH", captureStart)
+        val snapshot = capturedBoundary.snapshot
+        val tEnd = snapshot.health.captureEndedNanos ?: SystemClock.elapsedRealtimeNanos()
+        val deep = CaptureBus.deepCapture || config.isWatch
+        val flows = if (deep) FlowPhases.assign(CaptureBus.flowSnapshot(), PhaseClock.from(emptyList())) else emptyList()
+        when (outcome.end) {
+            WatchLoop.End.STOPPED_BY_PERSON -> notes += WatchCopy.stoppedNote(outcome.watchedMs)
+            WatchLoop.End.CAPTURE_STOPPED -> notes += WatchCopy.captureStoppedNote(outcome.watchedMs)
+            WatchLoop.End.FINISHED -> Unit
+        }
+        if (DeviceChecks.phoneLocked(context)) locked = true
+        if (locked) notes += WatchCopy.LOCKED_NOTE
+        if (outcome.firstOffNanos == null) notes += WatchCopy.NEVER_OFF_SCREEN_NOTE
+        val onScreenNanos = outcome.onScreen.sumOf { it.toNanos - it.fromNanos }
+        if (onScreenNanos > 0) notes += WatchCopy.onScreenNote(label, onScreenNanos / 1_000_000)
+        val privateDnsAtEnd = DeviceChecks.privateDnsActive(context)
+        if (privateDnsAtEnd && !privateDnsAtStart) notes += "Private DNS was turned on during the watch; lookups after that may be hidden from TraceVeil."
+        if (privateDnsAtStart && !privateDnsAtEnd) notes += "Private DNS was turned off during the watch."
+        val conditions = PlanConditions(
+            startMode = com.dpdpxray.core.model.StartMode.NOT_RESTARTED, runningBeforeStart = runningBefore,
+            privateDnsAtStart = privateDnsAtStart, privateDnsAtEnd = privateDnsAtEnd,
+            otherVpnAtEnd = DeviceChecks.otherVpnActive(context),
+            networkAtStart = networkAtStart, networkAtEnd = DeviceChecks.networkOnline(context),
+            phoneLocked = locked,
+            appTraffic = AppTrafficReader.traffic(facts?.uid, trafficStart, connectionSamples.maxOrNull()),
+            systemApp = facts?.system,
+        )
+        val session = AuditSession(
+            id = "$auditId-WATCH",
+            targetPackage = pkg,
+            targetLabel = label,
+            plan = plan,
+            childFacing = config.childFacing,
+            startedAtNanos = t0,
+            endedAtNanos = tEnd,
+            startedAtEpochMs = epoch,
+            netEvents = snapshot.events,
+            deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}",
+            androidVersion = Build.VERSION.RELEASE,
+            privateDnsActive = privateDnsAtStart || privateDnsAtEnd,
+            notes = notes,
+            captureHealth = snapshot.health,
+            // The app kept its data: a watch never clears it.
+            freshState = false,
+            backgroundStartedNanos = outcome.firstOffNanos,
+            manifestFacts = manifest,
+            conditions = conditions,
+            flows = flows,
+            captureDepth = if (deep) "full-relay" else "dns-only",
+            watch = BackgroundWatch(
+                plannedMs = plannedMs, watchedMs = outcome.watchedMs,
+                stoppedEarly = outcome.end == WatchLoop.End.STOPPED_BY_PERSON, onScreen = outcome.onScreen,
+            ),
+        )
+        return CapturedPlan(session, capturedBoundary.reading)
     }
 
     private suspend fun runPlan(
         config: AuditConfig, plan: AuditPlan, index: Int, auditId: String, dir: File, attempt: Int = 0, manifest: AppManifestFacts? = null,
+        facts: DeviceChecks.AppFacts? = null,
+        sideEffects: List<FoundSideEffect>? = null,
     ): CapturedPlan = coroutineScope {
         val t = AuditTimingPolicy.forAudit(config)
         val pkg = config.targetPackage
@@ -176,19 +382,48 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             _progress.value = AuditProgress.Running(config, index, plan, s, start)
         }
 
-        step(if (config.resetAppData) "Resetting authorised test app ${config.targetLabel}" else "Keeping ${config.targetLabel}'s current data")
-        var freshState = false // true only when an approved reset actually cleared the app's data
-        if (config.resetAppData && ShizukuBridge.hasPermission()) {
-            val stopped = ShizukuBridge.forceStop(pkg)
-            if (stopped.isSuccess) ShizukuBridge.clearAppData(pkg).onSuccess { freshState = true }.onFailure { notes += "Could not clear app data: ${it.message}" }
-            else notes += "Could not clear app data because stopping the test app failed: ${stopped.exceptionOrNull()?.message}"
-        } else {
-            notes += "App data was not cleared (reset not approved or Shizuku not authorised) — results reflect the app's current state."
+        // Before every plan: the app is still installed and the capture is still up.
+        AuditTargets.beforePlan(config.targetLabel, installed = DeviceChecks.appFacts(context, pkg) != null,
+            captureRunning = CaptureBus.state.value is CaptureState.Running)?.let { throw PlanStopped(it) }
+
+        // A locked phone cannot open the app: wait for the person to unlock it, then carry on.
+        if (DeviceChecks.phoneLocked(context)) {
+            step("Unlock the phone to continue the check of ${config.targetLabel}")
+            BlockerNotifier.postUnlock(context, config.targetLabel)
+            val unlocked = Waits.until(UNLOCK_WAIT_MS, SystemClock::elapsedRealtime, { delay(it) }) { !DeviceChecks.phoneLocked(context) }
+            BlockerNotifier.clear(context)
+            if (!unlocked) throw PlanStopped(AuditTargets.stayedLocked(config.targetLabel))
+            notes += "The phone was locked when this plan was due; TraceVeil waited for it to be unlocked before opening the app."
         }
 
-        check(CaptureBus.state.value is CaptureState.Running) { (CaptureBus.state.value as? CaptureState.Error)?.message ?: "Capture stopped unexpectedly" }
+        val privateDnsAtStart = DeviceChecks.privateDnsActive(context)
+        val networkAtStart = DeviceChecks.networkOnline(context)
+        // Only a phone that can stop the app needs the decision: without Shizuku nothing is stopped anyway.
+        val decision = sideEffects?.takeIf { ShizukuBridge.hasPermission() }
+            ?.let { RestartDecision.decide(config.restart, it, config.resetAppData, config.targetLabel) }
+        val keepRunning = decision?.takeIf { !it.stop }?.reason
+        step(when {
+            config.resetAppData -> "Resetting authorised test app ${config.targetLabel}"
+            keepRunning != null -> "Opening ${config.targetLabel} as it is: ${keepRunning.replaceFirst("restarting it", "a restart")}"
+            ShizukuBridge.hasPermission() -> "Restarting ${config.targetLabel} (your data stays)"
+            else -> "Keeping ${config.targetLabel}'s current data"
+        })
+        val started = appStart.prepare(pkg, config.resetAppData, keepRunning)
+        notes += started.notes
+        decision?.note?.let { notes += it }
+        if (index == 0 && attempt == 0 && facts?.system == true) notes += AuditTargets.systemNote(config.targetLabel)
+        val freshState = started.freshState // true only when an approved reset actually cleared the app's data
+        val trafficStart = AppTrafficReader.mark(facts?.uid)
+        var lockedDuring = false
+        val connectionSamples = mutableListOf<Int>()
+        suspend fun sample() {
+            if (DeviceChecks.phoneLocked(context)) lockedDuring = true
+            withContext(Dispatchers.IO) { AppTrafficReader.connections(facts?.uid) }?.let { connectionSamples += it }
+        }
+
+        if (CaptureBus.state.value !is CaptureState.Running) throw PlanStopped(AuditTargets.CAPTURE_STOPPED)
         val captureStart = planCapture.start()
-        ConsentBus.arm(pkg, File(dir, "shots/$sessionId"))
+        ConsentBus.arm(pkg, File(dir, "shots/$sessionId"), config.targetLabel)
         if (!config.autoDrive && plan != AuditPlan.SILENT) {
             ConsentBus.expectedChoice = if (plan == AuditPlan.ACCEPT) ConsentKind.ACCEPT else ConsentKind.REJECT
         }
@@ -205,7 +440,9 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             true
         } ?: false
         if (!onScreen) {
-            val message = "${config.targetLabel} did not come to the screen. Android may have blocked opening it from the background — start Shizuku, or keep TraceVeil open and retry."
+            val message = AuditTargets.didNotOpen(config.targetLabel, crashed = ConsentBus.appCrashed)
+            // A crash, or a later plan: end the check here and keep the plans already captured.
+            if (ConsentBus.appCrashed || index > 0) throw PlanStopped(message)
             val need = if (ConsentAccessibilityService.instance == null) AccessNeed.WATCHER
             else AccessNeeds.shizuku(ShizukuBridge.isRunning(), ShizukuBridge.hasPermission())
             throw if (need != null) AccessNeededException(need, message) else IllegalStateException(message)
@@ -220,7 +457,12 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
                 withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.probeNow() }
                 ConsentBus.events.value.firstOrNull { it.kind == ConsentKind.SCREEN_APPEARED || it.kind == ConsentKind.MANUAL_MARK }
             },
-            detectBlocker = { withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.blockerNow() } },
+            // The app's own blocker screens, then Android's permission dialog over it (never answered by TraceVeil).
+            detectBlocker = {
+                withContext(Dispatchers.Main.immediate) {
+                    ConsentAccessibilityService.instance?.let { svc -> svc.blockerNow() ?: BlockerKind.PERMISSION.takeIf { svc.permissionDialogNow() } }
+                }
+            },
             // A skip button first; failing that, a profile form is completed with test values (never identifying fields).
             // Cheapest first: a skip button, then the known profile form, then the on-device model for anything else.
             trySkip = { withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.let { it.trySkipBlocker() ?: it.fillFormAndContinue() ?: agent.step(it) } } },
@@ -229,10 +471,10 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
                 val hindi = graph.settings.settings.value.guideLanguage == "hi"
                 val fields = withContext(Dispatchers.Main.immediate) {
                     val svc = ConsentAccessibilityService.instance
-                    val found = svc?.blockerFields().orEmpty()
+                    val found = if (kind == BlockerKind.PERMISSION) emptyList() else svc?.blockerFields().orEmpty()
                     svc?.showBlockerPrompt(
-                        BlockerCopy.promptTitle(kind, found, hindi), BlockerCopy.promptBody(hindi, agent.lastReason),
-                        BlockerCopy.promptStop(hindi), BlockerCopy.promptHide(hindi),
+                        BlockerCopy.promptTitle(kind, found, hindi), BlockerCopy.promptBody(kind, hindi, agent.lastReason.takeIf { kind != BlockerKind.PERMISSION }),
+                        BlockerCopy.promptStop(hindi), BlockerCopy.promptHide(hindi), BlockerCopy.promptContinue(hindi),
                     ) { this@AuditOrchestrator.cancel() }
                     found
                 }
@@ -246,13 +488,17 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             },
             clockMs = SystemClock::elapsedRealtime, pause = { delay(it) },
             interactive = plan != AuditPlan.SILENT,
+            // The model may take several small steps; Android's permission dialog never reaches it (see ConsentWaitAssist).
             maxSkips = if (agent.available) 3 + BlockerAgentRunner.MAX_STEPS else 3,
+            userContinued = { ConsentBus.takeContinue() },
         ).await(t.waitConsentMs)
         withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.hideBlockerPrompt() }
         BlockerNotifier.clear(context)
         agent.cleanup()
         notes += BlockerCopy.notes(waited, blocksPlan = plan != AuditPlan.SILENT)
+        val blockedStep = BlockerCopy.step(waited)
         val appeared = waited.consent
+        sample()
 
         // A child of this plan: cancelling the audit cancels the review too.
         val review = appeared?.let { ev -> async { graph.screenAuditor.audit(ev.tree, ev.screenshotPath?.let(::File)) } }
@@ -282,6 +528,8 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
                 t.observe(plan)
             }
         }
+        // Read before Home is pressed: the app's connections while it is in front.
+        sample()
 
         // C12: Home, confirm the app left the screen, keep capturing. Added after the window above, never taken from it.
         var backgroundStartedNanos: Long? = null
@@ -309,6 +557,30 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         if (ConsentBus.unconfirmedDialogClosedAtNanos != null && !ConsentBus.choiceMade) {
             notes += "Consent dialog closed without an observed button action; the choice remains unknown."
         }
+        val watcherOn = ConsentAccessibilityService.instance != null
+        val crashed = ConsentBus.appCrashed
+        val returns = ConsentBus.consentReturns
+        ConsentReappearance.capNote(returns)?.let { notes += it }
+        if (crashed) notes += "Android showed that ${config.targetLabel} stopped or was not responding during this plan."
+        if (DeviceChecks.phoneLocked(context)) lockedDuring = true
+        if (lockedDuring) notes += "The phone was locked or its screen went off during this plan; the app may have paused, so fewer lookups may have been seen."
+        val privateDnsAtEnd = DeviceChecks.privateDnsActive(context)
+        if (privateDnsAtEnd && !privateDnsAtStart) notes += "Private DNS was turned on during this plan; lookups after that may be hidden from TraceVeil."
+        if (privateDnsAtStart && !privateDnsAtEnd) notes += "Private DNS was turned off during this plan."
+        val conditions = PlanConditions(
+            startMode = started.mode, restartProblem = started.problem, runningBeforeStart = started.runningBefore,
+            privateDnsAtStart = privateDnsAtStart, privateDnsAtEnd = privateDnsAtEnd,
+            otherVpnAtEnd = DeviceChecks.otherVpnActive(context),
+            networkAtStart = networkAtStart, networkAtEnd = DeviceChecks.networkOnline(context),
+            phoneLocked = lockedDuring,
+            appCrashed = crashed.takeIf { watcherOn },
+            appTraffic = AppTrafficReader.traffic(facts?.uid, trafficStart, connectionSamples.maxOrNull()),
+            systemApp = facts?.system,
+            blocker = blockedStep,
+            consentShownAgain = returns.takeIf { it > 0 },
+            restartSideEffects = sideEffects?.map { it.kind.name },
+            restartChoice = decision?.choice,
+        )
         ConsentBus.disarm()
         step("Finishing AI review of the consent screen", t0)
         val screen = review?.let { d -> withTimeoutOrNull(REVIEW_TIMEOUT_MS) { d.await() }.also { if (it == null) d.cancel() } }
@@ -331,13 +603,14 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             screenAudit = screen,
             deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}",
             androidVersion = Build.VERSION.RELEASE,
-            privateDnsActive = DeviceChecks.privateDnsActive(context),
+            privateDnsActive = privateDnsAtStart || privateDnsAtEnd,
             notes = notes,
             captureHealth = snapshot.health,
             freshState = freshState,
             backgroundStartedNanos = backgroundStartedNanos,
             permissionDialogsWatched = ConsentAccessibilityService.instance != null,
             manifestFacts = manifest,
+            conditions = conditions,
             flows = flows,
             captureDepth = if (deep) "full-relay" else "dns-only",
         )
@@ -354,7 +627,8 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
 
     private suspend fun startCapture(config: AuditConfig) {
         CaptureBus.reset()
-        runCatching { XrayVpnService.start(context, config.targetPackage, config.includeGms) }
+        // A watch always records connections as well as lookups (full relay), whatever the capture setting.
+        runCatching { XrayVpnService.start(context, config.targetPackage, config.includeGms, fullRelay = config.isWatch || CaptureBus.deepCapture) }
             .onFailure { throw IllegalStateException("Could not start capture: ${it.message}") }
         val state = withTimeoutOrNull(6_000) { CaptureBus.state.first { it is CaptureState.Running || it is CaptureState.Error } }
         if (state !is CaptureState.Running) {
@@ -410,6 +684,8 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
 
     companion object {
         private const val LAUNCH_CHECK_MS = 8_000L
+        /** How long a plan waits for a locked phone to be unlocked before the check ends (keeping earlier plans). */
+        private const val UNLOCK_WAIT_MS = 120_000L
         private const val REVIEW_TIMEOUT_MS = 90_000L
     }
 }

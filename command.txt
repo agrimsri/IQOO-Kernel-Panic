@@ -1,0 +1,38 @@
+# 1. Export Windows ADB for this shell
+export ADB="/mnt/c/Users/Yashv/AppData/Local/Android/Sdk/platform-tools/adb.exe"
+export PATH="$(dirname "$ADB"):$PATH"
+
+# 2. Verify ADB and device connectivity
+"$ADB" version
+"$ADB" devices
+# If no device appears: unlock the phone, enable USB debugging, and accept the authorization prompt.
+
+# 3. Build both debug APKs if they do not exist
+bash ./gradlew :leakyshop:assembleLeakyDebug :leakyshop:assembleFixedDebug
+
+# 4. Install and audit deliberately leaky LeakyShop
+"$ADB" install -r leakyshop/build/outputs/apk/leaky/debug/leakyshop-leaky-debug.apk
+traceveil --adb "$ADB" audit \
+  --package com.leakyshop.demo \
+  --out leaky-report.json \
+  --auto-drive \
+  --reset
+# Expected: exit code 1 with findings (previous real-phone run: 66 / NEEDS_WORK, C1, NC, C10).
+
+# 5. Install and audit compliant LeakyShop Fixed
+"$ADB" install -r leakyshop/build/outputs/apk/fixed/debug/leakyshop-fixed-debug.apk
+traceveil --adb "$ADB" audit \
+  --package com.leakyshop.demo.fixed \
+  --out fixed-report.json \
+  --auto-drive \
+  --reset
+# Expected: exit code 0 according to demo.sh; this result has not yet been verified via the installed pip package.
+
+# 6. Audit any app straight from its file (.apk, or .xapk/.apks/.apkm split bundle):
+#    Traceveil reads the package name, installs it (skipped if that version is already there) and audits it.
+#    The report also lists the SDKs bundled in the APK next to what the audit saw live. No --reset for apps you do not own.
+traceveil --adb "$ADB" audit \
+  --path "/home/yashvi/codes/ideation/dpdp-xray/My+Talking+Tom+2_0.7_APKPure.xapk" \
+  --auto-drive \
+  --out talking-tom-report.json
+traceveil fix --report talking-tom-report.json --out talking-tom-fixes.md

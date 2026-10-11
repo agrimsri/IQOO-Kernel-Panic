@@ -179,10 +179,10 @@ class ModelCompatibilityTest {
     @Test
     fun `new checks and consent kinds are appended, never renamed`() {
         assertEquals(
-            listOf("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "NC", "V0", "U1", "S1", "C11", "C12", "C13", "C14", "C15", "V1"),
+            listOf("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "NC", "V0", "U1", "S1", "C11", "C12", "C13", "C14", "C15", "V1", "C16", "W1", "W2"),
             CheckId.entries.map { it.name },
         )
         CheckId.entries.forEach { assertEquals(it.name, it.code) }
-        assertEquals(listOf("SCREEN_APPEARED", "ACCEPT", "REJECT", "SETTINGS", "MANUAL_MARK", "PERMISSION_DIALOG"), ConsentKind.entries.map { it.name })
+        assertEquals(listOf("SCREEN_APPEARED", "ACCEPT", "REJECT", "SETTINGS", "MANUAL_MARK", "PERMISSION_DIALOG", "REPROMPT"), ConsentKind.entries.map { it.name })
     }
 }

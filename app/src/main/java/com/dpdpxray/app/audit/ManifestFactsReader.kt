@@ -29,6 +29,8 @@ internal object ManifestFactsReader {
             // Firebase registers each SDK as meta-data on its ComponentDiscoveryService.
             names(list) + list.flatMap { s -> s.metaData?.keySet().orEmpty().filter { it.startsWith(FIREBASE_REGISTRAR) } }
         } ?: info(pm, pkg, PackageManager.GET_SERVICES)?.let { names(it.services) }
+        // Whether the app can go online by itself at all (null when the permission list could not be read).
+        val internet = info(pm, pkg, PackageManager.GET_PERMISSIONS)?.let { p -> p.requestedPermissions.orEmpty().contains(android.Manifest.permission.INTERNET) }
         return catalog.facts(
             versionName = base.versionName,
             versionCode = base.longVersionCode,
@@ -38,7 +40,7 @@ internal object ManifestFactsReader {
                 AppManifestFacts.PART_RECEIVERS to info(pm, pkg, PackageManager.GET_RECEIVERS)?.let { names(it.receivers) },
                 AppManifestFacts.PART_PROVIDERS to info(pm, pkg, PackageManager.GET_PROVIDERS)?.let { names(it.providers) },
             ),
-        )
+        ).copy(requestsInternet = internet)
     }
 
     /** null when Android refused the read (package gone, or the answer too large); a part that was read is never null. */

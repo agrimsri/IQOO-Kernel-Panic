@@ -75,7 +75,7 @@
   {"entity": "Yandex AppMetrica", "category": "ANALYTICS", "domains": ["appmetrica.yandex.net", "appmetrica.yandex.com"]},
   {"entity": "Smartlook", "category": "ANALYTICS", "domains": ["smartlook.com"]},
   {"entity": "UXCam", "category": "ANALYTICS", "domains": ["uxcam.com"]},
-  {"entity": "Hotjar", "category": "ANALYTICS", "domains": ["hotjar.com"]},
+  {"entity": "Hotjar", "category": "ANALYTICS", "domains": ["hotjar.com", "hotjar.io"], "domainSource": "https://help.hotjar.com/hc/en-us/articles/36820026388881-Content-Security-Policies"},
   {"entity": "CleverTap", "category": "ENGAGEMENT", "domains": ["clevertap.com", "clevertap-prod.com", "wzrkt.com"], "sdkKey": "clevertap",
    "note": "Not established. CleverTap's About page lists offices but names no headquarters, and third-party sites disagree (Mountain View, San Francisco, Pune)."},
   {"entity": "MoEngage", "category": "ENGAGEMENT", "domains": ["moengage.com"]},
@@ -104,5 +104,16 @@
   {"entity": "Sentry", "category": "CRASH_REPORTING", "domains": ["sentry.io"]},
   {"entity": "Bugsnag", "category": "CRASH_REPORTING", "domains": ["bugsnag.com"]},
   {"entity": "Instabug", "category": "CRASH_REPORTING", "domains": ["instabug.com"]},
-  {"entity": "New Relic", "category": "CRASH_REPORTING", "domains": ["nr-data.net"]}
+  {"entity": "New Relic", "category": "CRASH_REPORTING", "domains": ["nr-data.net"]},
+  {"entity": "Google Tag Manager", "company": "Google", "category": "ANALYTICS", "domains": ["googletagmanager.com"], "location": {"country": "US", "basis": "HEADQUARTERS", "kind": "COMPANY_DOCUMENT", "asOf": "2026-10-10", "source": "https://www.sec.gov/Archives/edgar/data/1652044/000165204424000022/goog-20231231.htm", "quote": "Our headquarters are located in Mountain View, California."}, "incorporation": {"country": "US", "kind": "COMPANY_DOCUMENT", "asOf": "2026-10-10", "source": "https://policies.google.com/terms", "quote": "Google LLC organized under the laws of the State of Delaware, USA, and operating under the laws of the USA"}, "domainSource": "https://developers.google.com/tag-platform/gtagjs/install", "note": "Google's tag loader: the Google tag (gtag.js), which sends data to Google Analytics and Google Ads, is served from www.googletagmanager.com. Company facts as for Google Analytics."},
+  {"entity": "LinkedIn Insight Tag", "category": "ADVERTISING", "domains": ["snap.licdn.com", "ads.linkedin.com", "p.adsymptotic.com", "linkedin.oribi.io", "sjs.bizographics.com"], "domainSource": "https://www.linkedin.com/help/lms/answer/a425696"},
+  {"entity": "Pinterest Tag", "company": "Pinterest", "category": "ADVERTISING", "domains": ["ct.pinterest.com"], "domainSource": "https://developers.pinterest.com/docs/track-conversions/pinterest-tag/"},
+  {"entity": "Snap Pixel", "category": "ADVERTISING", "domains": ["tr.snapchat.com"], "domainSource": "https://developers.snap.com/api/marketing-api/Conversions-API/UsingTheAPI"},
+  {"entity": "Criteo", "category": "ADVERTISING", "domains": ["criteo.com"], "domainSource": "https://developers.criteo.com/retailer-integration/docs/onetag", "note": "Criteo's OneTag loads from dynamic.criteo.com; its technical notes also name gum.criteo.com."},
+  {"entity": "Taboola", "category": "ADVERTISING", "domains": ["taboola.com"], "domainSource": "https://developers.taboola.com/pixel/docs/add-the-base-pixel-manually"},
+  {"entity": "Outbrain", "category": "ADVERTISING", "domains": ["outbrain.com"], "domainSource": "https://developer.outbrain.com/outbrain-javascript-implementation-guide/"},
+  {"entity": "Adobe Experience Cloud", "category": "ANALYTICS", "domains": ["demdex.net", "omtrdc.net"], "domainSource": "https://experienceleague.adobe.com/en/docs/id-service/using/reference/csp"},
+  {"entity": "Microsoft Invest (Xandr)", "category": "ADVERTISING", "domains": ["adnxs.com"], "domainSource": "https://learn.microsoft.com/en-us/xandr/invest/user-id-syncing-with-external-partners"},
+  {"entity": "The Trade Desk", "category": "ADVERTISING", "domains": ["adsrvr.org"], "domainSource": "https://www.thetradedesk.com/assets/general/Unified-ID-Adoption-Guidelines-for-DSPs-v1.3.pdf"},
+  {"entity": "Comscore", "category": "ANALYTICS", "domains": ["scorecardresearch.com"], "domainSource": "https://www.comscore.com/About/Privacy-Policy", "note": "Comscore's privacy policy names ScorecardResearch as a Comscore service and links scorecardresearch.com."}
 ]

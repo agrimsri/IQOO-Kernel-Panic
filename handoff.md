@@ -219,7 +219,7 @@ First-party settings invalidate the map catalogue.
 
 No licensed GeoLite2-Country.mmdb has been provisioned here; filled source-IP map rendering is pending.
 A5 sourced owner mode can work without that IP database.
-The outline is amCharts/GeoMap CC BY-NC, not blanket commercial-release clearance. Keep credits and licence scope; do not assume competition prizes or future commercial distribution are automatically permitted.
+The outline is now Natural Earth 1:110m country outlines (public domain); it replaced the amCharts/GeoMap CC BY-NC outline on 11 October 2026 to allow commercial distribution. See docs/ATTRIBUTION.md.
 The legal panel labels selected condensed clauses and commencement context. Section 3 is scheduled for 13 May 2027 by the referenced official notification; this is readiness context, not a present jurisdiction/violation verdict.
 
 ## 8. Fresh verification and APK identity

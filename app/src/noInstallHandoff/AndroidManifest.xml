@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Used instead of the (empty) build-type manifests when the app is built with -Ptraceveil.installHandoff=false
+     (see app/build.gradle.kts and docs/CHECK_BEFORE_INSTALL.md): removes the permission behind APK Guard's
+     "Install anyway", for a store build whose review does not accept it. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove" />
+</manifest>

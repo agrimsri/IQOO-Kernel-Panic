@@ -1,0 +1,16 @@
+<!doctype html>
+<!-- Test fixture: a Usercentrics-style banner inside an open shadow root (data-testid values as Usercentrics uses them). Synthetic. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fixture: Usercentrics shadow root</title></head>
+<body>
+<main><h1>Portal</h1></main>
+<div id="usercentrics-root"></div>
+<script>
+  var root = document.getElementById('usercentrics-root').attachShadow({ mode: 'open' });
+  root.innerHTML = '<div style="position:fixed;bottom:0;left:0;right:0;background:#fff;padding:16px" role="dialog">' +
+    '<p>We use cookies and similar technologies. Privacy settings: you can change your consent at any time.</p>' +
+    '<button data-testid="uc-more-button">Settings</button>' +
+    '<button data-testid="uc-deny-all-button">Deny</button>' +
+    '<button data-testid="uc-accept-all-button">Accept All</button></div>';
+</script>
+</body></html>

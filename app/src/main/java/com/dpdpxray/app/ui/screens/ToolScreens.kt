@@ -386,7 +386,11 @@ private fun VerdictLine(text: String, problem: Boolean, known: Any?, inverted: B
 }
 
 @Composable
-fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit, onCheckup: (() -> Unit)? = null) {
+fun SettingsScreen(
+    vm: XrayViewModel, onBack: () -> Unit, onCheckup: (() -> Unit)? = null,
+    /** "Permissions & background": everything TraceVeil uses, each with its off switch; null hides the row. */
+    onControls: (() -> Unit)? = null,
+) {
     val s by vm.settings.collectAsState()
     Column(Modifier.fillMaxSize()) {
         TopBar("Settings", onBack)
@@ -394,6 +398,15 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit, onCheckup: (() -> Unit
             Modifier.verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // First: one place to see and switch off every permission and background behaviour TraceVeil uses.
+            if (onControls != null) com.dpdpxray.app.ui.system.Group(Modifier.reveal(0)) {
+                val lang = com.dpdpxray.app.ui.guide.guideLang()
+                val copy = com.dpdpxray.app.controls.ControlsCopy
+                com.dpdpxray.app.ui.system.ListRow(
+                    copy.pageTitle.pick(lang), subtitle = copy.pageRow.pick(lang),
+                    leading = { com.dpdpxray.app.ui.guide.GlyphIcon(Glyph.VPN, Film.boneDim, size = 24.dp) }, onClick = onControls,
+                )
+            }
             SectionCard(Modifier.reveal(0), title = ModeCopy.title(s.audience).en, glyph = Glyph.HOME) {
                 ModeSwitch(s.audience, { a -> vm.updateSettings { it.copy(audience = a) } })
             }
@@ -466,6 +479,7 @@ fun SettingsScreen(vm: XrayViewModel, onBack: () -> Unit, onCheckup: (() -> Unit
                     detail = "Speech recognition and answers still stay on this phone.",
                 )
             }
+            BackupRestoreCard(vm, Modifier.reveal(8))
             SectionCard(Modifier.reveal(8), title = "Not legal advice", glyph = Glyph.BOOK, accent = Film.warn) {
                 FoldText("Results are an automated technical assessment. Legal passages come from the selected legal lens (India's DPDP Act 2023 and Rules 2025, the EU GDPR and ePrivacy Directive, UK GDPR and PECR, California's CCPA, US COPPA, Brazil's LGPD or Singapore's PDPA) and are context, not a verdict.")
             }

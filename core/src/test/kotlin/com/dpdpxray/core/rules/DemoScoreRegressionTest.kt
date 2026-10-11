@@ -151,6 +151,31 @@ class DemoScoreRegressionTest {
         assertEquals(Triple(100, ScoreBand.READY, emptySet<CheckId>()), summary(engine.evaluate(phone(deviceFixed, Fixtures.fixedDialog))))
     }
 
+    /**
+     * LeakyShop leaky 1.0 now shows a second popup 5 s after "Reject all" (dark-pattern demo). The watcher records it as
+     * REPROMPT; no check reads that kind, so the rules-only 21, the AI-reading 8 and the trees' C15 stay exactly as they were.
+     */
+    @Test
+    fun `a popup shown again after Reject keeps 21, 8 and 100`() {
+        fun nagged(sessions: List<AuditSession>) = sessions.map { s ->
+            if (s.plan != AuditPlan.REJECT) s
+            else s.copy(consentEvents = s.consentEvents + ConsentEvent((13.5 * S).toLong(), ConsentKind.REPROMPT, tree = com.dpdpxray.core.darkpattern.DarkPatternFixtures.nagPopup))
+        }
+        assertEquals(engine.evaluate(deviceLeaky), engine.evaluate(nagged(deviceLeaky)))
+        assertEquals(
+            Triple(21, ScoreBand.AT_RISK, setOf(CheckId.C1, CheckId.C2, CheckId.C3, CheckId.C4, CheckId.C10)),
+            summary(engine.evaluate(nagged(deviceLeaky))),
+        )
+        assertEquals(engine.evaluate(leaky), engine.evaluate(nagged(leaky)))
+        assertEquals(8, engine.evaluate(nagged(leaky)).score)
+        val withTrees = deviceLeaky.map { s ->
+            s.copy(consentEvents = s.consentEvents.map { if (it.kind == ConsentKind.SCREEN_APPEARED) it.copy(tree = Fixtures.leakyDialog) else it })
+        }
+        assertEquals(engine.evaluate(withTrees), engine.evaluate(nagged(withTrees)))
+        assertEquals(nagged(deviceLeaky).first { it.plan == AuditPlan.REJECT }.consentChoice?.kind, ConsentKind.REJECT)
+        assertEquals(Triple(100, ScoreBand.READY, emptySet<CheckId>()), summary(engine.evaluate(deviceFixed)))
+    }
+
     @Test
     fun `fixed counterpart keeps 100 with no findings`() {
         assertEquals(Triple(100, ScoreBand.READY, emptySet<CheckId>()), summary(engine.evaluate(fixed)))

@@ -42,6 +42,21 @@ data class QuarantineSummary(
     val appCameToScreen: Boolean,
     /** No lookups, blocked packets, dialogs or settings screens were seen. Not proof the app does nothing. */
     val nothingObserved: Boolean,
+    /** Connections TraceVeil answered on the phone and read the first message of (never forwarded). */
+    val connectionsAnswered: Int = 0,
+    /** Server names the connections themselves stated (TLS or QUIC hello, HTTP Host), in first-seen order. */
+    val serverNames: List<String> = emptyList(),
+    /**
+     * INFERRED: [serverNames] the app never looked up during the run. It reached their addresses another way: its own
+     * DNS (for example DNS over HTTPS), addresses cached before the run, or addresses built into the app.
+     */
+    val namesWithoutLookup: List<String> = emptyList(),
+    /** Plain-HTTP requests, values replaced by their kind: "GET host/path?field=[email]". */
+    val cleartextRequests: List<String> = emptyList(),
+    /** Plain-HTTP requests carrying personal-data-like fields (field names and kinds only). */
+    val cleartextPersonalData: List<String> = emptyList(),
+    /** Connections whose hello offered Encrypted Client Hello: the visible name may not be the real server. */
+    val echConnections: Int = 0,
 ) {
     companion object {
         /**
@@ -83,7 +98,13 @@ data class QuarantineSummary(
                 settingsScreens = observations.settingsScreens.map { it.kind },
                 appCameToScreen = observations.targetOnScreenNanos != null,
                 nothingObserved = observations.dnsQueries == 0L && observations.blocked.isEmpty() &&
-                    observations.permissionDialogs.isEmpty() && observations.settingsScreens.isEmpty(),
+                    observations.permissionDialogs.isEmpty() && observations.settingsScreens.isEmpty() && observations.connections.isEmpty(),
+                connectionsAnswered = observations.connections.size,
+                serverNames = QuarantineConnections.serverNames(observations),
+                namesWithoutLookup = QuarantineConnections.namesWithoutLookup(observations),
+                cleartextRequests = QuarantineConnections.cleartextRequests(observations),
+                cleartextPersonalData = QuarantineConnections.cleartextPersonalData(observations),
+                echConnections = observations.connections.count { it.tls == com.dpdpxray.core.netcapture.TlsStatus.ECH_HIDDEN },
             )
         }
     }

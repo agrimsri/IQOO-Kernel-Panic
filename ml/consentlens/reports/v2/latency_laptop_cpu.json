@@ -1,0 +1,25 @@
+{
+ "machine": "laptop CPU (Intel Core i7-1355U), TFLite interpreter from TensorFlow 2.20, batch 1, XNNPACK default",
+ "results": {
+  "consentlens_int8.tflite|threads=1": {
+   "median_ms": 0.0734,
+   "p95_ms": 0.0938,
+   "runs": 3000
+  },
+  "consentlens_int8.tflite|threads=2": {
+   "median_ms": 0.0477,
+   "p95_ms": 0.094,
+   "runs": 3000
+  },
+  "consentlens2_candidate_int8.tflite|threads=1": {
+   "median_ms": 0.1467,
+   "p95_ms": 0.2086,
+   "runs": 3000
+  },
+  "consentlens2_candidate_int8.tflite|threads=2": {
+   "median_ms": 0.0885,
+   "p95_ms": 0.1758,
+   "runs": 3000
+  }
+ }
+}

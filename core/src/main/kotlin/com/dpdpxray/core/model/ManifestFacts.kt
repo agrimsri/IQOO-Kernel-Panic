@@ -1,5 +1,7 @@
 package com.dpdpxray.core.model
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /**
@@ -23,6 +25,12 @@ data class AppManifestFacts(
     val sdkComponents: List<String> = emptyList(),
     /** Which manifest parts were read: any of [PART_META_DATA], [PART_SERVICES], [PART_RECEIVERS], [PART_PROVIDERS]. */
     val partsRead: List<String> = emptyList(),
+    /**
+     * Whether the installed app asks Android for internet access (android.permission.INTERNET). Without it an app cannot
+     * open network connections itself. null = not read (older audits). Written only when read.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val requestsInternet: Boolean? = null,
 ) {
     fun read(part: String): Boolean = part in partsRead
 

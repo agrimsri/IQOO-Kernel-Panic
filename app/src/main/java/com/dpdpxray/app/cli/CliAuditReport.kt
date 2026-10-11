@@ -6,6 +6,7 @@ import com.dpdpxray.core.audit.PhaseAssigner
 import com.dpdpxray.core.model.Category
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.Phase
+import com.dpdpxray.core.rules.VisibilityDiagnosis
 import com.dpdpxray.core.trackers.TrackerCatalog
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -55,6 +56,8 @@ object CliAuditReport {
                     put("confidence", f.confidence)
                     put("plans", strings(f.plans.map { it.name }))
                     put("entities", strings(f.entities))
+                    // Rests on the person's answer about their consent history; written only when it does.
+                    if (f.declared) put("declared", true)
                 }
             }))
             put("sessions", JsonArray(bundle.sessions.map { s ->
@@ -64,10 +67,32 @@ object CliAuditReport {
                     put("consentEvents", s.consentEvents.size)
                     put("consentChoice", s.consentChoice?.kind?.takeIf { it == ConsentKind.ACCEPT || it == ConsentKind.REJECT }?.name?.let { JsonPrimitive(it) } ?: JsonNull)
                     put("notes", strings(s.notes))
+                    // How the app was started for this plan (RESET, RESTARTED, NOT_RESTARTED); only when recorded.
+                    s.conditions?.startMode?.let { put("startMode", it.name) }
                 }
             }))
+            // Why an inconclusive result saw too few lookups, with the one action most likely to help; only when there is one.
+            val diagnosis = VisibilityDiagnosis.forResult(bundle.result, bundle.sessions)
+            if (diagnosis.isNotEmpty()) put("diagnosis", JsonArray(diagnosis.map { d ->
+                buildJsonObject {
+                    put("cause", d.cause.name)
+                    put("action", d.action.name)
+                    put("phrase", VisibilityDiagnosis.phrase(d.cause))
+                    put("hint", VisibilityDiagnosis.hint(d.action))
+                    put("sentence", d.sentence)
+                    put("evidence", strings(d.evidence))
+                }
+            }))
+            // Kept data and no consent screen: the range by consent history (and the person's answer once given).
+            bundle.result.historyBounds?.let { b ->
+                put("historyBounds", buildJsonObject {
+                    put("lowScore", b.lowScore); put("lowBand", b.lowBand.name); put("highScore", b.highScore); put("highBand", b.highBand.name)
+                    put("bestBand", b.bestBand.name); b.answer?.let { put("answer", it.name) }; put("verdict", b.verdict())
+                })
+            }
             if (catalog != null) put("observedTrackers", observedTrackers(bundle, catalog, anchor))
             if (catalog != null) put("network", network(bundle, catalog))
+            if (catalog != null) put("dnsAnswers", dnsAnswers(bundle, catalog))
         }
         return pretty.encodeToString(JsonObject.serializer(), obj)
     }
@@ -140,6 +165,22 @@ object CliAuditReport {
         }
     }
 
+    /**
+     * The addresses each looked-up name resolved to, so `traceveil` can match the app's live sockets to a lookup. A
+     * connection to an address no lookup returned points to DNS TraceVeil could not see (encrypted DNS, a hardcoded IP).
+     */
+    private fun dnsAnswers(bundle: AuditBundle, catalog: TrackerCatalog): JsonArray {
+        val byHost = sortedMapOf<String, MutableSet<String>>()
+        bundle.sessions.flatMap { it.netEvents }.forEach { e -> byHost.getOrPut(e.hostname.lowercase().trimEnd('.')) { sortedSetOf() } += e.answerIps }
+        return JsonArray(byHost.map { (host, ips) ->
+            buildJsonObject {
+                put("host", host)
+                put("entity", catalog.classify(host).entity?.let { JsonPrimitive(it) } ?: JsonNull)
+                put("ips", strings(ips))
+            }
+        })
+    }
+
     private data class Hit(val entity: String, val category: Category, val phase: Phase, val tNanos: Long)
 
     fun status(requestId: String, state: String, step: String? = null, auditId: String? = null, error: String? = null, now: Long = System.currentTimeMillis()): String =
@@ -162,7 +203,14 @@ class CliReportStore(private val root: File) {
         val dir = File(root, requestId).apply { mkdirs() }
         val tmp = File(dir, "$name.tmp").apply { writeText(text) }
         val target = File(dir, name)
-        check(tmp.renameTo(target)) { "could not publish $name" }
+        // An atomic replace: File.renameTo cannot replace an existing file on every platform (it fails on Windows), and a
+        // status file is rewritten many times per request.
+        runCatching {
+            java.nio.file.Files.move(
+                tmp.toPath(), target.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+            )
+        }.onFailure { tmp.delete(); throw IllegalStateException("could not publish $name", it) }
         return target
     }
 }

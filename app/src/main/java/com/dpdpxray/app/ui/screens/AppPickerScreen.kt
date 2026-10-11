@@ -43,6 +43,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,6 +92,7 @@ import com.dpdpxray.app.ui.guide.moreLabel
 import com.dpdpxray.app.ui.modes.CheckChoice
 import com.dpdpxray.app.ui.modes.CheckSheet
 import com.dpdpxray.app.ui.modes.EverydayCheckSetup
+import com.dpdpxray.app.ui.modes.RestartWarning
 import com.dpdpxray.app.ui.theme.Brand
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
@@ -113,6 +115,10 @@ fun AppPickerScreen(
     onQuarantine: (String) -> Unit = {},
     /** Shows the Live check / APK Guard switch under the title; null hides it. */
     onSwitchToApk: (() -> Unit)? = null,
+    /** Package to select once the list loads (Update Watch "Re-check"): its check sheet opens; nothing starts by itself. */
+    preselect: String = "",
+    /** Adds "Website" to the switch under the title; null leaves it out. */
+    onSwitchToWeb: (() -> Unit)? = null,
 ) {
     val apps by vm.apps.collectAsState()
     val pf by vm.preflight.collectAsState()
@@ -120,15 +126,29 @@ fun AppPickerScreen(
     var query by remember { mutableStateOf(initialQuery) }
     var selected by remember { mutableStateOf<AuditableApp?>(null) }
     LaunchedEffect(Unit) { vm.refreshPreflight(); vm.loadApps() }
+    var preselected by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(apps, preselect) {
+        if (preselected || preselect.isBlank()) return@LaunchedEffect
+        apps.firstOrNull { it.packageName == preselect }?.let { selected = it; preselected = true }
+    }
 
     val demos = apps.filter { it.packageName in demoPackages }
     Column(Modifier.fillMaxSize()) {
         TopBar("Choose an app", onBack)
-        SpeakStep(GuideFlow.picker(demoInstalled = demos.isNotEmpty()))
+        val pickStep = GuideFlow.picker(demoInstalled = demos.isNotEmpty())
+        SpeakStep(pickStep)
         if (onSwitchToApk != null) {
-            SegmentedControl(listOf("Live check", "APK Guard"), 0, { if (it == 1) onSwitchToApk() }, Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+            SegmentedControl(
+                listOf("Live check", "APK Guard") + listOfNotNull(onSwitchToWeb?.let { com.dpdpxray.app.webcheck.WebCheckCopy.segment.pick(com.dpdpxray.app.ui.guide.guideLang()) }), 0,
+                { when (it) { 1 -> onSwitchToApk(); 2 -> onSwitchToWeb?.invoke() } }, Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
         }
         SearchField(query, { query = it }, "Search apps", Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+        // The step's advice stays on screen as one quiet line (which app to pick, which to avoid); read-aloud speaks it too.
+        Text(
+            pickStep.body.pick(com.dpdpxray.app.ui.guide.guideLang()), style = MaterialTheme.typography.bodySmall, color = Film.boneDim,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp),
+        )
         val q = query.trim()
         val shown = apps.filter { q.isBlank() || it.label.contains(q, true) || it.packageName.contains(q, true) }
         val showDemoSection = q.isBlank() && demos.isNotEmpty()
@@ -177,11 +197,15 @@ fun AppPickerScreen(
             LaunchedEffect(app.packageName, pf.shizukuGranted) {
                 while (!pf.shizukuGranted) { kotlinx.coroutines.delay(1_000); vm.refreshPreflight() }
             }
+            // What restarting this app would switch off (accessibility service, VPN, keyboard...), read once as the sheet opens.
+            val effects by androidx.compose.runtime.produceState<List<com.dpdpxray.app.audit.FoundSideEffect>?>(null, app.packageName, pf.shizukuGranted) {
+                value = vm.restartSideEffects(app.packageName)
+            }
             // Everyday mode: one Quick check that says No; Full and clearing data fold under Advanced.
             if (settings.audience == Audience.USER) {
-                EverydayCheckSetup(app, controlledDemo = app.packageName in demoPackages, shizukuReady = pf.shizukuGranted, shizukuHelp = help, onQuarantine = quarantine, onStart = start)
+                EverydayCheckSetup(app, controlledDemo = app.packageName in demoPackages, shizukuReady = pf.shizukuGranted, shizukuHelp = help, onQuarantine = quarantine, onStart = start, effects = effects)
             } else {
-                AuditSetup(app, shizukuReady = pf.shizukuGranted, shizukuHelp = help, preferPreview = settings.fastDemo, onQuarantine = quarantine, onStart = start)
+                AuditSetup(app, shizukuReady = pf.shizukuGranted, shizukuHelp = help, preferPreview = settings.fastDemo, onQuarantine = quarantine, onStart = start, effects = effects)
             }
         }
     }
@@ -260,22 +284,42 @@ private fun leadAndRest(text: String): Pair<String, String?> {
 }
 
 @Composable
-private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, shizukuHelp: ShizukuHelp, preferPreview: Boolean, onQuarantine: () -> Unit = {}, onStart: (AuditConfig) -> Unit) {
+private fun AuditSetup(
+    app: AuditableApp, shizukuReady: Boolean, shizukuHelp: ShizukuHelp, preferPreview: Boolean, onQuarantine: () -> Unit = {}, onStart: (AuditConfig) -> Unit,
+    effects: List<com.dpdpxray.app.audit.FoundSideEffect>? = null,
+) {
     val controlledDemo = app.packageName == "com.leakyshop.demo" || app.packageName == "com.leakyshop.demo.fixed"
     val initial = remember { CheckSheet.defaults(Audience.DEVELOPER, controlledDemo, shizukuReady, preferPreview) }
     var allowReset by remember { mutableStateOf(initial.allowReset) }
     val freshReset = allowReset && shizukuReady
     var full by remember { mutableStateOf(initial.choice == CheckChoice.FULL) }
     var preview by remember { mutableStateOf(initial.choice == CheckChoice.PREVIEW) }
+    // A background watch: no launch, restart, tap or clearing; only its length is chosen.
+    var watch by remember { mutableStateOf(false) }
+    var watchMinutes by remember { mutableStateOf(com.dpdpxray.core.model.BackgroundWatches.DEFAULT_MINUTES) }
     var agent by remember { mutableStateOf(initial.agentTaps) }
     var child by remember { mutableStateOf(false) }
     var gms by remember { mutableStateOf(false) }
+    // The safe option is the default: an app a restart would disturb is checked without restarting it.
+    var restartAnyway by remember { mutableStateOf(false) }
+    // Only a Full check clears data; Quick, Preview and a watch keep it even with the switch on.
+    val clears = freshReset && full && !watch
+    val leftRunning = shizukuReady && !clears && !effects.isNullOrEmpty() && !restartAnyway
+    // Clearing any app other than the demo apps is confirmed first; choosing Full never turns it on by itself.
+    val confirmFirst = CheckSheet.resetNeedsConfirmation(app.packageName)
+    var askReset by remember { mutableStateOf(false) }
+    if (askReset) com.dpdpxray.app.ui.modes.ResetConfirmDialog(app.label, com.dpdpxray.app.ui.guide.guideLang(),
+        onConfirm = { askReset = false; allowReset = true; full = true; preview = false; watch = false },
+        onDismiss = { askReset = false; if (!allowReset) full = false })
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CheckSheetTitle("Check ${app.label}")
-        SpeakStep(GuideFlow.pickerSetup(fullAvailable = freshReset))
-        if (shizukuReady) Toggle("Allow clearing this test app's local data", "Developer testing only. Removes its saved state, accounts and settings before each run. Leave off for personal apps.", allowReset) {
-            allowReset = it
+        val setupStep = GuideFlow.pickerSetup(fullAvailable = freshReset)
+        SpeakStep(setupStep)
+        // The step's advice stays as one quiet line under the title (read-aloud speaks it too).
+        Text(setupStep.body.pick(com.dpdpxray.app.ui.guide.guideLang()), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
+        if (shizukuReady) Toggle("Reset: clear this test app's local data", "Developer testing only. Removes its saved state, accounts and settings before each run. Leave off for personal apps: TraceVeil then only restarts the app, which keeps its data.", allowReset) {
+            if (it && confirmFirst) askReset = true else allowReset = it
             if (!it) full = false
         }
         Column(Modifier.reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -283,14 +327,25 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, shizukuHelp: Sh
             PlanOption(
                 "Full audit · normal timing",
                 "Three fresh-state runs: Silent, Reject, Accept. Observes Silent for 25 seconds and each choice for 15 seconds; launch, consent and AI review add time.",
-                full, enabled = shizukuReady,
-            ) { full = true; preview = false; allowReset = true }
+                full && !watch, enabled = shizukuReady,
+            ) {
+                full = true; preview = false; watch = false
+                if (!confirmFirst) allowReset = true else if (!allowReset) askReset = true
+            }
             if (!shizukuReady) ShizukuAccessNotice(shizukuHelp.running, shizukuHelp.onAllow, shizukuHelp.onOpenShizuku)
-            PlanOption("Quick audit · normal timing", "One Accept-plan run with 15 seconds of observation. No Silent or Reject comparison.", !full && !preview, enabled = true) { full = false; preview = false }
-            PlanOption("Fast Preview · limited evidence", "One Accept-plan run with 8 seconds of observation and a shorter consent-screen wait. Delayed traffic may be missed; not a Full audit.", preview, enabled = true) { full = false; preview = true }
+            PlanOption("Quick audit · normal timing", "One Accept-plan run with 15 seconds of observation. No Silent or Reject comparison.", !full && !preview && !watch, enabled = true) { full = false; preview = false; watch = false }
+            PlanOption("Fast Preview · limited evidence", "One Accept-plan run with 8 seconds of observation and a shorter consent-screen wait. Delayed traffic may be missed; not a Full audit.", preview && !watch, enabled = true) { full = false; preview = true; watch = false }
+            val lang = com.dpdpxray.app.ui.guide.guideLang()
+            PlanOption(com.dpdpxray.app.audit.WatchCopy.optionTitle.pick(lang), com.dpdpxray.app.audit.WatchCopy.optionDetail(watchMinutes).pick(lang), watch, enabled = true, lang = lang) {
+                full = false; preview = false; watch = true
+            }
+            if (watch) com.dpdpxray.app.ui.modes.WatchLengthChips(watchMinutes, { watchMinutes = it }, lang)
             // The caveat's first sentence stays in view; the rest folds behind More.
             val (lead, rest) = leadAndRest(
-                if (!freshReset) "Quick keeps the app's data. An already-opened app may keep its consent choice and not repeat launch-time DNS lookups. A missing dialog or quiet run is not a privacy pass."
+                if (watch) com.dpdpxray.app.audit.WatchCopy.caveat.pick(lang)
+                else if (leftRunning) "Quick opens the app as it is, without restarting it, so what it runs stays on; it may reuse launch-time lookups it made before. An app that was used before may keep its consent choice and not ask again. A missing dialog or quiet run is not a privacy pass."
+                else if (!clears && shizukuReady) "Quick restarts the app first (it keeps its data), so its launch-time lookups are made again. An app that was used before may keep its consent choice and not ask again. A missing dialog or quiet run is not a privacy pass."
+                else if (!clears) "Quick keeps the app's data and cannot restart it without Shizuku. An already-opened app may keep its consent choice and not repeat launch-time DNS lookups. A missing dialog or quiet run is not a privacy pass."
                 else "Starting an audit clears this selected app's local data before each plan. Use a test app or a backed-up development build; do not use a personal app with data you need.",
             )
             Callout(lead, detail = rest)
@@ -308,9 +363,14 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, shizukuHelp: Sh
             Toggle("Include Google Play services lookups", "Some SDKs upload through Play services. Those lookups may include other apps' traffic.", gms) { gms = it }
         }
 
-        GradientAction("Start check", {
-            val choice = when { full -> CheckChoice.FULL; preview -> CheckChoice.PREVIEW; else -> CheckChoice.QUICK }
-            onStart(CheckSheet.config(Audience.DEVELOPER, app.packageName, app.label, choice, allowReset, shizukuReady, agent, child, gms))
+        // A watch never restarts the app, so there is nothing a restart would switch off.
+        if (!watch) RestartWarning(app.label, effects, canStop = shizukuReady, reset = clears, restartAnyway = restartAnyway, onChange = { restartAnyway = it },
+            lang = com.dpdpxray.app.ui.guide.guideLang())
+
+        GradientAction(if (watch) com.dpdpxray.app.audit.WatchCopy.start.pick(com.dpdpxray.app.ui.guide.guideLang()) else "Start check", {
+            val choice = when { watch -> CheckChoice.WATCH; full -> CheckChoice.FULL; preview -> CheckChoice.PREVIEW; else -> CheckChoice.QUICK }
+            onStart(CheckSheet.config(Audience.DEVELOPER, app.packageName, app.label, choice, allowReset, shizukuReady, agent, child, gms,
+                CheckSheet.restartPolicy(effects.takeIf { shizukuReady }, restartAnyway), watchMinutes))
         }, Modifier.padding(top = 8.dp).reveal(3), glyph = Glyph.PLAY, sweep = true)
         // Quarantine run (separate feature): opens its own explainer; nothing starts until Start is tapped there.
         OutlineAction("Run in quarantine (network blocked)", onQuarantine, Modifier.reveal(3), glyph = Glyph.LOCK)

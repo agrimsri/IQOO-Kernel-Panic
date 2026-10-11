@@ -575,3 +575,35 @@ class GlobalOptionPlacementTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_reads_the_apps_own_json_export(tmp_path):
+    """`traceveil sdks/lens --report` accept the app's Export audit data (JSON) file, not only CLI-saved reports."""
+    from traceveil import cli as _cli
+    export = {
+        "schema": "traceveil.audit.v1",
+        "app": {"package": "com.leakyshop.demo", "label": "LeakyShop"},
+        "meta": {"id": "audit-1", "plans": ["Plan B · Reject"]},
+        "sessions": [{"plan": "REJECT", "netEvents": [], "consentEvents": []}],
+        "result": {"score": 8, "band": "AT_RISK", "findings": [{"checkId": "C2", "severity": "CRITICAL", "entities": ["AppsFlyer"]}]},
+        "sdkAttribution": {"groups": [{"name": "AppsFlyer", "category": "attribution", "known": True,
+                                       "hosts": [{"host": "launches.appsflyersdk.com", "lookups": 4,
+                                                  "relations": ["before consent", "after Reject"]}]},
+                                      {"name": "Unknown hosts", "known": False, "hosts": []}]},
+    }
+    p = tmp_path / "TraceVeil-audit-1.json"
+    p.write_text(__import__("json").dumps(export), encoding="utf-8")
+    rep = _cli._load_report(str(p), {"output": {"dir": str(tmp_path)}})
+    assert rep["auditId"] == "audit-1" and rep["score"] == 8 and rep["band"] == "AT_RISK"
+    assert rep["target"] == {"package": "com.leakyshop.demo", "label": "LeakyShop"}
+    assert rep["findings"][0]["checkId"] == "C2" and rep["findings"][0]["check"] == "C2"
+    assert rep["observedTrackers"] == [{"entity": "AppsFlyer", "category": "attribution", "lookups": 4, "phases": ["after Reject", "before consent"]}]
+
+
+def test_rejects_a_file_that_is_neither_format(tmp_path):
+    from traceveil import cli as _cli
+    p = tmp_path / "x.json"
+    p.write_text('{"hello": 1}', encoding="utf-8")
+    import pytest as _pytest
+    with _pytest.raises(ValueError):
+        _cli._load_report(str(p), {"output": {"dir": str(tmp_path)}})

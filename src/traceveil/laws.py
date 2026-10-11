@@ -62,8 +62,8 @@ def select(selection) -> list[dict]:
 
 
 def _inconclusive(findings: list[dict]) -> bool:
-    """`Inconclusive.reason` in the app: V0, or U1 naming trackers."""
-    return any(f.get("check") == "V0" or (f.get("check") == "U1" and f.get("entities")) for f in findings)
+    """`Inconclusive.reason` in the app: V0, or U1 naming trackers that the person's answer has not settled."""
+    return any(f.get("check") == "V0" or (f.get("check") == "U1" and f.get("entities") and not f.get("declared")) for f in findings)
 
 
 def band_for(score: int | None) -> str:
@@ -113,15 +113,21 @@ def assess_all(report: dict, selection=None, policy: str = DEFAULT_POLICY) -> di
     profiles = select(selection)
     if pid not in [p["id"] for p in profiles]:
         profiles = select([pid]) + profiles
-    return {"policy": pid, "source": "core LegalLens (resources/law)", "disclaimer": DISCLAIMER,
-            "lenses": [view(report, p) for p in profiles]}
+    block = {"policy": pid, "source": "core LegalLens (resources/law)", "disclaimer": DISCLAIMER,
+             "lenses": [view(report, p) for p in profiles]}
+    if isinstance(report.get("historyBounds"), dict):
+        block["historyBounds"] = report["historyBounds"]
+    return block
 
 
 def policy_view(block: dict) -> dict:
     """The policy lens in the shape `audit.exit_for_report` reads: its score, band and counted findings."""
     v = next(x for x in block["lenses"] if x["id"] == block["policy"])
-    return {"score": v["score"], "band": v["band"],
-            "findings": [{"severity": r["severity"]} for r in v["findings"] if r["relation"] != "NOT_APPLICABLE"]}
+    out = {"score": v["score"], "band": v["band"],
+           "findings": [{"severity": r["severity"]} for r in v["findings"] if r["relation"] != "NOT_APPLICABLE"]}
+    if isinstance(block.get("historyBounds"), dict):
+        out["historyBounds"] = block["historyBounds"]
+    return out
 
 
 def table(block: dict, style: Style = PLAIN) -> list[str]:

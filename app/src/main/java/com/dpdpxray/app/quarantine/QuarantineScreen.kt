@@ -96,7 +96,11 @@ import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
 import com.dpdpxray.app.ui.theme.LocalReduceMotion
 import com.dpdpxray.app.ui.theme.Motion
+import com.dpdpxray.core.netcapture.CleartextPersonalData
+import com.dpdpxray.core.netcapture.FlowRecord
+import com.dpdpxray.core.netcapture.TlsStatus
 import com.dpdpxray.core.quarantine.BlockedAttempt
+import com.dpdpxray.core.trackers.TrackerCatalog
 import com.dpdpxray.core.quarantine.DestinationRole
 import com.dpdpxray.core.quarantine.DomainAttempt
 import com.dpdpxray.core.quarantine.QuarantineEvidence
@@ -131,10 +135,12 @@ fun QuarantineScreen(vm: XrayViewModel, packageName: String, onBack: () -> Unit)
         lastSaved = withContext(Dispatchers.IO) { QuarantineController.store(ctx).latestFor(packageName) }
     }
 
+    val settings by vm.settings.collectAsState()
+    val catalog = remember(vm, settings.firstPartyDomains) { vm.graph.catalog() }
     val current = run
     when {
-        viewing != null -> ReportView(viewing!!, saved = true, path = null, onBack = { viewing = null }, onAgain = { viewing = null }, onDone = { viewing = null })
-        current is QuarantineRunState.Running && current.targetPackage == packageName -> LiveView(current, live, onBack)
+        viewing != null -> ReportView(viewing!!, saved = true, path = null, catalog = catalog, onBack = { viewing = null }, onAgain = { viewing = null }, onDone = { viewing = null })
+        current is QuarantineRunState.Running && current.targetPackage == packageName -> LiveView(current, live, catalog, onBack)
         current is QuarantineRunState.Running -> Column(Modifier.fillMaxSize()) {
             TopBar("Quarantine run", onBack)
             Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -143,7 +149,7 @@ fun QuarantineScreen(vm: XrayViewModel, packageName: String, onBack: () -> Unit)
             }
         }
         current is QuarantineRunState.Finished && current.report.targetPackage == packageName ->
-            ReportView(current.report, current.saved, current.path, onBack = onBack, onAgain = { QuarantineController.acknowledge() }, onDone = { QuarantineController.acknowledge(); onBack() })
+            ReportView(current.report, current.saved, current.path, catalog = catalog, onBack = onBack, onAgain = { QuarantineController.acknowledge() }, onDone = { QuarantineController.acknowledge(); onBack() })
         else -> Explainer(
             packageName = packageName,
             label = label,
@@ -305,7 +311,7 @@ private fun StepRow(n: Int, text: String) {
 }
 
 @Composable
-private fun LiveView(run: QuarantineRunState.Running, live: QuarantineObservations, onBack: () -> Unit) {
+private fun LiveView(run: QuarantineRunState.Running, live: QuarantineObservations, catalog: TrackerCatalog, onBack: () -> Unit) {
     val ctx = LocalContext.current
     var now by remember { mutableLongStateOf(SystemClock.elapsedRealtimeNanos()) }
     LaunchedEffect(run.runId) {
@@ -336,7 +342,7 @@ private fun LiveView(run: QuarantineRunState.Running, live: QuarantineObservatio
                         RuleRow(Film.leak, liveItemModifier()) { Text(st.kind.title, style = MaterialTheme.typography.bodyMedium); Note("By the app or by you; TraceVeil cannot tell which.") }
                     }
                 }
-                observationItems(live)
+                observationItems(live, catalog)
                 if (live.domains.isEmpty() && live.blocked.isEmpty() && live.permissionDialogs.isEmpty() && live.settingsScreens.isEmpty()) {
                     item(key = "empty") { EmptyHint("Nothing yet. Use the app; what it tries appears here.", glyph = Glyph.WATCHER) }
                 }
@@ -408,7 +414,7 @@ private fun StatTile(value: String, label: String, modifier: Modifier = Modifier
 }
 
 @Composable
-private fun ReportView(report: QuarantineReport, saved: Boolean, path: String?, onBack: () -> Unit, onAgain: () -> Unit, onDone: () -> Unit) {
+private fun ReportView(report: QuarantineReport, saved: Boolean, path: String?, catalog: TrackerCatalog, onBack: () -> Unit, onAgain: () -> Unit, onDone: () -> Unit) {
     val ctx = LocalContext.current
     val s = report.summary
     val exportScope = rememberCoroutineScope()
@@ -424,6 +430,21 @@ private fun ReportView(report: QuarantineReport, saved: Boolean, path: String?, 
             items(report.notes) { n -> Callout(n, Modifier.reveal(1)) }
             if (s.dnsBypassSignal) item {
                 Signal(Film.high, "Tried to reach addresses without looking them up", QuarantineEvidence.INFERRED, QuarantineText.bypassExplanation(s.addressesWithoutLookup), Modifier.reveal(1))
+            }
+            if (s.cleartextPersonalData.isNotEmpty()) item {
+                // OBSERVED when a value itself had a personal-data shape (an e-mail address, a phone number); otherwise
+                // only field names matched.
+                val shaped = report.observations.connections.flatMap { it.http }.any { h -> CleartextPersonalData.scan(h).any { it.valueShape } }
+                Signal(
+                    Film.high, "Tried to send personal data without encryption",
+                    if (shaped) QuarantineEvidence.OBSERVED else QuarantineEvidence.INFERRED,
+                    QuarantineText.cleartextExplanation(s.cleartextPersonalData), Modifier.reveal(1),
+                )
+            } else if (s.cleartextRequests.isNotEmpty()) item {
+                Signal(Film.warn, "Used plain HTTP (no encryption)", QuarantineEvidence.OBSERVED, QuarantineText.cleartextExplanation(s.cleartextRequests), Modifier.reveal(1))
+            }
+            if (s.namesWithoutLookup.isNotEmpty()) item {
+                Signal(Film.warn, "Connected to names it never looked up", QuarantineEvidence.INFERRED, QuarantineText.namesWithoutLookupExplanation(s.namesWithoutLookup), Modifier.reveal(2))
             }
             if (s.directResolvers.isNotEmpty()) item {
                 Signal(Film.warn, "Sent DNS straight to its own resolver", QuarantineEvidence.OBSERVED,
@@ -447,7 +468,7 @@ private fun ReportView(report: QuarantineReport, saved: Boolean, path: String?, 
                 KeyCaveat("The app's own window was not seen (the watcher may be off, or the app did not open).")
             }
 
-            observationItems(report.observations)
+            observationItems(report.observations, catalog)
 
             item(key = "timeline") {
                 if (report.timeline.isEmpty()) {
@@ -475,9 +496,15 @@ private fun ReportView(report: QuarantineReport, saved: Boolean, path: String?, 
                 val o = report.observations
                 CollapsibleCard(
                     "Capture details", Modifier.padding(top = 8.dp),
-                    summary = "${o.dnsQueries} lookups · ${o.blockedPackets} packets dropped", glyph = Glyph.SEARCH,
+                    summary = "${o.dnsQueries} lookups · ${o.blockedPackets} packets blocked", glyph = Glyph.SEARCH,
                 ) {
-                    Note("${o.dnsQueries} lookups (all answered \"does not exist\" on this phone), ${o.blockedPackets} packets dropped.")
+                    Note("${o.dnsQueries} lookups (all answered \"does not exist\" on this phone), ${o.blockedPackets} packets blocked (none forwarded; connections TraceVeil answered count their first packet here).")
+                    if (o.connectionsRead == true) {
+                        Note("${QuarantineText.plural(o.connections.size, "connection")} answered on the phone by TraceVeil and closed after the first message; nothing was forwarded.")
+                    }
+                    if (s.echConnections > 0) {
+                        Note("${QuarantineText.plural(s.echConnections, "connection")} offered Encrypted Client Hello, so the name shown may be the provider's public name rather than the real server.")
+                    }
                     if (o.networkControlPackets > 0) Note("${o.networkControlPackets} Android network-control packets (e.g. IPv6 neighbour discovery) were dropped and not counted as the app's attempts.")
                     if (o.unreadablePackets > 0) Note("${o.unreadablePackets} packets could not be read and were dropped.")
                     if (o.domainsOverflow + o.destinationsOverflow + o.uiEventsOverflow > 0) {
@@ -586,17 +613,27 @@ private fun LazyItemScope.liveItemModifier(): Modifier =
         fadeOutSpec = tween(Motion.SHORT, easing = Motion.exit),
     )
 
-/** Names, blocked destinations: shared by the live list and the report. */
-private fun LazyListScope.observationItems(o: QuarantineObservations) {
+/** Names, answered connections, blocked destinations: shared by the live list and the report. */
+private fun LazyListScope.observationItems(o: QuarantineObservations, catalog: TrackerCatalog) {
     if (o.domains.isNotEmpty()) {
         item(key = "h-d") { SectionTitle("Names it tried to look up (${o.domains.size})") }
         items(o.domains, key = { "d-" + it.hostname }) { DomainRow(it, liveItemModifier()) }
+    }
+    if (o.connections.isNotEmpty()) {
+        item(key = "h-c") {
+            Column {
+                SectionTitle("Connections answered on the phone (${o.connections.size})")
+                Note("TraceVeil answered these itself and closed them after the first message. Nothing was forwarded.")
+            }
+        }
+        items(o.connections.sortedBy { it.startNanos }, key = { "c-" + it.id }) { ConnectionRow(it, catalog, liveItemModifier()) }
     }
     val app = o.blocked.filter { it.role == DestinationRole.APP_DESTINATION }
     val resolver = o.blocked.filter { it.role == DestinationRole.PHONE_RESOLVER }
     if (app.isNotEmpty()) {
         item(key = "h-b") { SectionTitle("Connections blocked (${app.map { it.address to it.port }.distinct().size})") }
-        items(app, key = { "b-" + it.protocol + it.endpoint }) { BlockedRow(it, liveItemModifier()) }
+        val answered = o.connections.map { it.dstIp to it.dstPort }.toSet()
+        items(app, key = { "b-" + it.protocol + it.endpoint }) { BlockedRow(it, liveItemModifier(), answered = (it.address to it.port) in answered) }
     }
     if (resolver.isNotEmpty()) {
         item(key = "h-r") {
@@ -620,14 +657,31 @@ private fun DomainRow(d: DomainAttempt, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun BlockedRow(b: BlockedAttempt, modifier: Modifier = Modifier) {
+private fun ConnectionRow(f: FlowRecord, catalog: TrackerCatalog, modifier: Modifier = Modifier) {
+    val tracker = remember(f.host, catalog) {
+        f.host?.let { catalog.classify(it) }?.takeIf { it.entity != null && it.category.isTracking }
+            ?.let { "${it.entity} (${it.category.name.lowercase().replace('_', ' ')})" }
+    }
+    RuleRow(if (f.tls == TlsStatus.CLEARTEXT) Film.high else Film.scan, modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) { HostText(f.host ?: "Name not read") }
+            Tag(QuarantineText.connectionLabel(f), Film.boneDim)
+        }
+        Note(QuarantineText.connectionNote(f, tracker))
+    }
+}
+
+@Composable
+private fun BlockedRow(b: BlockedAttempt, modifier: Modifier = Modifier, answered: Boolean = false) {
     RuleRow(if (b.role == DestinationRole.PHONE_RESOLVER) Film.warn else Film.leak, modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { HostText(b.endpoint) }
             Tag(b.protocol.label, Film.boneDim)
         }
         val scope = QuarantineText.scopeNote(b.scope)
-        Note(QuarantineText.plural(b.packets.toInt(), "packet") + " dropped" + if (scope != null) " · $scope" else "")
+        // An answered connection's SYN was replied to on the phone, not dropped; either way nothing was forwarded.
+        val fate = if (answered) " · answered on the phone, nothing forwarded" else " dropped"
+        Note(QuarantineText.plural(b.packets.toInt(), "packet") + fate + if (scope != null) " · $scope" else "")
     }
 }
 

@@ -42,16 +42,23 @@ import com.dpdpxray.app.apkguard.ApkGuardIntents
 import com.dpdpxray.app.apkguard.ApkGuardResultScreen
 import com.dpdpxray.app.apkguard.ApkGuardRoutes
 import com.dpdpxray.app.apkguard.ApkGuardSubject
+import com.dpdpxray.app.apkguard.DownloadPickScreen
 import androidx.navigation.navArgument
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.automation.AutomationIntents
+import com.dpdpxray.app.controls.ControlsRoutes
+import com.dpdpxray.app.controls.controlsDestination
 import com.dpdpxray.app.autoguard.AutoGuardRoutes
 import com.dpdpxray.app.autoguard.CheckupScreen
 import com.dpdpxray.app.quarantine.QuarantineRoutes
 import com.dpdpxray.app.quarantine.QuarantineScreen
 import com.dpdpxray.app.quarantine.navigateToQuarantine
+import com.dpdpxray.app.notices.NoticesRoutes
+import com.dpdpxray.app.notices.noticesDestinations
 import com.dpdpxray.app.trust.TrustRoutes
+import com.dpdpxray.app.webcheck.WebCheckRoutes
+import com.dpdpxray.app.webcheck.webCheckDestinations
 import com.dpdpxray.app.trust.trustDestination
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.AuditRoutes
@@ -126,7 +133,7 @@ class MainActivity : ComponentActivity() {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
         }
         lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.RESUMED) { vm.refreshPreflight() }
+            repeatOnLifecycle(Lifecycle.State.RESUMED) { vm.refreshPreflight(); vm.refreshUpdates() }
         }
         if (savedInstanceState == null) AssistantEntry.featureFrom(intent)?.let { assistantFeatures.trySend(it) }
         addOnNewIntentListener { AssistantEntry.featureFrom(it)?.let { f -> assistantFeatures.trySend(f) } }
@@ -184,7 +191,13 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(Unit) {
                         // If an audit is still running when the UI comes back, show it.
                         if (progress is AuditProgress.Running) nav.navigate("live")
+                        // A website check needs its page on screen, so it comes back to its live screen too.
+                        else if (com.dpdpxray.app.webcheck.WebCheckRunner.isRunning) nav.navigate(WebCheckRoutes.LIVE)
                     }
+                    // The Check tab's three views (live app check, APK Guard, website) switch in place under the same tab.
+                    val toLive: () -> Unit = { if (vm.preflight.value.canAudit && vm.prepareAudit()) nav.navigate("pick") { popUpTo(AppTab.HOME.route); launchSingleTop = true } else nav.openTab(AppTab.HOME) }
+                    val toApkGuard: () -> Unit = { nav.navigate(ApkGuardRoutes.HUB) { popUpTo(AppTab.HOME.route); launchSingleTop = true } }
+                    val toWebsite: () -> Unit = { nav.navigate(WebCheckRoutes.START) { popUpTo(AppTab.HOME.route); launchSingleTop = true } }
                     val apkCheck: () -> (() -> Unit)? = { if (nav.graph.findNode("apkguard") != null) { { nav.navigate("apkguard") } } else null }
                     val leaveOnboarding = {
                         vm.updateSettings { it.copy(onboardingDone = true) }
@@ -226,10 +239,13 @@ class MainActivity : ComponentActivity() {
                                 onLive = { nav.navigate("live") },
                                 onAllReports = { nav.openTab(AppTab.REPORTS) },
                                 onAutomation = { nav.navigate("settings") },
+                                onTrust = { nav.navigate(TrustRoutes.ROUTE) },
+                                onRecheck = { nav.navigate(ApkGuardRoutes.recheckPicker(it)) },
+                                onWebsite = { nav.navigate(WebCheckRoutes.START) },
                             )
                         }
                         composable(AppTabs.REPORTS) {
-                            ReportsScreen(vm, onOpen = { nav.navigate("results/$it") })
+                            ReportsScreen(vm, onOpen = { nav.navigate("results/$it") }, onRecheck = { nav.navigate(ApkGuardRoutes.recheckPicker(it)) })
                         }
                         composable(AppTabs.MORE) {
                             MoreScreen(
@@ -241,15 +257,29 @@ class MainActivity : ComponentActivity() {
                                 onHowItWorks = { nav.navigate(OnboardingGate.ONBOARDING) },
                                 onOpen = { nav.navigate("results/$it") },
                                 onTrust = { nav.navigate(TrustRoutes.ROUTE) },
+                                onNotices = { nav.navigate(NoticesRoutes.LIST) },
+                                onControls = { nav.navigate(ControlsRoutes.ROUTE) },
                             )
                         }
                         trustDestination(nav)
-                        composable("pick?q={q}", arguments = listOf(navArgument("q") { type = NavType.StringType; defaultValue = "" })) { e ->
+                        webCheckDestinations(nav, onSwitchToLive = toLive, onSwitchToApk = toApkGuard)
+                        controlsDestination(nav, vm)
+                        noticesDestinations(nav)
+                        composable(
+                            "pick?q={q}&select={select}",
+                            arguments = listOf(
+                                navArgument("q") { type = NavType.StringType; defaultValue = "" },
+                                navArgument("select") { type = NavType.StringType; defaultValue = "" },
+                            ),
+                        ) { e ->
                             AppPickerScreen(
                                 vm, onBack = { nav.popBackStack() }, onStarted = { nav.navigate("live") { popUpTo("home") } },
                                 initialQuery = e.arguments?.getString("q").orEmpty(),
                                 onQuarantine = { nav.navigateToQuarantine(it) },
-                                onSwitchToApk = { nav.navigate(ApkGuardRoutes.HUB) { popUpTo(AppTab.HOME.route); launchSingleTop = true } },
+                                onSwitchToApk = toApkGuard,
+                                onSwitchToWeb = toWebsite,
+                                // Update Watch "Re-check" (notification, Home, Reports): the app's check sheet opens; nothing starts by itself.
+                                preselect = e.arguments?.getString("select").orEmpty().takeIf { ApkGuardRoutes.isPackageName(it) }.orEmpty(),
                             )
                         }
                         composable(QuarantineRoutes.ROUTE) { e ->
@@ -271,6 +301,8 @@ class MainActivity : ComponentActivity() {
                                 onReport = { nav.navigate("report/$id") },
                                 onAsk = { nav.navigate(AuditRoutes.voice(id)) },
                                 onCheckAgain = { if (vm.prepareAudit { nav.navigate("pick") { popUpTo("home") } }) nav.navigate("pick") { popUpTo("home") } },
+                                onLive = { nav.navigate("live") { popUpTo("home") } },
+                                onQuarantine = { nav.navigateToQuarantine(it) },
                             )
                         }
                         composable("finding/{id}/{check}") { e ->
@@ -285,7 +317,10 @@ class MainActivity : ComponentActivity() {
                         composable("lab") { AiLabScreen(vm, onBack = { nav.popBackStack() }) }
                         composable("camera") { CameraCheckScreen(vm, onBack = { nav.popBackStack() }) }
                         composable("settings") {
-                            SettingsScreen(vm, onBack = { nav.popBackStack() }, onCheckup = { nav.navigate(AutoGuardRoutes.CHECKUP) })
+                            SettingsScreen(
+                                vm, onBack = { nav.popBackStack() }, onCheckup = { nav.navigate(AutoGuardRoutes.CHECKUP) },
+                                onControls = { nav.navigate(ControlsRoutes.ROUTE) },
+                            )
                         }
                         composable(ApkGuardRoutes.HUB) {
                             ApkGuardHubScreen(
@@ -293,7 +328,8 @@ class MainActivity : ComponentActivity() {
                                 onOpenApp = { nav.navigate(ApkGuardRoutes.app(it)) },
                                 onOpenFile = { nav.navigate(ApkGuardRoutes.file(it)) },
                                 onCheckup = { nav.navigate(AutoGuardRoutes.CHECKUP) },
-                                onSwitchToLive = { if (vm.preflight.value.canAudit && vm.prepareAudit()) nav.navigate("pick") { popUpTo(AppTab.HOME.route); launchSingleTop = true } else nav.openTab(AppTab.HOME) },
+                                onSwitchToLive = toLive,
+                                onSwitchToWeb = toWebsite,
                             )
                         }
                         // Auto-guard "My phone checkup"; also opened by its weekly notification.
@@ -307,6 +343,13 @@ class MainActivity : ComponentActivity() {
                                 onAudit = { nav.navigate(ApkGuardRoutes.auditPicker(it)) },
                                 onOpenInstalled = { nav.navigate(ApkGuardRoutes.app(it)) },
                                 onQuarantine = { nav.navigateToQuarantine(it) },
+                            )
+                        }
+                        // A tapped "New APK downloaded" alert for a file TraceVeil cannot open itself.
+                        composable(ApkGuardRoutes.DOWNLOADS) {
+                            DownloadPickScreen(
+                                onBack = { nav.popBackStack() },
+                                onOpenFile = { nav.navigate(ApkGuardRoutes.file(it)) { popUpTo(ApkGuardRoutes.DOWNLOADS) { inclusive = true } } },
                             )
                         }
                         composable(ApkGuardRoutes.FILE) { e ->
