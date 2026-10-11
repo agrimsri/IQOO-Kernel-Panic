@@ -9,7 +9,7 @@ import com.dpdpxray.app.ui.onboarding.OnboardingCopy
 enum class HomeSection { MODE_SWITCH, HERO, UPDATES, RECENT, TRUST, CONTROLS, MORE_WAYS }
 
 /** The rows of Home's "More ways to check". */
-enum class HomeWay { APK_FILE, PHONE_APPS, AUTOMATE, ASK_LAST, CAMERA, SAMPLE, MORE_SAMPLES }
+enum class HomeWay { APK_FILE, PHONE_APPS, AUTOMATE, ASK_LAST, CAMERA, SAMPLE, MORE_SAMPLES, WEBSITE }
 
 /**
  * What Home shows, decided without Compose so it can be unit tested. Both modes share one Home: the mode switch, the
@@ -30,12 +30,17 @@ object HomeLayout {
     }
 
     /**
-     * The "More ways to check" rows. Everyday mode: an app file and (when the build has it) the apps on this phone.
+     * The "More ways to check" rows. Everyday mode: an app file, a website (when Home wires it) and (when the build has it)
+     * the apps on this phone.
      * Developer mode adds, in this order: Automate it (when wired), Ask about my last check (when there is one), Camera
      * check, See a sample and More samples.
      */
-    fun ways(audience: Audience, checkupAvailable: Boolean, automationAvailable: Boolean, hasLastCheck: Boolean): List<HomeWay> = buildList {
+    fun ways(
+        audience: Audience, checkupAvailable: Boolean, automationAvailable: Boolean, hasLastCheck: Boolean,
+        websiteAvailable: Boolean = false,
+    ): List<HomeWay> = buildList {
         add(HomeWay.APK_FILE)
+        if (websiteAvailable) add(HomeWay.WEBSITE)
         if (checkupAvailable) add(HomeWay.PHONE_APPS)
         if (audience == Audience.DEVELOPER) {
             if (automationAvailable) add(HomeWay.AUTOMATE)

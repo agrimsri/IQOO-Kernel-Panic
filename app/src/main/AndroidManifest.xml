@@ -37,6 +37,11 @@
         <uses-native-library android:name="libOpenCL.so" android:required="false" />
         <uses-native-library android:name="libcdsprpc.so" android:required="false" />
 
+        <!-- Website check browser (webcheck/WebCheckBrowser.kt): no usage statistics and no Google Safe Browsing lookups,
+             so the browser sends nothing beyond what the checked site asks for. -->
+        <meta-data android:name="android.webkit.WebView.MetricsOptOut" android:value="true" />
+        <meta-data android:name="android.webkit.WebView.EnableSafeBrowsing" android:value="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

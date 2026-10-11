@@ -84,6 +84,7 @@ object CheckBackups {
             sample = m.sample,
             timingProfile = m.timingProfile,
             inconclusiveReason = m.inconclusiveReason,
+            targetKind = m.targetKind ?: bundle.target?.kind,
         )
     }
 

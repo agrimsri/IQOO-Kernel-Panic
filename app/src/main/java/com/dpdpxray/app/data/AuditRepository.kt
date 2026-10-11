@@ -41,6 +41,9 @@ data class AuditMeta(
     val targetVersionName: String? = null,
     @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
     val targetVersionCode: Long? = null,
+    /** "web" for a website check (targetPackage is then "web:" + the host, targetLabel the address); null for app audits. */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val targetKind: String? = null,
 )
 
 data class AuditBundle(

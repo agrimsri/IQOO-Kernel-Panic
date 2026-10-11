@@ -23,6 +23,9 @@ class AppTabsTest {
         assertEquals(AppTab.CHECK, AppTabs.tabOf("pick?q={q}"))
         assertEquals(AppTab.CHECK, AppTabs.tabOf("pick"))
         assertEquals(AppTab.CHECK, AppTabs.tabOf("apkguard"))
+        // The website check's start screen is the Check tab's third view; its live screen is a flow without the bar.
+        assertEquals(AppTab.CHECK, AppTabs.tabOf(com.dpdpxray.app.webcheck.WebCheckRoutes.START))
+        assertNull(AppTabs.tabOf(com.dpdpxray.app.webcheck.WebCheckRoutes.LIVE))
         assertEquals(AppTab.REPORTS, AppTabs.tabOf(AppTabs.REPORTS))
         assertEquals(AppTab.MORE, AppTabs.tabOf(AppTabs.MORE))
     }

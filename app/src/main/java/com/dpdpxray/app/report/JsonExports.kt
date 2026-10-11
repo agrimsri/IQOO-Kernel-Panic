@@ -8,6 +8,8 @@ import com.dpdpxray.core.darkpattern.DarkPatternExport
 import com.dpdpxray.core.export.AuditBundleV1
 import com.dpdpxray.core.export.AuditBundles
 import com.dpdpxray.core.export.BundleApp
+import com.dpdpxray.core.export.BundleTarget
+import com.dpdpxray.core.web.WebAudit
 import com.dpdpxray.core.export.SdkAttributionExport
 import com.dpdpxray.core.quarantine.QuarantineReport
 import com.dpdpxray.core.report.AuditJson
@@ -53,6 +55,8 @@ object AuditJsonExport {
             sdkAttribution = sdkAttribution,
             playLabel = playLabel,
             darkPatterns = darkPatterns,
+            // A website check names what it checked: target.kind "web" and the address. App audits leave it out.
+            target = bundle.sessions.firstNotNullOfOrNull { it.web }?.takeIf { WebAudit.isWeb(bundle.sessions) }?.let { BundleTarget(WebAudit.KIND, it.url) },
         )
 
     /** Audit ids already say what they are ("audit-<ms>", "sample-<ms>"): TraceVeil-audit-1791595268053.json. */

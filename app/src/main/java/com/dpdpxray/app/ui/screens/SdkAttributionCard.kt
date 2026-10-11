@@ -64,12 +64,18 @@ import kotlinx.coroutines.withContext
  * the installed app's code marks SDKs whose class names are bundled (PRESENT IN CODE, static).
  */
 @Composable
-internal fun SdkAttributionCard(vm: XrayViewModel, b: AuditBundle, groups: List<SdkGroup>, modifier: Modifier = Modifier) {
+internal fun SdkAttributionCard(
+    vm: XrayViewModel, b: AuditBundle, groups: List<SdkGroup>, modifier: Modifier = Modifier,
+    /** A website check: requests instead of lookups, no app-code read and no Android SDK fixes. */
+    web: Boolean = false,
+) {
+    val unit = if (web) "request" else "lookup"
+    val fixFor: (String) -> FixTemplate? = if (web) { _ -> null } else { id -> vm.fixTemplate(id) }
     val linked = groups.filter { it.known && it.checks.isNotEmpty() }
     val quiet = groups.filter { it.known && it.checks.isEmpty() }
     val unknown = groups.firstOrNull { !it.known }
     val summary = SdkAttribution.headline(groups, byCompany = false) ?: when {
-        groups.isEmpty() -> "No lookups were captured in this audit."
+        groups.isEmpty() -> "No ${unit}s were captured in this audit."
         else -> "No finding in this audit names a catalogued SDK."
     }
     val ctx = LocalContext.current
@@ -78,19 +84,19 @@ internal fun SdkAttributionCard(vm: XrayViewModel, b: AuditBundle, groups: List<
     val code = (scan as? CodeScanState.Done)?.result?.found
     val signed = remember { SdkCodeSignatures.default.entries.map { it.entity }.toSet() }
     val row: @Composable (SdkGroup) -> Unit = { g ->
-        SdkGroupRow(g, b.result.findings, code, signed, vm::fixTemplate) { label, text -> vm.copy(label, text) }
+        SdkGroupRow(g, b.result.findings, code, signed, fixFor, unit) { label, text -> vm.copy(label, text) }
     }
 
-    CollapsibleCard("Which SDK caused this?", modifier, summary = summary, glyph = Glyph.SEARCH, accent = Brand.coral) {
-        KeyCaveat("A lookup is an attempt to contact a host, not proof that data was sent.", color = Film.scan)
+    CollapsibleCard(if (web) "Which company or tracker?" else "Which SDK caused this?", modifier, summary = summary, glyph = Glyph.SEARCH, accent = Brand.coral) {
+        KeyCaveat("A $unit is an attempt to contact a host, not proof that data was sent.", color = Film.scan)
         if (linked.isEmpty()) Note("No finding in this audit names a catalogued SDK.")
         linked.forEach { row(it) }
         if (quiet.isNotEmpty()) {
             LearnMore(label = "Also contacted, no finding (${quiet.size})", openLabel = "Hide") { quiet.forEach { row(it) } }
         }
         unknown?.let { row(it) }
-        Hairline(Modifier.padding(vertical = 4.dp))
-        CodeScanSection(b, groups, scan) {
+        if (!web) Hairline(Modifier.padding(vertical = 4.dp))
+        if (!web) CodeScanSection(b, groups, scan) {
             scope.launch {
                 scan = CodeScanState.Running
                 scan = withContext(Dispatchers.IO) { AppCodeReader.scan(ctx, b.meta.targetPackage) }
@@ -115,6 +121,7 @@ private fun SdkGroupRow(
     code: Map<String, List<String>>?,
     signed: Set<String>,
     fixFor: (String) -> FixTemplate?,
+    unit: String,
     copy: (String, String) -> Unit,
 ) {
     val accent = if (g.known) categoryColor(g.category) else Film.boneDim
@@ -149,7 +156,7 @@ private fun SdkGroupRow(
                 Tag(id.code, sev?.let { severityColor(it) } ?: Film.boneDim)
             }
             if (g.evidence == EvidenceType.OBSERVED) {
-                Tag("OBSERVED · ${g.lookups} ${if (g.lookups == 1) "lookup" else "lookups"}", Film.scan)
+                Tag("OBSERVED · ${g.lookups} ${if (g.lookups == 1) unit else "${unit}s"}", Film.scan)
             } else {
                 Tag("INFERRED", Film.warn)
             }

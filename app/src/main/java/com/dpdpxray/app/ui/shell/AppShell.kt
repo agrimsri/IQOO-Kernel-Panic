@@ -57,6 +57,8 @@ object AppTabs {
     const val REPORTS = "reports"
     /** Settings, AI lab, Camera check, samples and the intro. */
     const val MORE = "more"
+    /** The website check's start screen, the third view of the Check tab (webcheck.WebCheckRoutes.START). */
+    const val WEBSITE = "webcheck"
 
     /**
      * The tab a destination belongs to, or null for screens shown without the bar: onboarding, a running check,
@@ -64,7 +66,7 @@ object AppTabs {
      */
     fun tabOf(route: String?): AppTab? = when (route?.substringBefore('?')) {
         AppTab.HOME.route -> AppTab.HOME
-        AppTab.CHECK.route, "apkguard" -> AppTab.CHECK
+        AppTab.CHECK.route, "apkguard", WEBSITE -> AppTab.CHECK
         REPORTS -> AppTab.REPORTS
         MORE -> AppTab.MORE
         else -> null
