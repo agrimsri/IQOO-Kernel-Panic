@@ -43,6 +43,19 @@ object CheckSarif {
                             put("properties", buildJsonObject {
                                 put("policyPassed", checks.all { it.passed })
                                 put("policyViolations", JsonArray(checks.flatMap { c -> c.violations.map { JsonPrimitive("${c.source.displayPath}: ${it.rule}: ${it.message}") } }))
+                                // The hardware signature next to each bundle: verified, failed or absent (docs/SIGNED_EVIDENCE.md).
+                                put("signatures", buildJsonArray {
+                                    checks.forEach { c ->
+                                        c.signature?.let { s ->
+                                            add(buildJsonObject {
+                                                put("bundle", c.source.displayPath)
+                                                put("status", s.state.wire)
+                                                put("file", s.path)
+                                                put("text", s.summary)
+                                            })
+                                        }
+                                    }
+                                })
                             })
                         })
                     })
@@ -89,6 +102,7 @@ object CheckSarif {
             put("evidence", JsonArray(f.evidence.map(::JsonPrimitive)))
             put("entities", JsonArray(f.entities.map(::JsonPrimitive)))
             put("plans", JsonArray(f.plans.map { JsonPrimitive(it.name) }))
+            c.signature?.let { put("signature", it.state.wire) }
         })
     }
 

@@ -39,4 +39,16 @@ class EndpointMapIntegrationTest {
         assertFalse(legal.caveat.contains("not yet in force"))
         assertTrue(legal.caveat.contains("Verify"))
     }
+
+    @Test fun `outline credit names Natural Earth as public domain, with no non-commercial limit`() {
+        assertEquals("Country outlines: Natural Earth (public domain).", EndpointMapIntegration.OUTLINE_CREDIT)
+        assertFalse(EndpointMapIntegration.OUTLINE_CREDIT.contains("BY-NC"))
+        assertFalse(EndpointMapIntegration.OUTLINE_CREDIT.contains("amCharts"))
+    }
+
+    @Test fun `countries too small to draw are named under the map, never dropped silently`() {
+        assertEquals("Not drawn at this scale: Bahrain, Singapore. The list below includes them.", EndpointMapIntegration.undrawnNote(listOf("BH", "SG")))
+        assertEquals("Not drawn at this scale: Singapore. The list below includes it.", EndpointMapIntegration.undrawnNote(listOf("SG")))
+        assertNull(EndpointMapIntegration.undrawnNote(emptyList()))
+    }
 }

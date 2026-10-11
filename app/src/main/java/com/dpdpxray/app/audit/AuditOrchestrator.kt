@@ -156,7 +156,11 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             findingCount = result.findings.size, plans = config.plans.map { it.label },
             timingProfile = timingProfile,
             inconclusiveReason = com.dpdpxray.core.rules.Inconclusive.reason(result.findings)?.name,
-        )
+        ).let { m ->
+            // Update Watch: the version this audit saw, so a later update of the app can be noticed and compared.
+            val version = com.dpdpxray.core.update.AppVersion.ofSessions(sessions)
+            m.copy(targetVersionName = version?.name, targetVersionCode = version?.code)
+        }
         graph.repository.save(meta, sessions, result, markdown, capturedPlans.map { it.upload })
         _progress.value = AuditProgress.Done(auditId)
         returnToXray()

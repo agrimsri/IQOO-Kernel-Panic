@@ -3,6 +3,8 @@ package com.leakyshop.demo
 import android.app.Application
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -31,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,14 +47,17 @@ import androidx.compose.ui.unit.sp
 import com.appsflyer.AppsFlyerLib
 import com.mixpanel.android.mpmetrics.MixpanelAPI
 import com.onesignal.OneSignal
+import kotlinx.coroutines.delay
 import java.net.InetAddress
+import java.util.Locale
 import kotlin.concurrent.thread
 
 /**
  * LeakyShop is the demo "victim" app for TraceVeil.
  * It does NOT contain real tracker SDKs and sends no data: it performs the same DNS lookups those SDKs make when they
  * initialise, which is exactly the evidence TraceVeil captures. The `leaky` flavor behaves like a typical non-compliant app;
- * the `fixed` flavor shows the DPDP-compliant pattern.
+ * the `fixed` flavor shows the DPDP-compliant pattern; `leakyV11` is version 1.1 of the leaky app, a partial fix (see the
+ * behaviour flags in build.gradle.kts).
  * A few lookups go through demo stand-ins that borrow real SDK package names (com.appsflyer, com.mixpanel, com.onesignal,
  * io.sentry) so `traceveil sdks` can show "SDK found in APK" next to "tracker observed live"; the rest are plain app code.
  */
@@ -85,7 +91,7 @@ class ShopApp : Application() {
     override fun onCreate() {
         super.onCreate()
         SdkSimulator.touch(SdkSimulator.OWN_API)
-        if (!BuildConfig.COMPLIANT) {
+        if (BuildConfig.TRACKERS_AT_LAUNCH) {
             // The classic mistake: SDKs auto-initialise in Application.onCreate, before any consent.
             SdkSimulator.touch(SdkSimulator.FIREBASE_ANALYTICS, SdkSimulator.FACEBOOK, SdkSimulator.CRASHLYTICS, SdkSimulator.AMPLITUDE, SdkSimulator.CLARITY)
             AppsFlyerLib.start()
@@ -98,6 +104,11 @@ class ShopApp : Application() {
 }
 
 class ShopActivity : ComponentActivity() {
+    /** NAG_AFTER_REJECT: the second popup shown 5 s after "Reject all" (leaky 1.0 only). */
+    private var nagVisible by mutableStateOf(false)
+    private val nagTimer = Handler(Looper.getMainLooper())
+    private val showNag = Runnable { nagVisible = true }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -107,14 +118,26 @@ class ShopActivity : ComponentActivity() {
                 if (showConsent) {
                     if (BuildConfig.COMPLIANT) FixedConsent { showConsent = false } else LeakyConsent { showConsent = false }
                 }
+                if (nagVisible) NagAfterReject(
+                    // Demo only: "Allow & save" stores the choice and contacts no host, so audits score as before.
+                    onAllow = { Consent.save(this, true); nagVisible = false },
+                    onDecline = { nagVisible = false },
+                )
             }
         }
+    }
+
+    /** Leaving the screen (Home, next audit plan) drops a pending or open nag, so it never greets a later launch. */
+    override fun onStop() {
+        nagTimer.removeCallbacks(showNag)
+        nagVisible = false
+        super.onStop()
     }
 
     @Composable
     private fun LeakyConsent(onDone: () -> Unit) {
         var manage by remember { mutableStateOf(false) }
-        var share by remember { mutableStateOf(true) } // pre-ticked: a dark pattern
+        var share by remember { mutableStateOf(BuildConfig.PRE_TICKED) } // pre-ticked: a dark pattern
         if (!manage) {
             AlertDialog(
                 onDismissRequest = {},
@@ -137,6 +160,10 @@ class ShopActivity : ComponentActivity() {
                         onDone()
                     }) { Text("Accept & Continue") }
                 },
+                // 1.1 adds a visible Reject on the first screen. Refusing here stores the choice and contacts no tracker.
+                dismissButton = if (BuildConfig.REJECT_ON_FIRST_SCREEN) {
+                    { OutlinedButton(onClick = { Consent.save(this, false); onDone() }) { Text("Reject") } }
+                } else null,
             )
         } else {
             AlertDialog(
@@ -147,15 +174,55 @@ class ShopActivity : ComponentActivity() {
                 dismissButton = {
                     TextButton(onClick = {
                         Consent.save(this, false)
-                        // The bug TraceVeil catches: refusal is stored but the SDKs keep running.
-                        SdkSimulator.touch(SdkSimulator.FACEBOOK, SdkSimulator.FIREBASE_ANALYTICS)
-                        AppsFlyerLib.start()
-                        MixpanelAPI.track()
+                        // The bug TraceVeil catches: refusal is stored but the SDKs keep running (fixed in 1.1).
+                        if (BuildConfig.TRACKERS_AFTER_REJECT) {
+                            SdkSimulator.touch(SdkSimulator.FACEBOOK, SdkSimulator.FIREBASE_ANALYTICS)
+                            AppsFlyerLib.start()
+                            MixpanelAPI.track()
+                        }
+                        // Dark-pattern demo (nagging): ask again 5 s after the refusal.
+                        if (BuildConfig.NAG_AFTER_REJECT) nagTimer.postDelayed(showNag, NAG_DELAY_MS)
                         onDone()
                     }) { Text("Reject all", fontSize = 12.sp) }
                 },
             )
         }
+    }
+
+    /**
+     * The nag after "Reject all" (leaky 1.0, NAG_AFTER_REJECT). Built to resemble four patterns of the CCPA's 2023 dark-pattern
+     * list for TraceVeil's demo: it asks again after a refusal (nagging), counts down (false urgency), makes declining sound
+     * costly (confirm shaming) and shows "Allow" as a big button but "No" as small grey text (interface interference), like
+     * the "Renew Now" / "Accept Risk" screen in the CCPA's published orders. It sends nothing and contacts no host.
+     */
+    @Composable
+    private fun NagAfterReject(onAllow: () -> Unit, onDecline: () -> Unit) {
+        var secondsLeft by remember { mutableStateOf(NAG_COUNTDOWN_S) }
+        LaunchedEffect(Unit) {
+            while (secondsLeft > 0) {
+                delay(1_000)
+                secondsLeft--
+            }
+        }
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Wait! Get 10% off by allowing personalised offers") },
+            text = {
+                Column {
+                    Text(
+                        String.format(Locale.US, "Offer ends in %02d:%02d", secondsLeft / 60, secondsLeft % 60),
+                        color = Color(0xFFC62828), fontWeight = FontWeight.Bold,
+                    )
+                    Text("Share data with our partners to unlock your discount.", modifier = Modifier.padding(top = 6.dp))
+                    Button(onClick = onAllow, modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) { Text("Allow & save") }
+                    Text(
+                        "No, I prefer paying more", color = Color.Gray, fontSize = 12.sp,
+                        modifier = Modifier.align(Alignment.CenterHorizontally).clickable { onDecline() }.padding(top = 8.dp),
+                    )
+                }
+            },
+            confirmButton = {},
+        )
     }
 
     @Composable
@@ -243,5 +310,10 @@ class ShopActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private companion object {
+        const val NAG_DELAY_MS = 5_000L
+        const val NAG_COUNTDOWN_S = 9 * 60 + 59
     }
 }

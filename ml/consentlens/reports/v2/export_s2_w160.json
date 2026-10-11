@@ -1,0 +1,25 @@
+{
+ "recipe": "s2_w160",
+ "seed": 42,
+ "bytes": 271720,
+ "sha256": "ce033aa749a106ceb55469de1ba3e959ec23c33102d8600201dc3d834ea64c79",
+ "params": 253511,
+ "ops": [
+  "GATHER",
+  "EXPAND_DIMS",
+  "CONV_2D",
+  "RESHAPE",
+  "EXPAND_DIMS",
+  "CONV_2D",
+  "RESHAPE",
+  "REDUCE_MAX",
+  "FULLY_CONNECTED",
+  "FULLY_CONNECTED",
+  "SOFTMAX"
+ ],
+ "output_quantization": [
+  0.00390625,
+  -128
+ ],
+ "int8_vs_float_agreement_on_training_rows": 0.9975
+}

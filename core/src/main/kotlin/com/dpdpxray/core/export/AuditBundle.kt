@@ -1,10 +1,15 @@
 package com.dpdpxray.core.export
 
+import com.dpdpxray.core.attribution.SdkGroup
+import com.dpdpxray.core.datasafety.PlayLabelExport
+import com.dpdpxray.core.darkpattern.DarkPatternExport
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.ScoreBand
 import com.dpdpxray.core.quarantine.QuarantineReport
 import com.dpdpxray.core.report.AuditJson
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -30,7 +35,13 @@ import java.time.temporal.ChronoUnit
  * so a bundle holds exactly the evidence the app scored. Readers ignore fields they do not know. A missing optional
  * part (meta, networkReadings) reads as unknown, never as zero. Fixtures may add a top-level "note"; it is omitted
  * when unset. "legalProfile" names the legal lens selected when the bundle was exported (a core LegalProfile name such
- * as "EU"); it is omitted when unset and never changes the evidence or the stored result.
+ * as "EU"); it is omitted when unset and never changes the evidence or the stored result. "sdkAttribution" (optional,
+ * omitted when unset) groups the bundle's own lookups and findings by the catalogue service behind them; it is derived
+ * from "sessions" and "result" with TraceVeil's tracker catalogue and adds no new evidence. "playLabel" (optional, omitted
+ * when unset) is the Google Play Data safety text a person attached to the audit and, when computed, its comparison with
+ * the bundle's lookups; it is separate from the score and never changes "result".
+ * "darkPatterns" (optional, omitted when unset) lists the dark-pattern signals (India CCPA 2023) read from the same
+ * sessions' consent-screen trees and taps; they are signals for review, never findings, and never change "result".
  */
 
 /** The audited app named at the top of a bundle. */
@@ -57,7 +68,28 @@ data class AuditBundleV1(
     val note: String? = null,
     /** The legal lens selected at export (LegalProfile name). Not written when null; readers fall back to their default. */
     val legalProfile: String? = null,
+    /** "Which SDK caused this?", derived on the phone from [sessions] and [result]. Not written when null. */
+    val sdkAttribution: SdkAttributionExport? = null,
+    /** "Play label vs what this check saw": the attached Data safety text and its comparison. Not written when null. */
+    val playLabel: PlayLabelExport? = null,
+    /** Dark-pattern signals (India CCPA 2023), derived on the phone from [sessions]; never part of [result]. Not written when null. */
+    val darkPatterns: DarkPatternExport? = null,
 )
+
+/**
+ * The optional "sdkAttribution" part of an audit bundle: [groups] in impact order, with the [basis] they rest on. Older
+ * readers ignore it; a bundle without it means "not exported", never "no SDK".
+ */
+@Serializable
+data class SdkAttributionExport(
+    val basis: String = BASIS,
+    val groups: List<SdkGroup>,
+) {
+    companion object {
+        const val BASIS = "Derived on the phone from this bundle's sessions and findings with TraceVeil's tracker catalogue. " +
+            "A lookup is an attempt to contact a host, not proof that data was sent; hosts the catalogue does not list stay unknown."
+    }
+}
 
 @Serializable
 data class QuarantineBundleV1(
@@ -86,6 +118,14 @@ data class BundleMeta(
     val timingProfile: String? = null,
     /** Why an inconclusive result has no score (Inconclusive.Reason name); absent in older exports. */
     val inconclusiveReason: String? = null,
+    /**
+     * The audited app's versionName / versionCode at audit start (the sessions' manifest facts hold the same values).
+     * Absent in older exports and when not recorded: unknown, never a version. Written only when present.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val targetVersionName: String? = null,
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val targetVersionCode: Long? = null,
 )
 
 /** The text is not a readable bundle of the expected kind; the message says why in plain words. */
@@ -113,21 +153,36 @@ object AuditBundles {
         exportedAt: String = now(),
         note: String? = null,
         legalProfile: String? = null,
+        sdkAttribution: SdkAttributionExport? = null,
+        playLabel: PlayLabelExport? = null,
+        darkPatterns: DarkPatternExport? = null,
     ) = AuditBundleV1(
         exportedAt = exportedAt, app = app, meta = meta, sessions = sessions, result = result,
         networkReadings = networkReadings, tool = BundleTool(TOOL_NAME, toolVersion), note = note, legalProfile = legalProfile,
+        sdkAttribution = sdkAttribution, playLabel = playLabel, darkPatterns = darkPatterns,
     )
 
     fun quarantine(report: QuarantineReport, exportedAt: String = now(), note: String? = null) =
         QuarantineBundleV1(exportedAt = exportedAt, report = report, note = note)
 
-    fun encode(bundle: AuditBundleV1): String = write(json.encodeToJsonElement(AuditBundleV1.serializer(), bundle))
+    fun encode(bundle: AuditBundleV1): String = json.encodeToString(JsonElement.serializer(), element(bundle))
+
+    /** The bundle as the JSON tree [encode] writes: optional top-level parts are left out when unset. */
+    fun element(bundle: AuditBundleV1): JsonElement = trim(json.encodeToJsonElement(AuditBundleV1.serializer(), bundle))
 
     fun encodeQuarantine(bundle: QuarantineBundleV1): String = write(json.encodeToJsonElement(QuarantineBundleV1.serializer(), bundle))
 
     /** Reads a "traceveil.audit.v1" bundle. Throws [BundleFormatException] with a plain reason when it cannot. */
     fun decode(text: String): AuditBundleV1 {
         val root = expectSchema(text, AUDIT_SCHEMA)
+        return readAs("audit bundle") { json.decodeFromJsonElement(AuditBundleV1.serializer(), root) }
+    }
+
+    /** Reads an already-parsed "traceveil.audit.v1" bundle (for example one item of a backup). */
+    fun decode(element: JsonElement): AuditBundleV1 {
+        val root = element as? JsonObject ?: throw BundleFormatException("Expected a JSON object for the audit bundle")
+        val schema = (root["schema"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+        if (schema != AUDIT_SCHEMA) throw BundleFormatException("This item is \"${schema ?: "unnamed"}\", not $AUDIT_SCHEMA")
         return readAs("audit bundle") { json.decodeFromJsonElement(AuditBundleV1.serializer(), root) }
     }
 
@@ -146,14 +201,15 @@ object AuditBundles {
     fun metaOf(bundle: AuditBundleV1): BundleMeta =
         runCatching { lenientMeta.decodeFromJsonElement(BundleMeta.serializer(), bundle.meta) }.getOrElse { BundleMeta() }
 
-    /** Optional "note" and "legalProfile" are dropped when null so the top level stays exactly the shared shape. */
-    private fun write(element: JsonElement): String {
+    /** Optional top-level parts are dropped when null so the top level stays exactly the shared shape. */
+    private fun write(element: JsonElement): String = json.encodeToString(JsonElement.serializer(), trim(element))
+
+    private fun trim(element: JsonElement): JsonElement {
         val obj = element as JsonObject
-        val trimmed = JsonObject(obj.filterNot { (k, v) -> k in OPTIONAL_TOP_LEVEL && v == JsonNull })
-        return json.encodeToString(JsonObject.serializer(), trimmed)
+        return JsonObject(obj.filterNot { (k, v) -> k in OPTIONAL_TOP_LEVEL && v == JsonNull })
     }
 
-    private val OPTIONAL_TOP_LEVEL = setOf("note", "legalProfile")
+    private val OPTIONAL_TOP_LEVEL = setOf("note", "legalProfile", "sdkAttribution", "playLabel", "darkPatterns")
 
     private fun expectSchema(text: String, expected: String): JsonObject {
         val parsed = try {

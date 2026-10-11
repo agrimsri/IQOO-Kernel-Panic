@@ -56,6 +56,12 @@ export default function Compare({ query }) {
                 <Hud>Score change</Hud>
                 <div className={`delta ${deltaClass}`} style={{ marginTop: 8 }}>{cmp.delta == null ? "n/a" : `${cmp.delta > 0 ? "+" : ""}${cmp.delta}`}</div>
                 <div className="small muted" style={{ marginTop: 6 }}>{base.score ?? "–"} → {cand.score ?? "–"} · {bandInfo(base.band).short} → {bandInfo(cand.band).short}</div>
+                {base.versionName && cand.versionName && (
+                  <div className="small cmp-version" style={{ marginTop: 6 }}>
+                    Version {base.versionName} → {cand.versionName}
+                    {base.versionCode != null && cand.versionCode != null && <span className="muted"> (version code {base.versionCode} → {cand.versionCode})</span>}
+                  </div>
+                )}
                 <div className="row" style={{ justifyContent: "center", marginTop: 10 }}>
                   {cmp.samePkg ? <span className="verdict pass"><CheckCircle2 size={13} />Same package</span> : <span className="verdict warn"><AlertTriangle size={13} />Different packages</span>}
                 </div>
@@ -112,7 +118,7 @@ function Picker({ label, value, audits, onChange }) {
     <label className="field">
       <Hud>{label}</Hud>
       <select className="select" value={value || ""} onChange={(e) => onChange(e.target.value)}>
-        {audits.map((a) => <option key={a.id} value={a.id}>{a.label} · {a.pkg} · {fmtDate(a.createdAtMs)} · {a.score ?? "–"}/100{a.sample ? " · sample" : ""}</option>)}
+        {audits.map((a) => <option key={a.id} value={a.id}>{a.label} · {a.pkg}{a.versionName ? ` v${a.versionName}` : ""} · {fmtDate(a.createdAtMs)} · {a.score ?? "–"}/100{a.sample ? " · sample" : ""}</option>)}
       </select>
     </label>
   );

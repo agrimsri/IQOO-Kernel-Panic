@@ -4,6 +4,7 @@ import android.content.Context
 import com.dpdpxray.core.automation.AutomationContract
 import com.dpdpxray.core.automation.AutomationStatus
 import com.dpdpxray.core.automation.AutomationStatuses
+import com.dpdpxray.core.evidence.EvidenceSignatures
 import java.io.File
 import java.io.IOException
 
@@ -26,6 +27,11 @@ class AutomationFiles(private val root: File) {
 
     /** Returns the exact bytes written, which are what the run's bundle signature covers. */
     fun writeBundle(runId: String, text: String): ByteArray = replace(File(runDir(runId), AutomationContract.BUNDLE_FILE), text)
+
+    /** bundle.json.sig.json: the hardware signature (traceveil.signature.v1) over bundle.json's exact bytes. */
+    fun writeSignature(runId: String, text: String) {
+        replace(File(runDir(runId), EvidenceSignatures.fileNameFor(AutomationContract.BUNDLE_FILE)), text)
+    }
 
     /** Keeps the [keep] most recent run folders plus [current]; other run folders are deleted. Nothing else is touched. */
     fun prune(keep: Int, current: String) {

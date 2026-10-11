@@ -2,8 +2,9 @@
 //   node scripts/smoke.mjs        (or: npm run smoke)
 // Checks: first visit loads the labelled samples and starts the tour; importing a valid audit, a bare quarantine
 // report and a broken file; importing the traceveil-ci sample bundles from ../docs/samples (the same files the CLI
-// tests gate); same-package compare; the policy preview with the CLI's defaults and rules; deleting all data stays
-// deleted on reload; no console errors and no network requests.
+// tests gate); the SDK groups (sdkAttribution) those samples carry; same-package compare; app versions in compare; a
+// signature file imported with its export (badge only, never verified in the browser); the policy preview with the
+// CLI's defaults and rules; deleting all data stays deleted on reload; no console errors and no network requests.
 import puppeteer from "puppeteer-core";
 import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -87,6 +88,14 @@ check(t.includes("6 audits"), "the three traceveil-ci sample audits were importe
 await go("/audits/sample-leakyshop-leaky");
 t = await text();
 check(t.includes("LeakyShop (sample)") && /\b21\b/.test(t), "the CLI leaky sample opens with its score of 21");
+// the samples carry sdkAttribution like a phone export (derived by core SdkAttribution, see cli SampleBundles)
+const sdk = await page.evaluate(() => document.querySelector("[data-tour=sdk]")?.innerText || "");
+check(/which sdk caused this\?/i.test(sdk) && sdk.includes("Meta (Facebook SDK)") && sdk.includes("graph.facebook.com"), "the export's SDK groups are shown on the audit page");
+check(sdk.includes("first seen 0.7 s after launch · before consent"), "an SDK group says when it was first seen relative to consent");
+check(sdk.includes("Meta (Facebook) SDK: delay initialisation and app events"), "an SDK group names its fix template");
+check(/C1\s*C2\s*C10/.test(sdk), "an SDK group lists the checks that name it");
+check(sdk.includes("Unknown hosts") && sdk.includes("api.leakyshop.example"), "hosts the catalogue does not list stay in Unknown hosts");
+check(sdk.includes("A lookup is an attempt to contact a host, not proof that data was sent."), "the SDK card carries the lookup caveat");
 await go("/audits/sample-instagram-kept-data");
 t = await text();
 check(t.includes("Instagram (synthetic sample)"), "the CLI kept-data sample opens");
@@ -144,6 +153,43 @@ t = await text();
 check(t.includes("Legal lens: US children (COPPA)") && t.includes("named in the export") && t.includes("skips C3, C4 (not applicable)"),
   "an export's legalProfile selects its lens and the lens score skips not-applicable checks");
 check(t.includes("US children (COPPA): Not applicable"), "a not-applicable finding is labelled, not hidden");
+check(await page.$("[data-tour=sdk]") === null, "an export without sdkAttribution shows no SDK card");
+
+// 5b. app versions in compare, and a signature file imported together with its export (not verified here)
+const v10 = structuredClone(leaky);
+delete v10.sample; v10.meta.sample = false; v10.meta.id = "audit-smoke-v10"; v10.meta.targetVersionName = "1.0"; v10.meta.targetVersionCode = 10;
+const v11 = structuredClone(v10);
+v11.meta.id = "audit-smoke-v11"; v11.meta.targetVersionName = "1.1"; v11.meta.targetVersionCode = 11; v11.meta.createdAtMs += 7_200_000;
+// A structurally valid traceveil.signature.v1 file with placeholder values: the console only notes that it is present.
+const sigFor = (name) => ({
+  schema: "traceveil.signature.v1", algorithm: "ES256", signedFile: name, sha256: "00".repeat(32), signature: "AA==", certificateChain: ["AA=="],
+  createdAt: "2026-10-11T08:00:05Z", appVersion: "1.1.0", keyAlias: "traceveil-evidence-v1", securityLevel: "StrongBox", about: "smoke-test placeholder",
+});
+const rel = { v10: join(tmp, "release-1.0.json"), v11: join(tmp, "release-1.1.json"), sig: join(tmp, "release-1.1.json.sig.json"), orphan: join(tmp, "orphan.json.sig.json") };
+writeFileSync(rel.v10, JSON.stringify(v10));
+writeFileSync(rel.v11, JSON.stringify(v11));
+writeFileSync(rel.sig, JSON.stringify(sigFor("release-1.1.json")));
+writeFileSync(rel.orphan, JSON.stringify(sigFor("orphan.json")));
+const input3 = await page.$("input[type=file]");
+await input3.uploadFile(rel.v10, rel.v11, rel.sig, rel.orphan);
+await sleep(1500);
+t = await text();
+check(t.includes("orphan.json.sig.json: a TraceVeil signature file"), "a signature file without its export is explained, not imported");
+check(!t.includes("release-1.1.json.sig.json: "), "a signature file imported with its export raises no error");
+await go("/compare?a=audit-smoke-v10&b=audit-smoke-v11");
+t = await text();
+check(t.includes("Version 1.0 → 1.1"), "compare shows the app versions when both exports carry them");
+await go("/compare?a=audit-1791590915883&b=audit-smoke-v11");
+t = await text();
+check(!/Version \S+ → /.test(t), "no version line when only one export carries a version");
+await go("/audits/audit-smoke-v11");
+t = (await text()).toLowerCase(); // badges are upper-cased by CSS
+check(t.includes("signature file present"), "an export imported with its .sig.json shows a signature-file badge");
+check(t.includes("not verified in this browser") && t.includes("traceveil-ci verify release-1.1.json"), "the badge says it is not verified here and how to verify");
+check(t.includes("version 1.1 (11)"), "the audit page shows the audited app's version");
+await go("/audits/audit-smoke-v10");
+t = (await text()).toLowerCase();
+check(!t.includes("signature file present"), "an export imported without a signature file has no badge");
 
 // 6. delete everything, reload: samples do not come back
 await go("/settings");

@@ -65,6 +65,8 @@ jobs:
 
       # Exit codes: 0 pass, 1 policy violation, 2 no phone, a refusal on the phone (the log says what to fix there),
       # or timeout. Any non-zero code fails the job. The token comes from TRACEVEIL_TOKEN and is never printed.
+      # The phone's hardware signature (bundle.json.sig.json) is copied and verified too; add --require-signature to
+      # fail the job when the phone could not sign or the signature does not verify.
       - name: Run the consent audit on the phone and gate the build
         run: |
           cli/build/install/traceveil-ci/bin/traceveil-ci run \
@@ -87,7 +89,7 @@ jobs:
       # Code scanning needs GitHub Advanced Security on private repositories; the gate itself (exit code) works without.
       - name: Upload SARIF to code scanning
         if: ${{ !cancelled() && hashFiles('traceveil.sarif') != '' }}
-        uses: github/codeql-action/upload-sarif@v4 # pin to a commit SHA once you adopt the workflow
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           sarif_file: traceveil.sarif
           category: traceveil-device

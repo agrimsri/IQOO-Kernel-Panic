@@ -353,7 +353,8 @@ class RulesEngine(
 
 object ScoreCalculator {
     /**
-     * 100 minus severity weights (inferred findings count half). The result is inconclusive, with no score, when too few
+     * 100 minus severity weights (inferred findings count half). Ready needs 85 or more and no High or Critical problem
+     * seen on the phone; Needs work is 60 to 84; At risk is below 60. The result is inconclusive, with no score, when too few
      * lookups were captured (V0) or when third-party trackers were looked up but consent history is unknown (U1 with
      * entities): a kept-data run cannot tell whether consent came first, so it must never read as "Ready".
      */
@@ -361,12 +362,33 @@ object ScoreCalculator {
         if (Inconclusive.reason(findings) != null) return null to ScoreBand.INCONCLUSIVE
         val penalty = findings.sumOf { f -> f.severity.weight * if (f.evidenceType == EvidenceType.INFERRED) 0.5 else 1.0 }
         val score = (100 - penalty).coerceAtLeast(0.0).roundToInt()
+        // One High alone leaves exactly 85, so points cannot keep a serious problem out of Ready; this gate does.
+        // Only problems seen on the phone close the gate: an AI-inferred finding costs points but never decides alone.
+        val seriousSeen = findings.any { it.evidenceType == EvidenceType.OBSERVED && it.severity.weight >= Severity.HIGH.weight }
         val band = when {
-            score >= 85 -> ScoreBand.READY
+            score >= 85 && !seriousSeen -> ScoreBand.READY
             score >= 60 -> ScoreBand.NEEDS_WORK
             else -> ScoreBand.AT_RISK
         }
         return score to band
+    }
+
+    /**
+     * How far AI or documentation readings could move this result, without changing it: the worst case counts every
+     * INFERRED finding at full weight as if seen on the phone (so an inferred High or Critical also closes the Ready
+     * gate), the best case drops every INFERRED finding as if it were wrong. Both ends use [compute] itself. Null when the
+     * result is inconclusive (V0 and U1 are OBSERVED, so neither end can change that).
+     */
+    fun robustness(findings: List<Finding>): ScoreRobustness? {
+        val (score, band) = compute(findings)
+        if (score == null) return null
+        val confirmed = findings.map { if (it.evidenceType == EvidenceType.INFERRED) it.copy(evidenceType = EvidenceType.OBSERVED) else it }
+        val (worst, worstBand) = compute(confirmed)
+        val (best, bestBand) = compute(findings.filter { it.evidenceType == EvidenceType.OBSERVED })
+        if (worst == null || best == null) return null
+        val inferred = findings.filter { it.evidenceType == EvidenceType.INFERRED && it.severity.weight > 0 }
+            .map { it.checkId }.distinct().sortedBy { it.ordinal }
+        return ScoreRobustness(score, band, worst, worstBand, best, bestBand, inferred)
     }
 }
 

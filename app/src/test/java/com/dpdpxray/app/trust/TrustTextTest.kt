@@ -91,12 +91,47 @@ class TrustTextTest {
 
     @Test
     fun `online voice is described as off or on exactly as the live setting says`() {
-        val off = TrustText.staysOnPhone(onlineVoiceOn = false, backupAllowed = false).first { it.title.startsWith("Online voice") }
+        val off = TrustText.staysOnPhone(onlineVoiceOn = false, backupAllowed = false, onlineVoiceAvailable = true).first { it.title.startsWith("Online voice") }
         assertTrue(off.line, off.line.startsWith("Off"))
-        val on = TrustText.staysOnPhone(onlineVoiceOn = true, backupAllowed = false).first { it.title.startsWith("Online voice") }
+        val on = TrustText.staysOnPhone(onlineVoiceOn = true, backupAllowed = false, onlineVoiceAvailable = true).first { it.title.startsWith("Online voice") }
         assertTrue(on.line, on.line.startsWith("On") && on.line.contains("Sarvam AI") && on.line.contains("not your audio"))
-        val path = TrustText.networkPaths(onlineVoiceOn = false, fallbackResolvers = DnsForwarder.FALLBACKS).first { it.sourceFile.endsWith("SarvamTts.kt") }
+        val path = TrustText.networkPaths(onlineVoiceOn = false, fallbackResolvers = DnsForwarder.FALLBACKS, onlineVoiceAvailable = true).first { it.sourceFile.endsWith("SarvamTts.kt") }
         assertTrue(path.line, path.line.contains("sends nothing"))
+    }
+
+    // ---- builds with and without the optional online voice ----------------------------------------------------------
+
+    @Test
+    fun `a build with the online voice lists it as a network path, in what stays on the phone and under Internet`() {
+        val paths = TrustText.networkPaths(false, DnsForwarder.FALLBACKS, onlineVoiceAvailable = true).map { it.sourceFile }
+        assertTrue(paths.toString(), paths.contains("voice/SarvamTts.kt"))
+        assertTrue(TrustText.staysOnPhone(false, false, onlineVoiceAvailable = true).any { it.title == "Online voice (Sarvam AI)" })
+        assertTrue(TrustText.purpose("android.permission.INTERNET", own, onlineVoiceAvailable = true)!!.second.contains("online voice"))
+    }
+
+    @Test
+    fun `a build without the online voice never mentions it on the trust screen`() {
+        listOf(true, false).forEach { on ->
+            val paths = TrustText.networkPaths(on, DnsForwarder.FALLBACKS, onlineVoiceAvailable = false)
+            assertTrue(paths.none { it.sourceFile.endsWith("SarvamTts.kt") })
+            val words = (
+                paths.flatMap { listOf(it.title, it.line) } +
+                    TrustText.staysOnPhone(on, false, onlineVoiceAvailable = false).flatMap { listOf(it.title, it.line, it.detail.orEmpty()) } +
+                    TrustText.permissionLines(listOf(HeldPermission("android.permission.INTERNET", true)), own, onlineVoiceAvailable = false).map { it.purpose }
+                ).joinToString(" ").lowercase()
+            assertFalse(words, words.contains("sarvam") || words.contains("online voice"))
+        }
+        // Nothing else changes: the other paths and claims are the same in both builds.
+        assertEquals(
+            TrustText.networkPaths(false, DnsForwarder.FALLBACKS, onlineVoiceAvailable = true).filterNot { it.sourceFile == "voice/SarvamTts.kt" },
+            TrustText.networkPaths(false, DnsForwarder.FALLBACKS, onlineVoiceAvailable = false),
+        )
+        assertEquals(
+            TrustText.staysOnPhone(false, false, onlineVoiceAvailable = true).filterNot { it.title.startsWith("Online voice") },
+            TrustText.staysOnPhone(false, false, onlineVoiceAvailable = false),
+        )
+        val internet = TrustText.purpose("android.permission.INTERNET", own, onlineVoiceAvailable = false)!!.second
+        assertTrue(internet, internet.contains("DNS lookups") && internet.contains("wake-word model download"))
     }
 
     @Test

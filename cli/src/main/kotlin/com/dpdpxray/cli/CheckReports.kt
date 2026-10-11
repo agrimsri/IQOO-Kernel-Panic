@@ -7,7 +7,10 @@ import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.EvidenceType
 import com.dpdpxray.core.model.Finding
 import com.dpdpxray.core.model.ScoreBand
+import com.dpdpxray.core.rules.ScoreCalculator
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -21,17 +24,40 @@ object Wording {
         "This is an automated technical check, not legal advice or a compliance certificate."
 
     fun score(r: AuditResult): String =
-        if (r.band == ScoreBand.INCONCLUSIVE || r.score == null) "Inconclusive (score not established)" else "${r.score}/100 · ${band(r.band)}"
+        if (r.band == ScoreBand.INCONCLUSIVE || r.score == null) "Inconclusive (score not established)" else "${r.score}/100 · ${band(r.band, r.score)}"
 
-    /** The score band as a plain range; never a readiness or compliance label. Thresholds as in the core rules engine. */
-    fun band(b: ScoreBand): String = when (b) {
+    /**
+     * The score band as a plain range; never a readiness or compliance label. Thresholds as in the core rules engine,
+     * where an observed High or Critical finding keeps even 85+ points out of the top band.
+     */
+    fun band(b: ScoreBand, score: Int? = null): String = when (b) {
         ScoreBand.READY -> "85–100 band"
-        ScoreBand.NEEDS_WORK -> "60–84 band"
+        ScoreBand.NEEDS_WORK -> if (score != null && score >= 85) "below the 85–100 band: a High or Critical finding was observed" else "60–84 band"
         ScoreBand.AT_RISK -> "below 60"
         ScoreBand.INCONCLUSIVE -> "inconclusive"
     }
 
     fun evidence(t: EvidenceType): String = t.name
+
+    /**
+     * How far AI and documentation readings (INFERRED findings) could move the result: worst case every one confirmed,
+     * best case every one wrong. Computed from the findings by the core calculator; the score itself never changes.
+     */
+    fun robustness(r: AuditResult): String {
+        val rob = ScoreCalculator.robustness(r.findings) ?: return "not established (the result is inconclusive)"
+        val codes = rob.inferred.joinToString { it.code }
+        return when {
+            rob.movable -> "AI and documentation readings (INFERRED: $codes) can move this between ${rob.worstCase} and ${rob.bestCase} · " +
+                if (rob.bandStable) "the band stays ${band(rob.band, rob.score)}"
+                else "the band could change (worst case: ${band(rob.worstBand, rob.worstCase)}; best case: ${band(rob.bestBand, rob.bestCase)})"
+            rob.inferred.isEmpty() -> "fixed: no INFERRED finding carries points, so AI and documentation readings cannot move this score"
+            else -> "fixed at ${rob.score}: the OBSERVED findings alone give ${rob.bestCase}, so the INFERRED findings ($codes) cannot move it"
+        }
+    }
+
+    const val ROBUSTNESS_MEANING = "worstCase: every INFERRED finding (AI screen review or SDK documentation) confirmed, at full weight, " +
+        "and an inferred High or Critical then closes the 85-100 band like an observed one; bestCase: every INFERRED finding wrong " +
+        "and dropped. Computed from the current result's findings; it never changes the score."
 
     fun evidenceMeaning(t: EvidenceType): String = when (t) {
         EvidenceType.OBSERVED -> "OBSERVED evidence"
@@ -96,6 +122,10 @@ object CheckText {
         appendLine("== ${c.source.displayPath}")
         appendLine("App:      ${b.app.label} · ${b.app.packageName}")
         appendLine("Exported: ${b.exportedAt} by ${b.tool.name} ${b.tool.version}")
+        c.signature?.let { s ->
+            val hint = if (s.state == SignatureStatus.State.FAILED) " · traceveil-ci verify shows every check" else ""
+            appendLine("Signature: ${s.summary}${s.path?.let { " · $it" } ?: ""}$hint")
+        }
         c.warnings.forEach { appendLine("Warning:  $it") }
         appendLine("Plans:    " + if (c.coverage.isEmpty()) "none" else c.coverage.joinToString(" | ") { "${it.plan.label}: ${Wording.choice(it)}" })
         appendLine("Fresh:    ${Wording.fresh(c.coverage)}")
@@ -107,6 +137,7 @@ object CheckText {
         } else {
             appendLine("Score:    ${Wording.score(c.current)} (re-evaluated; same as stored in the bundle)")
         }
+        appendLine("Range:    ${Wording.robustness(c.current)}")
         lens(c)
         appendLine()
         findingsTable(c.current.findings)
@@ -170,6 +201,7 @@ object CheckJson {
         put("note", b.note)
         put("storedResult", result(c.stored))
         put("currentResult", result(c.current))
+        put("robustness", robustness(c.current))
         put("resultChanged", c.resultChanged)
         put("plans", buildJsonArray {
             c.coverage.forEach { p ->
@@ -187,6 +219,7 @@ object CheckJson {
             c.outcomes.forEach { o -> add(buildJsonObject { put("rule", o.rule); put("status", o.status.name); put("message", o.message) }) }
         })
         put("legalLens", lens(c))
+        put("signature", c.signature?.toJson() ?: JsonNull)
         put("warnings", JsonArray(c.warnings.map(::JsonPrimitive)))
         put("passed", c.passed)
     }
@@ -200,7 +233,7 @@ object CheckJson {
         put("source", c.lensSource.name.lowercase())
         put("score", v.score)
         put("band", v.band.name)
-        put("bandText", Wording.band(v.band))
+        put("bandText", Wording.band(v.band, v.score))
         put("notApplicable", JsonArray(v.notApplicable.map { JsonPrimitive(it.finding.checkId.code) }))
         put("relations", buildJsonArray {
             v.findings.forEach { lf ->
@@ -216,10 +249,28 @@ object CheckJson {
         put("caveat", Wording.LENS_CAVEAT)
     }
 
+    /** The robustness interval of [r] (null when inconclusive); see Wording.robustness. */
+    private fun robustness(r: AuditResult): JsonElement {
+        val rob = ScoreCalculator.robustness(r.findings) ?: return JsonNull
+        return buildJsonObject {
+            put("score", rob.score)
+            put("worstCase", rob.worstCase)
+            put("bestCase", rob.bestCase)
+            put("band", rob.band.name)
+            put("worstBand", rob.worstBand.name)
+            put("bestBand", rob.bestBand.name)
+            put("bandStable", rob.bandStable)
+            put("movable", rob.movable)
+            put("inferred", JsonArray(rob.inferred.map { JsonPrimitive(it.code) }))
+            put("text", Wording.robustness(r))
+            put("meaning", Wording.ROBUSTNESS_MEANING)
+        }
+    }
+
     private fun result(r: AuditResult) = buildJsonObject {
         put("score", r.score)
         put("band", r.band.name)
-        put("bandText", Wording.band(r.band))
+        put("bandText", Wording.band(r.band, r.score))
         put("checks", JsonArray(r.findings.map { JsonPrimitive(it.checkId.code) }))
     }
 

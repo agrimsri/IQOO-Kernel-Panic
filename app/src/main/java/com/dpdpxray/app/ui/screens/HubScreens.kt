@@ -43,6 +43,7 @@ import com.dpdpxray.app.BuildConfig
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.data.SampleAudit
+import com.dpdpxray.app.notices.OpenSourceNotices
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.ChipFlow
 import com.dpdpxray.app.ui.components.FoldText
@@ -81,8 +82,10 @@ import java.util.Locale
 
 /** The Reports tab: every saved check, newest first, with a band filter. */
 @Composable
-fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit) {
+fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit, onRecheck: (String) -> Unit = {}) {
     val audits by vm.audits.collectAsState()
+    // Update Watch: checked apps whose installed version changed since their last check (same list as Home).
+    val updated by vm.updatedApps.collectAsState()
     val lang = guideLang()
     var filter by rememberSaveable { mutableIntStateOf(0) }
     val bands = listOf(null, ScoreBand.AT_RISK, ScoreBand.NEEDS_WORK, ScoreBand.READY)
@@ -90,6 +93,7 @@ fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         TopBar("Reports", onBack = null)
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (updated.isNotEmpty()) item(key = "updated") { UpdatedSinceCard(updated, onRecheck, Modifier.padding(bottom = 16.dp)) }
             if (audits.isNotEmpty()) item(key = "filter") {
                 SegmentedControl(
                     listOf("All", ScoreBand.AT_RISK.label, ScoreBand.NEEDS_WORK.label, ScoreBand.READY.label), filter, { filter = it },
@@ -109,6 +113,8 @@ fun ReportsScreen(vm: XrayViewModel, onOpen: (String) -> Unit) {
             itemsIndexed(shown, key = { _, a -> a.id }) { _, a ->
                 Box(Modifier.animateItem().cardSurface(Radii.row)) { CheckRow(a, lang) { onOpen(a.id) } }
             }
+            // Back up / restore: also reachable on a new phone, when the list above is still empty.
+            item(key = "backup") { BackupRestoreCard(vm, Modifier.padding(top = 24.dp)) }
         }
     }
 }
@@ -124,6 +130,8 @@ fun MoreScreen(
     onHowItWorks: () -> Unit,
     onOpen: (String) -> Unit,
     onTrust: (() -> Unit)? = null,
+    /** "Open-source notices"; null hides the row. */
+    onNotices: (() -> Unit)? = null,
 ) {
     val audits by vm.audits.collectAsState()
     val llm by vm.llmStatus.collectAsState()
@@ -157,6 +165,10 @@ fun MoreScreen(
             ) {
                 if (onTrust != null) {
                     MoreRow("Why you can trust TraceVeil", "What stays on the phone, its permissions and network use", Glyph.LOCK, onTrust)
+                    GroupDivider(54.dp)
+                }
+                if (onNotices != null) {
+                    MoreRow(OpenSourceNotices.TITLE, OpenSourceNotices.ROW_DETAIL, Glyph.BOOK, onNotices)
                     GroupDivider(54.dp)
                 }
                 ListRow("Version", trailing = { Text(BuildConfig.VERSION_NAME, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim) })

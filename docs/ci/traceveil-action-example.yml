@@ -1,0 +1,58 @@
+# TraceVeil gate action on TraceVeil Runner evidence (example workflow). Copy it to .github/workflows/ to use it; it is
+# an example only and does not run from docs/ci. Action reference: docs/CI_MODE.md ("GitHub Action").
+#
+# Where the bundles come from: `traceveil-ci run --out traceveil-out` saves each run's evidence in
+# traceveil-out/<run id>/ as bundle.json, status.json and, when the phone could sign it in secure hardware,
+# bundle.json.sig.json. Commit the run you release with, both files together and byte for byte (the signature covers
+# bundle.json's exact bytes, so re-indenting or re-saving it breaks the signature), for example:
+#
+#   privacy/traceveil/release-1.4.0/bundle.json
+#   privacy/traceveil/release-1.4.0/bundle.json.sig.json
+#
+# The action re-checks every bundle with the latest rules, verifies each signature offline against Google's hardware
+# attestation roots, uploads the findings to code scanning as SARIF, and fails the job on a policy violation. With
+# require-signature: 'true' an unsigned bundle, or one whose signature does not verify, also fails.
+#
+# This example uses the action from the same repository (the TraceVeil source tree), as docs/ci/traceveil-gate.yml
+# does. From another repository, refer to the action by a full commit SHA of the TraceVeil repository instead:
+#   uses: <owner>/<repository>/.github/actions/traceveil-gate@<full commit SHA>
+# The action then builds traceveil-ci from that commit (Java 17, ./gradlew :cli:installDist).
+name: TraceVeil gate (Runner evidence)
+
+on:
+  pull_request:
+    paths: ['privacy/traceveil/**', 'docs/ci/traceveil-policy.json']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write # needed to upload SARIF to code scanning
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Gate on TraceVeil Runner evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7, same pin as .github/workflows/checks.yml
+        with:
+          persist-credentials: false
+
+      # Exit codes of the gate: 0 pass, 1 policy violation (fails the job), 2 bad input or unreadable bundle (fails
+      # the job). The SARIF report is uploaded in both pass and fail cases.
+      - name: Gate the release on the committed Runner bundles
+        id: traceveil
+        uses: ./.github/actions/traceveil-gate
+        with:
+          bundles: privacy/traceveil/*/bundle.json
+          policy: docs/ci/traceveil-policy.json
+          sarif: traceveil.sarif
+          require-signature: 'true'
+          # Code scanning needs GitHub Advanced Security on private repositories; without it set this to 'false'.
+          upload-sarif: 'true'
+          sarif-category: traceveil-runner

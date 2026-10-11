@@ -49,6 +49,13 @@ enum class ConsentKind {
      * armed; [ConsentEvent.nodeText] holds its visible text. Never a consent choice and never a consent screen.
      */
     PERMISSION_DIALOG,
+
+    /**
+     * The audited app's consent screen was shown again after the plan's recorded Accept/Reject (nagging evidence for the
+     * dark-pattern signals); [ConsentEvent.tree] holds the screen shown again. Never a choice and never the plan's first
+     * consent screen, so no phase or score reads it.
+     */
+    REPROMPT,
 }
 
 /** The three audit plans: accept the consent, reject it, or never touch the app. */

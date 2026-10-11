@@ -24,10 +24,15 @@ import com.google.ai.edge.litertlm.ResponseFormat
 import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.ThinkingConfig
 import com.google.ai.edge.litertlm.benchmark
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -80,7 +85,7 @@ class LlmEngine(private val context: Context) {
      * Loads the model for [kind]. NPU only ever loads a bundle compiled for this phone's SoC and never falls back to the
      * GPU bundle: if no matching bundle exists the status says so and nothing is labelled NPU.
      */
-    suspend fun load(kind: BackendKind = BackendKind.GPU): Boolean = mutex.withLock {
+    suspend fun load(kind: BackendKind = BackendKind.GPU): Boolean = inUse {
         withContext(Dispatchers.Default) {
             val file = when (kind) {
                 BackendKind.NPU -> when (val choice = ModelFiles.npuChoice(context)) {
@@ -157,7 +162,28 @@ class LlmEngine(private val context: Context) {
         EncoderTarget.CPU -> Backend.CPU()
     }
 
-    suspend fun unload() = mutex.withLock { withContext(Dispatchers.Default) { unloadLocked() } }
+    suspend fun unload() = mutex.withLock { idleJob?.cancel(); withContext(Dispatchers.Default) { unloadLocked() } }
+
+    private val idleScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    @Volatile private var idleJob: Job? = null
+
+    /** Runs [block] under the engine lock, then restarts the idle timer, so a model nobody uses does not stay in memory. */
+    private suspend fun <T> inUse(block: suspend () -> T): T = try { mutex.withLock { block() } } finally { armIdleUnload() }
+
+    /** Closes the model after [IDLE_UNLOAD_MS] without a call; the next explanation or audit loads it again. */
+    private fun armIdleUnload() {
+        idleJob?.cancel()
+        if (engine == null) return
+        idleJob = idleScope.launch {
+            delay(IDLE_UNLOAD_MS)
+            mutex.withLock {
+                if (engine != null) {
+                    Log.i(TAG, "closing the model after ${IDLE_UNLOAD_MS / 60_000} minutes unused")
+                    unloadLocked()
+                }
+            }
+        }
+    }
 
     private fun unloadLocked() {
         runCatching { engine?.close() }
@@ -172,7 +198,7 @@ class LlmEngine(private val context: Context) {
      * Reviews a consent screen (screenshot + accessibility text) with constrained JSON output. A text-only model is never
      * sent the screenshot (or a camera photo); it is not asked at all and the accessibility-tree rules decide.
      */
-    suspend fun auditConsentScreen(screenshot: File?, treeText: String): ScreenAudit? = mutex.withLock {
+    suspend fun auditConsentScreen(screenshot: File?, treeText: String): ScreenAudit? = inUse {
         withContext(Dispatchers.Default) {
             val e = engine ?: return@withContext null
             val plan = CapabilityRouting.screenReview(capabilities, screenshot?.exists() == true)
@@ -205,7 +231,7 @@ class LlmEngine(private val context: Context) {
     suspend fun generate(system: String, prompt: String): String? = generateOutcome(system, prompt, AskOptions.EXPLANATION).textOrNull
 
     /** Like [generate], but says what happened: text, an empty reply, or the exception class and message. */
-    suspend fun generateOutcome(system: String, prompt: String, options: AskOptions = AskOptions()): LlmOutcome = mutex.withLock {
+    suspend fun generateOutcome(system: String, prompt: String, options: AskOptions = AskOptions()): LlmOutcome = inUse {
         withContext(Dispatchers.Default) {
             val e = engine ?: return@withContext LlmOutcome.NotLoaded
             llmCatching { ask(e, system, Contents.of(prompt), options) }.also { record("generate", it) }
@@ -227,7 +253,7 @@ class LlmEngine(private val context: Context) {
      * AI lab "Answer check": fixed, data-free prompts run under the app's settings and under each older setting that could
      * explain empty answers, so the failing setting is observed on the phone rather than guessed.
      */
-    suspend fun diagnose(): AnswerCheckReport = mutex.withLock {
+    suspend fun diagnose(): AnswerCheckReport = inUse {
         withContext(Dispatchers.Default) {
             val e = engine ?: return@withContext AnswerCheckReport(
                 listOf(DiagnosticRow("Model", LlmOutcome.NotLoaded, 0, ok = false)), listOf("Load the model first."), "",
@@ -322,7 +348,7 @@ class LlmEngine(private val context: Context) {
 
     /** Real tokens/sec on each backend using LiteRT-LM's built-in benchmark (the main engine is unloaded first). */
     @OptIn(ExperimentalApi::class)
-    suspend fun benchmark(kind: BackendKind): BenchResult = mutex.withLock {
+    suspend fun benchmark(kind: BackendKind): BenchResult = inUse {
         withContext(Dispatchers.Default) {
             val file = if (kind == BackendKind.NPU) {
                 when (val choice = ModelFiles.npuChoice(context)) {
@@ -359,6 +385,7 @@ class LlmEngine(private val context: Context) {
 
     private companion object {
         const val TAG = "TraceVeilLlm"
+        const val IDLE_UNLOAD_MS = 10 * 60_000L
 
         fun samplerConfig(choice: SamplerChoice): SamplerConfig? {
             val k = choice.topK ?: return null

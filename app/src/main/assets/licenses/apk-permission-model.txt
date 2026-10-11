@@ -1,0 +1,19 @@
+APK permission-risk model (ml/apk_permission_risk.json)
+
+TraceVeil trained this model on the datasets below. Both are published under the Creative Commons
+Attribution 4.0 International licence (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/
+The full licence text is included in this app.
+
+NATICUSdroid (Android Permissions) Dataset (training and held-out test)
+  Mathur, A., Podila, L. M., Kulkarni, K., Niyaz, Q., & Javaid, A. Y. (2021). NATICUSdroid
+  (Android Permissions) Dataset. UCI Machine Learning Repository. https://doi.org/10.24432/C5FS64
+  https://archive.ics.uci.edu/dataset/722/naticusdroid+android+permissions+dataset
+
+TUANDROMD (Tezpur University Android Malware Dataset) (cross-dataset test only)
+  Borah, P., & Bhattacharyya, D. K. (2020). TUANDROMD (Tezpur University Android Malware Dataset).
+  UCI Machine Learning Repository. https://doi.org/10.24432/C5560H
+  https://archive.ics.uci.edu/dataset/855/tuandromd+tezpur+university+android+malware+dataset
+
+Changes: permission names were normalised, one duplicated column was merged, and TUANDROMD columns
+that do not map to a single manifest permission name were dropped. Only the trained weights are in
+this app, not the datasets.

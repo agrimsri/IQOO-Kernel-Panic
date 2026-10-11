@@ -30,7 +30,7 @@ internal const val AUTOGUARD_LOG = "TraceVeilAutoGuard"
 class NewAppCheckJobService : AutoGuardJobService() {
     override suspend fun work(jobId: Int) {
         val outcome = NewAppCheck.run(applicationContext, fromJob = true)
-        Log.i(AUTOGUARD_LOG, "new-app check job=$jobId read=${outcome?.read ?: "switched off"} alerted=${outcome?.alerted?.size ?: 0}")
+        Log.i(AUTOGUARD_LOG, "new-app check job=$jobId read=${outcome?.read ?: "switched off"} alerted=${outcome?.alerted?.size ?: 0} updated=${outcome?.updated?.size ?: 0}")
         outcome?.speak?.let { speakAndWait(applicationContext, it) }
     }
 }

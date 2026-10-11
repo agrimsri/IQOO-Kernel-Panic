@@ -17,6 +17,8 @@ dependencies {
     implementation(project(":core"))
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)
+    // Test-only certificate chain builder for `verify` (core/src/testFixtures).
+    testImplementation(testFixtures(project(":core")))
 }
 
 application {

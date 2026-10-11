@@ -288,6 +288,10 @@ class CheckCommandTest {
         assertTrue(outputs[0].out, outputs[0].out.contains("Score:    100/100 · 85–100 band"))
         assertEquals("85–100 band", Wording.band(com.dpdpxray.core.model.ScoreBand.READY))
         assertEquals("60–84 band", Wording.band(com.dpdpxray.core.model.ScoreBand.NEEDS_WORK))
+        // 85 points with an observed High or Critical finding is Needs work: the range must not claim 60–84.
+        assertEquals("60–84 band", Wording.band(com.dpdpxray.core.model.ScoreBand.NEEDS_WORK, 72))
+        assertEquals("below the 85–100 band: a High or Critical finding was observed",
+            Wording.band(com.dpdpxray.core.model.ScoreBand.NEEDS_WORK, 85))
         assertEquals("below 60", Wording.band(com.dpdpxray.core.model.ScoreBand.AT_RISK))
         assertEquals("inconclusive", Wording.band(com.dpdpxray.core.model.ScoreBand.INCONCLUSIVE))
     }

@@ -51,6 +51,8 @@ import com.dpdpxray.app.autoguard.CheckupScreen
 import com.dpdpxray.app.quarantine.QuarantineRoutes
 import com.dpdpxray.app.quarantine.QuarantineScreen
 import com.dpdpxray.app.quarantine.navigateToQuarantine
+import com.dpdpxray.app.notices.NoticesRoutes
+import com.dpdpxray.app.notices.noticesDestinations
 import com.dpdpxray.app.trust.TrustRoutes
 import com.dpdpxray.app.trust.trustDestination
 import com.dpdpxray.app.ui.XrayViewModel
@@ -126,7 +128,7 @@ class MainActivity : ComponentActivity() {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
         }
         lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.RESUMED) { vm.refreshPreflight() }
+            repeatOnLifecycle(Lifecycle.State.RESUMED) { vm.refreshPreflight(); vm.refreshUpdates() }
         }
         if (savedInstanceState == null) AssistantEntry.featureFrom(intent)?.let { assistantFeatures.trySend(it) }
         addOnNewIntentListener { AssistantEntry.featureFrom(it)?.let { f -> assistantFeatures.trySend(f) } }
@@ -226,10 +228,12 @@ class MainActivity : ComponentActivity() {
                                 onLive = { nav.navigate("live") },
                                 onAllReports = { nav.openTab(AppTab.REPORTS) },
                                 onAutomation = { nav.navigate("settings") },
+                                onTrust = { nav.navigate(TrustRoutes.ROUTE) },
+                                onRecheck = { nav.navigate(ApkGuardRoutes.recheckPicker(it)) },
                             )
                         }
                         composable(AppTabs.REPORTS) {
-                            ReportsScreen(vm, onOpen = { nav.navigate("results/$it") })
+                            ReportsScreen(vm, onOpen = { nav.navigate("results/$it") }, onRecheck = { nav.navigate(ApkGuardRoutes.recheckPicker(it)) })
                         }
                         composable(AppTabs.MORE) {
                             MoreScreen(
@@ -241,15 +245,25 @@ class MainActivity : ComponentActivity() {
                                 onHowItWorks = { nav.navigate(OnboardingGate.ONBOARDING) },
                                 onOpen = { nav.navigate("results/$it") },
                                 onTrust = { nav.navigate(TrustRoutes.ROUTE) },
+                                onNotices = { nav.navigate(NoticesRoutes.LIST) },
                             )
                         }
                         trustDestination(nav)
-                        composable("pick?q={q}", arguments = listOf(navArgument("q") { type = NavType.StringType; defaultValue = "" })) { e ->
+                        noticesDestinations(nav)
+                        composable(
+                            "pick?q={q}&select={select}",
+                            arguments = listOf(
+                                navArgument("q") { type = NavType.StringType; defaultValue = "" },
+                                navArgument("select") { type = NavType.StringType; defaultValue = "" },
+                            ),
+                        ) { e ->
                             AppPickerScreen(
                                 vm, onBack = { nav.popBackStack() }, onStarted = { nav.navigate("live") { popUpTo("home") } },
                                 initialQuery = e.arguments?.getString("q").orEmpty(),
                                 onQuarantine = { nav.navigateToQuarantine(it) },
                                 onSwitchToApk = { nav.navigate(ApkGuardRoutes.HUB) { popUpTo(AppTab.HOME.route); launchSingleTop = true } },
+                                // Update Watch "Re-check" (notification, Home, Reports): the app's check sheet opens; nothing starts by itself.
+                                preselect = e.arguments?.getString("select").orEmpty().takeIf { ApkGuardRoutes.isPackageName(it) }.orEmpty(),
                             )
                         }
                         composable(QuarantineRoutes.ROUTE) { e ->

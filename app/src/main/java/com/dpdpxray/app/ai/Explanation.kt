@@ -1,6 +1,7 @@
 package com.dpdpxray.app.ai
 
 import com.dpdpxray.core.copilot.CitationValidator
+import com.dpdpxray.core.copilot.VerdictWords
 import com.dpdpxray.core.dpdp.Passage
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.CheckId
@@ -36,11 +37,12 @@ object Explanations {
     private val bareRef = Regex("\\b(section|sec\\.|s\\.|rule|धारा|नियम)\\s*([0-9]+)", RegexOption.IGNORE_CASE)
     private val idNumber = Regex("^[a-z]+([0-9]+)")
 
-    /** An AI explanation, kept only when it is non-empty and cites no law it was not given. */
+    /** An AI explanation, kept only when it is non-empty, cites no law it was not given and makes no verdict. */
     fun fromModel(text: String?, finding: Finding, passages: List<Passage>, hindi: Boolean, model: String): Explanation {
         val t = plain(text)
         if (t.isEmpty()) return fallback(finding, hindi, "the on-device AI returned no text")
         if (!groundedIn(t, passages)) return fallback(finding, hindi, "the AI's answer cited law it was not given, so it is not shown")
+        VerdictWords.find(t)?.let { return fallback(finding, hindi, "the AI's answer said \"$it\", a verdict TraceVeil never gives, so it is not shown") }
         return Explanation(t, ResultSource.AI_INFERRED, "Written on this phone by $model from this finding's evidence and the law shown above. It can be wrong.")
     }
 

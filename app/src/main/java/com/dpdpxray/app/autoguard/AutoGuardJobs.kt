@@ -13,7 +13,7 @@ import android.content.Context
  * scheduled again with the same settings: scheduling resets its timer and would stop it if it were running.
  */
 object AutoGuardJobs {
-    /** New-app check, about every 15 minutes (Android's minimum period; Android decides the exact time). */
+    /** New-app check, about every 15 minutes (Android's minimum period; Android decides the exact time, never on low battery). */
     const val NEW_APPS_PERIODIC = 4101
     /** One extra new-app check soon after boot, after the app starts, or when the check is switched on. */
     const val NEW_APPS_NOW = 4102
@@ -65,7 +65,7 @@ object AutoGuardJobs {
         val js = context.getSystemService(JobScheduler::class.java) ?: return
         val plan = plan(newApps, weekly)
         plan.cancel.forEach { id -> runCatching { js.cancel(id) } }
-        if (NEW_APPS_PERIODIC in plan.keep) ensurePeriodic(js, context, NEW_APPS_PERIODIC, NewAppCheckJobService::class.java, NEW_APPS_INTERVAL_MS, NEW_APPS_FLEX_MS, batteryNotLow = false)
+        if (NEW_APPS_PERIODIC in plan.keep) ensurePeriodic(js, context, NEW_APPS_PERIODIC, NewAppCheckJobService::class.java, NEW_APPS_INTERVAL_MS, NEW_APPS_FLEX_MS, batteryNotLow = true)
         if (WEEKLY_CHECKUP in plan.keep) ensurePeriodic(js, context, WEEKLY_CHECKUP, PhoneCheckupJobService::class.java, CHECKUP_INTERVAL_MS, CHECKUP_FLEX_MS, batteryNotLow = true)
         if (newApps && runNewAppCheckNow) runNewAppCheckSoon(context)
     }
@@ -83,7 +83,7 @@ object AutoGuardJobs {
 
     private fun ensurePeriodic(js: JobScheduler, context: Context, id: Int, service: Class<*>, interval: Long, flex: Long, batteryNotLow: Boolean) {
         val pending = runCatching { js.getPendingJob(id) }.getOrNull()
-        if (pending != null && pending.isPeriodic && pending.intervalMillis == interval && pending.isPersisted) return
+        if (pending != null && pending.isPeriodic && pending.intervalMillis == interval && pending.isPersisted && pending.isRequireBatteryNotLow == batteryNotLow) return
         val job = JobInfo.Builder(id, ComponentName(context, service))
             .setPeriodic(interval, flex)
             .setPersisted(true)

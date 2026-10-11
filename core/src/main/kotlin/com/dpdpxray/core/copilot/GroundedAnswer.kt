@@ -156,7 +156,8 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
         }
         override fun score(r: AuditResult) = if (r.score == null || com.dpdpxray.core.rules.Inconclusive.reason(r.findings) != null) "This audit is inconclusive and has no score."
         else "It scored ${r.score} out of 100 (${r.band.label}) with ${r.findings.size} finding${if (r.findings.size == 1) "" else "s"}" +
-            (if (r.findings.isEmpty()) "." else ": ${r.findings.joinToString(", ") { it.checkId.code }}.")
+            (if (r.findings.isEmpty()) "." else ": ${r.findings.joinToString(", ") { it.checkId.code }}.") +
+            (robustness(r)?.let { " " + it.line().replace(" · ", "; ") + "." } ?: "")
         override fun trackers(entities: List<String>) = "This audit's findings name these trackers: ${entities.joinToString()}."
         override fun lawLine(passages: List<Passage>) = " Relevant law: ${passages.joinToString("; ") { "[${it.id}] ${it.title}" }}."
     }
@@ -195,13 +196,18 @@ class GroundedAnswerer(private val corpus: DpdpCorpus, private val retriever: Pa
         }
         override fun score(r: AuditResult) = if (r.score == null || com.dpdpxray.core.rules.Inconclusive.reason(r.findings) != null) "यह ऑडिट अनिर्णायक है और इसका कोई स्कोर नहीं है।"
         else "स्कोर ${r.score}/100 (${r.band.label}), ${r.findings.size} निष्कर्ष" +
-            (if (r.findings.isEmpty()) "।" else ": ${r.findings.joinToString(", ") { it.checkId.code }}।")
+            (if (r.findings.isEmpty()) "।" else ": ${r.findings.joinToString(", ") { it.checkId.code }}।") +
+            (robustness(r)?.let { " " + it.line(hindi = true).replace(" · ", "; ") + "।" } ?: "")
         override fun trackers(entities: List<String>) = "इस ऑडिट के निष्कर्षों में ये ट्रैकर हैं: ${entities.joinToString()}।"
         override fun lawLine(passages: List<Passage>) = " संबंधित कानून: ${passages.joinToString("; ") { "[${it.id}] ${it.title}" }}।"
     }
 
     companion object {
         const val TOP_K = 3
+
+        /** The robustness range for a score answer: only when inferred findings can move it and the saved score is today's. */
+        private fun robustness(r: AuditResult) = com.dpdpxray.core.rules.ScoreCalculator.robustness(r.findings)
+            ?.takeIf { it.movable && it.score == r.score && it.band == r.band }
         private const val MAX_ENTITIES = 6
         private val SCREEN_CHECKS = listOf(CheckId.C3, CheckId.C4, CheckId.C5, CheckId.C6)
 

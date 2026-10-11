@@ -18,6 +18,8 @@ google-services.json
 *.jks
 *.keystore
 *.pem
+# Public Android attestation certificate chains (no private key), used only as test inputs.
+!/core/src/test/resources/evidence/keyattestation/*.pem
 *.key
 
 /tools/tests/__pycache__/
@@ -38,3 +40,6 @@ __pycache__/
 /dist/
 *.egg-info/
 /.venv/
+
+# Release signing: passwords and keystore path live outside Git (see docs/RELEASE.md).
+keystore.properties

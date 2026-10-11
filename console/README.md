@@ -40,12 +40,14 @@ npm run screens   # 1440x900 screenshots of the main pages into screens/ (add --
 | `traceveil.quarantine.v1` | `{ schema, exportedAt, report{QuarantineReport} }` |
 | bare `QuarantineReport` | the phone's saved quarantine JSON; summary and timeline are recomputed with the core rules if missing |
 | `traceveil.console-backup.v1` | this console's own "Download all data" file |
+| `traceveil.signature.v1` | the phone's hardware signature next to an export (`<file>.sig.json`). Imported together with that export, it adds a "Signature file present" badge. It is never verified in the browser: use `traceveil-ci verify <file>` on the original file. Imported alone, it is explained and not stored. |
 
 Field names follow `core/src/main/kotlin/com/dpdpxray/core/model/Model.kt` and `core/.../quarantine/*.kt`.
 Unknown fields are ignored; a broken or foreign file is rejected with a reason and nothing else changes. Lookups are
 re-phased exactly like `PhaseAssigner` and classified with the same tracker catalogue the app ships; the tracker
 catalogue, fix templates and DPDP passages are imported at build time from `../core/src/main/resources`, so the
-console never drifts from the app.
+console never drifts from the app. The optional `sdkAttribution` part of an audit export and the audited app's
+`meta.targetVersionName` / `targetVersionCode` are shown as exported when present.
 
 ## Pages
 
@@ -54,8 +56,12 @@ console never drifts from the app.
 - **Audit detail**: coverage first (each plan, consent screen, the exact recorded tap, missing choices, fresh state,
   capture health, Private DNS), score, consent timeline (lanes C, B, A; lookups as marks, red diamonds after Reject,
   tooltips with host, entity, time, phase), findings with OBSERVED / INFERRED / NOT ESTABLISHED labels, first evidence
-  lines, DPDP context and copyable fix snippets, the captured consent screen and every host contacted.
-- **Compare**: resolved, new and unchanged findings by check and the score change. Different packages, plan sets,
+  lines, DPDP context and copyable fix snippets, "Which SDK caused this?" (the export's `sdkAttribution` groups:
+  service, company, hosts, first seen relative to consent, checks, evidence label and fix templates; hidden when the
+  export has none), the captured consent screen and every host contacted. The app's version, and a "Signature file
+  present" badge when the export's `.sig.json` was imported with it (not verified here), sit in the header.
+- **Compare**: resolved, new and unchanged findings by check and the score change, with "Version 1.0 → 1.1" when both
+  exports carry the app's version. Different packages, plan sets,
   timing profiles, sample/live mixes and inconclusive scores are labelled, never passed off as a before-and-after.
 - **Quarantine**: blocked names and addresses, the inferred hard-coded-address signal, permission dialogs, sensitive
   settings screens, the behaviour timeline and the run's own limits.

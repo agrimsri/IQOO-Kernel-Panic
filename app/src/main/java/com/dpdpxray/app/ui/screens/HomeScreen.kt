@@ -47,6 +47,7 @@ import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.control.DeviceChecks
 import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.data.AuditMeta
+import com.dpdpxray.app.trust.HomeTrustCard
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.cardSurface
 import com.dpdpxray.app.ui.components.reveal
@@ -62,6 +63,9 @@ import com.dpdpxray.app.ui.guide.SetupSteps
 import com.dpdpxray.app.ui.guide.SpeakStep
 import com.dpdpxray.app.ui.guide.guideLang
 import com.dpdpxray.app.ui.modes.EverydayCopy
+import com.dpdpxray.app.ui.modes.EverydayUpdates
+import com.dpdpxray.app.autoguard.UpdateWatchCopy
+import com.dpdpxray.core.update.UpdatedApp
 import com.dpdpxray.app.ui.system.Group
 import com.dpdpxray.app.ui.system.GroupDivider
 import com.dpdpxray.app.ui.system.LangVoiceButton
@@ -133,6 +137,10 @@ fun HomeScreen(
     onAllReports: () -> Unit = {},
     /** Developer mode only: the laptop and CI automation settings; null hides the row. */
     onAutomation: (() -> Unit)? = null,
+    /** Opens "Why you can trust TraceVeil"; null hides the trust card. */
+    onTrust: (() -> Unit)? = null,
+    /** Update Watch "Re-check" / "Check again": opens the check flow with this package selected; nothing starts by itself. */
+    onRecheck: (String) -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val lang = guideLang()
@@ -141,6 +149,8 @@ fun HomeScreen(
     val llm by vm.llmStatus.collectAsState()
     val progress by vm.progress.collectAsState()
     val settings by vm.settings.collectAsState()
+    // Update Watch: checked apps whose installed version changed since their last check (same list as Reports).
+    val updated by vm.updatedApps.collectAsState()
     var showSetup by remember { mutableStateOf(false) }
     var showSamples by remember { mutableStateOf(false) }
     val developer = settings.audience == Audience.DEVELOPER
@@ -215,6 +225,12 @@ fun HomeScreen(
             }
         }
 
+        // Update Watch: shown only while a checked app has a different version installed. Developer mode keeps the version
+        // and last-result detail; everyday mode says it plainly, in both guidance languages.
+        if (updated.isNotEmpty()) {
+            if (developer) DeveloperUpdates(updated, onRecheck) else EverydayUpdatesSection(updated, lang, onRecheck, onAllReports)
+        }
+
         // Recent checks: three rows, the rest in Reports.
         SectionHeader(EverydayCopy.recentTitle.pick(lang)) {
             if (audits.size > RECENT_ON_HOME) TextAction(EverydayCopy.seeAll.pick(lang), onAllReports)
@@ -282,6 +298,13 @@ fun HomeScreen(
                 }
             }
         }
+
+        // "Why you can trust TraceVeil": four code-checked facts and this install's live permission line; it opens the
+        // full trust page (also in More › About TraceVeil).
+        if (onTrust != null) {
+            Spacer(Modifier.height(32.dp))
+            HomeTrustCard(lang, onTrust)
+        }
         Spacer(Modifier.height(32.dp))
     }
 
@@ -299,6 +322,35 @@ private fun SectionHeader(text: String, trailing: (@Composable () -> Unit)? = nu
     Row(Modifier.fillMaxWidth().padding(top = 32.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
         trailing?.invoke()
+    }
+}
+
+/** Update Watch for developer mode: each updated app with its version change and last result, and "Re-check". */
+@Composable
+private fun DeveloperUpdates(items: List<UpdatedApp>, onRecheck: (String) -> Unit) {
+    SectionHeader(UpdateWatchCopy.cardTitle(items.size))
+    UpdatedAppsGroup(items, onRecheck)
+}
+
+/**
+ * Update Watch for everyday mode: "An app you checked has updated", each app ("LeakyShop 1.0 → 1.1") with "Check again",
+ * which opens the check for that app; nothing starts until Start is tapped. Past [EverydayUpdates.MAX_ROWS] apps, "See
+ * all" opens Reports, which lists every one.
+ */
+@Composable
+private fun EverydayUpdatesSection(items: List<UpdatedApp>, lang: GuideLang, onRecheck: (String) -> Unit, onAllReports: () -> Unit) {
+    val card = EverydayUpdates.card(items) ?: return
+    SectionHeader(card.title.pick(lang)) {
+        if (card.more > 0) TextAction("${EverydayCopy.seeAll.pick(lang)} (${items.size})", onAllReports)
+    }
+    Group(footer = EverydayCopy.updatedNote.pick(lang)) {
+        card.rows.forEachIndexed { i, row ->
+            if (i > 0) GroupDivider()
+            ListRow(
+                row.line.pick(lang), subtitleMaxLines = 2,
+                trailing = { TextAction(EverydayCopy.checkAgain.pick(lang), { onRecheck(row.packageName) }) },
+            )
+        }
     }
 }
 

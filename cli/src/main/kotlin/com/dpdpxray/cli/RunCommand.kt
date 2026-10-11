@@ -4,6 +4,8 @@ import com.dpdpxray.core.automation.AutomationContract
 import com.dpdpxray.core.automation.AutomationMode
 import com.dpdpxray.core.automation.AutomationStatus
 import com.dpdpxray.core.automation.AutomationStatuses
+import com.dpdpxray.core.evidence.GoogleAttestationRoots
+import com.dpdpxray.core.evidence.TrustedRoot
 import com.dpdpxray.core.model.AuditPlan
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -33,7 +35,7 @@ data class RunOptions(
 ) {
     companion object {
         val VALUE_OPTIONS = listOf("--device", "--package", "--apk", "--mode", "--token", "--policy", "--timeout", "--out", "--adb", "--format", "--sarif")
-        val FLAGS = listOf("--child-facing")
+        val FLAGS = listOf("--child-facing", TraceVeilCi.REQUIRE_SIGNATURE)
         const val DEFAULT_TIMEOUT_S = 300L
         const val MAX_TIMEOUT_S = 86_400L
         const val DEFAULT_OUT = "traceveil-out"
@@ -92,11 +94,12 @@ data class RunOptions(
                 ?: throw UsageException("no pairing token: pass --token or set TRACEVEIL_TOKEN (copy it from $TOKEN_SOURCE)")
             if (!AutomationContract.isValidToken(token.trim())) throw UsageException("the token is not a TraceVeil pairing token (copy it from $TOKEN_SOURCE)")
 
-            val (policy, policySource) = values["--policy"]?.let { path ->
+            val (filePolicy, fileSource) = values["--policy"]?.let { path ->
                 val f = resolve(path)
                 if (!f.isFile) throw UsageException("policy file not found: $path")
                 Policy.parse(f.readText(Charsets.UTF_8)) to "policy file ${LoadedBundle.displayPath(f, cwd)}"
             } ?: (Policy() to DEFAULT_POLICY_SOURCE)
+            val (policy, policySource) = TraceVeilCi.withRequireSignature(filePolicy, fileSource, TraceVeilCi.REQUIRE_SIGNATURE in flags)
 
             val apk = values["--apk"]?.let { path -> resolve(path).also { if (!it.isFile) throw UsageException("APK not found: $path") } }
             return RunOptions(
@@ -124,6 +127,8 @@ class RunCommand(
     private val adbFactory: (String) -> Adb,
     private val clock: RunClock,
     private val newRunId: () -> String,
+    /** Roots the hardware signature must chain to: Google's attestation roots (tests pass a test root). */
+    private val trustedRoots: () -> List<TrustedRoot> = { GoogleAttestationRoots.all },
 ) {
     private val pretty = Json { prettyPrint = true }
 
@@ -155,7 +160,7 @@ class RunCommand(
         } catch (e: IOException) {
             return failure(o, runner, runId, "Could not save the run's files: ${e.message}", "Make --out a folder this user can write to.", null)
         }
-        log("Saved:    ${shown(result.bundleFile)}, ${shown(result.statusFile)}")
+        log("Saved:    ${listOfNotNull(result.bundleFile, result.statusFile, result.signatureFile).joinToString { shown(it) }}")
 
         val loaded = try {
             LoadedBundle.read(result.bundleFile, cwd)
@@ -172,7 +177,9 @@ class RunCommand(
             return failure(o, runner, runId, "bundle.json is audit $bundleAudit, but the phone reported $statusAudit.", null, result.status)
         }
 
-        val check = gate().check(loaded, o.policy)
+        // The hardware signature is verified before gating; with requireSignature anything but verified fails.
+        val signature = SignatureStatus.of(result.bundleFile, null, cwd, trustedRoots())
+        val check = gate().check(loaded, o.policy, signature = signature)
         val code = if (check.passed) Exit.PASS else Exit.VIOLATION
         o.sarif?.let { f ->
             runCatching {
@@ -181,7 +188,15 @@ class RunCommand(
             }.getOrElse { return failure(o, runner, runId, "could not write ${f.path}: ${it.message}", null, result.status) }
         }
         if (json) {
-            out.println(pretty.encodeToString(JsonObject.serializer(), report(o, runner, runId, code, null, null, result.status, shown(result.bundleFile), CheckJson.render(listOf(check), o.policy, o.policySource))))
+            out.println(
+                pretty.encodeToString(
+                    JsonObject.serializer(),
+                    report(
+                        o, runner, runId, code, null, null, result.status, shown(result.bundleFile),
+                        CheckJson.render(listOf(check), o.policy, o.policySource), result.signatureFile?.let(::shown),
+                    ),
+                ),
+            )
         } else {
             out.println()
             out.print(CheckText.render(listOf(check), o.policy, o.policySource))
@@ -205,7 +220,7 @@ class RunCommand(
     /** Machine-readable result: schema "traceveil.ci.run.v1". */
     private fun report(
         o: RunOptions, runner: DeviceRunner, runId: String, code: Int, error: String?, fix: String?,
-        status: AutomationStatus?, bundle: String?, check: JsonObject?,
+        status: AutomationStatus?, bundle: String?, check: JsonObject?, signatureFile: String? = null,
     ): JsonObject = buildJsonObject {
         put("schema", SCHEMA)
         put("tool", buildJsonObject { put("name", CliInfo.NAME); put("version", CliInfo.version) })
@@ -219,6 +234,7 @@ class RunCommand(
         put("runId", runId)
         put("status", status?.let { Json.parseToJsonElement(AutomationStatuses.encode(it)) } ?: JsonNull as JsonElement)
         put("bundle", bundle)
+        put("signatureFile", signatureFile)
         put("check", check ?: JsonNull)
     }
 

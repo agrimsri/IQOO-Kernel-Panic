@@ -9,8 +9,12 @@ import com.dpdpxray.core.geo.GeoTableKind
 import com.dpdpxray.core.geo.IpCountry
 import com.dpdpxray.core.geo.IpCountryLookup
 import com.dpdpxray.core.geo.MapGuide
+import com.dpdpxray.core.geo.MapMode
+import com.dpdpxray.core.geo.MapPresenter
 import com.dpdpxray.core.geo.MmdbReader
+import com.dpdpxray.core.geo.OwnerRegistry
 import com.dpdpxray.core.geo.TableOrigin
+import com.dpdpxray.core.geo.WorldMap
 import com.dpdpxray.core.model.AnswerStatus
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditSession
@@ -75,6 +79,18 @@ class BundledGeoTableTest {
         assertTrue(info.credit!!.startsWith("IP Geolocation by DB-IP (https://db-ip.com)"))
     }
 
+    private fun leakyShopReject(): AuditSession {
+        val s = 1_000_000_000L
+        return AuditSession(
+            id = "r", targetPackage = "com.leakyshop.demo", targetLabel = "LeakyShop", plan = AuditPlan.REJECT,
+            consentEvents = listOf(ConsentEvent(2 * s, ConsentKind.SCREEN_APPEARED), ConsentEvent(8 * s, ConsentKind.REJECT)),
+            netEvents = listOf(
+                NetEvent(tNanos = 1 * s, hostname = "graph.facebook.com", answerIps = listOf("157.240.1.35"), answerStatus = AnswerStatus.COMPLETE, rcode = 0),
+                NetEvent(tNanos = 9 * s, hostname = "app-measurement.com", answerIps = listOf("8.8.8.8"), answerStatus = AnswerStatus.COMPLETE, rcode = 0),
+            ),
+        )
+    }
+
     @Test
     fun `a LeakyShop-style audit gets countries with no file of the person's own`() {
         val s = 1_000_000_000L
@@ -90,5 +106,18 @@ class BundledGeoTableTest {
         val model = EndpointGeoAggregator.build(listOf(session), TrackerCatalog.loadDefault(), choice)
         assertEquals(listOf("US"), model.countries.map { it.iso })
         assertTrue(model.unknown.isEmpty())
+    }
+
+    @Test
+    fun `the LeakyShop map highlights the same countries in both modes and the bundled outline draws them all`() {
+        val model = EndpointGeoAggregator.build(listOf(leakyShopReject()), TrackerCatalog.loadDefault(), GeoSource.Loaded(lookup, TableOrigin.BUNDLED))
+        val owners = OwnerRegistry.fromCatalog(TrackerCatalog.loadDefault())
+        val source = MapPresenter.highlight(model, owners, MapMode.SOURCE_DNS)
+        val owner = MapPresenter.highlight(model, owners, MapMode.OWNER_LEGAL)
+        assertEquals(setOf("US"), source)
+        assertEquals(setOf("US"), owner)
+        val world = WorldMap.loadDefault()
+        assertTrue(world.undrawn(source + owner).isEmpty())
+        assertTrue(world.paths.getValue("US").isNotBlank())
     }
 }
