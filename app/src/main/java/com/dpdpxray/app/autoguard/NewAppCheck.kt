@@ -10,6 +10,8 @@ import com.dpdpxray.app.apkguard.ApkInspector
 import com.dpdpxray.app.apkguard.ApkInstallWatcher
 import com.dpdpxray.app.apkguard.InstallAlert
 import com.dpdpxray.app.apkguard.InstallAlertPolicy
+import com.dpdpxray.app.apkguard.InstallSessions
+import com.dpdpxray.app.apkguard.InstalledScan
 import com.dpdpxray.app.graph
 import com.dpdpxray.core.apk.ApkRiskRules
 
@@ -103,9 +105,17 @@ object NewAppCheck {
             val alerted = mutableListOf<String>()
             var first: InstallAlert? = null
             fresh.forEach { app ->
+                // Installed through "Install anyway" a moment ago: the person has just seen this check.
+                if (InstallSessions.expected.isExpected(app.packageName, System.currentTimeMillis())) {
+                    store.claim(app.packageName, app.firstInstallTime)
+                    return@forEach
+                }
                 val inspected = ApkInspector.readInstalled(context, app.packageName)
                 val alert = when {
-                    inspected != null -> InstallAlertPolicy.alert(inspected.facts.label, ApkRiskRules.evaluate(inspected.facts).summary, app.packageName)
+                    inspected != null -> ApkRiskRules.evaluate(inspected.facts).let { report ->
+                        // The automatic static check: APK Guard rules plus the app's code (skipped on low battery).
+                        InstallAlertPolicy.alert(inspected.facts.label, report.summary, app.packageName, InstalledScan.highlights(context, report))
+                    }
                     ApkInspector.firstInstallTime(context, app.packageName) == null -> return@forEach // removed again
                     else -> InstallAlertPolicy.unread(label(context, app.packageName), app.packageName)
                 }

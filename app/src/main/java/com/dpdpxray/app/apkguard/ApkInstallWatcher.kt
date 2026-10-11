@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 object ApkInstallWatcher {
     const val CHANNEL = "apk_guard_installs"
     const val UPDATES_CHANNEL = "checked_app_updates"
+    const val DOWNLOADS_CHANNEL = "apk_downloads"
     @Volatile private var registered = false
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -63,6 +64,11 @@ object ApkInstallWatcher {
         nm.createNotificationChannel(
             NotificationChannel(UPDATES_CHANNEL, "Updates to apps you checked", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Tells you when an app you checked was updated, so you can check it again. Nothing starts by itself."
+            },
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(DOWNLOADS_CHANNEL, "New APK downloads", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Asks you to check a new app file (APK) in Downloads before you install it. Nothing is installed by itself."
             },
         )
     }
@@ -97,8 +103,11 @@ object ApkInstallWatcher {
         val firstInstall = ApkInspector.firstInstallTime(context, pkg) ?: return
         // The background check may have found this install first; never alert the same install twice.
         if (!AutoGuardStore(context).claim(pkg, firstInstall)) return
+        // Installed through "Install anyway" a moment ago: the person has just seen this check.
+        if (InstallSessions.expected.isExpected(pkg, System.currentTimeMillis())) return
         val report = ApkRiskRules.evaluate(inspected.facts)
-        val alert = InstallAlertPolicy.alert(inspected.facts.label, report.summary, pkg)
+        // The automatic static check: APK Guard rules plus the app's code, read from its installed APK files.
+        val alert = InstallAlertPolicy.alert(inspected.facts.label, report.summary, pkg, InstalledScan.highlights(context, report))
         postInstallAlert(context, pkg, alert)
         if (settings?.speakApkGuardAlerts == true) ApkAlertSpeaker.speak(context, alert.spokenEn, alert.spokenHi)
     }
@@ -110,6 +119,7 @@ object ApkInstallWatcher {
      */
     private fun onUpdate(context: Context, pkg: String) {
         UpdateWatchSource.packageChanged()
+        if (InstallSessions.expected.isExpected(pkg, System.currentTimeMillis())) return
         val settings = runCatching { context.graph.settings.settings.value }.getOrNull()
         if (settings?.autoCheckNewApps == false || settings?.alertCheckedAppUpdates == false) return
         val item = UpdateWatchSource.updates(context, setOf(pkg)).firstOrNull() ?: return
@@ -131,13 +141,22 @@ object ApkInstallWatcher {
         post(context, id, id, open, alert, UPDATES_CHANNEL)
     }
 
-    /** One app's alert; tapping it opens that app's APK Guard result. Re-posting for the same package replaces it. */
+    /**
+     * One app's alert; tapping it opens that app's APK Guard result. Its "Run a consent check" button opens the check
+     * sheet for that app (nothing starts until the person taps Start). Re-posting for the same package replaces it.
+     */
     fun postInstallAlert(context: Context, pkg: String, alert: InstallAlert) {
         val open = Intent(context, MainActivity::class.java)
             .setAction(IncomingApk.ACTION_OPEN_INSTALLED)
             .putExtra(IncomingApk.EXTRA_PACKAGE, pkg)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        post(context, NOTIFICATION_BASE + (pkg.hashCode() and 0xFFFF), pkg.hashCode(), open, alert)
+        val consentCheck = Intent(context, MainActivity::class.java)
+            .setAction(AutoGuardRoutes.ACTION_RECHECK)
+            .putExtra(AutoGuardRoutes.EXTRA_PACKAGE, pkg)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val id = NOTIFICATION_BASE + (pkg.hashCode() and 0xFFFF)
+        post(context, id, pkg.hashCode(), open, alert, action = InstallAlertPolicy.CONSENT_CHECK_ACTION to
+            PendingIntent.getActivity(context, CONSENT_BASE + (pkg.hashCode() and 0xFFFF), consentCheck, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
     }
 
     /**
@@ -160,24 +179,32 @@ object ApkInstallWatcher {
         return context.getSystemService(NotificationManager::class.java)?.areNotificationsEnabled() != false
     }
 
-    private fun post(context: Context, id: Int, requestCode: Int, open: Intent, alert: InstallAlert, channel: String = CHANNEL) {
+    internal fun post(
+        context: Context, id: Int, requestCode: Int, open: Intent, alert: InstallAlert, channel: String = CHANNEL,
+        action: Pair<String, PendingIntent>? = null,
+    ) {
         if (!notificationsAllowed(context)) return
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         ensureChannel(context)
         val tap = PendingIntent.getActivity(context, requestCode, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val n = Notification.Builder(context, channel)
+        val builder = Notification.Builder(context, channel)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(alert.title)
             .setContentText(alert.text)
             .setStyle(Notification.BigTextStyle().bigText("${alert.text}\n${alert.hindi}"))
             .setContentIntent(tap)
             .setAutoCancel(true)
-            .build()
-        runCatching { nm.notify(id, n) }
+        action?.let { (label, intent) -> builder.addAction(Notification.Action.Builder(null, label, intent).build()) }
+        runCatching { nm.notify(id, builder.build()) }
     }
 
-    /** Notification ids: one app's alert 0x4A0000..0x4AFFFF, combined alerts 0x4B0000..0x4BFFFF, updates 0x4C0000..0x4CFFFF. */
+    /**
+     * Notification ids: one app's alert 0x4A0000..0x4AFFFF, combined alerts 0x4B0000..0x4BFFFF, updates
+     * 0x4C0000..0x4CFFFF, new APK downloads 0x4D0000..0x4DFFFF. [CONSENT_BASE] numbers the consent-check buttons.
+     */
     private const val NOTIFICATION_BASE = 0x4A0000
     private const val COMBINED_BASE = 0x4B0000
     private const val UPDATE_BASE = 0x4C0000
+    const val DOWNLOAD_BASE = 0x4D0000
+    private const val CONSENT_BASE = 0x4E0000
 }
