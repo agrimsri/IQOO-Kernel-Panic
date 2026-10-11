@@ -39,7 +39,7 @@ class RestartChoiceDiagnosisTest {
             "Plan B · Reject: TraceVeil did not restart the app first (restarting it would switch off its accessibility service); it was already running."))
         assertTrue(item.sentence, item.sentence.startsWith("TraceVeil left the app running, so as not to switch off something it runs"))
         assertFalse(item.sentence, item.sentence.contains("could not restart"))
-        assertEquals(VisibilityDiagnosis.Action.CHECK_AGAIN_WITH_RESTART, item.action)
+        assertEquals(VisibilityDiagnosis.Action.WATCH_LONGER, item.action)
     }
 
     @Test fun `a restart that failed is still a failure`() {

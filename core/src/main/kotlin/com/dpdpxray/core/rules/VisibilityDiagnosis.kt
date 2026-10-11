@@ -2,6 +2,7 @@ package com.dpdpxray.core.rules
 
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
+import com.dpdpxray.core.model.BackgroundWatches
 import com.dpdpxray.core.model.CheckId
 import com.dpdpxray.core.model.StartMode
 import java.util.Locale
@@ -14,18 +15,32 @@ import java.util.Locale
  * It never adds a score or a finding of its own: the result stays inconclusive. A cause is named only from something
  * recorded; when nothing recorded explains the gap, it says so ([Cause.UNEXPLAINED]) instead of guessing. Pure and
  * deterministic, so the app, the reports and both CLIs word the same causes the same way.
+ *
+ * An app that works in the background (periodic sync, polls) often goes online only every few minutes, and its screens
+ * may be gated: for an app left running, one that stayed quiet, a short watch or a sign-in or passcode gate, the action
+ * offered is a background watch ([Action.WATCH_LONGER]). A watch that itself saw almost nothing is named as what it is,
+ * an observation of the watch ([Cause.QUIET_WATCH]); a locked phone or an app left running is expected there.
  */
 object VisibilityDiagnosis {
     /** Ordered by what has to be fixed first: nothing else helps while another VPN holds the slot. */
     enum class Cause {
         OTHER_VPN, CAPTURE_STOPPED, NO_NETWORK, PRIVATE_DNS, PHONE_LOCKED, APP_CRASHED, NO_INTERNET_PERMISSION,
         ALREADY_RUNNING, OWN_DNS, APP_QUIET, WINDOW_TOO_SHORT, UNEXPLAINED,
+
+        /** A sign-in, passcode or similar screen stood before the consent screen and was not passed. */
+        GATED,
+
+        /** A background watch saw the app make almost no connections in its whole length. */
+        QUIET_WATCH,
     }
 
     /** What one tap on the result offers for a cause. NONE: nothing on the phone would change the outcome. */
     enum class Action {
         CHECK_AGAIN_WITH_RESTART, TURN_OFF_PRIVATE_DNS, TURN_OFF_OTHER_VPN, CONNECT_TO_INTERNET, CHECK_AGAIN,
         RUN_WITH_INTERNET_CUT_OFF, NONE,
+
+        /** Watch the app in the background for longer (see [BackgroundWatches.nextMinutes]); no launch, restart or tap. */
+        WATCH_LONGER,
     }
 
     /** [evidence]: what was recorded, per plan. [sentence]: the plain-language cause, for reports and the result. */
@@ -92,7 +107,8 @@ object VisibilityDiagnosis {
         }, "Private DNS was on, so Android can send the app's lookups encrypted, past TraceVeil. Turn it off in Settings and check again.",
             Action.TURN_OFF_PRIVATE_DNS)
 
-        add(Cause.PHONE_LOCKED, sessions.filter { it.conditions?.phoneLocked == true }.map { "${it.plan.label}: the phone was locked or its screen was off during the plan." },
+        // A watch runs while the phone is used as usual or locked: locking is expected there, never a problem.
+        add(Cause.PHONE_LOCKED, sessions.filter { it.watch == null && it.conditions?.phoneLocked == true }.map { "${it.plan.label}: the phone was locked or its screen was off during the plan." },
             "The phone was locked or its screen went off during the check, so the app may have paused. Keep the phone unlocked and check again.",
             Action.CHECK_AGAIN)
 
@@ -105,7 +121,8 @@ object VisibilityDiagnosis {
             "The app does not ask Android for internet access, so it cannot go online by itself. There was nothing for TraceVeil to see.",
             Action.NONE)
 
-        val notRestarted = sessions.filter(::mayHaveBeenRunning)
+        // A watch leaves the app running on purpose: that is the point of it, not a cause.
+        val notRestarted = sessions.filter { it.watch == null && mayHaveBeenRunning(it) }
         if (notRestarted.isNotEmpty()) {
             val certain = notRestarted.any { it.conditions?.runningBeforeStart == true }
             // Left running on purpose: a restart would have switched off something the app runs (an accessibility service...).
@@ -121,9 +138,17 @@ object VisibilityDiagnosis {
                         "Restarting is your choice: your data stays, but you would switch that on again afterwards."
                     certain -> "The app was already running and TraceVeil could not restart it, so it could reuse addresses it had looked up before the check. Check again with a restart: your data stays."
                     else -> "TraceVeil did not restart the app first. If it was already running, it may have reused addresses it looked up before the check. Check again with a restart: your data stays."
-                },
-                Action.CHECK_AGAIN_WITH_RESTART)
+                } + " " + WATCH_NEEDS_NO_RESTART,
+                Action.WATCH_LONGER)
         }
+
+        // A sign-in or passcode gate: the check could not get further into the app; a watch needs no sign-in.
+        val gated = sessions.filter { s -> s.watch == null && s.conditions?.blocker?.let { it.kind != "PERMISSION" && !it.consentReached } == true }
+        add(Cause.GATED, gated.map(::gateLine),
+            "A sign-in, passcode or similar screen stood before the app's consent screen and was not passed, so the check could not " +
+                "get further into the app. Such apps may go online only in the background, every few minutes, which a background " +
+                "watch can see without anyone signing in.",
+            Action.WATCH_LONGER)
 
         // Only plans that started fresh can say anything about the app's own DNS: a kept process may simply reuse old lookups.
         val fresh = sessions.filter { it.conditions?.startMode == StartMode.RESTARTED || it.conditions?.startMode == StartMode.RESET }
@@ -143,14 +168,24 @@ object VisibilityDiagnosis {
         val explained = out.isNotEmpty()
         val quiet = fresh.filter { seen[it]?.isEmpty() == true || (seen[it] == null && it.conditions?.appTraffic?.active == false) }
         if (!explained) add(Cause.APP_QUIET, quiet.map { s -> "${s.plan.label}: restarted, and " + (if (seen[s] != null) "the app opened no connections" else trafficLine(s)) + "." },
-            "TraceVeil restarted the app and it did not use the network during the check, so there was nothing to judge.",
-            Action.NONE)
+            "TraceVeil restarted the app and it did not use the network during the check, so there was nothing to judge. " +
+                "An app that works in the background may go online only every few minutes.",
+            Action.WATCH_LONGER)
 
+        // A watch stopped early is named by its own cause below, with its length.
         val watched = sessions.sumOf(::watchedNanos)
-        if (sessions.isNotEmpty() && watched in 1 until SHORT_WATCH_NANOS) {
+        if (sessions.isNotEmpty() && !BackgroundWatches.isWatch(sessions) && watched in 1 until SHORT_WATCH_NANOS) {
             add(Cause.WINDOW_TOO_SHORT, listOf("Watched for ${secs(watched)} s in all."),
                 "TraceVeil watched for only ${secs(watched)} s, so lookups the app makes a little later were not seen. A normal Quick check watches longer.",
-                Action.CHECK_AGAIN)
+                Action.WATCH_LONGER)
+        }
+
+        // A background watch that saw almost nothing: an observation of the watch, worded as one.
+        val watches = sessions.filter { it.watch != null }
+        if (watches.isNotEmpty()) {
+            val busy = watches.filter { s -> (connectionCount(s, seen[s]) ?: 0) >= RulesEngine.MIN_EVENTS }
+            add(Cause.QUIET_WATCH, watches.map { watchLine(it, seen[it]) }, quietWatchSentence(watches, seen, busy.isNotEmpty()),
+                if (busy.isEmpty() && BackgroundWatches.nextMinutes(watches) != null) Action.WATCH_LONGER else Action.NONE)
         }
 
         if (out.isEmpty()) {
@@ -163,6 +198,9 @@ object VisibilityDiagnosis {
         }
         return out
     }
+
+    /** Added to the "already running" cause: the action offered there leaves the app as it is. */
+    private const val WATCH_NEEDS_NO_RESTART = "Watching it in the background for longer needs no restart."
 
     /** A short phrase for a cause, for one-line outputs such as the command-line tools ("likely cause: ..."). */
     fun phrase(c: Cause): String = when (c) {
@@ -178,6 +216,8 @@ object VisibilityDiagnosis {
         Cause.APP_QUIET -> "the app did not use the network"
         Cause.WINDOW_TOO_SHORT -> "the watch was too short"
         Cause.UNEXPLAINED -> "not known from what was recorded"
+        Cause.GATED -> "a sign-in or passcode screen was in the way"
+        Cause.QUIET_WATCH -> "the app made almost no connections while it was watched in the background"
     }
 
     /** What to do about an [Action], in a few words, for one-line outputs. */
@@ -189,6 +229,15 @@ object VisibilityDiagnosis {
         Action.CHECK_AGAIN -> "check again"
         Action.RUN_WITH_INTERNET_CUT_OFF -> "run it with the internet cut off to list the addresses it tries"
         Action.NONE -> "nothing on the phone would change this result"
+        Action.WATCH_LONGER -> "watch it in the background for ${BackgroundWatches.DEFAULT_MINUTES} minutes or longer (TraceVeil does not open, restart or tap it; its data stays)"
+    }
+
+    /** [hint] with the watch length to offer next after [sessions] (10 minutes, or 30 after a 10-minute watch). */
+    fun hint(a: Action, sessions: List<AuditSession>): String {
+        val next = BackgroundWatches.nextMinutes(sessions)
+        return if (a == Action.WATCH_LONGER && next != null && next != BackgroundWatches.DEFAULT_MINUTES)
+            "watch it in the background for $next minutes (TraceVeil does not open, restart or tap it; its data stays)"
+        else hint(a)
     }
 
     /** One sentence per cause, for the V0 explanation in reports. */
@@ -226,6 +275,54 @@ object VisibilityDiagnosis {
         )
         return if (parts.isEmpty()) "the app's own network use was not readable" else "the app had " + parts.joinToString(", ")
     }
+
+    /** "Plan B · Reject: a sign-in screen appeared before any consent screen and was not passed (you were asked to complete it)." */
+    private fun gateLine(s: AuditSession): String {
+        val b = s.conditions?.blocker ?: return "${s.plan.label}: a blocking screen appeared before any consent screen."
+        val kind = when (b.kind) {
+            "SIGN_IN" -> "sign-in"
+            "OTP" -> "verification-code"
+            "CAPTCHA" -> "CAPTCHA"
+            "BIOMETRIC" -> "fingerprint, PIN or passcode"
+            "FORM" -> "details-form"
+            else -> "blocking"
+        }
+        return "${s.plan.label}: a $kind screen appeared before any consent screen and was not passed" +
+            (if (b.handedOff) " (you were asked to complete it)" else "") + "."
+    }
+
+    /** Connections a plan recorded: the deeper capture's when given, else its own full-relay flows; null when not captured. */
+    private fun connectionCount(s: AuditSession, seen: List<SeenConnection>?): Int? =
+        seen?.size ?: s.flows.size.takeIf { s.captureDepth == FULL_RELAY }
+
+    /** "Background watch: watched 10 minutes; 1 lookup, 1 connection; it was running when the watch began." */
+    private fun watchLine(s: AuditSession, seen: List<SeenConnection>?): String {
+        val w = s.watch ?: return "${s.plan.label}: ${s.netEvents.size} lookups."
+        val lookups = s.netEvents.count { !it.fromConnection }
+        val conns = connectionCount(s, seen)?.let { count(it, "connection") } ?: "connections were not captured"
+        val running = when (s.conditions?.runningBeforeStart) {
+            true -> "; it was running when the watch began"
+            false -> "; it was not running when the watch began"
+            null -> ""
+        }
+        return "${BackgroundWatches.LABEL}: watched ${BackgroundWatches.length(w)}; ${count(lookups, "lookup")}, $conns$running."
+    }
+
+    private fun quietWatchSentence(watches: List<AuditSession>, seen: Map<AuditSession, List<SeenConnection>?>, busy: Boolean): String {
+        val first = watches.first()
+        val w = first.watch!!
+        val lookups = watches.sumOf { s -> s.netEvents.count { !it.fromConnection } }
+        val conns = watches.mapNotNull { connectionCount(it, seen[it]) }.takeIf { it.size == watches.size }?.sum()
+        val counts = count(lookups, "lookup") + (conns?.let { ", " + count(it, "connection") } ?: "")
+        val head = "TraceVeil watched ${first.targetLabel} in the background for ${BackgroundWatches.length(w)}"
+        if (busy) return "$head: it connected ${conns ?: "several"} times but made only ${count(lookups, "lookup")} TraceVeil could see, " +
+            "so it reused addresses it looked up before the watch or uses its own DNS. The connections are in the check's evidence."
+        val notRunning = if (watches.all { it.conditions?.runningBeforeStart == false }) " It was not running when the watch began." else ""
+        return "$head and saw it make almost no connections ($counts). That is what this watch observed: the app may go online " +
+            "less often than that, or keep using a connection it opened before the watch began, which TraceVeil cannot see.$notRunning"
+    }
+
+    private const val FULL_RELAY = "full-relay"
 
     /** Captured time for one plan: the capture's own window when recorded, else the plan's length. */
     private fun watchedNanos(s: AuditSession): Long {

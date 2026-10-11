@@ -34,11 +34,12 @@ class NoScoreHelpTest {
         netEvents = hosts.mapIndexed { i, h -> NetEvent((i + 1) * 1_000_000_000L, h) }, freshState = fresh, conditions = conditions,
     )
 
-    @Test fun `the live HackTracker result offers check again with a restart as the one filled action`() {
+    @Test fun `the live HackTracker result offers a background watch as the one filled action, a restart as a link`() {
         val b = bundle(session(emptyList(), PlanConditions(startMode = StartMode.NOT_RESTARTED, runningBeforeStart = true)))
         assertEquals(Cause.ALREADY_RUNNING, NoScoreHelp.items(b).first().cause)
         assertTrue(NoScoreHelp.hasPrimary(b))
-        assertEquals(emptyList<Action>(), NoScoreHelp.otherActions(NoScoreHelp.items(b)))
+        assertEquals(Action.WATCH_LONGER, com.dpdpxray.core.rules.VisibilityDiagnosis.primaryAction(NoScoreHelp.items(b)))
+        assertEquals(listOf(Action.CHECK_AGAIN_WITH_RESTART), NoScoreHelp.otherActions(NoScoreHelp.items(b)))
     }
 
     @Test fun `after a settings fix the restart stays one tap away, and check again is never offered twice`() {

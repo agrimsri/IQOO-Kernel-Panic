@@ -42,6 +42,8 @@ object DiagnosisCopy {
         Cause.APP_QUIET -> Bi("The app stayed offline", "ऐप ऑफ़लाइन रहा")
         Cause.WINDOW_TOO_SHORT -> Bi("The watch was short", "देखने का समय छोटा था")
         Cause.UNEXPLAINED -> Bi("Cause not known", "कारण पता नहीं")
+        Cause.GATED -> Bi("A sign-in or passcode screen was in the way", "साइन-इन या पासकोड स्क्रीन रास्ते में थी")
+        Cause.QUIET_WATCH -> Bi("Almost no connections while watched", "देखते समय लगभग कोई कनेक्शन नहीं")
     }
 
     fun body(item: Item): Bi = Bi(item.sentence, when (item.cause) {
@@ -52,21 +54,27 @@ object DiagnosisCopy {
         Cause.PHONE_LOCKED -> "जाँच के दौरान फ़ोन लॉक हुआ या स्क्रीन बंद हुई, इसलिए ऐप रुक गया हो सकता है। फ़ोन अनलॉक रखकर फिर जाँचें।"
         Cause.APP_CRASHED -> "जाँच के दौरान ऐप गड़बड़ी के साथ बंद हुआ (Android ने \"बार-बार बंद हो रहा है\" या \"जवाब नहीं दे रहा\" दिखाया), इसलिए देखने को कम था।"
         Cause.NO_INTERNET_PERMISSION -> "ऐप Android से इंटरनेट की अनुमति नहीं माँगता, इसलिए वह खुद ऑनलाइन नहीं जा सकता। TraceVeil के देखने लायक कुछ नहीं था।"
-        Cause.ALREADY_RUNNING -> "ऐप पहले से चल रहा था या हो सकता है, और TraceVeil उसे रीस्टार्ट नहीं कर सका, इसलिए उसने जाँच से पहले के पते फिर इस्तेमाल किए होंगे। रीस्टार्ट करके फिर जाँचें: आपका डेटा बना रहता है।"
+        Cause.ALREADY_RUNNING -> "ऐप पहले से चल रहा था या हो सकता है, और TraceVeil उसे रीस्टार्ट नहीं कर सका, इसलिए उसने जाँच से पहले के पते फिर इस्तेमाल किए होंगे। रीस्टार्ट करके फिर जाँचें: आपका डेटा बना रहता है। बैकग्राउंड में ज़्यादा देर देखने के लिए रीस्टार्ट की ज़रूरत नहीं।"
         Cause.OWN_DNS -> "ऐप ने नेटवर्क इस्तेमाल किया, पर TraceVeil को लगभग कोई लुकअप नहीं दिखा, इसलिए वह शायद अपना एन्क्रिप्टेड DNS (DNS over HTTPS) या तय पते इस्तेमाल करता है।"
-        Cause.APP_QUIET -> "TraceVeil ने ऐप को रीस्टार्ट किया और जाँच के दौरान उसने नेटवर्क इस्तेमाल नहीं किया, इसलिए परखने को कुछ नहीं था।"
+        Cause.APP_QUIET -> "TraceVeil ने ऐप को रीस्टार्ट किया और जाँच के दौरान उसने नेटवर्क इस्तेमाल नहीं किया, इसलिए परखने को कुछ नहीं था। बैकग्राउंड में काम करने वाला ऐप शायद हर कुछ मिनट पर ही ऑनलाइन जाता है।"
         Cause.WINDOW_TOO_SHORT -> "TraceVeil ने बहुत कम समय तक देखा, इसलिए ऐप के थोड़ी देर बाद के लुकअप नहीं दिखे। सामान्य Quick जाँच ज़्यादा देर देखती है।"
         Cause.UNEXPLAINED -> "TraceVeil को लगभग कोई लुकअप नहीं दिखा और दर्ज किसी चीज़ से इसका कारण पता नहीं चलता। ऐप शायद खुलते समय ऑनलाइन नहीं जाता, या अपना DNS इस्तेमाल करता है; यह इस फ़ोन पर पता नहीं।"
+        Cause.GATED -> "ऐप की सहमति स्क्रीन से पहले साइन-इन, पासकोड या ऐसी ही स्क्रीन आई और पार नहीं हुई, इसलिए जाँच ऐप में आगे नहीं बढ़ सकी। ऐसे ऐप शायद सिर्फ़ बैकग्राउंड में, हर कुछ मिनट पर ऑनलाइन जाते हैं, जिसे बैकग्राउंड निगरानी बिना साइन-इन के देख सकती है।"
+        Cause.QUIET_WATCH -> "TraceVeil ने ऐप को बैकग्राउंड में देखा और उसे लगभग कोई कनेक्शन बनाते नहीं देखा। यह इसी निगरानी में देखा गया: ऐप शायद इससे कम बार ऑनलाइन जाता है, या निगरानी से पहले खोला गया कनेक्शन इस्तेमाल करता है, जिसे TraceVeil नहीं देख सकता।"
     })
 
-    /** The label of the one-tap action for [a]; null when nothing on the phone would help. */
-    fun action(a: Action): Bi? = when (a) {
+    /**
+     * The label of the one-tap action for [a]; null when nothing on the phone would help. A background watch names [app]
+     * and its length in [minutes].
+     */
+    fun action(a: Action, app: String = "the app", minutes: Int = com.dpdpxray.core.model.BackgroundWatches.DEFAULT_MINUTES): Bi? = when (a) {
         Action.CHECK_AGAIN_WITH_RESTART -> restart
         Action.TURN_OFF_PRIVATE_DNS -> Bi("Open Private DNS settings", "Private DNS सेटिंग खोलें")
         Action.TURN_OFF_OTHER_VPN -> Bi("Open VPN settings", "VPN सेटिंग खोलें")
         Action.CONNECT_TO_INTERNET -> Bi("Open internet settings", "इंटरनेट सेटिंग खोलें")
         Action.CHECK_AGAIN -> Bi("Check again", "फिर से जाँचें")
         Action.RUN_WITH_INTERNET_CUT_OFF -> Bi("Run with the internet cut off", "इंटरनेट काटकर चलाएँ")
+        Action.WATCH_LONGER -> WatchCopy.action(app, minutes)
         Action.NONE -> null
     }
 }
