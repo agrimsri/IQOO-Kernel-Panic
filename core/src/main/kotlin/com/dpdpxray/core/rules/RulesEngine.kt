@@ -34,6 +34,8 @@ class RulesEngine(
     private val catalog: TrackerCatalog,
     owners: AppOwners = AppOwners.default,
     sdkCatalog: SdkManifestCatalog = SdkManifestCatalog.default,
+    /** Connections from a capture deeper than DNS; [ConnectionSource.NONE] (DNS only) keeps every rule as it was. */
+    private val connections: ConnectionSource = ConnectionSource.NONE,
 ) {
 
     private val classifier = SessionClassifier(catalog, owners)
@@ -44,13 +46,14 @@ class RulesEngine(
         val historyUnknown: Boolean get() = session.appDataKept && !session.consentScreenSeen
     }
 
-    fun evaluate(sessions: List<AuditSession>): AuditResult {
+    fun evaluate(recorded: List<AuditSession>): AuditResult {
+        val sessions = recorded.map(::withNamedConnections)
         val ctx = sessions.map { s -> Ctx(s, classifier.classify(s), classifier.ownerOf(s)) }
         val findings = mutableListOf<Finding>()
 
         val allEvents = ctx.flatMap { it.events }
         val anyTracking = allEvents.any { it.category.isTracking }
-        if (allEvents.size < MIN_EVENTS && !anyTracking) findings += lowVisibility(sessions)
+        if (allEvents.size < MIN_EVENTS && !anyTracking) findings += lowVisibility(recorded)
 
         c1BeforeConsent(ctx)?.let { findings += it }
         noConsentMechanism(ctx)?.let { findings += it }
@@ -70,6 +73,22 @@ class RulesEngine(
     }
 
     private fun preConsent(e: NetEvent) = e.phase == Phase.BEFORE_CONSENT || e.phase == Phase.NO_CONSENT_SEEN
+
+    /**
+     * A plan with too few lookups, captured more deeply: connections whose server name was read stand in for the missing
+     * lookups (marked [NetEvent.fromConnection]), so the plan can be judged from them. Names already looked up are not
+     * added again, and plans with enough lookups are left exactly as recorded.
+     */
+    private fun withNamedConnections(s: AuditSession): AuditSession {
+        if (s.netEvents.size >= MIN_EVENTS) return s
+        val seen = connections.connections(s) ?: return s
+        val looked = s.netEvents.map { it.hostname.lowercase().trimEnd('.') }.toSet()
+        val extra = seen.mapNotNull { c ->
+            c.serverName?.lowercase()?.trim()?.trimEnd('.')?.takeIf { it.isNotEmpty() && it !in looked }
+                ?.let { NetEvent(tNanos = c.tNanos, hostname = it, fromConnection = true) }
+        }.distinctBy { it.hostname }
+        return if (extra.isEmpty()) s else s.copy(netEvents = (s.netEvents + extra).sortedBy { it.tNanos })
+    }
 
     private fun c1BeforeConsent(ctx: List<Ctx>): Finding? {
         val hits = ctx.filterNot { it.historyUnknown }
@@ -291,7 +310,7 @@ class RulesEngine(
      * tells anyone to clear a personal app's data. The result stays inconclusive: unknown stays unknown.
      */
     private fun lowVisibility(sessions: List<AuditSession>): Finding {
-        val diagnosis = VisibilityDiagnosis.diagnose(sessions)
+        val diagnosis = VisibilityDiagnosis.diagnose(sessions, connections)
         return Finding(
             checkId = CheckId.V0, severity = Severity.INFO, evidenceType = EvidenceType.OBSERVED,
             title = CheckId.V0.title,
@@ -318,7 +337,9 @@ class RulesEngine(
         val who = e.entity?.let { " ($it)" } ?: ""
         val via = e.viaPackage?.let { " via $it" } ?: ""
         val match = e.entity?.let { " — catalogue match: ${e.category.name.lowercase().replace('_', ' ')}" } ?: ""
-        return "${e.hostname}$who$via${alias(e)}$match — looked up $sinceLaunch s after launch, $rel [${c.session.plan.label}]"
+        val seen = if (e.fromConnection) "connected $sinceLaunch s after launch (server name read from the connection; no lookup seen)"
+            else "looked up $sinceLaunch s after launch"
+        return "${e.hostname}$who$via${alias(e)}$match — $seen, $rel [${c.session.plan.label}]"
     }
 
     /** How long the plan was watched ("35.3 s"), so consent claims stay inside the capture window; null if unrecorded. */

@@ -35,18 +35,22 @@ object VisibilityDiagnosis {
     const val SHORT_WATCH_NANOS = 20_000_000_000L
 
     /** The diagnosis behind [result]'s V0 finding; empty when the result has none (enough was captured). */
-    fun forResult(result: AuditResult, sessions: List<AuditSession>): List<Item> =
-        if (result.findings.any { it.checkId == CheckId.V0 }) diagnose(sessions) else emptyList()
+    fun forResult(result: AuditResult, sessions: List<AuditSession>, connections: ConnectionSource = ConnectionSource.NONE): List<Item> =
+        if (result.findings.any { it.checkId == CheckId.V0 }) diagnose(sessions, connections) else emptyList()
 
     /** The first action that can help, or [Action.NONE]. */
     fun primaryAction(items: List<Item>): Action = items.firstOrNull { it.action != Action.NONE }?.action ?: Action.NONE
 
     /**
      * The causes for an audit whose lookups were below the visibility threshold, most important first. Never empty: when
-     * nothing recorded explains the gap, the single item says that the cause is unknown.
+     * nothing recorded explains the gap, the single item says that the cause is unknown. [connections] adds what a
+     * capture deeper than DNS saw (see [ConnectionSource]); without it, the app's own network use comes only from
+     * [com.dpdpxray.core.model.PlanConditions.appTraffic].
      */
-    fun diagnose(sessions: List<AuditSession>): List<Item> {
+    fun diagnose(sessions: List<AuditSession>, connections: ConnectionSource = ConnectionSource.NONE): List<Item> {
         val out = mutableListOf<Item>()
+        val seen = sessions.associateWith { connections.connections(it) }
+        fun lookups(s: AuditSession) = s.netEvents.count { !it.fromConnection }
         fun add(cause: Cause, evidence: List<String>, sentence: String, action: Action) {
             if (evidence.isNotEmpty()) out += Item(cause, evidence.distinct(), sentence, action)
         }
@@ -104,7 +108,10 @@ object VisibilityDiagnosis {
         val notRestarted = sessions.filter(::mayHaveBeenRunning)
         if (notRestarted.isNotEmpty()) {
             val certain = notRestarted.any { it.conditions?.runningBeforeStart == true }
-            add(Cause.ALREADY_RUNNING, notRestarted.map(::notRestartedLine),
+            add(Cause.ALREADY_RUNNING, notRestarted.map { s ->
+                val skipped = seen[s]?.count { it.noLookup } ?: 0
+                notRestartedLine(s) + if (skipped > 0) " It opened ${count(skipped, "connection")} without a lookup TraceVeil saw." else ""
+            },
                 if (certain) "The app was already running and TraceVeil could not restart it, so it could reuse addresses it had looked up before the check. Check again with a restart: your data stays."
                 else "TraceVeil did not restart the app first. If it was already running, it may have reused addresses it looked up before the check. Check again with a restart: your data stays.",
                 Action.CHECK_AGAIN_WITH_RESTART)
@@ -112,15 +119,22 @@ object VisibilityDiagnosis {
 
         // Only plans that started fresh can say anything about the app's own DNS: a kept process may simply reuse old lookups.
         val fresh = sessions.filter { it.conditions?.startMode == StartMode.RESTARTED || it.conditions?.startMode == StartMode.RESET }
-        val busy = fresh.filter { it.netEvents.size < RulesEngine.MIN_EVENTS && it.conditions?.appTraffic?.active == true }
-        add(Cause.OWN_DNS, busy.map { "${it.plan.label}: ${trafficLine(it)}, but only ${it.netEvents.size} lookups." },
-            "The app used the network but made almost no lookups TraceVeil could see, so it may use its own encrypted DNS (DNS over HTTPS) " +
+        val connected = fresh.filter { lookups(it) < RulesEngine.MIN_EVENTS && !seen[it].isNullOrEmpty() }
+        val busy = fresh.filter { lookups(it) < RulesEngine.MIN_EVENTS && it.conditions?.appTraffic?.active == true && it !in connected }
+        add(Cause.OWN_DNS,
+            connected.map { s ->
+                val c = seen[s].orEmpty()
+                "${s.plan.label}: the app opened ${count(c.size, "connection")} (${c.count { it.noLookup }} to addresses it never looked up), but only ${lookups(s)} lookups."
+            } + busy.map { "${it.plan.label}: ${trafficLine(it)}, but only ${lookups(it)} lookups." },
+            if (connected.isNotEmpty()) "The app connected to servers without a lookup TraceVeil could see, so it uses its own DNS (for example DNS over HTTPS) " +
+                "or fixed server addresses. The connections themselves are listed with this check."
+            else "The app used the network but made almost no lookups TraceVeil could see, so it may use its own encrypted DNS (DNS over HTTPS) " +
                 "or fixed server addresses. Running it with the internet cut off lists the addresses it tries.",
             Action.RUN_WITH_INTERNET_CUT_OFF)
 
         val explained = out.isNotEmpty()
-        val quiet = fresh.filter { it.conditions?.appTraffic?.active == false }
-        if (!explained) add(Cause.APP_QUIET, quiet.map { "${it.plan.label}: restarted, and ${trafficLine(it)}." },
+        val quiet = fresh.filter { seen[it]?.isEmpty() == true || (seen[it] == null && it.conditions?.appTraffic?.active == false) }
+        if (!explained) add(Cause.APP_QUIET, quiet.map { s -> "${s.plan.label}: restarted, and " + (if (seen[s] != null) "the app opened no connections" else trafficLine(s)) + "." },
             "TraceVeil restarted the app and it did not use the network during the check, so there was nothing to judge.",
             Action.NONE)
 
@@ -133,7 +147,7 @@ object VisibilityDiagnosis {
 
         if (out.isEmpty()) {
             val restarted = fresh.isNotEmpty()
-            add(Cause.UNEXPLAINED, sessions.map { "${it.plan.label}: ${it.netEvents.size} lookups; " + (if (it in fresh) "started fresh; " else "") + trafficLine(it) + "." },
+            add(Cause.UNEXPLAINED, sessions.map { "${it.plan.label}: ${lookups(it)} lookups; " + (if (it in fresh) "started fresh; " else "") + trafficLine(it) + "." },
                 (if (restarted) "TraceVeil restarted the app and nothing it can see blocked the capture, yet it saw almost no lookups. "
                 else "Nothing TraceVeil recorded explains why it saw almost no lookups. ") +
                     "The app may not go online when it opens, or may use its own DNS over HTTPS or fixed addresses; whether it used the network is unknown on this phone.",
@@ -184,4 +198,6 @@ object VisibilityDiagnosis {
     private val STOP_NOTES = listOf("Capture stopped", "Capture was not running", "Capture restarted after")
 
     private fun secs(nanos: Long) = String.format(Locale.US, "%.1f", nanos / 1e9)
+
+    private fun count(n: Int, word: String) = if (n == 1) "1 $word" else "$n ${word}s"
 }

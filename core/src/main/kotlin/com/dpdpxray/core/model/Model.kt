@@ -109,6 +109,13 @@ data class NetEvent(
     val answerStatus: AnswerStatus? = null,
     /** DNS RCODE of a matching reply (0 = no error, 3 = NXDOMAIN). null when no matching reply was read. */
     val rcode: Int? = null,
+    /**
+     * true: not a DNS lookup but a connection whose server name a deeper capture read (see rules `ConnectionSource`); the
+     * rules engine adds these only for a plan that saw too few lookups, and words them "connected". Never saved by the
+     * DNS capture, and written only when true.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val fromConnection: Boolean = false,
 )
 
 @Serializable
