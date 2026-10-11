@@ -189,6 +189,7 @@ object WebCheckRunner {
         var goneAfterChoice = false
         var stillShownNoted = false
         var unavailable = false
+        var unavailableAtMs = 0L
         var bannerSeenAt = 0L
         var nextDuringSnapshotMs = 0L
         val personTaps = !config.agentTaps
@@ -211,7 +212,18 @@ object WebCheckRunner {
 
         fun clickTime(c: WebClick): Long = t0 + (c.epochMs - epoch0) * 1_000_000
 
-        val waitLimitMs = if (personTaps) WebCheckTiming.WAIT_PERSON_MS else WebCheckTiming.WAIT_BANNER_MS
+        // When a Reject or Accept run without a choice ends: no banner by 20 s (then 15 s more of watching); no way to make
+        // the choice (15 s of watching from then); the person not tapping (45 s, and at least 20 s after the banner);
+        // TraceVeil's tap not taking (10 s of retries after the banner settled).
+        fun deadlineMs(): Long {
+            val bannerMs = (bannerSeenAt - t0) / 1_000_000
+            return when {
+                banner == null -> WebCheckTiming.WAIT_BANNER_MS + WebCheckTiming.OBSERVE_MS
+                unavailable -> unavailableAtMs + WebCheckTiming.OBSERVE_MS
+                personTaps -> maxOf(WebCheckTiming.WAIT_PERSON_MS, bannerMs + 20_000)
+                else -> maxOf(WebCheckTiming.WAIT_BANNER_MS, bannerMs + WebCheckTiming.SETTLE_MS + 10_000)
+            }
+        }
         while (true) {
             delay(WebCheckTiming.POLL_MS)
             if (browser.rendererGone) throw PlanFailure(WebCheckCopy.pageStopped)
@@ -273,7 +285,7 @@ object WebCheckRunner {
                         if (clicked?.ok == true) {
                             choiceAt = at; choiceKind = next.kind
                             events += ConsentEvent(at, next.kind, clicked.text ?: next.control.text)
-                        } else notes += "TraceVeil could not tap \"${next.control.text}\"; it will try again."
+                        } else notes += "TraceVeil could not tap \"${next.control.text}\"."
                     }
                     is WebStep.OpenSettings -> {
                         val clicked = WebProbe.parseClick(browser.evaluate(WebProbe.clickCall(next.control.index)))
@@ -281,15 +293,15 @@ object WebCheckRunner {
                             events += ConsentEvent(now(), ConsentKind.SETTINGS, clicked.text ?: next.control.text)
                             settingsOpened = true
                             delay(WebCheckTiming.SETTINGS_PAUSE_MS)
-                        } else { notes += next.let { "TraceVeil could not open \"${it.control.text}\"." }; unavailable = true }
+                        } else { notes += "TraceVeil could not open \"${next.control.text}\"."; unavailable = true; unavailableAtMs = elapsedMs() }
                     }
-                    is WebStep.Unavailable -> { notes += next.reason; unavailable = true; step(Bi(next.reason, next.reason)) }
+                    is WebStep.Unavailable -> { notes += next.reason; unavailable = true; unavailableAtMs = elapsedMs(); step(Bi(next.reason, next.reason)) }
                 }
                 continue
             } else if (banner == null) step(WebCheckCopy.lookingForBanner)
-            if (elapsedMs() >= waitLimitMs + if (unavailable || banner == null) WebCheckTiming.OBSERVE_MS else 0) {
+            if (elapsedMs() >= deadlineMs()) {
                 when {
-                    banner == null -> notes += WebCheckCopy.noBannerNote(waitLimitMs / 1000).en
+                    banner == null -> notes += WebCheckCopy.noBannerNote(WebCheckTiming.WAIT_BANNER_MS / 1000).en
                     personTaps -> notes += WebCheckCopy.noTapNote.en
                     !unavailable -> notes += WebCheckCopy.noChoiceNote.en
                 }
