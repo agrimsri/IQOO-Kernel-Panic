@@ -6,7 +6,7 @@ import com.dpdpxray.app.ui.modes.ModeCopy
 import com.dpdpxray.app.ui.onboarding.OnboardingCopy
 
 /** The parts of Home below its header (logo, title, language and settings), top to bottom. */
-enum class HomeSection { MODE_SWITCH, HERO, UPDATES, RECENT, TRUST, MORE_WAYS }
+enum class HomeSection { MODE_SWITCH, HERO, UPDATES, RECENT, TRUST, CONTROLS, MORE_WAYS }
 
 /** The rows of Home's "More ways to check". */
 enum class HomeWay { APK_FILE, PHONE_APPS, AUTOMATE, ASK_LAST, CAMERA, SAMPLE, MORE_SAMPLES }
@@ -15,15 +15,17 @@ enum class HomeWay { APK_FILE, PHONE_APPS, AUTOMATE, ASK_LAST, CAMERA, SAMPLE, M
  * What Home shows, decided without Compose so it can be unit tested. Both modes share one Home: the mode switch, the
  * hero, recent checks, the trust card and "More ways to check" are always there (the trust card when the build has the
  * trust screen); Update Watch appears only while a checked app has a different version installed; developer mode adds
- * its quick actions as extra rows under "More ways to check", one tap from Home.
+ * its quick actions as extra rows under "More ways to check", one tap from Home. "What TraceVeil uses" (the on/off line
+ * that opens the Setup sheet with every permission and switch) sits right under the trust card when Home wires it.
  */
 object HomeLayout {
-    fun sections(audience: Audience, updatedApps: Int, trustAvailable: Boolean): List<HomeSection> = buildList {
+    fun sections(audience: Audience, updatedApps: Int, trustAvailable: Boolean, controlsAvailable: Boolean = false): List<HomeSection> = buildList {
         add(HomeSection.MODE_SWITCH)
         add(HomeSection.HERO)
         if (updatedApps > 0) add(HomeSection.UPDATES)
         add(HomeSection.RECENT)
         if (trustAvailable) add(HomeSection.TRUST)
+        if (controlsAvailable) add(HomeSection.CONTROLS)
         add(HomeSection.MORE_WAYS)
     }
 

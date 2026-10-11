@@ -282,6 +282,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         step("Waiting for a consent screen", t0)
         // A sign-in, code, CAPTCHA or fingerprint screen can stand between launch and the consent screen: skip it with a
         // harmless button when there is one, otherwise ask the person to complete it and keep watching meanwhile.
+        val agent = BlockerAgentRunner(graph.llm, File(context.cacheDir, "blocker-step.jpg"))
         val waited = ConsentWaitAssist(
             probe = {
                 withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.probeNow() }
@@ -294,7 +295,8 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
                 }
             },
             // A skip button first; failing that, a profile form is completed with test values (never identifying fields).
-            trySkip = { withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.let { it.trySkipBlocker() ?: it.fillFormAndContinue() } } },
+            // Cheapest first: a skip button, then the known profile form, then the on-device model for anything else.
+            trySkip = { withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.let { it.trySkipBlocker() ?: it.fillFormAndContinue() ?: agent.step(it) } } },
             onHandoff = { kind ->
                 // Say which field to fill in, using the app's own label for it, on screen and in the notification.
                 val hindi = graph.settings.settings.value.guideLanguage == "hi"
@@ -302,7 +304,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
                     val svc = ConsentAccessibilityService.instance
                     val found = if (kind == BlockerKind.PERMISSION) emptyList() else svc?.blockerFields().orEmpty()
                     svc?.showBlockerPrompt(
-                        BlockerCopy.promptTitle(kind, found, hindi), BlockerCopy.promptBody(kind, hindi),
+                        BlockerCopy.promptTitle(kind, found, hindi), BlockerCopy.promptBody(kind, hindi, agent.lastReason.takeIf { kind != BlockerKind.PERMISSION }),
                         BlockerCopy.promptStop(hindi), BlockerCopy.promptHide(hindi), BlockerCopy.promptContinue(hindi),
                     ) { this@AuditOrchestrator.cancel() }
                     found
@@ -317,10 +319,13 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             },
             clockMs = SystemClock::elapsedRealtime, pause = { delay(it) },
             interactive = plan != AuditPlan.SILENT,
+            // The model may take several small steps; Android's permission dialog never reaches it (see ConsentWaitAssist).
+            maxSkips = if (agent.available) 3 + BlockerAgentRunner.MAX_STEPS else 3,
             userContinued = { ConsentBus.takeContinue() },
         ).await(t.waitConsentMs)
         withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.hideBlockerPrompt() }
         BlockerNotifier.clear(context)
+        agent.cleanup()
         notes += BlockerCopy.notes(waited, blocksPlan = plan != AuditPlan.SILENT)
         val blockedStep = BlockerCopy.step(waited)
         val appeared = waited.consent

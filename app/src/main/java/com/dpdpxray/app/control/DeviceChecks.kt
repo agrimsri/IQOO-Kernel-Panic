@@ -109,6 +109,13 @@ object DeviceChecks {
         runCatching { context.startActivity(intent) }
     }
 
+    /** Opens the Shizuku app, where the user can stop it or take back TraceVeil's permission. */
+    fun openShizuku(context: Context) {
+        val launch = context.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
+        if (launch != null && runCatching { context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) return
+        openAppInfo(context, "moe.shizuku.privileged.api")
+    }
+
     fun openAppInfo(context: Context, pkg: String) {
         context.startActivity(
             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$pkg"))

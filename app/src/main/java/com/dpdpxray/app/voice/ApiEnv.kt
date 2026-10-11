@@ -29,9 +29,15 @@ object ApiEnv {
      */
     val ONLINE_VOICE_AVAILABLE: Boolean = BuildConfig.ONLINE_VOICE_AVAILABLE
 
-    fun load(context: Context): ApiConfig = load(ONLINE_VOICE_AVAILABLE) {
+    /** The online voice as it applies now: off when the person switched it off ([OnlineVoiceSwitch]); then the file is not read. */
+    fun load(context: Context): ApiConfig = load(ONLINE_VOICE_AVAILABLE && OnlineVoiceSwitch.get(context).allowed.value) { readFile(context) }
+
+    /** Whether `api.env` on this phone turns the online voice on, before the person's own switch. */
+    fun setUp(context: Context): Boolean =
+        SpeechOutputChoice.choose(load(ONLINE_VOICE_AVAILABLE) { readFile(context) }) == SpeechOutputChoice.ONLINE
+
+    private fun readFile(context: Context): String? =
         runCatching { File(context.getExternalFilesDir(null), FILE_NAME).takeIf { it.isFile }?.readText() }.getOrNull()
-    }
 
     /** [read] returns the file's text (null when absent); it is not called at all when the build has no online voice. */
     fun load(onlineVoiceAvailable: Boolean, read: () -> String?): ApiConfig = if (onlineVoiceAvailable) parse(read()) else ApiConfig.OFF

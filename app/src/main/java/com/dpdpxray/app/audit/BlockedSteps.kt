@@ -34,8 +34,8 @@ internal object BlockedSteps {
                         "आपने इसे पूरा किया (TraceVeil ने $waited सेकंड इंतज़ार किया, जो जाँच के समय में नहीं गिना गया), फिर सहमति स्क्रीन आई।"
                     step.handedOff -> "You were asked to complete it, but the consent screen was not reached in time, so consent was not tested in this plan." to
                         "आपसे इसे पूरा करने को कहा गया, पर सहमति स्क्रीन समय पर नहीं आई, इसलिए इस रन में सहमति की जाँच नहीं हुई।"
-                    step.agentTapped.isNotEmpty() && step.consentReached -> "TraceVeil got past it by tapping $tapped (never a sign-in, and only harmless test values), then the consent screen was reached." to
-                        "TraceVeil ने $tapped दबाकर इसे पार किया (कभी साइन-इन नहीं, सिर्फ़ हानिरहित टेस्ट मान), फिर सहमति स्क्रीन आई।"
+                    step.agentTapped.isNotEmpty() && step.consentReached -> "TraceVeil got past it by itself ($tapped), then the consent screen was reached. It never signs in and types only harmless test values." to
+                        "TraceVeil ने इसे खुद पार किया ($tapped), फिर सहमति स्क्रीन आई। यह कभी साइन-इन नहीं करता और सिर्फ़ हानिरहित टेस्ट मान भरता है।"
                     step.consentReached -> "It went away by itself, then the consent screen was reached." to "यह अपने आप हट गया, फिर सहमति स्क्रीन आई।"
                     else -> "It was shown while TraceVeil was not touching the app, and the consent screen was not reached, so consent was not tested in this plan." to
                         "यह तब दिखा जब TraceVeil ऐप को छू नहीं रहा था, और सहमति स्क्रीन नहीं आई, इसलिए इस रन में सहमति की जाँच नहीं हुई।"

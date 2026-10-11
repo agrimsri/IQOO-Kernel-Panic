@@ -59,12 +59,19 @@ internal object BlockerCopy {
         }
     }
 
-    /** What the person does on the card, then Continue (the check also carries on by itself once they are through). */
-    fun promptBody(k: BlockerKind = BlockerKind.SIGN_IN, hindi: Boolean = false) = when {
-        k == BlockerKind.PERMISSION && hindi -> "Allow या Don't allow खुद चुनें, फिर Continue दबाएँ। TraceVeil अनुमति के अनुरोधों का जवाब कभी नहीं देता।"
-        k == BlockerKind.PERMISSION -> "Choose Allow or Don't allow yourself, then tap Continue. TraceVeil never answers permission requests."
-        hindi -> "यह ऐप में खुद पूरा करें, फिर Continue दबाएँ। TraceVeil पासवर्ड, कोड या निजी जानकारी कभी नहीं भरता।"
-        else -> "Do this in the app yourself, then tap Continue. TraceVeil never enters passwords, codes or personal details."
+    /**
+     * What the person does on the card, then Continue (the check also carries on by itself once they are through). [why]
+     * is the reason TraceVeil, or its on-device model, could not carry on by itself, when it knows one.
+     */
+    fun promptBody(k: BlockerKind = BlockerKind.SIGN_IN, hindi: Boolean = false, why: String? = null): String {
+        val base = when {
+            k == BlockerKind.PERMISSION && hindi -> "Allow या Don't allow खुद चुनें, फिर Continue दबाएँ। TraceVeil अनुमति के अनुरोधों का जवाब कभी नहीं देता।"
+            k == BlockerKind.PERMISSION -> "Choose Allow or Don't allow yourself, then tap Continue. TraceVeil never answers permission requests."
+            hindi -> "यह ऐप में खुद पूरा करें, फिर Continue दबाएँ। TraceVeil पासवर्ड, कोड या निजी जानकारी कभी नहीं भरता।"
+            else -> "Do this in the app yourself, then tap Continue. TraceVeil never types a password, code or personal detail."
+        }
+        val reason = why?.let { (if (hindi) "रुकने का कारण: " else "Why TraceVeil stopped: ") + it }
+        return listOfNotNull(base, reason).joinToString("\n")
     }
 
     fun promptContinue(hindi: Boolean = false) = if (hindi) "जारी रखें" else "Continue"
@@ -77,7 +84,7 @@ internal object BlockerCopy {
         val kind = outcome.blocker ?: return emptyList()
         return buildList {
             if (outcome.skipped.isNotEmpty()) {
-                add("A ${kind(kind)} appeared before the consent screen; the agent tapped ${outcome.skipped.joinToString { "“$it”" }} to continue.")
+                add("A ${kind(kind)} appeared before the consent screen; the agent took these steps to continue: ${outcome.skipped.joinToString("; ") { "“$it”" }}.")
             }
             if (outcome.handedOff && kind == BlockerKind.PERMISSION) {
                 add("An Android permission request appeared before the consent screen; TraceVeil never answers these and waited ${outcome.blockedMs / 1000} s for the person.")

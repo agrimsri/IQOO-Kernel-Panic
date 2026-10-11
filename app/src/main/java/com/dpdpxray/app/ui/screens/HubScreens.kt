@@ -43,6 +43,7 @@ import com.dpdpxray.app.BuildConfig
 import com.dpdpxray.app.ai.LlmStatus
 import com.dpdpxray.app.data.AuditMeta
 import com.dpdpxray.app.data.SampleAudit
+import com.dpdpxray.app.controls.ControlsCopy
 import com.dpdpxray.app.notices.OpenSourceNotices
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.components.ChipFlow
@@ -147,6 +148,8 @@ fun MoreScreen(
     onTrust: (() -> Unit)? = null,
     /** "Open-source notices"; null hides the row. */
     onNotices: (() -> Unit)? = null,
+    /** "Permissions & background" (everything TraceVeil uses, to switch off); null hides the row. */
+    onControls: (() -> Unit)? = null,
 ) {
     val audits by vm.audits.collectAsState()
     val llm by vm.llmStatus.collectAsState()
@@ -168,6 +171,11 @@ fun MoreScreen(
             }
             Group(Modifier.reveal(1), title = "App") {
                 MoreRow("Settings", "Mode, text size, voice, your domains and privacy", Glyph.SETTINGS, onSettings)
+                if (onControls != null) {
+                    GroupDivider(54.dp)
+                    val lang = guideLang()
+                    MoreRow(ControlsCopy.pageTitle.pick(lang), ControlsCopy.pageRow.pick(lang), Glyph.VPN, onControls)
+                }
                 GroupDivider(54.dp)
                 MoreRow("AI lab", aiStatusLine(llm), Glyph.AI, onLab)
             }

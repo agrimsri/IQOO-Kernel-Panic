@@ -50,6 +50,18 @@ class HomeLayoutTest {
         )
     }
 
+    @Test fun `What TraceVeil uses sits right under the trust card in both modes when its page is wired`() {
+        both.forEach { a ->
+            val s = HomeLayout.sections(a, updatedApps = 0, trustAvailable = true, controlsAvailable = true)
+            assertEquals(s.indexOf(HomeSection.TRUST) + 1, s.indexOf(HomeSection.CONTROLS))
+            assertEquals(HomeSection.MORE_WAYS, s.last())
+            // Without the trust card it still comes before More ways to check.
+            val noTrust = HomeLayout.sections(a, updatedApps = 0, trustAvailable = false, controlsAvailable = true)
+            assertEquals(listOf(HomeSection.MODE_SWITCH, HomeSection.HERO, HomeSection.RECENT, HomeSection.CONTROLS, HomeSection.MORE_WAYS), noTrust)
+            assertFalse(HomeSection.CONTROLS in HomeLayout.sections(a, updatedApps = 0, trustAvailable = true, controlsAvailable = false))
+        }
+    }
+
     @Test fun `everyday mode shows only the file and phone rows under More ways to check`() {
         assertEquals(
             listOf(HomeWay.APK_FILE, HomeWay.PHONE_APPS),
