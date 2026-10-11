@@ -108,12 +108,20 @@ object VisibilityDiagnosis {
         val notRestarted = sessions.filter(::mayHaveBeenRunning)
         if (notRestarted.isNotEmpty()) {
             val certain = notRestarted.any { it.conditions?.runningBeforeStart == true }
+            // Left running on purpose: a restart would have switched off something the app runs (an accessibility service...).
+            val chosen = notRestarted.all { leftRunning(it) }
             add(Cause.ALREADY_RUNNING, notRestarted.map { s ->
                 val skipped = seen[s]?.count { it.noLookup } ?: 0
                 notRestartedLine(s) + if (skipped > 0) " It opened ${count(skipped, "connection")} without a lookup TraceVeil saw." else ""
             },
-                if (certain) "The app was already running and TraceVeil could not restart it, so it could reuse addresses it had looked up before the check. Check again with a restart: your data stays."
-                else "TraceVeil did not restart the app first. If it was already running, it may have reused addresses it looked up before the check. Check again with a restart: your data stays.",
+                when {
+                    chosen -> "TraceVeil left the app running, so as not to switch off something it runs (see the check's notes). " +
+                        (if (certain) "It was already running, so it could reuse addresses it had looked up before the check. "
+                        else "If it was already running, it may have reused addresses it looked up before the check. ") +
+                        "Restarting is your choice: your data stays, but you would switch that on again afterwards."
+                    certain -> "The app was already running and TraceVeil could not restart it, so it could reuse addresses it had looked up before the check. Check again with a restart: your data stays."
+                    else -> "TraceVeil did not restart the app first. If it was already running, it may have reused addresses it looked up before the check. Check again with a restart: your data stays."
+                },
                 Action.CHECK_AGAIN_WITH_RESTART)
         }
 
@@ -200,7 +208,13 @@ object VisibilityDiagnosis {
             else -> "whether it was already running is unknown"
         }
         val open = c.appTraffic?.openConnections?.takeIf { it > 0 }?.let { "; it had $it open connections" } ?: ""
-        return "${s.plan.label}: TraceVeil could not restart the app first$why; $running$open."
+        val did = if (leftRunning(s)) "did not" else "could not"
+        return "${s.plan.label}: TraceVeil $did restart the app first$why; $running$open."
+    }
+
+    /** Not restarted on purpose (by default or the person's choice) because a restart would switch something off. */
+    private fun leftRunning(s: AuditSession): Boolean = s.conditions?.restartChoice.let {
+        it == com.dpdpxray.core.model.RestartChoice.SKIPPED_BY_DEFAULT || it == com.dpdpxray.core.model.RestartChoice.SKIPPED_BY_PERSON
     }
 
     private fun trafficLine(s: AuditSession): String {

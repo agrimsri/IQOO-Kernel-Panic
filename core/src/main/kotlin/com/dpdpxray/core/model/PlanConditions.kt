@@ -1,5 +1,7 @@
 package com.dpdpxray.core.model
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /** How the audited app was started for one plan. Saved by name: add new values at the end and never rename one. */
@@ -13,6 +15,22 @@ enum class StartMode {
 
     /** Opened without stopping it first (no Shizuku, or stopping failed): it may have been running already. */
     NOT_RESTARTED,
+}
+
+/**
+ * Whether the audited app was stopped before the plan although stopping it would switch something off (see
+ * [PlanConditions.restartSideEffects]). Saved by name: add new values at the end and never rename one.
+ */
+@Serializable
+enum class RestartChoice {
+    /** Not restarted: the safe default when a restart would switch something off and nobody chose otherwise. */
+    SKIPPED_BY_DEFAULT,
+
+    /** Not restarted: the person chose "Check without restarting". */
+    SKIPPED_BY_PERSON,
+
+    /** Restarted although it switches something off: the person chose "Restart anyway" (or approved a reset). */
+    RESTARTED_BY_PERSON,
 }
 
 /**
@@ -48,6 +66,15 @@ data class PlanConditions(
     val blocker: BlockedStep? = null,
     /** How many times the consent screen came back after the plan's choice (all of them, not only the ones kept). */
     val consentShownAgain: Int? = null,
+    /**
+     * What stopping the app would have switched off, read before the check (the app's names for them, such as
+     * ACCESSIBILITY, VPN, KEYBOARD). Empty = none found among what could be read; null = not read. Written only when read.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val restartSideEffects: List<String>? = null,
+    /** What was done about [restartSideEffects]; null when nothing would have been switched off. Written only when set. */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val restartChoice: RestartChoice? = null,
 )
 
 /**
