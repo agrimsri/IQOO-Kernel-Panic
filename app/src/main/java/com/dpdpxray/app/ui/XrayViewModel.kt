@@ -172,6 +172,36 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         return problem == null
     }
 
+    /**
+     * The result's one-tap "Check again": the same check of the same app, started fresh. A restart keeps the app's data
+     * and needs the Shizuku helper (without it the person is asked to turn it on, and the check starts once it is). A
+     * reset clears the data and is only ever started for an app [resetEligible] allows, after the person confirmed it.
+     */
+    fun checkAgain(bundle: com.dpdpxray.app.data.AuditBundle, mode: com.dpdpxray.app.audit.CheckAgain.Mode, onStarted: () -> Unit) {
+        if (mode == com.dpdpxray.app.audit.CheckAgain.Mode.RESET && !resetEligible(bundle.meta.targetPackage)) {
+            _toast.value = "A reset is only offered for an app you develop. Check again with a restart instead."
+            return
+        }
+        val config = com.dpdpxray.app.audit.CheckAgain.config(bundle.meta, bundle.sessions, mode)
+        val begin = { if (startAudit(config, onStarted)) onStarted() }
+        if (!ShizukuBridge.hasPermission()) {
+            refreshPreflight()
+            val need = AccessNeeds.shizuku(ShizukuBridge.isRunning(), granted = false)
+            if (need != null) { _access.value = AccessPrompt(need) { begin() }; return }
+        }
+        begin()
+    }
+
+    /**
+     * Whether "Check again with a reset" may be offered for [pkg]: an app the person develops (a debuggable build, the
+     * LeakyShop demo, or one on the developer-runner reset list), never a system app.
+     */
+    fun resetEligible(pkg: String): Boolean {
+        val facts = DeviceChecks.appFacts(ctx, pkg) ?: return false
+        val allowlisted = runCatching { pkg in com.dpdpxray.app.automation.AutomationStore.get(ctx).settings.value.resetAllowlist }.getOrDefault(false)
+        return com.dpdpxray.app.audit.CheckAgain.resetAllowed(facts.debuggable, pkg in com.dpdpxray.app.audit.CheckAgain.CONTROLLED_DEMOS, allowlisted, facts.system)
+    }
+
     /** A check that was stopped by a missing permission, started again once it is on. */
     fun retryAudit(config: AuditConfig): Boolean {
         acknowledgeProgress()

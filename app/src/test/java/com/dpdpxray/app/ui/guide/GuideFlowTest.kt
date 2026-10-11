@@ -72,6 +72,7 @@ class GuideFlowTest {
             "Loading on-device AI model" to LivePhase.LOADING_AI,
             "Resetting authorised test app LeakyShop" to LivePhase.RESETTING,
             "Keeping LeakyShop's current data" to LivePhase.KEEPING_DATA,
+            "Restarting LeakyShop (your data stays)" to LivePhase.RESTARTING,
             "Launching LeakyShop" to LivePhase.LAUNCHING,
             "Waiting for a consent screen" to LivePhase.WAITING_SCREEN,
             "Agent is choosing: reject" to LivePhase.AGENT_CHOOSING,
@@ -129,7 +130,7 @@ class GuideFlowTest {
     @Test fun `spoken guidance never contains the app name or raw step text`() {
         val phases = listOf(
             "Starting per-app DNS capture", "Loading on-device AI model", "Resetting authorised test app $secretLabel",
-            "Keeping $secretLabel's current data", "Launching $secretLabel", "Waiting for a consent screen", "Agent is choosing: reject",
+            "Keeping $secretLabel's current data", "Restarting $secretLabel (your data stays)", "Launching $secretLabel", "Waiting for a consent screen", "Agent is choosing: reject",
             "Your turn: tap Reject in the app", "Observing traffic after the recorded choice",
             "Observing traffic without a verified consent choice", "Observing without touching the app",
             "Finishing AI review of the consent screen", "Evaluating DPDP checks", "Unexpected $secretLabel step",
@@ -177,7 +178,7 @@ class GuideFlowTest {
             GuideFlow.home(pf(vpn = false)), GuideFlow.home(pf(watcher = false)), GuideFlow.home(pf(privateDns = true)), GuideFlow.home(pf()),
             GuideFlow.picker(true), GuideFlow.picker(false), GuideFlow.pickerSetup(true), GuideFlow.pickerSetup(false),
         ) + listOf(
-            "Starting", "Loading on-device AI model", "Resetting authorised test app X", "Keeping X's current data", "Launching X",
+            "Starting", "Loading on-device AI model", "Resetting authorised test app X", "Keeping X's current data", "Restarting X (your data stays)", "Launching X",
             "Waiting for a consent screen", "Agent is choosing: accept", "Your turn: tap Reject in the app",
             "Observing traffic after the recorded choice", "Observing traffic without a verified consent choice",
             "Observing without touching the app", "Finishing AI review of the consent screen", "Evaluating DPDP checks",

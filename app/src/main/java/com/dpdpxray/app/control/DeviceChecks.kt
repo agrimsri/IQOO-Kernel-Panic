@@ -67,6 +67,39 @@ object DeviceChecks {
         return runCatching { cm.getLinkProperties(cm.activeNetwork)?.isPrivateDnsActive == true }.getOrDefault(false)
     }
 
+    /** Whether the phone has a working (validated) internet connection now; null when it cannot be read. */
+    fun networkOnline(context: Context): Boolean? = runCatching {
+        val cm = context.getSystemService(ConnectivityManager::class.java) ?: return null
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork ?: return false) ?: return false
+        caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }.getOrNull()
+
+    /** The phone is locked or its screen is off, so an app cannot be opened or seen working in front. */
+    fun phoneLocked(context: Context): Boolean = runCatching {
+        val keyguard = context.getSystemService(android.app.KeyguardManager::class.java)
+        val power = context.getSystemService(android.os.PowerManager::class.java)
+        keyguard?.isKeyguardLocked == true || power?.isInteractive == false
+    }.getOrDefault(false)
+
+    /** Install facts about [pkg]; null when it is not installed. */
+    data class AppFacts(val uid: Int, val system: Boolean, val debuggable: Boolean, val launchable: Boolean)
+
+    fun appFacts(context: Context, pkg: String): AppFacts? = runCatching {
+        val ai = context.packageManager.getApplicationInfo(pkg, 0)
+        AppFacts(
+            uid = ai.uid,
+            system = ai.flags and ApplicationInfo.FLAG_SYSTEM != 0,
+            debuggable = ai.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
+            launchable = context.packageManager.getLaunchIntentForPackage(pkg) != null,
+        )
+    }.getOrNull()
+
+    /** Android's Wi-Fi and mobile data settings, for a check that ran without a working connection. */
+    fun openInternetSettings(context: Context) {
+        runCatching { context.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
     fun openAccessibilitySettings(context: Context) {
         context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }

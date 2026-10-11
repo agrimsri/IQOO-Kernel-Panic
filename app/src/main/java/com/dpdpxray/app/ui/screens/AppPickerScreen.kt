@@ -291,7 +291,7 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, shizukuHelp: Sh
         SpeakStep(setupStep)
         // The step's advice stays as one quiet line under the title (read-aloud speaks it too).
         Text(setupStep.body.pick(com.dpdpxray.app.ui.guide.guideLang()), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
-        if (shizukuReady) Toggle("Allow clearing this test app's local data", "Developer testing only. Removes its saved state, accounts and settings before each run. Leave off for personal apps.", allowReset) {
+        if (shizukuReady) Toggle("Reset: clear this test app's local data", "Developer testing only. Removes its saved state, accounts and settings before each run. Leave off for personal apps: TraceVeil then only restarts the app, which keeps its data.", allowReset) {
             allowReset = it
             if (!it) full = false
         }
@@ -307,7 +307,8 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, shizukuHelp: Sh
             PlanOption("Fast Preview · limited evidence", "One Accept-plan run with 8 seconds of observation and a shorter consent-screen wait. Delayed traffic may be missed; not a Full audit.", preview, enabled = true) { full = false; preview = true }
             // The caveat's first sentence stays in view; the rest folds behind More.
             val (lead, rest) = leadAndRest(
-                if (!freshReset) "Quick keeps the app's data. An already-opened app may keep its consent choice and not repeat launch-time DNS lookups. A missing dialog or quiet run is not a privacy pass."
+                if (!freshReset && shizukuReady) "Quick restarts the app first (it keeps its data), so its launch-time lookups are made again. An app that was used before may keep its consent choice and not ask again. A missing dialog or quiet run is not a privacy pass."
+                else if (!freshReset) "Quick keeps the app's data and cannot restart it without Shizuku. An already-opened app may keep its consent choice and not repeat launch-time DNS lookups. A missing dialog or quiet run is not a privacy pass."
                 else "Starting an audit clears this selected app's local data before each plan. Use a test app or a backed-up development build; do not use a personal app with data you need.",
             )
             Callout(lead, detail = rest)

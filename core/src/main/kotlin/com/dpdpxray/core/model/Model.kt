@@ -1,5 +1,7 @@
 package com.dpdpxray.core.model
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /**
@@ -107,6 +109,13 @@ data class NetEvent(
     val answerStatus: AnswerStatus? = null,
     /** DNS RCODE of a matching reply (0 = no error, 3 = NXDOMAIN). null when no matching reply was read. */
     val rcode: Int? = null,
+    /**
+     * true: not a DNS lookup but a connection whose server name a deeper capture read (see rules `ConnectionSource`); the
+     * rules engine adds these only for a plan that saw too few lookups, and words them "connected". Never saved by the
+     * DNS capture, and written only when true.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val fromConnection: Boolean = false,
 )
 
 @Serializable
@@ -236,6 +245,13 @@ data class AuditSession(
     val permissionDialogsWatched: Boolean? = null,
     /** Allow-listed facts read from the audited app's installed manifest at audit start. null = not read. */
     val manifestFacts: AppManifestFacts? = null,
+    /**
+     * How the app was started for this plan and what the phone looked like around it (restart, Private DNS, other VPN,
+     * network, lock, crash, the app's own network use, blockers). null = not recorded (audits saved before it existed).
+     * Written only when recorded, so older sessions and exports stay exactly as before.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val conditions: PlanConditions? = null,
 ) {
     val consentChoice: ConsentEvent?
         get() = consentEvents.firstOrNull { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }

@@ -126,6 +126,20 @@ def _names(entities: list, style: Style) -> str:
     return shown + (style.dim(f" (+{len(entities) - MAX_NAMES} more)") if len(entities) > MAX_NAMES else "")
 
 
+def diagnosis_lines(rep: dict, style: Style = PLAIN) -> list[str]:
+    """Why an inconclusive report has no score, from the phone's own diagnosis (report key "diagnosis", when present):
+    the main cause in a sentence, the other causes in a phrase, and the one thing most likely to help."""
+    items = [d for d in (rep.get("diagnosis") or []) if isinstance(d, dict)]
+    if not items:
+        return []
+    lines = [f"  {style.warn('why no score:')} {items[0].get('sentence') or items[0].get('cause', '?')}"]
+    lines += [f"       also: {d.get('phrase') or d.get('cause', '?')}" for d in items[1:]]
+    hint = next((d.get("hint") for d in items if d.get("action") not in (None, "NONE") and d.get("hint")), None)
+    if hint:
+        lines.append(f"  {style.warn('try:')} {hint}")
+    return lines
+
+
 def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) -> str:
     t = rep["target"]
     lines = [f"Traceveil audit  {style.bold(t.get('label', '?'))} ({t.get('package', '?')})  "
@@ -136,6 +150,7 @@ def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) ->
         lines.append(f"  {f.get('check', '?'):<4} {style.severity(sev, 8)} {f.get('title', '')}{tag}")
         if f.get("entities"):
             lines.append(f"       {style.dim('trackers:')} {_names(f['entities'], style)}")
+    lines += diagnosis_lines(rep, style)
     if rep.get("dataAccess") is not None:
         lines += access.lines(rep["dataAccess"], style)
     if rep.get("lenses"):

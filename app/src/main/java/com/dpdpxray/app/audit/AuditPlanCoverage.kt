@@ -28,7 +28,9 @@ internal object AuditPlanCoverage {
             }
         }.distinct() + listOfNotNull(BlockerCopy.GAP_LINE.takeIf { blocked(sessions) })
 
+    /** Not for a plan that was restarted first: its launch-time lookups did repeat, and the visibility diagnosis covers it. */
     fun freshStateHint(sessions: List<AuditSession>): String? = if (sessions.any { session ->
+        session.conditions?.startMode != StartMode.RESTARTED &&
         session.netEvents.isEmpty() && session.consentEvents.isEmpty() && session.notes.any {
             it.contains("not cleared", ignoreCase = true) || it.contains("Could not clear app data", ignoreCase = true)
         }

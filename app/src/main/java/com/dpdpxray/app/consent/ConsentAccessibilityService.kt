@@ -15,6 +15,7 @@ import com.dpdpxray.core.consent.BlockerAgent
 import com.dpdpxray.core.consent.BlockerKind
 import com.dpdpxray.core.consent.BlockerLexicon
 import com.dpdpxray.core.consent.ConsentLexicon
+import com.dpdpxray.core.consent.CrashDialog
 import com.dpdpxray.core.consent.FormFill
 import com.dpdpxray.core.model.ConsentEvent
 import com.dpdpxray.core.model.ConsentKind
@@ -90,6 +91,8 @@ class ConsentAccessibilityService : AccessibilityService() {
             if (pkg != null && QuarantineUiRules.isPermissionController(pkg) && event.eventType != AccessibilityEvent.TYPE_VIEW_CLICKED) {
                 permissionWatcher.onPermissionControllerEvent(pkg, ConsentBus.generation)
             }
+            // Android's own app-stopped or not-responding dialog naming the audited app. Read only, never tapped.
+            if (pkg == SYSTEM_PACKAGE && event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) checkCrashDialog(event)
             return
         }
         ConsentBus.markTargetSeen()
@@ -136,12 +139,33 @@ class ConsentAccessibilityService : AccessibilityService() {
         ConsentBus.markTargetSeen()
         val isConsent = ConsentLexicon.isConsentScreen(tree.flatten().map { it.label })
         if (isConsent && !ConsentBus.screenSeen) recordScreen(tree)
-        else if (ConsentReappearance.shouldRecord(isConsent, consentVisible, ConsentBus.screenSeen, ConsentBus.choiceMade, ConsentBus.repromptCount)) {
-            // Shown again after the recorded choice (nagging evidence). Recorded only; never tapped, never a choice.
-            ConsentBus.emitForSession(generation, ConsentReappearance.event(SystemClock.elapsedRealtimeNanos(), tree))
+        else if (ConsentReappearance.countsAsReturn(isConsent, consentVisible, ConsentBus.screenSeen, ConsentBus.choiceMade)) {
+            // Every return is counted (a loop past the cap is noted); only the first few are kept as evidence.
+            ConsentBus.countConsentReturn()
+            if (ConsentReappearance.shouldRecord(isConsent, consentVisible, ConsentBus.screenSeen, ConsentBus.choiceMade, ConsentBus.repromptCount)) {
+                // Shown again after the recorded choice (nagging evidence). Recorded only; never tapped, never a choice.
+                ConsentBus.emitForSession(generation, ConsentReappearance.event(SystemClock.elapsedRealtimeNanos(), tree))
+            }
         }
         if (consentVisible && !isConsent) onConsentGone()
         consentVisible = isConsent
+    }
+
+    /** Texts of the Android system dialog behind [event], matched against the armed app's name. */
+    private fun checkCrashDialog(event: AccessibilityEvent) {
+        val label = ConsentBus.armedLabel ?: return
+        val texts = event.text.orEmpty().map { it?.toString() }.toMutableList()
+        val root = runCatching { windows.mapNotNull { it.root }.lastOrNull { it.packageName?.toString() == SYSTEM_PACKAGE } }.getOrNull()
+        NodeMapper.map(root)?.flatten()?.take(CRASH_TEXT_NODES)?.forEach { texts += it.label }
+        if (CrashDialog.detect(texts, label) != null) ConsentBus.markCrashed()
+    }
+
+    /** Whether Android's own permission dialog is on screen now (any permission controller window). Main thread. */
+    fun permissionDialogNow(): Boolean {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        return runCatching {
+            windows.any { w -> w.root?.packageName?.toString()?.let(QuarantineUiRules::isPermissionController) == true }
+        }.getOrDefault(false)
     }
 
     /** Android's Home action, used by the audit's background step (C12). Callers use the main dispatcher. */
@@ -290,9 +314,9 @@ class ConsentAccessibilityService : AccessibilityService() {
         return BlockerLexicon.fieldLabels(tree)
     }
 
-    /** Shows the "fill this in" card over the audited app. Main thread. */
-    fun showBlockerPrompt(title: String, body: String, stopLabel: String, hideLabel: String, onStop: () -> Unit) =
-        overlay.showPrompt(title, body, stopLabel, hideLabel, onStop)
+    /** Shows the "fill this in" card over the audited app; Continue tells the check the person is through. Main thread. */
+    fun showBlockerPrompt(title: String, body: String, stopLabel: String, hideLabel: String, continueLabel: String, onStop: () -> Unit) =
+        overlay.showPrompt(title, body, stopLabel, hideLabel, continueLabel, onContinue = { ConsentBus.userContinued() }, onStop = onStop)
 
     fun hideBlockerPrompt() = overlay.hidePrompt()
 
@@ -409,6 +433,9 @@ class ConsentAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val SETTLE_MS = 250L
+        /** Android's own windows (system_server), which show the app-stopped and not-responding dialogs. */
+        private const val SYSTEM_PACKAGE = "android"
+        private const val CRASH_TEXT_NODES = 60
         /** Time for the removed glow window to leave the screen before a screenshot is taken. */
         private const val GLOW_CLEAR_MS = 120L
 

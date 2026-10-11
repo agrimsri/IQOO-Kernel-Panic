@@ -69,6 +69,17 @@ class EverydayCopyTest {
         assertTrue(EverydaySheetCopy.quickDetail.en.contains("keeps its data"))
     }
 
+    @Test fun `the sheet tells a restart (keeps your data) from a reset (clears data)`() {
+        // With the Shizuku helper every check restarts the app first; that never deletes anything.
+        val restart = EverydaySheetCopy.quickDetailRestart.en
+        assertTrue(restart, restart.startsWith("Restarts the app (keeps your data)") && restart.contains("Reject") && restart.contains("15 seconds"))
+        assertTrue(EverydaySheetCopy.quickDetailFresh.en.startsWith("Resets the app (clears its data)"))
+        assertTrue(EverydaySheetCopy.resetTitle.en.startsWith("Reset: clear"))
+        assertTrue(EverydaySheetCopy.resetDetail.en.contains("restart"))
+        assertTrue(EverydaySheetCopy.quickDetailRestart in sheet)
+        assertFalse("no restart is promised without Shizuku", EverydaySheetCopy.quickDetail.en.contains("Restarts"))
+    }
+
     // ---- Update Watch on the everyday Home ---------------------------------------------------------------------------
 
     private fun updated(label: String, kind: UpdateKind, old: AppVersion?, new: AppVersion?) =

@@ -5,6 +5,7 @@ import com.dpdpxray.core.audit.PhaseAssigner
 import com.dpdpxray.core.model.Category
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.Phase
+import com.dpdpxray.core.rules.VisibilityDiagnosis
 import com.dpdpxray.core.trackers.TrackerCatalog
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -63,6 +64,20 @@ object CliAuditReport {
                     put("consentEvents", s.consentEvents.size)
                     put("consentChoice", s.consentChoice?.kind?.takeIf { it == ConsentKind.ACCEPT || it == ConsentKind.REJECT }?.name?.let { JsonPrimitive(it) } ?: JsonNull)
                     put("notes", strings(s.notes))
+                    // How the app was started for this plan (RESET, RESTARTED, NOT_RESTARTED); only when recorded.
+                    s.conditions?.startMode?.let { put("startMode", it.name) }
+                }
+            }))
+            // Why an inconclusive result saw too few lookups, with the one action most likely to help; only when there is one.
+            val diagnosis = VisibilityDiagnosis.forResult(bundle.result, bundle.sessions)
+            if (diagnosis.isNotEmpty()) put("diagnosis", JsonArray(diagnosis.map { d ->
+                buildJsonObject {
+                    put("cause", d.cause.name)
+                    put("action", d.action.name)
+                    put("phrase", VisibilityDiagnosis.phrase(d.cause))
+                    put("hint", VisibilityDiagnosis.hint(d.action))
+                    put("sentence", d.sentence)
+                    put("evidence", strings(d.evidence))
                 }
             }))
             if (catalog != null) put("observedTrackers", observedTrackers(bundle, catalog, anchor))

@@ -210,9 +210,12 @@ object EverydaySheetCopy {
     val quickTitle = Bi("Quick check: say No", "जल्दी जाँच: 'ना' कहें")
     val quickDetail = Bi("Opens the app once, says No (Reject) to its consent popup, then watches for 15 seconds. The app keeps its data.",
         "ऐप एक बार खुलता है, कंसेंट पॉपअप पर 'ना' (Reject) कहा जाता है, फिर 15 सेकंड तक देखा जाता है। ऐप का डेटा नहीं हटता।")
+    /** Quick with the Shizuku helper ready: the app is closed and opened again first, so it starts fresh. Nothing is deleted. */
+    val quickDetailRestart = Bi("Restarts the app (keeps your data), says No (Reject) to its consent popup, then watches for 15 seconds.",
+        "ऐप को रीस्टार्ट करता है (आपका डेटा बना रहता है), कंसेंट पॉपअप पर 'ना' (Reject) कहा जाता है, फिर 15 सेकंड तक देखा जाता है।")
     /** Quick with clearing approved under Advanced: the same single No run, from a fresh start. */
-    val quickDetailFresh = Bi("Clears the app's data, opens it once, says No (Reject) to its consent popup, then watches for 15 seconds.",
-        "ऐप का डेटा साफ़ करके उसे एक बार खोलता है, कंसेंट पॉपअप पर 'ना' (Reject) कहा जाता है, फिर 15 सेकंड तक देखा जाता है।")
+    val quickDetailFresh = Bi("Resets the app (clears its data), opens it once, says No (Reject) to its consent popup, then watches for 15 seconds.",
+        "ऐप को रीसेट करता है (उसका डेटा साफ़ होता है), उसे एक बार खोलता है, कंसेंट पॉपअप पर 'ना' (Reject) कहा जाता है, फिर 15 सेकंड तक देखा जाता है।")
     val agentTitle = Bi("Let TraceVeil tap No for me", "TraceVeil मेरे लिए 'ना' दबाए")
     val agentDetail = Bi("Off: you tap it yourself when the app asks.", "बंद: ऐप पूछे तो आप खुद दबाएँ।")
     val quickCaveat = Bi(
@@ -233,9 +236,9 @@ object EverydaySheetCopy {
         "नई शुरुआत से तीन रन: कोई जवाब नहीं, 'ना', फिर 'हाँ', और तीनों की तुलना। हर रन से पहले ऐप का डेटा साफ़ होता है।")
     val fullNeeds = Bi("Needs the Shizuku helper app and your OK to clear this app's data. Not for personal apps.",
         "इसके लिए Shizuku सहायक ऐप और इस ऐप का डेटा साफ़ करने की आपकी मंज़ूरी चाहिए। निजी ऐप के लिए नहीं।")
-    val resetTitle = Bi("Allow clearing this app's data", "इस ऐप का डेटा साफ़ करने दें")
-    val resetDetail = Bi("For your own test apps only. Removes its saved state, accounts and settings before each run.",
-        "सिर्फ़ आपके अपने टेस्ट ऐप के लिए। हर रन से पहले उसकी सहेजी स्थिति, अकाउंट और सेटिंग हटाता है।")
+    val resetTitle = Bi("Reset: clear this app's data", "रीसेट: इस ऐप का डेटा साफ़ करें")
+    val resetDetail = Bi("For your own test apps only. Removes its saved state, accounts and settings before each run. Off, TraceVeil only does a restart, which keeps your data.",
+        "सिर्फ़ आपके अपने टेस्ट ऐप के लिए। हर रन से पहले उसकी सहेजी स्थिति, अकाउंट और सेटिंग हटाता है। बंद होने पर TraceVeil सिर्फ़ रीस्टार्ट करता है, जिससे आपका डेटा बना रहता है।")
     val childTitle = Bi("This app is made for children", "यह ऐप बच्चों के लिए है")
     val childDetail = Bi("Adds the children's check: no tracking or targeted ads.", "बच्चों वाली जाँच जोड़ता है: कोई ट्रैकिंग या टारगेटेड विज्ञापन नहीं।")
     val gmsTitle = Bi("Include Google Play services lookups", "Google Play services के लुकअप भी शामिल करें")
@@ -246,6 +249,6 @@ object EverydaySheetCopy {
         "सिर्फ़ इस ऐप का इंटरनेट काटता है और दर्ज करता है कि यह कहाँ पहुँचने की कोशिश करता है और कौन-सी अनुमतियाँ माँगता है। यह ऐप के बारे में फ़ैसला नहीं देता।")
 
     fun all(): List<Bi> = listOf(title("App"), guide("App").title, guide("App").body, guide("App").spoken, quickTitle, quickDetail,
-        quickDetailFresh, agentTitle, agentDetail, quickCaveat, resetCaveat, start, advanced, advancedSummary, fullTitle, fullDetail, fullNeeds,
+        quickDetailRestart, quickDetailFresh, agentTitle, agentDetail, quickCaveat, resetCaveat, start, advanced, advancedSummary, fullTitle, fullDetail, fullNeeds,
         resetTitle, resetDetail, childTitle, childDetail, gmsTitle, gmsDetail, quarantine, quarantineNote)
 }

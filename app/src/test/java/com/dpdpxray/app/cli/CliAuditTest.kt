@@ -90,6 +90,25 @@ class CliAuditTest {
         assertEquals("REJECT", obj["sessions"]!!.jsonArray.single().jsonObject["consentChoice"]!!.jsonPrimitive.content)
     }
 
+    @Test fun `an inconclusive low-visibility report carries its diagnosis and each plan's start mode`() {
+        val quiet = AuditSession("s1", "com.reskill.hacktracker", "HackTracker", AuditPlan.REJECT, endedAtNanos = 40_000_000_000,
+            conditions = com.dpdpxray.core.model.PlanConditions(startMode = com.dpdpxray.core.model.StartMode.NOT_RESTARTED,
+                runningBeforeStart = true, restartProblem = "the Shizuku helper is not running or not allowed"))
+        val result = com.dpdpxray.core.rules.RulesEngine(TrackerCatalog.loadDefault()).evaluate(listOf(quiet))
+        val meta = AuditMeta("audit-2", "com.reskill.hacktracker", "HackTracker", 1000L, null, ScoreBand.INCONCLUSIVE, result.findings.size, listOf("Plan B · Reject"))
+        val obj = Json.parseToJsonElement(CliAuditReport.build("r2", AuditBundle(meta, listOf(quiet), result, File(".")))).jsonObject
+        assertEquals("diagnosis", obj.keys.last())
+        val d = obj["diagnosis"]!!.jsonArray.first().jsonObject
+        assertEquals("ALREADY_RUNNING", d["cause"]!!.jsonPrimitive.content)
+        assertEquals("CHECK_AGAIN_WITH_RESTART", d["action"]!!.jsonPrimitive.content)
+        assertTrue(d["sentence"]!!.jsonPrimitive.content.contains("restart"))
+        assertEquals("check again with a restart (the app keeps its data)", d["hint"]!!.jsonPrimitive.content)
+        assertEquals("the app was already running (not restarted)", d["phrase"]!!.jsonPrimitive.content)
+        assertTrue(d["evidence"]!!.jsonArray.isNotEmpty())
+        assertEquals("NOT_RESTARTED", obj["sessions"]!!.jsonArray.single().jsonObject["startMode"]!!.jsonPrimitive.content)
+        assertFalse("a conclusive report has no diagnosis", "diagnosis" in Json.parseToJsonElement(CliAuditReport.build("r1", bundle(21))).jsonObject)
+    }
+
     @Test fun `observed trackers list every catalogue entity looked up, by phase, only when a catalogue is given`() {
         val catalog = TrackerCatalog(listOf(TrackerEntry("AppsFlyer", Category.ATTRIBUTION, listOf("appsflyer.com"))))
         val b = bundle(21).let { b ->

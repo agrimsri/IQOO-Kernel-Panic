@@ -7,7 +7,7 @@ import com.dpdpxray.core.model.AuditPlan
 /** The orchestrator's progress text, recognised by its stable prefix. Unknown text is still shown, just not read aloud. */
 enum class LivePhase {
     STARTING, LOADING_AI, RESETTING, KEEPING_DATA, LAUNCHING, WAITING_SCREEN, AGENT_CHOOSING, YOUR_TURN,
-    OBSERVING_CHOICE, OBSERVING_NO_CHOICE, OBSERVING_SILENT, REVIEWING, EVALUATING, OTHER;
+    OBSERVING_CHOICE, OBSERVING_NO_CHOICE, OBSERVING_SILENT, REVIEWING, EVALUATING, RESTARTING, OTHER;
 
     companion object {
         fun of(step: String): LivePhase = when {
@@ -15,6 +15,7 @@ enum class LivePhase {
             step.startsWith("Loading on-device AI") -> LOADING_AI
             step.startsWith("Resetting") -> RESETTING
             step.startsWith("Keeping") -> KEEPING_DATA
+            step.startsWith("Restarting") -> RESTARTING
             step.startsWith("Launching") -> LAUNCHING
             step.startsWith("Waiting for a consent screen") -> WAITING_SCREEN
             step.startsWith("Agent is choosing") -> AGENT_CHOOSING
@@ -147,6 +148,13 @@ object GuideFlow {
                     "$app का डेटा नहीं हटेगा। अगर यह पहले कंसेंट पॉपअप दिखा चुका है, तो शायद दोबारा न दिखाए।"),
                 Bi("${runEn}The app keeps its data. It may not show its consent popup again.",
                     "${runHi}ऐप का डेटा रखा जा रहा है। हो सकता है कंसेंट पॉपअप दोबारा न दिखे।"),
+            )
+            LivePhase.RESTARTING -> live(
+                "live.$i.restart", GuideTone.WAIT,
+                Bi("Restarting the app", "ऐप रीस्टार्ट हो रहा है"),
+                Bi("$app is closed and opened again so it starts fresh. Its data stays. If it showed its consent popup before, it may not show it again.",
+                    "$app को बंद करके फिर खोला जा रहा है ताकि यह नए सिरे से शुरू हो। इसका डेटा बना रहता है। अगर यह पहले कंसेंट पॉपअप दिखा चुका है, तो शायद दोबारा न दिखाए।"),
+                Bi("${runEn}Restarting the app. Its data stays.", "${runHi}ऐप रीस्टार्ट हो रहा है। इसका डेटा बना रहता है।"),
             )
             LivePhase.LAUNCHING -> live(
                 "live.$i.launch", GuideTone.WAIT,

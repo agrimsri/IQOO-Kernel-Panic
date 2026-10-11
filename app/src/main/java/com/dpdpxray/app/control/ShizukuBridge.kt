@@ -7,7 +7,8 @@ import rikka.shizuku.Shizuku
 
 /**
  * Shell-level control through Shizuku (paired on-device via wireless debugging; no root, no PC).
- * Used to reset the audited app (`pm clear`) so each audit plan starts like a fresh install.
+ * Used to restart the audited app before each plan (`am force-stop`, data kept), and, only with approval for a test app,
+ * to reset it (`pm clear`) so a plan starts like a fresh install.
  */
 object ShizukuBridge {
     const val REQUEST_CODE = 4711
@@ -40,5 +41,20 @@ object ShizukuBridge {
     }
 
     suspend fun clearAppData(pkg: String) = exec("pm", "clear", pkg)
+
+    /** Stops the app's process (a restart once it is opened again). Its data, sign-in and settings are untouched. */
     suspend fun forceStop(pkg: String) = exec("am", "force-stop", pkg)
+
+    /** Whether [pkg] has a running process; null when that cannot be read (no Shizuku, or the shell failed). */
+    suspend fun processRunning(pkg: String): Boolean? {
+        if (!hasPermission()) return null
+        return exec("pidof", pkg).fold({ it.isNotBlank() }, { e -> if (e.message?.startsWith("exit 1") == true) false else null })
+    }
+
+    /**
+     * The kernel's TCP and UDP socket tables (IPv4 and IPv6) as text, read by the shell; null when unreadable. Only
+     * counted (core SocketTable), never stored or logged.
+     */
+    suspend fun socketTables(): String? =
+        exec("sh", "-c", "cat /proc/net/tcp /proc/net/tcp6 /proc/net/udp /proc/net/udp6 2>/dev/null; true").getOrNull()?.takeIf { it.isNotBlank() }
 }

@@ -14,7 +14,8 @@ import kotlinx.coroutines.launch
 /**
  * Debug-only entry point for `traceveil audit`: `adb shell am broadcast -a com.dpdpxray.app.debug.RUN_AUDIT ...`.
  * Starts the normal [com.dpdpxray.app.audit.AuditOrchestrator], mirrors its progress into `status.json` and writes
- * `report.json` under `<external files>/reports/<request_id>/`. Uploads nothing and never force-stops any app.
+ * `report.json` under `<external files>/reports/<request_id>/`. Uploads nothing. Like every check, each plan restarts the
+ * target app first when Shizuku is allowed (a force-stop that keeps its data); its data is cleared only with `reset=true`.
  */
 class DebugAuditReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -32,6 +33,7 @@ class DebugAuditReceiver : BroadcastReceiver() {
         val g = app.graph
 
         val problem = when {
+            request.targetPackage == app.packageName -> "TraceVeil can't check itself: pass the package of the app under test"
             app.packageManager.getLaunchIntentForPackage(request.targetPackage) == null -> "${request.targetPackage} is not installed or has no launcher activity"
             !DeviceChecks.vpnReady(app) -> "VPN permission not granted: open TraceVeil once and allow it"
             !DeviceChecks.accessibilityOn(app) -> "TraceVeil accessibility service is off: enable it in Accessibility settings"

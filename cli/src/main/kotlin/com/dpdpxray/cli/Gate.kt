@@ -18,6 +18,7 @@ import com.dpdpxray.core.model.ScoreBand
 import com.dpdpxray.core.model.ScreenAudit
 import com.dpdpxray.core.model.Severity
 import com.dpdpxray.core.rules.RulesEngine
+import com.dpdpxray.core.rules.VisibilityDiagnosis
 import com.dpdpxray.core.trackers.TrackerCatalog
 import java.io.File
 
@@ -169,7 +170,7 @@ class Gate(
         }
         val coverage = b.sessions.map(PlanCoverage::of)
         val outcomes = buildList {
-            add(inconclusive(current, policy))
+            add(inconclusive(current, b.sessions, policy))
             policy.failOn.forEach { add(failOn(it, current, b.sessions, policy)) }
             add(minScore(current, policy))
             add(maxHigh(current, policy))
@@ -183,13 +184,17 @@ class Gate(
         return BundleCheck(source, b.result, current, coverage, outcomes, warnings, legal.view(current, lensId), lensSource, signature)
     }
 
-    private fun inconclusive(r: AuditResult, p: Policy): RuleOutcome = when {
-        r.band != ScoreBand.INCONCLUSIVE -> RuleOutcome("allowInconclusive", RuleStatus.PASS, "result is conclusive")
-        p.allowInconclusive -> RuleOutcome("allowInconclusive", RuleStatus.PASS, "result is inconclusive (low network visibility); the policy accepts that")
-        else -> RuleOutcome(
-            "allowInconclusive", RuleStatus.FAIL,
-            "result is inconclusive (V0: almost no lookups were captured), so this capture cannot pass; re-run it",
-        )
+    /** Names the likely cause and the fix from the capture's own records (core VisibilityDiagnosis), never a guess. */
+    private fun inconclusive(r: AuditResult, sessions: List<AuditSession>, p: Policy): RuleOutcome {
+        if (r.band != ScoreBand.INCONCLUSIVE) return RuleOutcome("allowInconclusive", RuleStatus.PASS, "result is conclusive")
+        val d = VisibilityDiagnosis.forResult(r, sessions)
+        val why = when {
+            d.isNotEmpty() -> "V0: almost no lookups were captured; likely cause: ${VisibilityDiagnosis.phrase(d.first().cause)}"
+            else -> "U1: the app kept its data, so whether consent came before its tracker lookups is unknown"
+        }
+        val fix = if (d.isNotEmpty()) VisibilityDiagnosis.hint(VisibilityDiagnosis.primaryAction(d)) else "check a fresh install of a test build"
+        return if (p.allowInconclusive) RuleOutcome("allowInconclusive", RuleStatus.PASS, "result is inconclusive ($why); the policy accepts that")
+        else RuleOutcome("allowInconclusive", RuleStatus.FAIL, "result is inconclusive ($why), so this capture cannot pass; $fix")
     }
 
     /**
