@@ -67,6 +67,17 @@ private object MarkPaths {
 }
 
 private val VeilLining = Color(0xFFFFF1E8)
+
+/** The mark keeps its original colours in every theme: it is the logo, not part of the UI palette. */
+private object MarkColors {
+    val lens = Color(0xFF10202E)
+    val scan = Color(0xFF7FD3E6)
+    val lookup = Color(0xFFFF5A4E)
+    val peach = Color(0xFFFAA275)
+    val coral = Color(0xFFFF8C61)
+    val rose = Color(0xFFCE6A85)
+    val stops = listOf(peach, coral, rose)
+}
 private val VeilShade = Color(0xFF8E3F5C)
 
 /**
@@ -78,7 +89,7 @@ private val VeilShade = Color(0xFF8E3F5C)
 fun BrandMark(
     size: Dp,
     modifier: Modifier = Modifier,
-    lens: Color = Film.base,
+    lens: Color = MarkColors.lens,
     contentDescription: String? = "TraceVeil",
 ) {
     val described = contentDescription?.let { label -> modifier.semantics { this.contentDescription = label } } ?: modifier
@@ -91,14 +102,14 @@ fun BrandMark(
 private fun DrawScope.drawMark(lens: Color) {
     val g = BrandMarkGeometry
     drawPath(MarkPaths.lens, lens)
-    drawPath(MarkPaths.arcInner, Film.scan, style = Stroke(width = g.ARC_WIDTH))
-    drawPath(MarkPaths.arcOuter, Film.scan, alpha = g.OUTER_ARC_ALPHA, style = Stroke(width = g.ARC_WIDTH))
-    drawPath(MarkPaths.lookup, Film.leak)
-    drawPath(MarkPaths.veil, Brush.linearGradient(Brand.stops, start = Offset(19f, 19f), end = g.foldMid))
+    drawPath(MarkPaths.arcInner, MarkColors.scan, style = Stroke(width = g.ARC_WIDTH))
+    drawPath(MarkPaths.arcOuter, MarkColors.scan, alpha = g.OUTER_ARC_ALPHA, style = Stroke(width = g.ARC_WIDTH))
+    drawPath(MarkPaths.lookup, MarkColors.lookup)
+    drawPath(MarkPaths.veil, Brush.linearGradient(MarkColors.stops, start = Offset(19f, 19f), end = g.foldMid))
     drawPath(MarkPaths.shade, VeilShade, alpha = g.SHADE_ALPHA)
     drawPath(
         MarkPaths.lining,
-        Brush.linearGradient(listOf(VeilLining, Brand.peach), start = g.foldMid - Offset(30f, 30f), end = g.foldMid),
+        Brush.linearGradient(listOf(VeilLining, MarkColors.peach), start = g.foldMid - Offset(30f, 30f), end = g.foldMid),
     )
 }
 
@@ -111,7 +122,7 @@ private fun DrawScope.drawMark(lens: Color) {
 fun BrandWordmark(modifier: Modifier = Modifier, markSize: Dp = 32.dp) {
     val fontSize = with(LocalDensity.current) { (markSize * 0.554f).toSp() }
     // "Veil" starts at about 60% of the word's width; the span brush spans the whole line, so the gradient starts there.
-    val veilBrush = Brush.horizontalGradient(0.6f to Brand.peach, 0.8f to Brand.coral, 1f to Brand.rose)
+    val veilBrush = Brush.horizontalGradient(0.6f to MarkColors.peach, 0.8f to MarkColors.coral, 1f to MarkColors.rose)
     Row(
         modifier.clearAndSetSemantics { contentDescription = "TraceVeil" },
         verticalAlignment = Alignment.CenterVertically,

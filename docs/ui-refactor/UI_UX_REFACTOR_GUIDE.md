@@ -737,3 +737,18 @@ Not done, still to do:
 * **Entrance fade** (`reveal`) is still called about 87 times, but it is now one short fade. Remove the calls screen by screen.
 * **Verification not yet done:** TalkBack pass, 200 % font scale, stage mode, Hindi layouts, dark mode on every screen (only Home and onboarding were checked in dark), and the screens that need the VPN and consent watcher (live audit, finding detail, quarantine).
 * **Tests:** two `CliAuditTest` tests fail. They sit in the CLI work that was already uncommitted on this branch and are unrelated to the UI. `BrandPaletteTest` (map palette) still passes unchanged.
+
+### Colour scheme update
+
+The section 6.1 hex values were replaced by a scheme built from five supplied colours: Icy Aqua `#BCF8EC`, Light Blue `#AED9E0`, Lavender Grey `#9FA0C3`, Dusty Lavender `#8B687F` and Vintage Berry `#7B435B`. The tokens now live in `ui/theme/Tokens.kt`.
+
+| Token | Light | Dark |
+|---|---|---|
+| bg / surface / fill | `#F1FBF9` / `#FFFFFF` / `#E1F1F4` (tints of Icy Aqua and Light Blue) | `#151017` / `#1F1822` / `#2C2330` (berry-charcoal) |
+| accent / onAccent | Vintage Berry `#7B435B` / `#FFFFFF` | Icy Aqua `#BCF8EC` / `#0F2420` |
+| text primary / secondary / tertiary | `#2A1E26` / `#5E4F5A` / Dusty Lavender `#8B687F` | `#F3EEF2` / `#B7ABB4` / Dusty Lavender `#8B687F` |
+| risk / caution / ok | `#A62F4E` / `#565991` (deep Lavender Grey) / `#1E7468` | `#F08AA8` / Lavender Grey `#9FA0C3` / `#7FD9C0` |
+
+The five colours have no red, amber or green, so the three status colours are derived from the same hue families (berry, lavender, aqua) and are always accompanied by a word. `PaletteContrastTest` checks every pair in both themes.
+
+The logo keeps its original colours (peach, coral and rose veil, cyan arcs, red lookup dot, dark navy lens) in every theme: `BrandMark` no longer reads the UI palette. It is back in the Home header beside the title, as it was before the refactor.

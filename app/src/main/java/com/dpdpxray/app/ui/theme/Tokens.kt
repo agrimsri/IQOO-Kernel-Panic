@@ -8,8 +8,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /**
- * The design tokens (UI_UX_REFACTOR_GUIDE.md section 6.1): neutral surfaces, one accent, and three status colours.
- * Status colour appears as a dot or one word, never as a card fill. Two palettes follow the system light/dark setting.
+ * The design tokens (UI_UX_REFACTOR_GUIDE.md section 6.1): soft surfaces, one accent, and three status colours. Status
+ * colour appears as a dot or one word, never as a card fill. Two palettes follow the system light/dark setting.
+ *
+ * The scheme is built from five colours: Icy Aqua #BCF8EC, Light Blue #AED9E0, Lavender Grey #9FA0C3, Dusty Lavender
+ * #8B687F and Vintage Berry #7B435B. Light uses Vintage Berry as the accent over surfaces tinted from Icy Aqua and Light
+ * Blue; dark uses Icy Aqua as the accent over berry-charcoal surfaces. Where a text colour needs more contrast than the
+ * raw colour gives, a deeper or lighter step of the same hue is used (checked in PaletteContrastTest).
  */
 @Immutable
 class Palette(
@@ -44,20 +49,20 @@ class Palette(
 object Palettes {
     val Dark = Palette(
         dark = true,
-        bg = Color(0xFF0E0E10), surface = Color(0xFF1A1A1D), surfaceRaised = Color(0xFF232327),
-        separator = Color(0xFF2C2C30), fill = Color(0xFF2A2A2E),
-        textPrimary = Color(0xFFF5F5F7), textSecondary = Color(0xFFA1A1A6), textTertiary = Color(0xFF6E6E73),
-        accent = Color(0xFFFF9E80), onAccent = Color(0xFF1A0F0B),
-        risk = Color(0xFFFF6B62), caution = Color(0xFFF2B35A), ok = Color(0xFF6FD39A), neutral = Color(0xFFA1A1A6),
+        bg = Color(0xFF151017), surface = Color(0xFF1F1822), surfaceRaised = Color(0xFF2A222D),
+        separator = Color(0xFF352C38), fill = Color(0xFF2C2330),
+        textPrimary = Color(0xFFF3EEF2), textSecondary = Color(0xFFB7ABB4), textTertiary = Color(0xFF8B687F),
+        accent = Color(0xFFBCF8EC), onAccent = Color(0xFF0F2420),
+        risk = Color(0xFFF08AA8), caution = Color(0xFF9FA0C3), ok = Color(0xFF7FD9C0), neutral = Color(0xFFB7ABB4),
     )
 
     val Light = Palette(
         dark = false,
-        bg = Color(0xFFF5F5F7), surface = Color(0xFFFFFFFF), surfaceRaised = Color(0xFFFFFFFF),
-        separator = Color(0xFFE5E5EA), fill = Color(0xFFEDEDF0),
-        textPrimary = Color(0xFF1D1D1F), textSecondary = Color(0xFF636366), textTertiary = Color(0xFF8A8A8E),
-        accent = Color(0xFFB2472D), onAccent = Color(0xFFFFFFFF),
-        risk = Color(0xFFBD2F26), caution = Color(0xFF8F5806), ok = Color(0xFF25704A), neutral = Color(0xFF636366),
+        bg = Color(0xFFF1FBF9), surface = Color(0xFFFFFFFF), surfaceRaised = Color(0xFFFFFFFF),
+        separator = Color(0xFFD9E9EC), fill = Color(0xFFE1F1F4),
+        textPrimary = Color(0xFF2A1E26), textSecondary = Color(0xFF5E4F5A), textTertiary = Color(0xFF8B687F),
+        accent = Color(0xFF7B435B), onAccent = Color(0xFFFFFFFF),
+        risk = Color(0xFFA62F4E), caution = Color(0xFF565991), ok = Color(0xFF1E7468), neutral = Color(0xFF5E4F5A),
     )
 }
 
