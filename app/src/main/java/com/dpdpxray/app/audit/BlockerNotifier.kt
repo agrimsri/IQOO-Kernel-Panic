@@ -44,6 +44,33 @@ internal object BlockerNotifier {
         runCatching { nm.notify(ID, n) }
     }
 
+    /** The phone is locked while a plan is due: the check carries on once it is unlocked. */
+    fun postUnlock(context: Context, app: String) = postText(
+        context, "TraceVeil is waiting",
+        "Unlock your phone to continue the check of $app.",
+        "$app की जाँच जारी रखने के लिए फ़ोन अनलॉक करें।",
+    )
+
+    private fun postText(context: Context, title: String, text: String, hindi: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return
+        val nm = context.getSystemService(NotificationManager::class.java) ?: return
+        if (!nm.areNotificationsEnabled()) return
+        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Check needs you", NotificationManager.IMPORTANCE_HIGH))
+        val open = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val tap = PendingIntent.getActivity(context, ID, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val n = Notification.Builder(context, CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(Notification.BigTextStyle().bigText(text + "\n" + hindi))
+            .setContentIntent(tap)
+            .setOnlyAlertOnce(true)
+            .build()
+        runCatching { nm.notify(ID, n) }
+    }
+
     fun clear(context: Context) {
         runCatching { context.getSystemService(NotificationManager::class.java)?.cancel(ID) }
     }

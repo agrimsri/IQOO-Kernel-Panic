@@ -53,15 +53,43 @@ object ConsentBus {
     val repromptCount: Int
         get() = _events.value.count { it.kind == ConsentKind.REPROMPT }
 
-    fun arm(pkg: String, dir: java.io.File) = synchronized(lock) {
+    /** The armed app's name as the person sees it, so Android's crash dialog can be matched to it. */
+    @Volatile var armedLabel: String? = null
+        private set
+
+    /** Every return of the consent screen after the choice in this plan, including those past the recording cap. */
+    @Volatile var consentReturns: Int = 0
+        private set
+
+    /** Android showed its "keeps stopping" or "isn't responding" dialog for the armed app in this plan. */
+    @Volatile var appCrashed: Boolean = false
+        private set
+
+    private val continued = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    fun arm(pkg: String, dir: java.io.File, label: String? = null) = synchronized(lock) {
         armGeneration++
         _events.value = emptyList()
         _targetSeen.value = false
         expectedChoice = null
         unconfirmedDialogClosedAtNanos = null
+        armedLabel = label
+        consentReturns = 0
+        appCrashed = false
+        continued.set(false)
         shotDir = dir.apply { mkdirs() }
         _armed.value = pkg
     }
+
+    fun countConsentReturn() = synchronized(lock) { if (_armed.value != null) consentReturns++ }
+
+    fun markCrashed() = synchronized(lock) { if (_armed.value != null) appCrashed = true }
+
+    /** The person tapped Continue on the hand-off card. */
+    fun userContinued() = continued.set(true)
+
+    /** True once after the person tapped Continue (read by the consent wait). */
+    fun takeContinue(): Boolean = continued.getAndSet(false)
 
     fun disarm() = synchronized(lock) {
         _armed.value = null
