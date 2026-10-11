@@ -12,6 +12,7 @@ import android.util.Log
 import com.dpdpxray.core.model.ScreenAudit
 import com.dpdpxray.core.screen.ConsentAuditPrompt
 import com.dpdpxray.core.screen.VlmResponseParser
+import com.dpdpxray.core.consent.BlockerAgent
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Capabilities
 import com.google.ai.edge.litertlm.Content
@@ -224,6 +225,31 @@ class LlmEngine(private val context: Context) {
             val text = outcome.textOrNull ?: return@withContext null
             VlmResponseParser.parse(text)?.copy(modelId = modelName, latencyMs = SystemClock.elapsedRealtime() - start)
                 ?: null.also { Log.w(TAG, "screen review: model reply did not parse as a screen audit (${text.length} chars)") }
+        }
+    }
+
+    /**
+     * One step for a screen between launch and an app's consent screen that no rule covers (see BlockerAgent). Text only: the
+     * numbered list of what is on screen is enough, and it keeps the answer quick. The reply is only a proposal; BlockerAgent
+     * decides whether it is safe to carry out.
+     */
+    suspend fun decideBlockerStep(userMessage: String, screenshot: File? = null): String? = mutex.withLock {
+        withContext(Dispatchers.Default) {
+            val e = engine ?: return@withContext null
+            if (thermallyStressed()) Thread.sleep(1500)
+            // The screenshot goes along only when the loaded model can read images; a text-only model still gets the list.
+            val parts = buildList {
+                if (screenshot?.exists() == true && capabilities?.canReadImages == true) add(Content.ImageFile(screenshot.absolutePath))
+                add(Content.Text(userMessage))
+            }
+            val contents = Contents.of(parts)
+            val constrained = llmCatching {
+                ask(e, BlockerAgent.SYSTEM, contents, AskOptions(constrained = true, maxOutputTokens = 160), BlockerAgent.JSON_SCHEMA)
+            }
+            val outcome = if (constrained is LlmOutcome.Text) constrained
+            else llmCatching { ask(e, BlockerAgent.SYSTEM, contents, AskOptions(maxOutputTokens = 160)) }
+            record("blocker step", outcome)
+            outcome.textOrNull
         }
     }
 

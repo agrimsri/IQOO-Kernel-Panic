@@ -47,6 +47,8 @@ import androidx.navigation.navArgument
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.automation.AutomationIntents
+import com.dpdpxray.app.controls.ControlsRoutes
+import com.dpdpxray.app.controls.controlsDestination
 import com.dpdpxray.app.autoguard.AutoGuardRoutes
 import com.dpdpxray.app.autoguard.CheckupScreen
 import com.dpdpxray.app.quarantine.QuarantineRoutes
@@ -247,9 +249,11 @@ class MainActivity : ComponentActivity() {
                                 onOpen = { nav.navigate("results/$it") },
                                 onTrust = { nav.navigate(TrustRoutes.ROUTE) },
                                 onNotices = { nav.navigate(NoticesRoutes.LIST) },
+                                onControls = { nav.navigate(ControlsRoutes.ROUTE) },
                             )
                         }
                         trustDestination(nav)
+                        controlsDestination(nav, vm)
                         noticesDestinations(nav)
                         composable(
                             "pick?q={q}&select={select}",
@@ -300,7 +304,10 @@ class MainActivity : ComponentActivity() {
                         composable("lab") { AiLabScreen(vm, onBack = { nav.popBackStack() }) }
                         composable("camera") { CameraCheckScreen(vm, onBack = { nav.popBackStack() }) }
                         composable("settings") {
-                            SettingsScreen(vm, onBack = { nav.popBackStack() }, onCheckup = { nav.navigate(AutoGuardRoutes.CHECKUP) })
+                            SettingsScreen(
+                                vm, onBack = { nav.popBackStack() }, onCheckup = { nav.navigate(AutoGuardRoutes.CHECKUP) },
+                                onControls = { nav.navigate(ControlsRoutes.ROUTE) },
+                            )
                         }
                         composable(ApkGuardRoutes.HUB) {
                             ApkGuardHubScreen(
