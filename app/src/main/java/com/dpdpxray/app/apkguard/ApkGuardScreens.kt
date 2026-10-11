@@ -167,15 +167,18 @@ fun ApkGuardHubScreen(
                     Spacer(Modifier.height(16.dp))
                     PrimaryButton("Choose a file", { picker.launch(arrayOf(IncomingApk.APK_MIME, "application/octet-stream")) })
                     Text(
-                        "Not an antivirus. It only reads, never installs anything, and what it finds stays on this phone.",
+                        "Not an antivirus. It reads the file; it installs only if you tap Install anyway and confirm in Android's installer. What it finds stays on this phone.",
                         style = MaterialTheme.typography.bodySmall, color = Film.boneDim, modifier = Modifier.padding(top = 12.dp),
                     )
                     LearnMore(Modifier.padding(top = 4.dp), label = "How APK Guard works") {
                         Note("Reads permissions, special services, where an app came from and who signed it.")
                         Note("APK Guard explains what an app can do from what Android shows about it: permissions, special services, where it came from and who signed it. It is not an antivirus and cannot say whether an app is harmful. Keep Google Play Protect on as well (Play Store › your profile › Play Protect).")
-                        Note("Got an app file on WhatsApp or in Files? Tap it and choose TraceVeil, or share it to TraceVeil. TraceVeil only reads the file; it never installs it.")
+                        Note("Downloaded an APK in Chrome, or got one on WhatsApp or in Files? Tap it and choose TraceVeil (Always, to check every APK first), or share it to TraceVeil. TraceVeil checks it first; Android installs it only if you tap Install anyway and confirm.")
                     }
                 }
+            }
+            item(key = "before-install") {
+                BeforeInstallGroup(settings.checkApkDownloads, resumes, Modifier.padding(top = 16.dp).reveal(1))
             }
             if (onCheckup != null) item(key = "checkup") {
                 Group(Modifier.padding(top = 16.dp).reveal(1)) {
@@ -327,7 +330,7 @@ fun ApkGuardResultScreen(
                     Spacer(Modifier.height(12.dp))
                     OutlineAction("Back", onBack)
                 }
-                is ResultState.Ready -> ReadyResult(s.app, s.report, hindi, onAudit, onOpenInstalled, onQuarantine)
+                is ResultState.Ready -> ReadyResult(s.app, s.report, hindi, onAudit, onOpenInstalled, onQuarantine, (subject as? ApkGuardSubject.File)?.key, onBack)
             }
         }
     }
@@ -339,7 +342,7 @@ private suspend fun load(ctx: Context, subject: ApkGuardSubject): ResultState = 
         ?.let { ResultState.Ready(it, ApkGuardModel.withModelCard(ApkRiskRules.evaluate(it.facts))) }
         ?: ResultState.Failed("This app is not installed, or Android did not let TraceVeil read it.")
     is ApkGuardSubject.File -> when (val r = ApkFileChecks.await(subject.key)) {
-        null -> ResultState.Failed("This file check is no longer in memory, for example because TraceVeil was closed. Open the APK file again from WhatsApp or Files.")
+        null -> ResultState.Failed("This file check is no longer in memory, for example because TraceVeil was closed. Open the APK file again from Files, Chrome's downloads or WhatsApp.")
         is ArchiveRead.Failed -> ResultState.Failed(r.reason)
         is ArchiveRead.Ok -> ResultState.Ready(r.app, ApkGuardModel.withModelCard(ApkRiskRules.evaluate(r.app.facts)))
     }
@@ -368,14 +371,22 @@ private fun ReadyResult(
     onAudit: (String) -> Unit,
     onOpenInstalled: (String) -> Unit,
     onQuarantine: ((String) -> Unit)?,
+    fileKey: String?,
+    onBack: () -> Unit,
 ) {
     val ctx = LocalContext.current
     val facts = app.facts
     val isFile = facts.origin.source == InstallSource.NOT_INSTALLED
 
     VerdictCard(app, report, hindi, Modifier.reveal(0))
+    if (isFile && fileKey != null) {
+        // Check before install: the decision sits right under the verdict, the evidence follows.
+        PreInstallPanel(fileKey, report, hindi, onConsentCheck = onAudit, onOpenInstalled = onOpenInstalled, onBack = onBack, modifier = Modifier.padding(top = 16.dp))
+    }
     Spacer(Modifier.height(12.dp))
     DetailsCard(app, hindi, Modifier.reveal(1))
+    if (isFile) CodeFoundGroup(app.codeScan, hindi, Modifier.padding(top = 16.dp))
+    else InstalledCodeGroup(facts.packageName, hindi, Modifier.padding(top = 16.dp))
 
     var order = 2
     ApkSeverity.entries.forEach { severity ->
@@ -426,13 +437,8 @@ private fun ReadyResult(
             facts.installedTwin?.let {
                 OutlineAction("Check the installed \"${it.label}\"", { onOpenInstalled(facts.packageName) }, glyph = Glyph.APK)
             }
-            CollapsibleCard(
-                if (hindi) "अगर आपको अब भी इस फ़ाइल पर भरोसा है" else "If you still trust this file",
-                summary = if (hindi) "TraceVeil ऐप इंस्टॉल नहीं करता। आगे कैसे बढ़ें, यह देखें।" else "TraceVeil does not install apps. See how to continue, if you choose to.",
-                glyph = Glyph.INFO,
-            ) {
-                Note(CONTINUE_WITH_INSTALLER.pick(hindi), Film.bone)
-            }
+            // The install decision (Install anyway / Don't install) is in the "Before you install" group above.
+            Note(if (hindi) "इंस्टॉल का फ़ैसला ऊपर \"इंस्टॉल करने से पहले\" में है।" else "The install decision is above, under Before you install.")
         }
     }
     Spacer(Modifier.height(20.dp))
@@ -445,11 +451,6 @@ private fun ReadyResult(
         Note("APK Guard rules v${ApkRiskRules.VERSION}. Sources: Google Play Protect developer guidance; CERT-In advisory CICA-2026-3492; Cyber Swachhta Kendra SpyMax alert; McAfee Labs SpyLoan research. Nothing about this check leaves the phone.")
     }
 }
-
-private val CONTINUE_WITH_INSTALLER = Bilingual(
-    "TraceVeil does not install apps. If, after this check, you still trust the file: go back to the app where you found it (for example WhatsApp or Files), tap the file again and choose Android's package installer. Android may ask you to allow installs from that app; you can switch that off again in Settings › Apps › Special app access › Install unknown apps. Better still, get the app from Google Play or the official website.",
-    "TraceVeil ऐप इंस्टॉल नहीं करता। अगर इस जाँच के बाद भी आपको फ़ाइल पर भरोसा है: उस ऐप में वापस जाएँ जहाँ फ़ाइल मिली थी (जैसे WhatsApp या Files), फ़ाइल पर फिर टैप करें और Android का पैकेज इंस्टॉलर चुनें। Android उस ऐप से इंस्टॉल की अनुमति माँग सकता है; बाद में इसे सेटिंग्स › ऐप्स › ख़ास ऐप ऐक्सेस › अनजान ऐप इंस्टॉल करें में फिर से बंद कर सकते हैं। सबसे अच्छा है कि ऐप Google Play या आधिकारिक वेबसाइट से लें।",
-)
 
 /** Attention colour for the verdict card: orange when something needs careful review, amber for "worth knowing". */
 private fun toneOf(report: ApkGuardReport): Color = when {

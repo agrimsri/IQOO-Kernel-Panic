@@ -42,6 +42,7 @@ import com.dpdpxray.app.apkguard.ApkGuardIntents
 import com.dpdpxray.app.apkguard.ApkGuardResultScreen
 import com.dpdpxray.app.apkguard.ApkGuardRoutes
 import com.dpdpxray.app.apkguard.ApkGuardSubject
+import com.dpdpxray.app.apkguard.DownloadPickScreen
 import androidx.navigation.navArgument
 import com.dpdpxray.app.audit.AuditProgress
 import com.dpdpxray.app.data.Audience
@@ -321,6 +322,13 @@ class MainActivity : ComponentActivity() {
                                 onAudit = { nav.navigate(ApkGuardRoutes.auditPicker(it)) },
                                 onOpenInstalled = { nav.navigate(ApkGuardRoutes.app(it)) },
                                 onQuarantine = { nav.navigateToQuarantine(it) },
+                            )
+                        }
+                        // A tapped "New APK downloaded" alert for a file TraceVeil cannot open itself.
+                        composable(ApkGuardRoutes.DOWNLOADS) {
+                            DownloadPickScreen(
+                                onBack = { nav.popBackStack() },
+                                onOpenFile = { nav.navigate(ApkGuardRoutes.file(it)) { popUpTo(ApkGuardRoutes.DOWNLOADS) { inclusive = true } } },
                             )
                         }
                         composable(ApkGuardRoutes.FILE) { e ->
