@@ -107,7 +107,7 @@ class BlockerAgentTest {
         )
         val tree = screen(text("Please enter the following details"), picker, button("Cancel"), button("OK"))
         val d = BlockerAgent.digest(tree).text
-        assertTrue(d.contains("picker is open"))
+        assertTrue(d.contains("picker is open") && d.contains("Confirm it by tapping button"))
         assertFalse("inner number fields must not be listed as text fields", d.contains("text field"))
         val ok = numberOf(tree, "\"OK\"")
         assertTrue(decide("""{"action":"tap","target":$ok,"reason":"confirm the date"}""", tree) is Step.Tap)
@@ -118,5 +118,21 @@ class BlockerAgentTest {
         assertFalse(gaveUp.vetoed)
         val vetoed = decide("""{"action":"tap","target":99,"reason":"x"}""", tour) as Step.HandOff
         assertTrue(vetoed.vetoed)
+    }
+
+    @Test fun `the prompt mentions an attached screenshot only when there is one, and still points at the list`() {
+        val d = BlockerAgent.digest(tour)
+        assertFalse(BlockerAgent.userMessage(d, emptyList()).contains("screenshot"))
+        val with = BlockerAgent.userMessage(d, emptyList(), screenshotAttached = true)
+        assertTrue(with.contains("screenshot") && with.contains("only ever choose a target from the numbered list"))
+    }
+
+    @Test fun `once every field is filled the screen description names the way forward`() {
+        val done = screen(text("Details"), input("Name", typed = "Test User"), UiNode(className = "android.widget.Spinner", isClickable = true, children = listOf(text("English"))), button("CONTINUE"))
+        val d = BlockerAgent.digest(done).text
+        assertTrue(d, d.contains("every text field is filled in") && d.contains("tap button"))
+        assertEquals("a dropdown's inner text is not listed twice", 1, d.lines().count { it.contains("English") })
+        val notYet = BlockerAgent.digest(screen(input("Name"), button("CONTINUE"))).text
+        assertFalse(notYet.contains("every text field is filled in"))
     }
 }

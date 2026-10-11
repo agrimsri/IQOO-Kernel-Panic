@@ -207,15 +207,21 @@ class LlmEngine(private val context: Context) {
      * numbered list of what is on screen is enough, and it keeps the answer quick. The reply is only a proposal; BlockerAgent
      * decides whether it is safe to carry out.
      */
-    suspend fun decideBlockerStep(userMessage: String): String? = mutex.withLock {
+    suspend fun decideBlockerStep(userMessage: String, screenshot: File? = null): String? = mutex.withLock {
         withContext(Dispatchers.Default) {
             val e = engine ?: return@withContext null
             if (thermallyStressed()) Thread.sleep(1500)
+            // The screenshot goes along only when the loaded model can read images; a text-only model still gets the list.
+            val parts = buildList {
+                if (screenshot?.exists() == true && capabilities?.canReadImages == true) add(Content.ImageFile(screenshot.absolutePath))
+                add(Content.Text(userMessage))
+            }
+            val contents = Contents.of(parts)
             val constrained = llmCatching {
-                ask(e, BlockerAgent.SYSTEM, Contents.of(userMessage), AskOptions(constrained = true, maxOutputTokens = 160), BlockerAgent.JSON_SCHEMA)
+                ask(e, BlockerAgent.SYSTEM, contents, AskOptions(constrained = true, maxOutputTokens = 160), BlockerAgent.JSON_SCHEMA)
             }
             val outcome = if (constrained is LlmOutcome.Text) constrained
-            else llmCatching { ask(e, BlockerAgent.SYSTEM, Contents.of(userMessage), AskOptions(maxOutputTokens = 160)) }
+            else llmCatching { ask(e, BlockerAgent.SYSTEM, contents, AskOptions(maxOutputTokens = 160)) }
             record("blocker step", outcome)
             outcome.textOrNull
         }

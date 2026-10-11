@@ -212,7 +212,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         step("Waiting for a consent screen", t0)
         // A sign-in, code, CAPTCHA or fingerprint screen can stand between launch and the consent screen: skip it with a
         // harmless button when there is one, otherwise ask the person to complete it and keep watching meanwhile.
-        val agent = BlockerAgentRunner(graph.llm)
+        val agent = BlockerAgentRunner(graph.llm, File(context.cacheDir, "blocker-step.jpg"))
         val waited = ConsentWaitAssist(
             probe = {
                 withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.probeNow() }
@@ -248,6 +248,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         ).await(t.waitConsentMs)
         withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.hideBlockerPrompt() }
         BlockerNotifier.clear(context)
+        agent.cleanup()
         notes += BlockerCopy.notes(waited, blocksPlan = plan != AuditPlan.SILENT)
         val appeared = waited.consent
 

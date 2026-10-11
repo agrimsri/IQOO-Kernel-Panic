@@ -340,6 +340,12 @@ class ConsentAccessibilityService : AccessibilityService() {
         return "$label (after typing test values into ${typed.joinToString { it.label }.ifEmpty { "no fields" }})"
     }
 
+    /**
+     * Saves a screenshot of the screen to [file] (JPEG), without the inspection glow in it. False when it could not be
+     * taken (for example on Android 10, where accessibility screenshots do not exist). Main thread.
+     */
+    suspend fun screenshotTo(file: File): Boolean = suspendCancellableCoroutine { cont -> capture(file) { ok -> if (cont.isActive) cont.resume(ok) } }
+
     /** The audited app's screen as the pure model plus its live nodes (same order), or null. Main thread. */
     fun readScreen(): Pair<UiNode, List<AccessibilityNodeInfo>>? {
         check(Looper.myLooper() == Looper.getMainLooper())
