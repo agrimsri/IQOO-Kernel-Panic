@@ -32,8 +32,12 @@ class PaletteContrastTest {
         check("$name onAccent on accent", p, 4.5, p.onAccent, p.accent)
         check("$name textPrimary on surfaceRaised", p, 4.5, p.textPrimary, p.surfaceRaised)
         check("$name accent on surfaceRaised", p, 4.5, p.accent, p.surfaceRaised)
-        // Captions carry no information that is not repeated elsewhere, so graphic-level contrast is enough.
-        check("$name textTertiary on bg", p, 3.0, p.textTertiary, p.bg)
+        for ((bgName, bg) in listOf("bg" to p.bg, "surface" to p.surface, "fill" to p.fill)) {
+            check("$name textTertiary on $bgName", p, 4.5, p.textTertiary, bg)
+            check("$name graphic on $bgName", p, 3.0, p.graphic, bg)
+        }
+        // Cards must be told apart from the screen: a white or lifted surface needs a visible step from the background.
+        check("$name surface against bg", p, 1.1, p.surface, p.bg)
         check("$name separator on bg is a hairline, not text", p, 1.05, p.separator, p.bg)
     }
 

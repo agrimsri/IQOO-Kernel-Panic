@@ -752,3 +752,10 @@ The section 6.1 hex values were replaced by a scheme built from five supplied co
 The five colours have no red, amber or green, so the three status colours are derived from the same hue families (berry, lavender, aqua) and are always accompanied by a word. `PaletteContrastTest` checks every pair in both themes.
 
 The logo keeps its original colours (peach, coral and rose veil, cyan arcs, red lookup dot, dark navy lens) in every theme: `BrandMark` no longer reads the UI palette. It is back in the Home header beside the title, as it was before the refactor.
+
+### Appearance setting and contrast pass
+
+* **Appearance:** Settings › Display now has a System / Light / Dark control (stored as `themeMode`, default `system`, so existing installs see no change). The status and navigation bar icons follow the chosen theme, not only the phone's.
+* **Light-mode contrast:** the background was deepened to `#E9F5F4` and the quiet fill to `#D5EAED` so white cards read as cards; the separator is `#D1E3E6`. Caption text (`textTertiary`) is now `#735668`, which passes 4.5:1 on every surface. Dusty Lavender `#8B687F` stays for icons and switch thumbs through a new `graphic` token (3:1). "Ready" green is `#1B6B60`.
+* **Dark-mode contrast:** surfaces were lifted one step (`#231B26` on `#151017`) so cards separate from the screen; caption text is `#A08E9B`.
+* `PaletteContrastTest` now also checks caption text on all three surfaces, graphics at 3:1, and the card-versus-background step, in both themes.

@@ -47,6 +47,8 @@ object Film {
     val fill: Color get() = ActivePalette.current.fill
     /** Captions only. */
     val tertiary: Color get() = ActivePalette.current.textTertiary
+    /** Icons and switch thumbs. */
+    val graphic: Color get() = ActivePalette.current.graphic
     /** Text and icons on a filled accent. */
     val onAccent: Color get() = ActivePalette.current.onAccent
     /** Low, info, inconclusive. */
@@ -162,10 +164,21 @@ private fun typography(k: Float) = Typography(
 )
 
 @Composable
-fun XrayTheme(stageMode: Boolean, content: @Composable () -> Unit) {
+fun XrayTheme(stageMode: Boolean, themeMode: String = "system", content: @Composable () -> Unit) {
     val k = if (stageMode) 1.18f else 1f
     val reduceMotion = rememberSystemReduceMotion()
-    val palette = if (isSystemInDarkTheme()) Palettes.Dark else Palettes.Light
+    val systemDark = isSystemInDarkTheme()
+    val palette = when (themeMode) { "dark" -> Palettes.Dark; "light" -> Palettes.Light; else -> if (systemDark) Palettes.Dark else Palettes.Light }
+    // Keep the status and navigation bar icons readable on the chosen theme (the system only knows its own setting).
+    val view = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.SideEffect {
+        val window = (view.context as? android.app.Activity)?.window
+        if (window != null) {
+            val controls = androidx.core.view.WindowCompat.getInsetsController(window, view)
+            controls.isAppearanceLightStatusBars = !palette.dark
+            controls.isAppearanceLightNavigationBars = !palette.dark
+        }
+    }
     // Set before any child reads a colour, so the first frame already uses the right palette.
     remember(palette) { ActivePalette.current = palette }
     // Text without an explicit colour must read as the primary text colour (Compose defaults it to black).

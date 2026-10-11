@@ -395,7 +395,7 @@ fun SwitchRow(title: String, detail: String?, checked: Boolean, onChange: (Boole
                 checked = checked, onCheckedChange = null, enabled = enabled,
                 colors = SwitchDefaults.colors(
                     checkedTrackColor = Film.scan, checkedThumbColor = Film.onAccent, checkedBorderColor = Color.Transparent,
-                    uncheckedTrackColor = Film.fill, uncheckedThumbColor = Film.tertiary, uncheckedBorderColor = Color.Transparent,
+                    uncheckedTrackColor = Film.fill, uncheckedThumbColor = Film.graphic, uncheckedBorderColor = Color.Transparent,
                 ),
             )
         }

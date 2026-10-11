@@ -40,7 +40,7 @@ fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Un
             val on = i == selected
             Box(
                 Modifier.weight(1f).heightIn(min = 40.dp).clip(RoundedCornerShape(10.dp))
-                    .background(if (on) Film.raised else Color.Transparent)
+                    .background(if (on) (if (com.dpdpxray.app.ui.theme.ActivePalette.current.dark) Film.bone.copy(alpha = 0.14f) else Film.raised) else Color.Transparent)
                     .selectable(selected = on, role = Role.RadioButton) { onSelect(i) },
                 contentAlignment = Alignment.Center,
             ) {

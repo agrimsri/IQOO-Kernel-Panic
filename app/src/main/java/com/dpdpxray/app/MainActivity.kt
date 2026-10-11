@@ -147,7 +147,7 @@ class MainActivity : ComponentActivity() {
                     vm.updateSettings { it.copy(guideLanguage = lang.code) }
                 },
             )
-            XrayTheme(stageMode = settings.stageMode) {
+            XrayTheme(stageMode = settings.stageMode, themeMode = settings.themeMode) {
                 CompositionLocalProvider(LocalGuide provides guide) {
                 val nav = rememberNavController()
                 val entry by nav.currentBackStackEntryAsState()

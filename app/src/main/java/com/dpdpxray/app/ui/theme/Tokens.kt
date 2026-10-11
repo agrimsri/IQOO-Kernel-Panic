@@ -33,6 +33,8 @@ class Palette(
     val textSecondary: Color,
     /** Captions only, never the only carrier of information. */
     val textTertiary: Color,
+    /** Icons and switch thumbs (graphics need 3:1, not text contrast): Dusty Lavender in both themes. */
+    val graphic: Color,
     /** Links, selection and the one primary action. */
     val accent: Color,
     val onAccent: Color,
@@ -49,20 +51,20 @@ class Palette(
 object Palettes {
     val Dark = Palette(
         dark = true,
-        bg = Color(0xFF151017), surface = Color(0xFF1F1822), surfaceRaised = Color(0xFF2A222D),
-        separator = Color(0xFF352C38), fill = Color(0xFF2C2330),
-        textPrimary = Color(0xFFF3EEF2), textSecondary = Color(0xFFB7ABB4), textTertiary = Color(0xFF8B687F),
+        bg = Color(0xFF151017), surface = Color(0xFF231B26), surfaceRaised = Color(0xFF2D252F),
+        separator = Color(0xFF3A313D), fill = Color(0xFF2F2633),
+        textPrimary = Color(0xFFF3EEF2), textSecondary = Color(0xFFB7ABB4), textTertiary = Color(0xFFA08E9B), graphic = Color(0xFF8B687F),
         accent = Color(0xFFBCF8EC), onAccent = Color(0xFF0F2420),
         risk = Color(0xFFF08AA8), caution = Color(0xFF9FA0C3), ok = Color(0xFF7FD9C0), neutral = Color(0xFFB7ABB4),
     )
 
     val Light = Palette(
         dark = false,
-        bg = Color(0xFFF1FBF9), surface = Color(0xFFFFFFFF), surfaceRaised = Color(0xFFFFFFFF),
-        separator = Color(0xFFD9E9EC), fill = Color(0xFFE1F1F4),
-        textPrimary = Color(0xFF2A1E26), textSecondary = Color(0xFF5E4F5A), textTertiary = Color(0xFF8B687F),
+        bg = Color(0xFFE9F5F4), surface = Color(0xFFFFFFFF), surfaceRaised = Color(0xFFFFFFFF),
+        separator = Color(0xFFD1E3E6), fill = Color(0xFFD5EAED),
+        textPrimary = Color(0xFF2A1E26), textSecondary = Color(0xFF5E4F5A), textTertiary = Color(0xFF735668), graphic = Color(0xFF8B687F),
         accent = Color(0xFF7B435B), onAccent = Color(0xFFFFFFFF),
-        risk = Color(0xFFA62F4E), caution = Color(0xFF565991), ok = Color(0xFF1E7468), neutral = Color(0xFF5E4F5A),
+        risk = Color(0xFFA62F4E), caution = Color(0xFF565991), ok = Color(0xFF1B6B60), neutral = Color(0xFF5E4F5A),
     )
 }
 

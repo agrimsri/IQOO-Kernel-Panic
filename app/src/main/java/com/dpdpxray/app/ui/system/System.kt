@@ -108,7 +108,7 @@ fun ListRow(
         }
         if (chevron) {
             Spacer(Modifier.width(8.dp))
-            GlyphIcon(Glyph.CHEVRON_RIGHT, Film.tertiary, size = 16.dp)
+            GlyphIcon(Glyph.CHEVRON_RIGHT, Film.graphic, size = 16.dp)
         }
     }
 }

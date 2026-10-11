@@ -272,7 +272,7 @@ private fun InstalledRow(app: ApkInspector.ListedApp, modifier: Modifier = Modif
             if (note != null) Text(note, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
         }
         Spacer(Modifier.width(6.dp))
-        GlyphIcon(Glyph.CHEVRON_RIGHT, Film.tertiary, size = 16.dp)
+        GlyphIcon(Glyph.CHEVRON_RIGHT, Film.graphic, size = 16.dp)
     }
 }
 
