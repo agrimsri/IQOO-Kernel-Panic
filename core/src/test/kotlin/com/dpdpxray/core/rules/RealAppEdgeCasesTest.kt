@@ -96,6 +96,21 @@ class RealAppEdgeCasesTest {
         assertFalse(CheckId.V0 in found)
     }
 
+    @Test fun `a permission prompt handed to the person before the consent screen is still recorded as C14, and the plan is scored`() {
+        val prompt = session(listOf("api.hacktracker.example", "cdn.hacktracker.example"), freshState = true, notes = emptyList(),
+            conditions = restarted.copy(blocker = BlockedStep(BlockerKind.PERMISSION.name, handedOff = true, waitedMs = 8_000, consentReached = true)))
+            .copy(permissionDialogsWatched = true, consentEvents = listOf(
+                com.dpdpxray.core.model.ConsentEvent(2 * s, ConsentKind.PERMISSION_DIALOG, "Allow HackTracker to access this device's location?"),
+                com.dpdpxray.core.model.ConsentEvent(12 * s, ConsentKind.SCREEN_APPEARED),
+                com.dpdpxray.core.model.ConsentEvent(14 * s, ConsentKind.REJECT),
+            ))
+        val r = engine.evaluate(listOf(prompt))
+        val c14 = r.findings.single { it.checkId == CheckId.C14 }
+        assertEquals(com.dpdpxray.core.model.Severity.LOW, c14.severity)
+        assertTrue(c14.evidence.single(), c14.evidence.single().contains("before the consent screen appeared"))
+        assertNotNull(r.score)
+    }
+
     // --- Consent screen in a WebView ----------------------------------------------------------------------------------
 
     /** A cookie-consent page rendered in a WebView, as Android's accessibility tree exposes it: nested Views, Buttons as leaves. */
