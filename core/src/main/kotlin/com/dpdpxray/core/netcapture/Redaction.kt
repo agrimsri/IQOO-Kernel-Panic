@@ -12,6 +12,9 @@ enum class SensitiveKind(val label: String) {
     LOCATION("coordinates"),
     TOKEN("long token or key"),
     CREDENTIAL("credential header"),
+
+    /** A field whose name says it holds personal data (first_name, address, dob, …); its value was replaced unread. */
+    PERSONAL_FIELD("field named like personal data"),
 }
 
 data class Redacted(val text: String, val found: Set<SensitiveKind>)
@@ -61,13 +64,38 @@ object Redaction {
         val params = target.substring(q + 1).split('&').map { kv ->
             val eq = kv.indexOf('=')
             if (eq < 0) kv else {
-                val r = value(kv.substring(eq + 1))
+                // Values are often percent-encoded (asha%40example.in): look for shapes in the decoded form as well.
+                val raw = kv.substring(eq + 1)
+                val plain = value(raw)
+                val decoded = decode(raw)
+                val r = if (decoded != raw) value(decoded).takeIf { it.found.size > plain.found.size } ?: plain else plain
                 found += r.found
-                kv.substring(0, eq) + "=" + r.text
+                // A field named like personal data (first_name, address, dob) keeps no part of its value: only the kinds
+                // of value seen in it, or [personal] when its value had no recognisable shape.
+                val name = kv.substring(0, eq)
+                val personal = r.text.isNotEmpty() && PersonalFieldNames.kindOf(decode(name)) != null
+                val text = when {
+                    !personal -> r.text
+                    r.found.isEmpty() -> "[personal]".also { found += SensitiveKind.PERSONAL_FIELD }
+                    else -> r.found.joinToString("") { placeholder(it) }
+                }
+                "$name=$text"
             }
         }
         return Redacted(path.text + "?" + params.joinToString("&"), found)
     }
+
+    private fun placeholder(k: SensitiveKind) = when (k) {
+        SensitiveKind.EMAIL -> "[email]"
+        SensitiveKind.DEVICE_ID -> "[device-id]"
+        SensitiveKind.IMEI_LIKE -> "[15-digit-id]"
+        SensitiveKind.PHONE -> "[phone]"
+        SensitiveKind.LOCATION -> "[coordinate]"
+        SensitiveKind.TOKEN -> "[token]"
+        SensitiveKind.CREDENTIAL, SensitiveKind.PERSONAL_FIELD -> "[personal]"
+    }
+
+    private fun decode(s: String): String = runCatching { java.net.URLDecoder.decode(s, "UTF-8") }.getOrDefault(s)
 
     /** Only an allow-list of harmless headers is kept (values scrubbed); credential headers become a [SensitiveKind.CREDENTIAL] flag. */
     fun headers(h: Map<String, String>): Pair<Map<String, String>, Set<SensitiveKind>> {
