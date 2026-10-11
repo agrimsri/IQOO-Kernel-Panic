@@ -113,7 +113,14 @@ class CliReportStore(private val root: File) {
         val dir = File(root, requestId).apply { mkdirs() }
         val tmp = File(dir, "$name.tmp").apply { writeText(text) }
         val target = File(dir, name)
-        check(tmp.renameTo(target)) { "could not publish $name" }
+        // An atomic replace: File.renameTo cannot replace an existing file on every platform (it fails on Windows), and a
+        // status file is rewritten many times per request.
+        runCatching {
+            java.nio.file.Files.move(
+                tmp.toPath(), target.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+            )
+        }.onFailure { tmp.delete(); throw IllegalStateException("could not publish $name", it) }
         return target
     }
 }
