@@ -54,7 +54,10 @@ class NoScoreHelpTest {
 
     @Test fun `a consent-history result explains the limit without offering a restart, and a sample shows nothing`() {
         val kept = bundle(session(listOf("app-measurement.com", "api.hacktracker.example"), PlanConditions(startMode = StartMode.RESTARTED)))
-        assertTrue(NoScoreHelp.historyUnknown(kept))
+        // Today's results carry a range, shown by its own section; only a result saved before ranges is "no score".
+        assertFalse(NoScoreHelp.historyUnknown(kept))
+        val saved = kept.copy(result = kept.result.copy(historyBounds = null))
+        assertTrue(NoScoreHelp.historyUnknown(saved))
         assertTrue(NoScoreHelp.items(kept).isEmpty())
         assertFalse(NoScoreHelp.hasPrimary(kept))
         assertEquals(emptyList<Action>(), NoScoreHelp.otherActions(NoScoreHelp.items(kept)))

@@ -17,6 +17,7 @@ enum class ResultSource(val label: String, val meaning: String) {
     AI_INFERRED("AI-inferred", "Written or read by the on-device AI. It can be wrong; the evidence above is what counts."),
     INFERRED("Inferred", "Reasoned from vendor documentation, not seen directly."),
     FALLBACK("Fallback", "Rules-based text written without the AI, from this finding's own evidence."),
+    DECLARED("Based on your answer", "Seen on this phone and judged by your answer about your consent history, which TraceVeil cannot check."),
 }
 
 object ResultSources {
@@ -24,6 +25,7 @@ object ResultSources {
 
     /** An inferred consent-screen finding comes from the AI's reading of the screen when a model reviewed it. */
     fun of(finding: Finding, sessions: List<AuditSession>): ResultSource = when {
+        finding.declared -> ResultSource.DECLARED
         finding.evidenceType == EvidenceType.OBSERVED -> ResultSource.OBSERVED
         finding.checkId in SCREEN_CHECKS && sessions.any { it.screenAudit?.modelId != null } -> ResultSource.AI_INFERRED
         else -> ResultSource.INFERRED

@@ -250,6 +250,43 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
 
     fun open(id: String) = viewModelScope.launch {
         if (_bundle.value?.meta?.id != id) _bundle.value = graph.repository.load(id)
+        // A kept-data check saved before results carried a consent-history range gets its range (and nothing else).
+        val b = _bundle.value?.takeIf { it.meta.id == id } ?: return@launch
+        val catalog = graph.catalog()
+        val ranged = withContext(Dispatchers.Default) {
+            runCatching { com.dpdpxray.app.data.ConsentAnswers.rangeFor(b) { s, h -> RulesEngine(catalog).evaluate(s, h) } }.getOrNull()
+        } ?: return@launch
+        val meta = b.meta.copy(historyBounds = ranged.historyBounds)
+        saveRescored(b, meta, ranged)
+    }
+
+    /**
+     * The person's answer about their consent history for a kept-data check: re-scores the same sessions with it
+     * ([answer] null clears it) and saves the new result, report and metadata. Called only from a tap on the result.
+     */
+    fun answerConsentHistory(bundle: AuditBundle, answer: com.dpdpxray.core.model.ConsentHistory?) = viewModelScope.launch {
+        if (com.dpdpxray.app.data.ConsentAnswers.state(bundle) == com.dpdpxray.app.data.ConsentAnswers.State.NONE) return@launch
+        val catalog = graph.catalog()
+        val (meta, result) = withContext(Dispatchers.Default) {
+            com.dpdpxray.app.data.ConsentAnswers.apply(bundle, answer) { s, h -> RulesEngine(catalog).evaluate(s, h) }
+        }
+        saveRescored(bundle, meta, result)
+        _toast.value = when (answer) {
+            null -> "Answer cleared. The result is a range again."
+            com.dpdpxray.core.model.ConsentHistory.NOT_SURE -> "Saved: not sure. The result stays a range."
+            else -> "Saved as your answer. You can change it on the result."
+        }
+    }
+
+    private suspend fun saveRescored(b: AuditBundle, meta: AuditMeta, result: com.dpdpxray.core.model.AuditResult) {
+        val catalog = graph.catalog()
+        val md = withContext(Dispatchers.Default) {
+            runCatching {
+                EvidenceReport.annotate(MarkdownReport.build(result, b.sessions, graph.fixCatalog.fixesFor(result, catalog), graph.citations()), b.sessions, meta.timingProfile)
+            }.getOrDefault("")
+        }
+        runCatching { graph.repository.updateResult(meta, result, md) }.onFailure { _toast.value = "Could not save the change"; return }
+        _bundle.update { cur -> if (cur?.meta?.id == meta.id) cur.copy(meta = meta, result = result) else cur }
     }
 
     fun delete(id: String) = viewModelScope.launch { graph.repository.delete(id) }

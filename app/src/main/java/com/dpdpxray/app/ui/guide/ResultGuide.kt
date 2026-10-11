@@ -16,6 +16,8 @@ data class ResultFacts(
     val sample: Boolean,
     /** Why an inconclusive result has no score; null for the older "too little was captured" wording. */
     val inconclusiveReason: com.dpdpxray.core.rules.Inconclusive.Reason? = null,
+    /** The consent-history range of a kept-data check (score still open); null when the result has one score. */
+    val bounds: com.dpdpxray.core.model.HistoryBounds? = null,
 )
 
 enum class NextAction { SEE_EVIDENCE, HOW_TO_FIX, CHECK_AGAIN, CHECK_REAL_APP, ASK, REPORT }
@@ -52,7 +54,8 @@ object ResultGuide {
                         "TraceVeil recorded ${findings(f.findingCount)}, and the score is in the At risk range. Open each finding to see the lookups and times behind it.",
                         "TraceVeil ने ${f.findingCount} फ़ाइंडिंग दर्ज कीं, और स्कोर At risk श्रेणी में है। हर फ़ाइंडिंग खोलकर उसके पीछे के लुकअप और समय देखें।",
                     )
-                    ScoreBand.INCONCLUSIVE -> if (f.inconclusiveReason == com.dpdpxray.core.rules.Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN) Bi(
+                    ScoreBand.INCONCLUSIVE -> if (f.bounds != null) range(f.bounds)
+                    else if (f.inconclusiveReason == com.dpdpxray.core.rules.Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN) Bi(
                         "No score: the lookups were captured, but this app kept its data, so whether you agreed to tracking earlier can't be seen. Unknown stays unknown: this is not a pass.",
                         "कोई स्कोर नहीं: लुकअप दर्ज हुए, लेकिन ऐप ने अपना डेटा रखा, इसलिए आपने पहले ट्रैकिंग की सहमति दी थी या नहीं, यह नहीं दिखता। अज्ञात, अज्ञात ही रहता है: इसे पास न समझें।",
                     ) else Bi(
@@ -106,6 +109,22 @@ object ResultGuide {
         return ResultExplanation(meaning, next)
     }
 
+    /** A kept-data check's range: the band it holds either way, or the best it can reach, and why it is a range. */
+    private fun range(b: com.dpdpxray.core.model.HistoryBounds): Bi {
+        val never = " On an unchecked answer it is never Ready."
+        return if (b.bandSettled) Bi(
+            "${b.lowBand.label} whichever way you answer (${b.range}). The app kept its data, so whether you agreed to tracking earlier can't be seen: " +
+                "${b.lowScore} if you never agreed, ${b.highScore} if you did." + never,
+            "आप जो भी जवाब दें, ${bandHi(b.lowBand)} (${b.range})। ऐप ने अपना डेटा रखा, इसलिए यह नहीं दिखता कि आपने पहले ट्रैकिंग की सहमति दी थी या नहीं: " +
+                "कभी नहीं दी तो ${b.lowScore}, दी थी तो ${b.highScore}। सिर्फ़ जवाब के आधार पर यह कभी 'तैयार' नहीं होता।",
+        ) else Bi(
+            "At best ${b.bestBand.label} (${b.range}). The app kept its data, so whether you agreed to tracking earlier can't be seen; " +
+                "answer one question below to pick the score." + never,
+            "ज़्यादा से ज़्यादा ${bandHi(b.bestBand)} (${b.range})। ऐप ने अपना डेटा रखा, इसलिए यह नहीं दिखता कि आपने पहले ट्रैकिंग की सहमति दी थी या नहीं; " +
+                "स्कोर चुनने के लिए नीचे एक सवाल का जवाब दें। सिर्फ़ जवाब के आधार पर यह कभी 'तैयार' नहीं होता।",
+        )
+    }
+
     private fun bandHi(band: ScoreBand) = when (band) {
         ScoreBand.READY -> "तैयार"
         ScoreBand.NEEDS_WORK -> "सुधार की ज़रूरत"
@@ -115,9 +134,16 @@ object ResultGuide {
 
     /** Step 4 of the journey. The spoken line carries only score, band and counts: no app, host or tracker names. */
     fun step(f: ResultFacts): GuideStep {
-        val scoreEn = if (f.band == ScoreBand.INCONCLUSIVE || f.score == null) (f.inconclusiveReason?.en ?: "Inconclusive: too little was captured to score.")
+        val b = f.bounds?.takeIf { f.score == null }
+        val scoreEn = if (b != null) {
+            if (b.bandSettled) "${b.lowBand.label} either way, ${b.lowScore} to ${b.highScore}, depending on whether you agreed to tracking earlier."
+            else "At best ${b.bestBand.label}, ${b.lowScore} to ${b.highScore}: one answer about your consent history decides it."
+        } else if (f.band == ScoreBand.INCONCLUSIVE || f.score == null) (f.inconclusiveReason?.en ?: "Inconclusive: too little was captured to score.")
             else "Score ${f.score} out of 100: ${f.band.label}."
-        val scoreHi = if (f.band == ScoreBand.INCONCLUSIVE || f.score == null) (f.inconclusiveReason?.hi ?: "अनिर्णायक: स्कोर के लिए बहुत कम जानकारी दर्ज हुई।")
+        val scoreHi = if (b != null) {
+            if (b.bandSettled) "दोनों हाल में ${bandHi(b.lowBand)}, ${b.lowScore} से ${b.highScore}, इस पर निर्भर कि आपने पहले ट्रैकिंग की सहमति दी थी या नहीं।"
+            else "ज़्यादा से ज़्यादा ${bandHi(b.bestBand)}, ${b.lowScore} से ${b.highScore}: सहमति के इतिहास के बारे में एक जवाब इसे तय करता है।"
+        } else if (f.band == ScoreBand.INCONCLUSIVE || f.score == null) (f.inconclusiveReason?.hi ?: "अनिर्णायक: स्कोर के लिए बहुत कम जानकारी दर्ज हुई।")
             else "स्कोर 100 में से ${f.score}: ${bandHi(f.band)}।"
         val extraEn = buildString {
             if (f.findingCount > 0 || f.band != ScoreBand.INCONCLUSIVE) append(" ${findings(f.findingCount)}.")

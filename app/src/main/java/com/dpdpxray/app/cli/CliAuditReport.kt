@@ -56,6 +56,8 @@ object CliAuditReport {
                     put("confidence", f.confidence)
                     put("plans", strings(f.plans.map { it.name }))
                     put("entities", strings(f.entities))
+                    // Rests on the person's answer about their consent history; written only when it does.
+                    if (f.declared) put("declared", true)
                 }
             }))
             put("sessions", JsonArray(bundle.sessions.map { s ->
@@ -81,6 +83,13 @@ object CliAuditReport {
                     put("evidence", strings(d.evidence))
                 }
             }))
+            // Kept data and no consent screen: the range by consent history (and the person's answer once given).
+            bundle.result.historyBounds?.let { b ->
+                put("historyBounds", buildJsonObject {
+                    put("lowScore", b.lowScore); put("lowBand", b.lowBand.name); put("highScore", b.highScore); put("highBand", b.highBand.name)
+                    put("bestBand", b.bestBand.name); b.answer?.let { put("answer", it.name) }; put("verdict", b.verdict())
+                })
+            }
             if (catalog != null) put("observedTrackers", observedTrackers(bundle, catalog, anchor))
             if (catalog != null) put("network", network(bundle, catalog))
             if (catalog != null) put("dnsAnswers", dnsAnswers(bundle, catalog))

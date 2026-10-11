@@ -49,6 +49,12 @@ data class AuditMeta(
     val autoDrive: Boolean? = null,
     @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
     val includeGms: Boolean? = null,
+    /**
+     * The result's consent-history range (the app kept its data and showed no consent screen), with the person's answer
+     * once given, so lists can show the range without opening the audit. null = no range. Written only when set.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val historyBounds: com.dpdpxray.core.model.HistoryBounds? = null,
 )
 
 data class AuditBundle(
@@ -106,6 +112,18 @@ class AuditRepository(private val context: Context) {
                 playLabel = PlayLabelFiles.load(dir),
             )
         }.getOrNull()
+    }
+
+    /**
+     * Replaces a saved check's result, report and metadata (the person answered, changed or cleared the consent-history
+     * question). The captured sessions and readings are never rewritten.
+     */
+    suspend fun updateResult(meta: AuditMeta, result: AuditResult, markdown: String) = withContext(Dispatchers.IO) {
+        val dir = File(root, meta.id)
+        File(dir, RESULT).writeText(AuditJson.encodeResult(result))
+        File(dir, REPORT_MD).writeText(markdown)
+        File(dir, META).writeText(AuditJson.json.encodeToString(AuditMeta.serializer(), meta))
+        refresh()
     }
 
     /** Attaches (or replaces) the Play label of a saved check. Blocking; call off the main thread. */

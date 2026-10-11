@@ -80,6 +80,7 @@ import com.dpdpxray.app.ui.components.FoldText
 import com.dpdpxray.app.ui.components.GradientRule
 import com.dpdpxray.app.ui.components.IconBadge
 import com.dpdpxray.app.ui.components.KeyCaveat
+import com.dpdpxray.app.ui.components.RangeRing
 import com.dpdpxray.app.ui.components.ScoreRing
 import com.dpdpxray.app.ui.components.SkeletonCard
 import com.dpdpxray.app.ui.components.SkeletonLines
@@ -204,13 +205,16 @@ fun ResultsScreen(
                     coverageGaps = gaps.isNotEmpty(), rejectPlanned = b.sessions.any { it.plan == AuditPlan.REJECT },
                     fastPreview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW, sample = b.meta.sample,
                     inconclusiveReason = com.dpdpxray.core.rules.Inconclusive.reason(r.findings),
+                    bounds = r.historyBounds?.takeIf { r.score == null },
                 )
                 val explanation = remember(facts) { ResultGuide.explain(facts) }
                 // The visible step banner is gone; people who use read-aloud still hear the same step.
                 SpeakStep(ResultGuide.step(facts))
 
                 ScoreHero(b, grade, lang, Modifier.reveal(0))
-                Text(headline(r.findings), style = MaterialTheme.typography.bodyLarge, color = Film.bone, modifier = Modifier.padding(top = 20.dp).reveal(1))
+                // A consent-history range has its own verdict line (never "Inconclusive"); everything else keeps the headline.
+                val head = r.historyBounds?.takeIf { r.score == null }?.let { ConsentHistoryCopy.headline(it).pick(lang) } ?: headline(r.findings)
+                Text(head, style = MaterialTheme.typography.bodyLarge, color = Film.bone, modifier = Modifier.padding(top = 20.dp).reveal(1))
 
                 // Caveats that must stay in view, above anything the reader might act on. Only those that apply are shown.
                 val preview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW
@@ -232,6 +236,13 @@ fun ResultsScreen(
                     freshHint?.let { Notice(it, kind = NoticeKind.CAUTION) }
                 }
 
+                // Kept data and no consent screen: the range, and the one question when the answer can change the band.
+                val resetOk = remember(b.meta.targetPackage) { !b.meta.sample && vm.resetEligible(b.meta.targetPackage) }
+                ConsentHistorySection(
+                    b, lang, everyday = lensSettings.audience == Audience.USER, resetOk = resetOk,
+                    onAnswer = { vm.answerConsentHistory(b, it) }, onReset = { vm.checkAgain(b, com.dpdpxray.app.audit.CheckAgain.Mode.RESET, onLive) },
+                    modifier = Modifier.padding(top = 20.dp),
+                )
                 // Why there is no score and what one tap can try next; then which steps needed the person.
                 NoScoreSection(vm, b, lang, onLive, onQuarantine, Modifier.padding(top = 20.dp))
                 BlockedStepsSection(b, lang, Modifier.padding(top = 20.dp))
@@ -427,8 +438,13 @@ private fun headline(findings: List<Finding>): String {
     val c1 = findings.firstOrNull { it.checkId == CheckId.C1 }
     val c2 = findings.firstOrNull { it.checkId == CheckId.C2 }
     val v0 = findings.any { it.checkId == CheckId.V0 }
+    val answered = findings.firstOrNull { it.checkId == CheckId.U1 && it.declared }
     return when {
         v0 -> "Too few lookups were captured to judge this app. Why, and what to try next, is just below."
+        c1 != null && c1.declared ->
+            "Based on your answer, hosts of ${c1.entities.size} tracker${if (c1.entities.size == 1) " was" else "s were"} looked up although you never agreed: ${c1.entities.joinToString()}."
+        answered != null && c1 == null && c2 == null ->
+            "Checked as after you agreed: its tracker lookups are not counted as before consent. Other checks are below."
         com.dpdpxray.core.rules.Inconclusive.reason(findings) == com.dpdpxray.core.rules.Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN ->
             "No score: this app kept its data, so whether consent came before its tracker lookups is unknown " +
                 "(${findings.first { it.checkId == CheckId.U1 }.entities.joinToString()}). Run a Full check on a test install."
@@ -451,10 +467,21 @@ private fun headline(findings: List<Finding>): String {
 @Composable
 private fun ScoreHero(b: AuditBundle, grade: ConfidenceGrade?, lang: GuideLang, modifier: Modifier = Modifier) {
     val r = b.result
-    val color = bandColor(r.band)
+    val range = r.historyBounds?.takeIf { r.score == null }
+    val color = bandColor(range?.lowBand ?: r.band)
     Column(modifier.fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        ScoreRing(if (r.band == ScoreBand.INCONCLUSIVE) null else r.score, r.band, ringSize = 176.dp, key = b.meta.id)
-        Text(r.band.label, style = MaterialTheme.typography.titleLarge, color = color, modifier = Modifier.padding(top = 12.dp))
+        if (range != null) {
+            // Consent history unknown: the two ends and the band the range allows, never "Inconclusive".
+            RangeRing(range, ringSize = 176.dp, hindi = lang == GuideLang.HI)
+            Text(range.verdict(hindi = lang == GuideLang.HI).substringBefore(" · "), style = MaterialTheme.typography.titleLarge, color = color,
+                modifier = Modifier.padding(top = 12.dp))
+        } else {
+            ScoreRing(if (r.band == ScoreBand.INCONCLUSIVE) null else r.score, r.band, ringSize = 176.dp, key = b.meta.id)
+            Text(r.band.label, style = MaterialTheme.typography.titleLarge, color = color, modifier = Modifier.padding(top = 12.dp))
+            if (r.historyBounds?.answer?.declared == true) {
+                Text(ConsentHistoryCopy.basedOnAnswer.pick(lang), style = MaterialTheme.typography.bodySmall, color = Film.warn)
+            }
+        }
         Text("Consent readiness", style = MaterialTheme.typography.labelMedium, color = Film.boneDim)
         val counts = Severity.entries.map { s -> s to r.findings.count { it.severity == s } }.filter { it.second > 0 }
         if (counts.isNotEmpty()) {
@@ -755,6 +782,7 @@ private fun sourceColor(s: ResultSource) = when (s) {
     ResultSource.AI_INFERRED -> Brand.rose
     ResultSource.INFERRED -> Film.warn
     ResultSource.FALLBACK -> Film.boneDim
+    ResultSource.DECLARED -> Film.warn
 }
 
 private fun screenshotFor(b: AuditBundle, f: Finding): String? {

@@ -46,8 +46,12 @@ internal object NoScoreHelp {
     fun items(b: AuditBundle): List<VisibilityDiagnosis.Item> = if (b.meta.sample) emptyList()
         else VisibilityDiagnosis.forResult(b.result, b.sessions)
 
+    /**
+     * A consent-history result saved before ranges existed (no bounds). A result with a range is not "no score": its
+     * own section (ConsentHistorySection) shows the range and the question instead.
+     */
     fun historyUnknown(b: AuditBundle): Boolean =
-        !b.meta.sample && Inconclusive.reason(b.result.findings) == Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN
+        !b.meta.sample && b.result.historyBounds == null && Inconclusive.reason(b.result.findings) == Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN
 
     /** True when this section brings its own filled action, so the result's next steps must not add a second one. */
     fun hasPrimary(b: AuditBundle): Boolean = VisibilityDiagnosis.primaryAction(items(b)) != Action.NONE

@@ -198,6 +198,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             timingProfile = timingProfile,
             inconclusiveReason = com.dpdpxray.core.rules.Inconclusive.reason(result.findings)?.name,
             autoDrive = config.autoDrive, includeGms = config.includeGms,
+            historyBounds = result.historyBounds,
         ).let { m ->
             // Update Watch: the version this audit saw, so a later update of the app can be noticed and compared.
             val version = com.dpdpxray.core.update.AppVersion.ofSessions(sessions)
