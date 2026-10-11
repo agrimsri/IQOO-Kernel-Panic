@@ -317,7 +317,7 @@ fun HomeScreen(
     if (showSetup) {
         val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(onDismissRequest = { showSetup = false }, sheetState = sheet, containerColor = Film.base) {
-            SetupSheetContent(items, todo, lang, aiLine = aiStatusLine(llm), fix = fix, onLab = { showSetup = false; onLab() })
+            SetupSheetContent(items, todo, lang, aiLine = aiStatusLine(llm), otherVpn = pf.otherVpnActive, fix = fix, onLab = { showSetup = false; onLab() })
         }
     }
     if (showSamples) SampleFixturesDialog(vm, onOpen) { showSamples = false }
@@ -375,7 +375,7 @@ internal fun CheckRow(meta: AuditMeta, lang: GuideLang, onClick: () -> Unit) {
 /** The Setup sheet: what still needs doing first, then what is already in place, then the optional on-device AI. */
 @Composable
 private fun SetupSheetContent(
-    items: List<SetupItem>, todo: List<SetupItem>, lang: GuideLang, aiLine: String, fix: (SetupKind) -> Unit, onLab: () -> Unit,
+    items: List<SetupItem>, todo: List<SetupItem>, lang: GuideLang, aiLine: String, otherVpn: Boolean, fix: (SetupKind) -> Unit, onLab: () -> Unit,
 ) {
     val done = items.filter { it !in todo && it.need != SetupNeed.OPTIONAL }
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).navigationBarsPadding().padding(bottom = 24.dp)) {
@@ -384,8 +384,10 @@ private fun SetupSheetContent(
             Group(title = HomeCopy.toDo.pick(lang)) {
                 todo.forEachIndexed { i, item ->
                     if (i > 0) GroupDivider()
-                    val plain = EverydayCopy.setupTitle(item.kind).pick(lang)
-                    val detail = EverydayCopy.setupDetail(item.kind).pick(lang)
+                    // Another VPN already running needs a different step (turn it off for the check), in both languages.
+                    val vpnBusy = item.kind == SetupKind.VPN && otherVpn
+                    val plain = (if (vpnBusy) EverydayCopy.otherVpnTitle else EverydayCopy.setupTitle(item.kind)).pick(lang)
+                    val detail = (if (vpnBusy) EverydayCopy.otherVpnDetail else EverydayCopy.setupDetail(item.kind)).pick(lang)
                     ListRow(
                         plain, subtitle = detail, subtitleMaxLines = 4,
                         trailing = if (item.fixable) { { TextAction((if (item.kind == SetupKind.SHIZUKU) HomeCopy.allow else HomeCopy.fix).pick(lang), { fix(item.kind) }) } } else null,

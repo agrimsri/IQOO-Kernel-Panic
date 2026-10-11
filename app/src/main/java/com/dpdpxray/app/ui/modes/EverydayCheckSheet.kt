@@ -86,7 +86,10 @@ internal fun EverydayCheckSetup(
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CheckSheetTitle(c.title(app.label).pick(lang))
-        SpeakStep(c.guide(app.label))
+        val step = c.guide(app.label)
+        SpeakStep(step)
+        // What to do once the check starts (say No when the app asks), as one quiet line; read-aloud speaks it too.
+        Text(step.body.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
         Column(Modifier.padding(top = 4.dp).reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             PlanOption(
                 c.quickTitle.pick(lang), (if (freshReset) c.quickDetailFresh else c.quickDetail).pick(lang),

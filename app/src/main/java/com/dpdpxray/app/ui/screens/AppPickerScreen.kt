@@ -287,7 +287,10 @@ private fun AuditSetup(app: AuditableApp, shizukuReady: Boolean, shizukuHelp: Sh
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CheckSheetTitle("Check ${app.label}")
-        SpeakStep(GuideFlow.pickerSetup(fullAvailable = freshReset))
+        val setupStep = GuideFlow.pickerSetup(fullAvailable = freshReset)
+        SpeakStep(setupStep)
+        // The step's advice stays as one quiet line under the title (read-aloud speaks it too).
+        Text(setupStep.body.pick(com.dpdpxray.app.ui.guide.guideLang()), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
         if (shizukuReady) Toggle("Allow clearing this test app's local data", "Developer testing only. Removes its saved state, accounts and settings before each run. Leave off for personal apps.", allowReset) {
             allowReset = it
             if (!it) full = false
