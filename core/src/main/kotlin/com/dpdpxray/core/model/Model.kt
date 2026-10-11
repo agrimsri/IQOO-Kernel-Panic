@@ -368,6 +368,13 @@ data class Finding(
     val penaltyBand: PenaltyBand,
     val confidence: Double = 1.0,
     val entities: List<String> = emptyList(),
+    /**
+     * true: this finding rests on the person's own answer about their consent history ([ConsentHistory]) as well as on
+     * what the phone recorded, and its wording says so ("based on your answer"). TraceVeil cannot check the answer.
+     * Written only when true, so older results read and write exactly as before.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val declared: Boolean = false,
 )
 
 @Serializable
@@ -383,4 +390,11 @@ data class AuditResult(
     val findings: List<Finding>,
     val score: Int?,
     val band: ScoreBand,
+    /**
+     * When the consent history is unknown (U1): the verdict bounded by the two answers the person could give, and their
+     * answer once given. [score] stays null until an answer picks an end. null = history known, or a result saved before
+     * this existed. Written only when set.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val historyBounds: HistoryBounds? = null,
 )
