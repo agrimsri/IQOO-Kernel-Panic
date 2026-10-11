@@ -156,8 +156,52 @@ def _load_report(ref: str | None, cfg) -> dict:
     if not path.exists():
         raise FileNotFoundError(f"no audit report at {ref} or {path}")
     rep = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(rep, dict) and rep.get("schema") == APP_EXPORT_SCHEMA:
+        rep = from_app_export(rep)
     if not isinstance(rep, dict) or "findings" not in rep:
         raise ValueError(f"{path} is not a traceveil audit report")
+    return rep
+
+
+APP_EXPORT_SCHEMA = "traceveil.audit.v1"
+
+
+def from_app_export(bundle: dict) -> dict:
+    """The app's "Export audit data (JSON)" file (`traceveil.audit.v1`, also what traceveil-ci and the Console read)
+    in the report shape this CLI uses. Only fields the bundle carries are filled; nothing is invented."""
+    meta, result, app = bundle.get("meta") or {}, bundle.get("result") or {}, bundle.get("app") or {}
+    # The app's findings name their check "checkId"; this CLI's reports call it "check". Keep both keys.
+    findings = [dict(f, check=f.get("check") or f.get("checkId")) for f in (result.get("findings") or []) if isinstance(f, dict)]
+    groups = (bundle.get("sdkAttribution") or {}).get("groups") or []
+    observed = []
+    for g in groups:
+        entity = g.get("name") or g.get("entity") if isinstance(g, dict) else None
+        if not entity or g.get("known") is False:
+            continue
+        hosts = [h for h in (g.get("hosts") or []) if isinstance(h, dict)]
+        phases = {str(r) for h in hosts for r in (h.get("relations") or [])}
+        observed.append({
+            "entity": entity,
+            "category": g.get("category"),
+            "lookups": sum(int(h.get("lookups") or 0) for h in hosts) or None,
+            "phases": sorted(phases),
+        })
+    rep = {
+        "schemaVersion": 1,
+        # An exported audit has no CLI request id; its audit id identifies it in headers instead.
+        "requestId": meta.get("id"),
+        "auditId": meta.get("id"),
+        "target": {"package": app.get("package") or meta.get("targetPackage"), "label": app.get("label") or meta.get("targetLabel")},
+        "score": result.get("score"),
+        "band": result.get("band"),
+        "findingCount": len(findings),
+        "plans": meta.get("plans") or [],
+        "findings": findings,
+        "sessions": bundle.get("sessions") or [],
+        "source": APP_EXPORT_SCHEMA,
+    }
+    if observed:
+        rep["observedTrackers"] = observed
     return rep
 
 
