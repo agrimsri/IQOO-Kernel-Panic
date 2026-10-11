@@ -255,7 +255,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
         val keepRunning = decision?.takeIf { !it.stop }?.reason
         step(when {
             config.resetAppData -> "Resetting authorised test app ${config.targetLabel}"
-            keepRunning != null -> "Opening ${config.targetLabel} without a restart (${keepRunning.removePrefix("restarting it ")})"
+            keepRunning != null -> "Opening ${config.targetLabel} as it is: ${keepRunning.replaceFirst("restarting it", "a restart")}"
             ShizukuBridge.hasPermission() -> "Restarting ${config.targetLabel} (your data stays)"
             else -> "Keeping ${config.targetLabel}'s current data"
         })

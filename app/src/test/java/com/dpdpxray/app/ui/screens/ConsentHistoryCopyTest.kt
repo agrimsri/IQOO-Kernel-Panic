@@ -36,9 +36,9 @@ class ConsentHistoryCopyTest {
     }
 
     @Test fun `a settled range explains itself without asking`() {
-        assertEquals("Needs work whichever way you answer: 65 if you never agreed to tracking, 99 if you agreed earlier (never Ready on an answer alone).",
-            c.settled(settled).en)
-        assertTrue(c.settled(settled).hi.contains("65") && c.settled(settled).hi.contains("99"))
+        assertEquals("Your answer wouldn't change the band (Needs work either way), so TraceVeil doesn't ask. " +
+            "Even if you agreed earlier, an unchecked answer never makes it Ready.", c.noQuestion(settled).en)
+        assertTrue(c.noQuestion(settled).hi.contains("TraceVeil"))
     }
 
     @Test fun `an answer is always labelled as the person's, and Not sure keeps the range`() {

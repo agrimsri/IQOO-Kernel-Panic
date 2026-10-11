@@ -83,12 +83,12 @@ object ConsentHistoryCopy {
 
     fun notSureDetail(b: HistoryBounds) = Bi("Keeps the range ${b.range}", "दायरा ${b.range} ही रहेगा")
 
-    /** Both answers give the same band: said once, no question. */
-    fun settled(b: HistoryBounds) = Bi(
-        "${b.lowBand.label} whichever way you answer: ${b.lowScore} if you never agreed to tracking, ${b.highScore} if you agreed earlier" +
-            (if (cap(b)) " (never Ready on an answer alone)." else "."),
-        "आप जो भी जवाब दें, नतीजा ${hi(b.lowBand)} रहेगा: अगर आपने कभी ट्रैकिंग की सहमति नहीं दी तो ${b.lowScore}, अगर पहले दी थी तो ${b.highScore}" +
-            (if (cap(b)) " (सिर्फ़ जवाब के आधार पर कभी 'तैयार' नहीं)।" else "।"),
+    /** Both answers give the same band (the headline already says which): nothing to ask. */
+    fun noQuestion(b: HistoryBounds) = Bi(
+        "Your answer wouldn't change the band (${b.lowBand.label} either way), so TraceVeil doesn't ask." +
+            if (cap(b)) " Even if you agreed earlier, an unchecked answer never makes it Ready." else "",
+        "आपका जवाब श्रेणी नहीं बदलेगा (दोनों हाल में ${hi(b.lowBand)}), इसलिए TraceVeil नहीं पूछता।" +
+            if (cap(b)) " अगर आपने पहले सहमति दी थी, तब भी बिना जाँचा जवाब इसे कभी 'तैयार' नहीं बनाता।" else "",
     )
 
     /** The result's one-line verdict for a range not yet settled by an answer. */
@@ -122,7 +122,7 @@ object ConsentHistoryCopy {
 
     fun all(open: HistoryBounds, settledBounds: HistoryBounds): List<Bi> = listOf(
         heading, limit, basedOnAnswer, question("App", true), question("App", false), why(true), why(false), never, agreed, notSure, change, clear,
-        neverDetail(open), agreedDetail(open), agreedDetail(settledBounds), notSureDetail(open), settled(settledBounds), headline(open),
+        neverDetail(open), agreedDetail(open), agreedDetail(settledBounds), notSureDetail(open), noQuestion(settledBounds), headline(open),
         headline(settledBounds), answered(open.copy(answer = ConsentHistory.DECLARED_NEVER), "App"),
         answered(open.copy(answer = ConsentHistory.DECLARED_AGREED), "App"), notSureLine(open, true), notSureLine(open, false),
     )
@@ -155,7 +155,7 @@ internal fun ConsentHistorySection(
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         when (state) {
             ConsentAnswers.State.SETTLED -> Group(title = c.heading.pick(lang)) {
-                ListRow(c.settled(bounds).pick(lang), subtitle = c.limit.pick(lang), subtitleMaxLines = 4,
+                ListRow(c.limit.pick(lang), subtitle = c.noQuestion(bounds).pick(lang), subtitleMaxLines = 4,
                     leading = { StatusDot(Film.boneDim) })
             }
             ConsentAnswers.State.ANSWERED -> Notice(

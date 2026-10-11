@@ -219,7 +219,8 @@ fun ResultsScreen(
                 // Caveats that must stay in view, above anything the reader might act on. Only those that apply are shown.
                 val preview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW
                 val rejectTested = b.sessions.any { it.plan == AuditPlan.REJECT }
-                val standalone = r.band == ScoreBand.READY || r.band == ScoreBand.INCONCLUSIVE
+                // A consent-history range says its meaning in the headline and its own section; its first line folds below.
+                val standalone = (r.band == ScoreBand.READY || r.band == ScoreBand.INCONCLUSIVE) && !(r.historyBounds != null && r.score == null)
                 Column(Modifier.padding(top = 12.dp).reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (b.meta.sample) Notice(ResultCopy.sample.pick(lang), kind = NoticeKind.CAUTION)
                     // "Restart anyway" switched something off (its accessibility service...): say so, with the screen to turn it on.
