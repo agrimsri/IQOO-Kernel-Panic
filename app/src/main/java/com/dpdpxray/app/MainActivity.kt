@@ -57,6 +57,8 @@ import com.dpdpxray.app.quarantine.navigateToQuarantine
 import com.dpdpxray.app.notices.NoticesRoutes
 import com.dpdpxray.app.notices.noticesDestinations
 import com.dpdpxray.app.trust.TrustRoutes
+import com.dpdpxray.app.webcheck.WebCheckRoutes
+import com.dpdpxray.app.webcheck.webCheckDestinations
 import com.dpdpxray.app.trust.trustDestination
 import com.dpdpxray.app.ui.XrayViewModel
 import com.dpdpxray.app.ui.AuditRoutes
@@ -189,7 +191,13 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(Unit) {
                         // If an audit is still running when the UI comes back, show it.
                         if (progress is AuditProgress.Running) nav.navigate("live")
+                        // A website check needs its page on screen, so it comes back to its live screen too.
+                        else if (com.dpdpxray.app.webcheck.WebCheckRunner.isRunning) nav.navigate(WebCheckRoutes.LIVE)
                     }
+                    // The Check tab's three views (live app check, APK Guard, website) switch in place under the same tab.
+                    val toLive: () -> Unit = { if (vm.preflight.value.canAudit && vm.prepareAudit()) nav.navigate("pick") { popUpTo(AppTab.HOME.route); launchSingleTop = true } else nav.openTab(AppTab.HOME) }
+                    val toApkGuard: () -> Unit = { nav.navigate(ApkGuardRoutes.HUB) { popUpTo(AppTab.HOME.route); launchSingleTop = true } }
+                    val toWebsite: () -> Unit = { nav.navigate(WebCheckRoutes.START) { popUpTo(AppTab.HOME.route); launchSingleTop = true } }
                     val apkCheck: () -> (() -> Unit)? = { if (nav.graph.findNode("apkguard") != null) { { nav.navigate("apkguard") } } else null }
                     val leaveOnboarding = {
                         vm.updateSettings { it.copy(onboardingDone = true) }
@@ -233,6 +241,7 @@ class MainActivity : ComponentActivity() {
                                 onAutomation = { nav.navigate("settings") },
                                 onTrust = { nav.navigate(TrustRoutes.ROUTE) },
                                 onRecheck = { nav.navigate(ApkGuardRoutes.recheckPicker(it)) },
+                                onWebsite = { nav.navigate(WebCheckRoutes.START) },
                             )
                         }
                         composable(AppTabs.REPORTS) {
@@ -253,6 +262,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         trustDestination(nav)
+                        webCheckDestinations(nav, onSwitchToLive = toLive, onSwitchToApk = toApkGuard)
                         controlsDestination(nav, vm)
                         noticesDestinations(nav)
                         composable(
@@ -266,7 +276,8 @@ class MainActivity : ComponentActivity() {
                                 vm, onBack = { nav.popBackStack() }, onStarted = { nav.navigate("live") { popUpTo("home") } },
                                 initialQuery = e.arguments?.getString("q").orEmpty(),
                                 onQuarantine = { nav.navigateToQuarantine(it) },
-                                onSwitchToApk = { nav.navigate(ApkGuardRoutes.HUB) { popUpTo(AppTab.HOME.route); launchSingleTop = true } },
+                                onSwitchToApk = toApkGuard,
+                                onSwitchToWeb = toWebsite,
                                 // Update Watch "Re-check" (notification, Home, Reports): the app's check sheet opens; nothing starts by itself.
                                 preselect = e.arguments?.getString("select").orEmpty().takeIf { ApkGuardRoutes.isPackageName(it) }.orEmpty(),
                             )
@@ -317,7 +328,8 @@ class MainActivity : ComponentActivity() {
                                 onOpenApp = { nav.navigate(ApkGuardRoutes.app(it)) },
                                 onOpenFile = { nav.navigate(ApkGuardRoutes.file(it)) },
                                 onCheckup = { nav.navigate(AutoGuardRoutes.CHECKUP) },
-                                onSwitchToLive = { if (vm.preflight.value.canAudit && vm.prepareAudit()) nav.navigate("pick") { popUpTo(AppTab.HOME.route); launchSingleTop = true } else nav.openTab(AppTab.HOME) },
+                                onSwitchToLive = toLive,
+                                onSwitchToWeb = toWebsite,
                             )
                         }
                         // Auto-guard "My phone checkup"; also opened by its weekly notification.

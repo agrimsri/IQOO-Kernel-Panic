@@ -41,7 +41,8 @@ internal class EvidenceUi(private val catalog: TrackerCatalog, private val corpu
         .mapNotNull(::aliasLabel).distinct()
 
     fun notice(check: CheckId, result: AuditResult, sessions: List<AuditSession>): RightsNotice? =
-        if (check == CheckId.C2) RightsNoticeBuilder(catalog, corpus, zone).build(result, sessions) else null
+        // The notice draft is worded for an app's DNS lookups; a website check has none.
+        if (check == CheckId.C2 && !com.dpdpxray.core.web.WebAudit.isWeb(sessions)) RightsNoticeBuilder(catalog, corpus, zone).build(result, sessions) else null
 }
 
 internal fun observedAliasLabel(event: NetEvent): String? = event.disguisedVia?.takeIf { it.isNotBlank() }

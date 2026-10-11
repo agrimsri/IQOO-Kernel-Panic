@@ -70,6 +70,15 @@ class HomeLayoutTest {
         assertEquals(listOf(HomeWay.APK_FILE), HomeLayout.ways(Audience.USER, checkupAvailable = false, automationAvailable = true, hasLastCheck = true))
     }
 
+    @Test fun `a website sits right after the app file in both modes when Home wires it`() {
+        assertEquals(
+            listOf(HomeWay.APK_FILE, HomeWay.WEBSITE, HomeWay.PHONE_APPS),
+            HomeLayout.ways(Audience.USER, checkupAvailable = true, automationAvailable = true, hasLastCheck = true, websiteAvailable = true),
+        )
+        assertEquals(HomeWay.WEBSITE, HomeLayout.ways(Audience.DEVELOPER, true, true, true, websiteAvailable = true)[1])
+        assertFalse(HomeWay.WEBSITE in HomeLayout.ways(Audience.USER, true, true, true))
+    }
+
     @Test fun `developer mode adds its quick actions one tap from Home`() {
         assertEquals(
             listOf(HomeWay.APK_FILE, HomeWay.PHONE_APPS, HomeWay.AUTOMATE, HomeWay.ASK_LAST, HomeWay.CAMERA, HomeWay.SAMPLE, HomeWay.MORE_SAMPLES),

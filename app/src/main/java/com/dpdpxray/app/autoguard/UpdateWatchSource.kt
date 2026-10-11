@@ -1,5 +1,6 @@
 package com.dpdpxray.app.autoguard
 
+import com.dpdpxray.core.web.WebAudit
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -29,7 +30,9 @@ object UpdateWatchSource {
     fun updates(context: Context, only: Set<String>? = null): List<UpdatedApp> {
         if (only != null && only.isEmpty()) return emptyList()
         val repo = context.graph.repository
-        val checked = CheckedApps.latest(repo.listNow().filter { only == null || it.targetPackage in only }, repo::sessionsNow)
+        // Website checks have no installed version to watch.
+        val metas = repo.listNow().filter { !WebAudit.isWebPackage(it.targetPackage) && (only == null || it.targetPackage in only) }
+        val checked = CheckedApps.latest(metas, repo::sessionsNow)
         val installed = checked.mapNotNull { installed(context, it.packageName) }.associateBy { it.packageName }
         return UpdateWatch.updatedSinceLastCheck(checked, installed)
     }

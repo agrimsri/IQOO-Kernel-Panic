@@ -1,5 +1,6 @@
 package com.dpdpxray.app.ui.screens
 
+import com.dpdpxray.app.webcheck.WebCheckCopy
 import android.database.ContentObserver
 import android.net.VpnService
 import android.os.Handler
@@ -148,6 +149,8 @@ fun HomeScreen(
     onTrust: (() -> Unit)? = null,
     /** Update Watch "Re-check" / "Check again": opens the check flow with this package selected; nothing starts by itself. */
     onRecheck: (String) -> Unit = {},
+    /** "A website": opens the website check; null hides the row. */
+    onWebsite: (() -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
     val lang = guideLang()
@@ -273,7 +276,7 @@ fun HomeScreen(
                 HomeSection.MORE_WAYS -> {
                     SectionHeader(HomeCopy.moreWays.pick(lang))
                     Group {
-                        HomeLayout.ways(settings.audience, onCheckup != null, onAutomation != null, latest != null).forEachIndexed { i, way ->
+                        HomeLayout.ways(settings.audience, onCheckup != null, onAutomation != null, latest != null, websiteAvailable = onWebsite != null).forEachIndexed { i, way ->
                             if (i > 0) GroupDivider(54.dp)
                             when (way) {
                                 HomeWay.APK_FILE -> ListRow(
@@ -281,6 +284,12 @@ fun HomeScreen(
                                     leading = { GlyphIcon(Glyph.APK, Film.boneDim, size = 24.dp) },
                                     onClick = { filePicker.launch(arrayOf(IncomingApk.APK_MIME, "application/octet-stream")) },
                                 )
+                                HomeWay.WEBSITE -> onWebsite?.let { open ->
+                                    ListRow(
+                                        WebCheckCopy.homeTitle.pick(lang), subtitle = WebCheckCopy.homeBody.pick(lang),
+                                        leading = { GlyphIcon(Glyph.PRIVATE_DNS, Film.boneDim, size = 24.dp) }, onClick = open,
+                                    )
+                                }
                                 HomeWay.PHONE_APPS -> onCheckup?.let { open ->
                                     ListRow(
                                         HomeCopy.appsTitle.pick(lang), subtitle = HomeCopy.appsBody.pick(lang),

@@ -11,7 +11,8 @@ Nothing on this page changed a weight, threshold or band rule. Every number belo
 > observed or inferred; see [NETWORK_CAPTURE.md](NETWORK_CAPTURE.md)) is a 14th check that can carry points. The same
 > tests, unchanged in method, now enumerate 2³ × 3⁷ × 2² × 3 (C14) × 3 (C16) = **629,856** assignments (120,932,352 finding
 > sets with the 192 zero-weight combinations) and pass: 7,243,344 lattice edges; 8,188,128 zero-weight sets in the
-> factored run; 5,038,848 lens views; all 31 check variants produced by the real engine. Bands: Ready 643, Needs work
+> factored run; 5,038,848 lens views; all 33 check variants produced by the real engine (W1 and W2, the website
+> check's zero-weight cookie notes, are the two added since; they are not in the app score space). Bands: Ready 643, Needs work
 > 24,452, At risk 604,761. The gate now moves exactly **10** assignments: an observed C1, NC, C3, C4 or C16 as the only
 > finding with points, with or without C14 Info. No weight, threshold or band rule changed. The tables and figures below
 > are the 10 October measurements of the 13-check space, kept as recorded; the new counts are written to

@@ -1,5 +1,6 @@
 package com.dpdpxray.core.model
 
+import com.dpdpxray.core.web.WebEvidence
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -259,6 +260,12 @@ data class AuditSession(
     val flows: List<com.dpdpxray.core.netcapture.FlowRecord> = emptyList(),
     /** "dns-only" or "full-relay"; null = not recorded (older audits, DNS-only). */
     val captureDepth: String? = null,
+    /**
+     * Website check evidence (requests with full URLs, cookies, storage keys, the consent banner). null for app audits,
+     * and never written for them, so app audit files and exports stay exactly as before.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val web: WebEvidence? = null,
 ) {
     val consentChoice: ConsentEvent?
         get() = consentEvents.firstOrNull { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }
@@ -353,6 +360,21 @@ enum class CheckId(val code: String, val title: String) {
      * rules such as GDPR Art. 32.
      */
     C16("C16", "Personal data in an unencrypted (HTTP) request"),
+
+    /**
+     * Website checks only: cookies of a catalogued tracker (kept for a tracker host, or named as the vendor documents for
+     * its tracking script) were already in TraceVeil's browser before any consent choice. INFO: the requests that set them
+     * are already scored under C1 (one tracker activity is scored once). Legal note: DPDP s.6(1) (consent before
+     * processing) is context; rules on storing information on a person's device (such as the EU ePrivacy rules) fit more
+     * closely.
+     */
+    W1("W1", "Tracking cookies stored before consent"),
+
+    /**
+     * Website checks only: tracking cookies were written, or written again, after the user chose Reject. INFO: the
+     * requests are scored under C2. Legal note: as W1.
+     */
+    W2("W2", "Tracking cookies stored after the user refused"),
 }
 
 @Serializable

@@ -1,0 +1,27 @@
+{
+  "v": 1,
+  "url": "https://fixture.example/sourcepoint-frame.html",
+  "banner": null,
+  "frames": [
+    {
+      "cmp": "Sourcepoint",
+      "host": "cdn.privacy-mgmt.com",
+      "id": "sp_message_iframe_1046321"
+    }
+  ],
+  "vp": {
+    "w": 412,
+    "h": 915,
+    "dpr": 2.625
+  },
+  "ls": [],
+  "ss": [],
+  "fpc": [],
+  "res": [
+    [
+      "https://cdn.privacy-mgmt.com/index.html?message_id=1046321",
+      "iframe"
+    ]
+  ],
+  "clicks": []
+}

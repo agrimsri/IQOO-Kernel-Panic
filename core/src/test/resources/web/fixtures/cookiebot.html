@@ -1,0 +1,29 @@
+<!doctype html>
+<!-- Test fixture: a shop page with a Cookiebot-style dialog (element ids as Cookiebot's dialog uses them). Synthetic. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fixture: Cookiebot dialog</title>
+<style>
+  body { font-family: sans-serif; margin: 0; }
+  #CybotCookiebotDialog { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 16px; }
+  #CybotCookiebotDialog button { padding: 12px; margin: 4px; }
+</style></head>
+<body>
+<main><h1>Shop</h1><p>Products.</p></main>
+<div id="CybotCookiebotDialog" role="dialog" aria-modal="true">
+  <div id="CybotCookiebotDialogBodyContent">
+    <h2 id="CybotCookiebotDialogBodyContentTitle">This website uses cookies</h2>
+    <div id="CybotCookiebotDialogBodyContentText">We use cookies to personalise content and ads, to provide social media features and to analyse our traffic. You can change or withdraw your consent at any time from the Cookie Declaration. Read our <a href="https://shop.example/privacy">privacy policy</a>.</div>
+  </div>
+  <div id="CybotCookiebotDialogBodyLevelWrapper">
+    <input type="checkbox" id="CybotCookiebotDialogBodyLevelButtonNecessary" checked disabled><label for="CybotCookiebotDialogBodyLevelButtonNecessary">Necessary</label>
+    <input type="checkbox" id="CybotCookiebotDialogBodyLevelButtonPreferences"><label for="CybotCookiebotDialogBodyLevelButtonPreferences">Preferences</label>
+    <input type="checkbox" id="CybotCookiebotDialogBodyLevelButtonStatistics"><label for="CybotCookiebotDialogBodyLevelButtonStatistics">Statistics</label>
+    <input type="checkbox" id="CybotCookiebotDialogBodyLevelButtonMarketing"><label for="CybotCookiebotDialogBodyLevelButtonMarketing">Marketing</label>
+  </div>
+  <div id="CybotCookiebotDialogBodyButtons">
+    <button id="CybotCookiebotDialogBodyButtonDecline">Deny</button>
+    <button id="CybotCookiebotDialogBodyLevelButtonLevelOptinAllowallSelection">Allow selection</button>
+    <button id="CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll">Allow all</button>
+  </div>
+</div>
+</body></html>

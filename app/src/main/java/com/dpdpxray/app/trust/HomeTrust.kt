@@ -35,8 +35,10 @@ object HomeTrust {
         Bi("No account", "कोई अकाउंट नहीं"),
         Bi("No account, no TraceVeil server", "कोई अकाउंट नहीं, TraceVeil का कोई सर्वर नहीं"),
         Bi(
-            "There is no sign-in and no server of TraceVeil's own, and the app contains no analytics, advertising or crash-reporting library.",
-            "कोई साइन-इन नहीं, TraceVeil का अपना कोई सर्वर नहीं, और ऐप में कोई एनालिटिक्स, विज्ञापन या क्रैश-रिपोर्टिंग लाइब्रेरी नहीं है।",
+            "There is no sign-in and no server of TraceVeil's own, and the app contains no analytics, advertising or crash-reporting library. " +
+                "A website check you start opens only the site you type, in TraceVeil's own browser.",
+            "कोई साइन-इन नहीं, TraceVeil का अपना कोई सर्वर नहीं, और ऐप में कोई एनालिटिक्स, विज्ञापन या क्रैश-रिपोर्टिंग लाइब्रेरी नहीं है। " +
+                "आपकी शुरू की हुई वेबसाइट जाँच सिर्फ़ आपकी लिखी साइट को TraceVeil के अपने ब्राउज़र में खोलती है।",
         ),
     )
     private val vpn = TrustFact(

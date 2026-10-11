@@ -62,6 +62,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dpdpxray.app.data.AuditBundle
+import com.dpdpxray.app.webcheck.WebCheckCopy
+import com.dpdpxray.app.webcheck.WebEvidenceCard
+import com.dpdpxray.core.web.WebAudit
 import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.audit.AuditPlanCoverage
 import com.dpdpxray.app.audit.AuditTimingPolicy
@@ -190,7 +193,9 @@ fun ResultsScreen(
                 }
             })
             Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-                val grade = remember(b.meta.id) { if (b.meta.sample) null else ConfidenceGrader.gradeAudit(b.sessions) }
+                // A website check has no DNS capture health to grade; its own card says what the browser saw.
+                val web = remember(b.meta.id) { WebAudit.isWeb(b.sessions) }
+                val grade = remember(b.meta.id) { if (b.meta.sample || web) null else ConfidenceGrader.gradeAudit(b.sessions) }
                 val lensSettings by vm.settings.collectAsState()
                 val choice = remember(lensSettings.legalProfile) { vm.lensChoice(lensSettings.legalProfile) }
                 val view = remember(b.meta.id, choice.profile) { vm.legal.view(r, choice.profile) }
@@ -210,7 +215,7 @@ fun ResultsScreen(
                 SpeakStep(ResultGuide.step(facts))
 
                 ScoreHero(b, grade, lang, Modifier.reveal(0))
-                Text(headline(r.findings), style = MaterialTheme.typography.bodyLarge, color = Film.bone, modifier = Modifier.padding(top = 20.dp).reveal(1))
+                Text(if (web) webHeadline(r.findings) else headline(r.findings), style = MaterialTheme.typography.bodyLarge, color = Film.bone, modifier = Modifier.padding(top = 20.dp).reveal(1))
 
                 // Caveats that must stay in view, above anything the reader might act on. Only those that apply are shown.
                 val preview = b.meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW
@@ -218,6 +223,7 @@ fun ResultsScreen(
                 val standalone = r.band == ScoreBand.READY || r.band == ScoreBand.INCONCLUSIVE
                 Column(Modifier.padding(top = 12.dp).reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (b.meta.sample) Notice(ResultCopy.sample.pick(lang), kind = NoticeKind.CAUTION)
+                    if (web) Notice(WebCheckCopy.notice.pick(lang), kind = NoticeKind.INFO)
                     // Update Watch: this check is of a different version than the previous one; the full diff is in Before / after.
                     beforeAfter?.update?.let { u -> Notice(UpdateDiffWording.banner(u, beforeAfter?.comparison), kind = NoticeKind.INFO) }
                     // For a quiet or inconclusive result the first meaning line is itself a caveat (not a certificate; unknown stays unknown).
@@ -272,13 +278,14 @@ fun ResultsScreen(
                 val sdkGroups = remember(b.meta.id, lensSettings.firstPartyDomains) { vm.sdkGroups(b) }
                 if (lensSettings.audience == Audience.DEVELOPER) {
                     Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SdkAttributionCard(vm, b, sdkGroups)
-                        PlayLabelCard(vm, b, sdkGroups)
+                        SdkAttributionCard(vm, b, sdkGroups, web = web)
+                        // A Play label belongs to an app; a website check has none.
+                        if (!web) PlayLabelCard(vm, b, sdkGroups)
                         DarkPatternCard(b.sessions)
                     }
                 } else {
                     val sdkLine = remember(sdkGroups) { SdkAttribution.headline(sdkGroups, byCompany = true) }
-                    val playLine = playLabelEverydayLine(vm, b, sdkGroups)
+                    val playLine = if (web) null else playLabelEverydayLine(vm, b, sdkGroups)
                     val darkLine = remember(b.meta.id) { DarkPatternView.of(b.sessions).everydayLine }
                     val lines = listOfNotNull(sdkLine, playLine, darkLine)
                     if (lines.isNotEmpty()) Group(Modifier.padding(top = 12.dp)) {
@@ -293,12 +300,17 @@ fun ResultsScreen(
                 GroupHeader("Where it connects")
                 CollapsibleCard(
                     "Server map",
-                    summary = if (b.meta.sample) "Synthetic sample: example IPs do not establish real locations." else "Which countries answered this app's lookups, and who runs those services",
+                    summary = when {
+                        b.meta.sample -> "Synthetic sample: example IPs do not establish real locations."
+                        web -> WebCheckCopy.mapSummary.pick(lang)
+                        else -> "Which countries answered this app's lookups, and who runs those services"
+                    },
                     summaryColor = if (b.meta.sample) Film.warn else Film.boneDim,
                     glyph = Glyph.PRIVATE_DNS,
                     initiallyOpen = !b.meta.sample,
                 ) {
                     if (b.meta.sample) Note("Synthetic sample: example IPs do not establish real locations.", Film.warn)
+                    if (web) Note(WebCheckCopy.mapNote.pick(lang))
                     val mapSettings by vm.settings.collectAsState()
                     val mapCatalog = remember(vm, mapSettings.firstPartyDomains) { vm.graph.catalog() }
                     val mapOwners = remember(mapCatalog) { EndpointMapIntegration.owners(mapCatalog) }
@@ -312,7 +324,8 @@ fun ResultsScreen(
 
                 GroupHeader(ResultCopy.evidence.pick(lang))
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CollapsibleCard(
+                    if (web) WebEvidenceCard(b.sessions)
+                    if (!web) CollapsibleCard(
                         "Evidence coverage",
                         summary = if (b.meta.sample) "Synthetic sample: capture confidence was not measured." else grade?.summary,
                         summaryColor = if (b.meta.sample) Film.warn else Film.boneDim,
@@ -375,7 +388,7 @@ fun ResultsScreen(
 
                     CollapsibleCard(
                         "Timeline",
-                        summary = "Each run's lookups, with the moment of the consent choice marked",
+                        summary = if (web) WebCheckCopy.timelineSummary.pick(lang) else "Each run's lookups, with the moment of the consent choice marked",
                         glyph = Glyph.CLOCK,
                     ) {
                         PlanTimelines(vm, b)
@@ -422,6 +435,20 @@ object ResultCopy {
 }
 
 private val SCREEN_CHECKS = setOf(CheckId.C3, CheckId.C4, CheckId.C5, CheckId.C6, CheckId.C7, CheckId.C8)
+
+/** The one-sentence verdict of a website check: the same order as [headline], in the words of requests and banners. */
+internal fun webHeadline(findings: List<Finding>): String {
+    val c1 = findings.firstOrNull { it.checkId == CheckId.C1 }
+    val c2 = findings.firstOrNull { it.checkId == CheckId.C2 }
+    return when {
+        findings.any { it.checkId == CheckId.V0 } -> "Almost nothing was seen, so this site cannot be judged. See the first finding."
+        c2 != null -> "The site contacted trackers after the user refused consent: ${c2.entities.joinToString()}."
+        c1 != null -> "The site contacted ${c1.entities.size} tracker${if (c1.entities.size == 1) "" else "s"} before any consent choice: ${c1.entities.joinToString()}."
+        findings.isEmpty() -> "No tracker requests before consent and no banner problems in this check."
+        findings.all { it.severity == Severity.INFO } -> "No tracker requests before consent and no scored banner problems in this check. See the information notes."
+        else -> "No tracker requests before consent, but the consent banner needs work."
+    }
+}
 
 private fun headline(findings: List<Finding>): String {
     val c1 = findings.firstOrNull { it.checkId == CheckId.C1 }

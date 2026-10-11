@@ -1,0 +1,148 @@
+{
+  "click": {
+    "v": 1,
+    "ok": true,
+    "text": "Accept All Cookies"
+  },
+  "after": {
+    "v": 1,
+    "url": "https://fixture.example/onetrust.html",
+    "banner": {
+      "cmp": "OneTrust",
+      "how": "cmp",
+      "texts": [
+        "We value your privacy",
+        "We and our partners store and access information on your device, such as cookies, to personalise ads and content and to measure audiences. You can withdraw your consent at any time. Cookie Policy",
+        "Cookies Settings",
+        "Reject All",
+        "Accept All Cookies"
+      ],
+      "controls": [
+        {
+          "i": 0,
+          "text": "Cookie Policy",
+          "role": null,
+          "btn": false,
+          "vis": true,
+          "l2": false,
+          "x": 199,
+          "y": 720,
+          "w": 97,
+          "h": 17
+        },
+        {
+          "i": 1,
+          "text": "Cookies Settings",
+          "role": "settings",
+          "btn": true,
+          "vis": true,
+          "l2": false,
+          "x": 16,
+          "y": 754,
+          "w": 380,
+          "h": 43
+        },
+        {
+          "i": 2,
+          "text": "Reject All",
+          "role": "reject",
+          "btn": true,
+          "vis": true,
+          "l2": false,
+          "x": 16,
+          "y": 805,
+          "w": 380,
+          "h": 43
+        },
+        {
+          "i": 3,
+          "text": "Accept All Cookies",
+          "role": "accept",
+          "btn": true,
+          "vis": true,
+          "l2": false,
+          "x": 16,
+          "y": 856,
+          "w": 380,
+          "h": 43
+        },
+        {
+          "i": 4,
+          "text": "Allow All",
+          "role": "accept",
+          "btn": true,
+          "vis": false,
+          "l2": true,
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "i": 5,
+          "text": "Reject All",
+          "role": "reject",
+          "btn": true,
+          "vis": false,
+          "l2": true,
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        {
+          "i": 6,
+          "text": "Confirm My Choices",
+          "role": "save",
+          "btn": true,
+          "vis": false,
+          "l2": true,
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        }
+      ],
+      "boxes": [
+        {
+          "label": "Strictly Necessary Cookies",
+          "checked": true,
+          "disabled": true,
+          "vis": false,
+          "l2": true
+        },
+        {
+          "label": "Performance Cookies",
+          "checked": true,
+          "disabled": false,
+          "vis": false,
+          "l2": true
+        },
+        {
+          "label": "Targeting Cookies",
+          "checked": false,
+          "disabled": false,
+          "vis": false,
+          "l2": true
+        }
+      ]
+    },
+    "frames": [],
+    "vp": {
+      "w": 412,
+      "h": 915,
+      "dpr": 2.625
+    },
+    "ls": [],
+    "ss": [],
+    "fpc": [],
+    "res": [],
+    "clicks": [
+      {
+        "t": 1791689065361,
+        "text": "Accept All Cookies",
+        "trusted": false
+      }
+    ]
+  }
+}

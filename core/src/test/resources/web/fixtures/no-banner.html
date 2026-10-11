@@ -1,0 +1,10 @@
+<!doctype html>
+<!-- Test fixture: a page with no consent banner, but with storage keys the probe should list. Synthetic. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fixture: no banner</title></head>
+<body>
+<main><h1>Plain page</h1><p>Read our privacy policy in the footer.</p><button>Subscribe</button></main>
+<script>
+  try { localStorage.setItem('theme', 'dark'); localStorage.setItem('visitor_id', 'abc123abc123'); sessionStorage.setItem('tab', '1'); } catch (e) {}
+</script>
+</body></html>

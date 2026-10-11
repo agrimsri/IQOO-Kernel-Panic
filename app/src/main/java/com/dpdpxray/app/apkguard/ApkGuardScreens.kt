@@ -130,6 +130,8 @@ fun ApkGuardHubScreen(
     onBack: (() -> Unit)?, onOpenApp: (String) -> Unit, onOpenFile: (String) -> Unit, onCheckup: (() -> Unit)? = null,
     /** Shows the Live check / APK Guard switch under the title; null hides it. */
     onSwitchToLive: (() -> Unit)? = null,
+    /** Adds "Website" to that switch; null leaves it out. */
+    onSwitchToWeb: (() -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
     val store = remember(ctx) { ctx.graph.settings }
@@ -154,7 +156,10 @@ fun ApkGuardHubScreen(
         TopBar("APK Guard", onBack)
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
             if (onSwitchToLive != null) item(key = "switch") {
-                SegmentedControl(listOf("Live check", "APK Guard"), 1, { if (it == 0) onSwitchToLive() }, Modifier.padding(top = 4.dp, bottom = 16.dp))
+                SegmentedControl(
+                    listOf("Live check", "APK Guard") + listOfNotNull(onSwitchToWeb?.let { com.dpdpxray.app.webcheck.WebCheckCopy.segment.pick(com.dpdpxray.app.ui.guide.guideLang()) }), 1,
+                    { when (it) { 0 -> onSwitchToLive(); 2 -> onSwitchToWeb?.invoke() } }, Modifier.padding(top = 4.dp, bottom = 16.dp),
+                )
             }
             item(key = "intro") {
                 // One lead line, the main action, one footnote. How it works is a single disclosure.

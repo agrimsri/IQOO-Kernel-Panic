@@ -116,6 +116,8 @@ fun AppPickerScreen(
     onSwitchToApk: (() -> Unit)? = null,
     /** Package to select once the list loads (Update Watch "Re-check"): its check sheet opens; nothing starts by itself. */
     preselect: String = "",
+    /** Adds "Website" to the switch under the title; null leaves it out. */
+    onSwitchToWeb: (() -> Unit)? = null,
 ) {
     val apps by vm.apps.collectAsState()
     val pf by vm.preflight.collectAsState()
@@ -135,7 +137,10 @@ fun AppPickerScreen(
         val pickStep = GuideFlow.picker(demoInstalled = demos.isNotEmpty())
         SpeakStep(pickStep)
         if (onSwitchToApk != null) {
-            SegmentedControl(listOf("Live check", "APK Guard"), 0, { if (it == 1) onSwitchToApk() }, Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+            SegmentedControl(
+                listOf("Live check", "APK Guard") + listOfNotNull(onSwitchToWeb?.let { com.dpdpxray.app.webcheck.WebCheckCopy.segment.pick(com.dpdpxray.app.ui.guide.guideLang()) }), 0,
+                { when (it) { 1 -> onSwitchToApk(); 2 -> onSwitchToWeb?.invoke() } }, Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
         }
         SearchField(query, { query = it }, "Search apps", Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
         // The step's advice stays on screen as one quiet line (which app to pick, which to avoid); read-aloud speaks it too.

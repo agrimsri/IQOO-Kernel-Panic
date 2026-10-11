@@ -254,7 +254,10 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
 
     fun delete(id: String) = viewModelScope.launch { graph.repository.delete(id) }
 
-    fun fixesFor(bundle: AuditBundle): List<FixTemplate> = graph.fixCatalog.fixesFor(bundle.result, graph.catalog())
+    /** App checks get the SDK and screen fix templates; a website check gets the website ones (Android SDK settings do not apply to a site). */
+    fun fixesFor(bundle: AuditBundle): List<FixTemplate> =
+        if (com.dpdpxray.core.web.WebAudit.isWeb(bundle.sessions)) com.dpdpxray.core.web.WebFixes.forResult(bundle.result)
+        else graph.fixCatalog.fixesFor(bundle.result, graph.catalog())
 
     /** "Which SDK caused this?": the audit's lookups grouped by catalogue service, in order of the findings' weight. */
     fun sdkGroups(bundle: AuditBundle): List<SdkGroup> =

@@ -15,4 +15,8 @@ address and the date it was read (10 October 2026).
   Amplitude, Inc., Form 10-K for fiscal year 2025 (sec.gov)
   AppsFlyer Terms of Use (www.appsflyer.com/legal/terms-of-use/)
 
+Website trackers (web/web_trackers.json and the catalogue's domainSource fields) cite the vendors'
+own documentation pages, read on 11 October 2026, for each domain, tracking path and cookie name;
+ATTRIBUTIONS.md lists them.
+
 Company names are used only to identify the companies; TraceVeil is not affiliated with them.

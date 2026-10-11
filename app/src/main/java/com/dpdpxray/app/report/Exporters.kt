@@ -1,5 +1,6 @@
 package com.dpdpxray.app.report
 
+import com.dpdpxray.core.web.WebAudit
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
@@ -238,8 +239,9 @@ object HtmlExporter {
     ): String = com.dpdpxray.core.datasafety.PlayLabelReport.insertHtml(HtmlReport.build(
         result, sessions, fixes, citations, catalog,
         HtmlCoverage(
-            statements = EvidenceReport.coverageNotes(sessions, timingProfile, sample),
-            scope = EvidenceReport.LOCAL_SCOPE,
+            statements = EvidenceReport.coverageNotes(sessions, timingProfile, sample) +
+                listOfNotNull(EvidenceReport.WEB_HTML_NOTE.takeIf { WebAudit.isWeb(sessions) }),
+            scope = if (WebAudit.isWeb(sessions)) EvidenceReport.WEB_SCOPE else EvidenceReport.LOCAL_SCOPE,
             noGaps = EvidenceReport.NO_GAPS,
             sample = sample,
             sampleNotes = if (sample) sessions.flatMap { it.notes }.distinct() else emptyList(),

@@ -40,6 +40,8 @@ enum class ControlId(val group: ControlGroup) {
     WAKE_WORD(ControlGroup.TRACEVEIL),
     AUTO_LOAD_AI(ControlGroup.TRACEVEIL),
     ONLINE_VOICE(ControlGroup.TRACEVEIL),
+    /** The website check's own browser: a network use with no switch, shown as information in both modes. */
+    WEBSITE_CHECK(ControlGroup.TRACEVEIL),
     RUNNER(ControlGroup.TRACEVEIL),
     SIGNED_EXPORTS(ControlGroup.TRACEVEIL),
     SAVED_CHECKS(ControlGroup.DATA),
@@ -187,6 +189,7 @@ object ControlsInventory {
                 if (r.onlineVoiceSetUp) switch(ControlId.ONLINE_VOICE, r.onlineVoiceAllowed)
                 else row(ControlId.ONLINE_VOICE, ControlsText.voiceNotSetUp, ControlsText.voiceNotSetUpHint, ControlState.OFF, ControlAction.None),
             )
+            add(row(ControlId.WEBSITE_CHECK, ControlsText.what(ControlId.WEBSITE_CHECK), ControlsText.websiteHint, ControlState.INFO, ControlAction.None))
             if (dev || r.runnerOn) add(switch(ControlId.RUNNER, r.runnerOn))
             if (dev) add(row(ControlId.SIGNED_EXPORTS, ControlsText.what(ControlId.SIGNED_EXPORTS), ControlsText.signedHint, ControlState.INFO, ControlAction.None))
 
@@ -338,6 +341,7 @@ internal object ControlsText {
         ControlId.AUTO_LOAD_AI to Names(Bi("Load Gemma when a check starts", "जाँच शुरू होने पर Gemma लोड करें"), Bi("Load on-device AI for each check", "हर जाँच के लिए फ़ोन पर AI लोड करें")),
         ControlId.ONLINE_VOICE to Names(Bi("Online voice (Sarvam AI)", "ऑनलाइन आवाज़ (Sarvam AI)"), Bi("Online voice for spoken answers", "बोले गए जवाबों के लिए ऑनलाइन आवाज़")),
         ControlId.RUNNER to Names(Bi("Allow TraceVeil Runner", "TraceVeil Runner की अनुमति"), Bi("Let a laptop start checks", "लैपटॉप को जाँच शुरू करने दें")),
+        ControlId.WEBSITE_CHECK to Names(Bi("Website check browser", "वेबसाइट जाँच का ब्राउज़र"), Bi("Checking a website", "वेबसाइट की जाँच")),
         ControlId.SIGNED_EXPORTS to Names(Bi("Signed exports", "हस्ताक्षर वाले एक्सपोर्ट")),
         ControlId.SAVED_CHECKS to Names(Bi("Your checks", "आपकी जाँचें")),
     )
@@ -393,6 +397,10 @@ internal object ControlsText {
             "A laptop or CI connected over USB (adb) can start a check on this phone.",
             "USB (adb) से जुड़ा लैपटॉप या CI इस फ़ोन पर जाँच शुरू कर सकता है।",
         ),
+        ControlId.WEBSITE_CHECK to Bi(
+            "Opens a site you type in TraceVeil's own browser, over the internet, only while you watch the check. The site sees a normal visit.",
+            "आपकी लिखी साइट को TraceVeil के अपने ब्राउज़र में, इंटरनेट से, सिर्फ़ तब खोलता है जब आप जाँच देख रहे हों। साइट को यह सामान्य विज़िट दिखती है।",
+        ),
         ControlId.SIGNED_EXPORTS to Bi(
             "When you export audit data, a key kept in this phone's hardware signs the file. Nothing is sent.",
             "जब आप ऑडिट डेटा एक्सपोर्ट करते हैं, इस फ़ोन के हार्डवेयर में रखी एक कुंजी फ़ाइल पर हस्ताक्षर करती है। कुछ भी भेजा नहीं जाता।",
@@ -445,6 +453,10 @@ internal object ControlsText {
         "यह सिर्फ़ नए ऐप की जाँच चालू रहने पर काम करता है।",
     )
     val signedHint = Bi("No switch: it runs only when you export.", "कोई स्विच नहीं: यह सिर्फ़ एक्सपोर्ट करने पर चलता है।")
+    val websiteHint = Bi(
+        "No switch: it runs only after you tap Check this website, stops when you leave that screen, and clears its browser afterwards.",
+        "कोई स्विच नहीं: यह सिर्फ़ \"यह वेबसाइट जाँचें\" दबाने के बाद चलता है, वह स्क्रीन छोड़ने पर रुक जाता है, और बाद में अपना ब्राउज़र साफ़ कर देता है।",
+    )
 
     fun switchHint(id: ControlId, on: Boolean): Bi = when (id) {
         ControlId.NEW_APP_CHECK, ControlId.WEEKLY_CHECKUP, ControlId.APK_DOWNLOADS ->

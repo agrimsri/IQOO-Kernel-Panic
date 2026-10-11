@@ -42,11 +42,19 @@ import java.time.temporal.ChronoUnit
  * the bundle's lookups; it is separate from the score and never changes "result".
  * "darkPatterns" (optional, omitted when unset) lists the dark-pattern signals (India CCPA 2023) read from the same
  * sessions' consent-screen trees and taps; they are signals for review, never findings, and never change "result".
+ * "target" (optional, omitted for app audits) says what was checked when it was not an installed app:
+ * {"kind": "web", "url": <the address checked>} for a website check. Its sessions then carry a "web" part (requests with
+ * full addresses, cookie names with value lengths and hashes, storage keys, the banner); readers that do not know
+ * "target" or "web" ignore both and still read the sessions, the result and the score.
  */
 
 /** The audited app named at the top of a bundle. */
 @Serializable
 data class BundleApp(@SerialName("package") val packageName: String, val label: String)
+
+/** What a bundle checked when it was not an installed app: kind "web" and the address for a website check. */
+@Serializable
+data class BundleTarget(val kind: String, val url: String? = null)
 
 /** The program and version that wrote a bundle. */
 @Serializable
@@ -74,6 +82,8 @@ data class AuditBundleV1(
     val playLabel: PlayLabelExport? = null,
     /** Dark-pattern signals (India CCPA 2023), derived on the phone from [sessions]; never part of [result]. Not written when null. */
     val darkPatterns: DarkPatternExport? = null,
+    /** Set only for a website check ({"kind": "web", "url": ...}); app audits leave it out. Not written when null. */
+    val target: BundleTarget? = null,
 )
 
 /**
@@ -126,6 +136,9 @@ data class BundleMeta(
     val targetVersionName: String? = null,
     @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
     val targetVersionCode: Long? = null,
+    /** "web" for a website check; absent (null) for app audits and older exports. Written only when present. */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val targetKind: String? = null,
 )
 
 /** The text is not a readable bundle of the expected kind; the message says why in plain words. */
@@ -156,10 +169,11 @@ object AuditBundles {
         sdkAttribution: SdkAttributionExport? = null,
         playLabel: PlayLabelExport? = null,
         darkPatterns: DarkPatternExport? = null,
+        target: BundleTarget? = null,
     ) = AuditBundleV1(
         exportedAt = exportedAt, app = app, meta = meta, sessions = sessions, result = result,
         networkReadings = networkReadings, tool = BundleTool(TOOL_NAME, toolVersion), note = note, legalProfile = legalProfile,
-        sdkAttribution = sdkAttribution, playLabel = playLabel, darkPatterns = darkPatterns,
+        sdkAttribution = sdkAttribution, playLabel = playLabel, darkPatterns = darkPatterns, target = target,
     )
 
     fun quarantine(report: QuarantineReport, exportedAt: String = now(), note: String? = null) =
@@ -209,7 +223,7 @@ object AuditBundles {
         return JsonObject(obj.filterNot { (k, v) -> k in OPTIONAL_TOP_LEVEL && v == JsonNull })
     }
 
-    private val OPTIONAL_TOP_LEVEL = setOf("note", "legalProfile", "sdkAttribution", "playLabel", "darkPatterns")
+    private val OPTIONAL_TOP_LEVEL = setOf("note", "legalProfile", "sdkAttribution", "playLabel", "darkPatterns", "target")
 
     private fun expectSchema(text: String, expected: String): JsonObject {
         val parsed = try {
