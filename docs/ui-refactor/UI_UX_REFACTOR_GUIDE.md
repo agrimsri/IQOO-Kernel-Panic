@@ -759,3 +759,7 @@ The logo keeps its original colours (peach, coral and rose veil, cyan arcs, red 
 * **Light-mode contrast:** the background was deepened to `#E9F5F4` and the quiet fill to `#D5EAED` so white cards read as cards; the separator is `#D1E3E6`. Caption text (`textTertiary`) is now `#735668`, which passes 4.5:1 on every surface. Dusty Lavender `#8B687F` stays for icons and switch thumbs through a new `graphic` token (3:1). "Ready" green is `#1B6B60`.
 * **Dark-mode contrast:** surfaces were lifted one step (`#231B26` on `#151017`) so cards separate from the screen; caption text is `#A08E9B`.
 * `PaletteContrastTest` now also checks caption text on all three surfaces, graphics at 3:1, and the card-versus-background step, in both themes.
+
+### Logo
+
+The logo is now `assets/logo.png` (the original 2048 px image), cropped to the mark without the corner watermark and bundled at 512 px as `res/drawable-nodpi/logo_mark.png`. `BrandMark` shows it as a rounded tile (so it looks the same in light and dark) in the Home header and on the first onboarding page. The launcher icon uses the same image on the logo's navy (`#111834`), inset 17% to stay inside the adaptive icon's safe zone. The old vector mark is no longer drawn; its geometry constants stay because `BrandMarkTest` still checks them against the SVG in `docs/brand`.
