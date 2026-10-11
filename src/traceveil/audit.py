@@ -139,6 +139,36 @@ def history_lines(rep: dict, style: Style = PLAIN) -> list[str]:
             f"never agreed -> {b.get('lowScore')}, agreed earlier -> {b.get('highScore')})"]
 
 
+def _minutes(ms) -> int:
+    return int((int(ms or 0) + 30_000) // 60_000)
+
+
+def _duration(ms) -> str:
+    total = max(int(ms or 0) // 1000, 0)
+    m, s = divmod(total, 60)
+    return f"{s} s" if m == 0 else f"{m} min" if s == 0 else f"{m} min {s} s"
+
+
+def background_watch(sessions) -> dict | None:
+    """The app's background watch (a session's "watch", `BackgroundWatch` in the app), or None when the audit is not one."""
+    for s in sessions or []:
+        w = s.get("watch") if isinstance(s, dict) else None
+        if isinstance(w, dict):
+            planned = _minutes(w.get("plannedMs"))
+            early = bool(w.get("stoppedEarly"))
+            length = f"{_duration(w.get('watchedMs'))} of a planned {planned} minutes (stopped early)" if early else f"{planned} minutes"
+            return {"plannedMinutes": planned, "watchedMs": w.get("watchedMs"), "stoppedEarly": early, "consentScreenDriven": False,
+                    "text": f"background watch of {length}: what the app sends while it runs in the background; "
+                            "the app was not opened, restarted or tapped, so its consent screen was not tested"}
+    return None
+
+
+def watch_lines(rep: dict, style: Style = PLAIN) -> list[str]:
+    """One line for a background watch (report key "backgroundWatch", when present)."""
+    w = rep.get("backgroundWatch")
+    return [f"  {style.warn('watch:')} {w.get('text')}"] if isinstance(w, dict) and w.get("text") else []
+
+
 def _range_reasons(b: dict, fail_on: str, min_score: int) -> list[str]:
     """A range is judged by its never-agreed end: a gate never passes on a consent history nobody could check."""
     reasons = []
@@ -236,6 +266,7 @@ def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) ->
     bounded = rep.get("score") is None and isinstance(rep.get("historyBounds"), dict)
     verdict = f"range {history_verdict(rep['historyBounds'])}" if bounded else f"score {style.score(rep['score'], rep['band'])} / {style.band(rep['band'])}"
     lines = [f"Traceveil audit  {style.bold(t.get('label', '?'))} ({t.get('package', '?')})  {verdict}  findings {len(rep['findings'])}"]
+    lines += watch_lines(rep, style)
     lines += history_lines(rep, style)
     plan = {i["check"]: i for i in rep.get("fixPlan", {}).get("issues", [])}
     for f in rep["findings"]:
