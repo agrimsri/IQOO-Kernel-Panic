@@ -81,6 +81,9 @@ class TunRelay(
     fun activeTcp() = tcpFlows.size
     fun activeUdp() = udpFlows.size
 
+    /** Whether a TCP connection from the app's [srcPort] to [dstIp]:[dstPort] is open in the relay. */
+    fun hasTcpFlow(srcPort: Int, dstIp: String, dstPort: Int): Boolean = tcpFlows.containsKey(Key(srcPort, dstIp, dstPort))
+
     /** Handles one packet from the tunnel. Returns false if it is not IPv4 TCP/UDP. */
     fun onPacket(buf: ByteArray, len: Int): Boolean {
         val p = PacketCodec.parse(buf, len) ?: return false
