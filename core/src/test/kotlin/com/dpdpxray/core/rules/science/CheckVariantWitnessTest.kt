@@ -17,6 +17,12 @@ import com.dpdpxray.core.rules.RulesEngine
 import com.dpdpxray.core.rules.ScoreCalculator
 import com.dpdpxray.core.screen.Fixtures
 import com.dpdpxray.core.trackers.TrackerCatalog
+import com.dpdpxray.core.web.WebCookie
+import com.dpdpxray.core.web.WebCookieBasis
+import com.dpdpxray.core.web.WebEvidence
+import com.dpdpxray.core.web.WebRequest
+import com.dpdpxray.core.web.WebResourceType
+import com.dpdpxray.core.web.WebSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -113,7 +119,31 @@ class CheckVariantWitnessTest {
         CheckId.C12 -> session(events = firstParty + net(25.0, "graph.facebook.com"), background = 20 * s)
         CheckId.C15 -> session(consent = listOf(shown.copy(tree = Fixtures.leakyDialog), ConsentEvent(5 * s, ConsentKind.ACCEPT)))
         CheckId.V1 -> session(privateDns = true)
+        CheckId.W1 -> webSession(
+            WebCookie("_ga", listOf("shop.test"), "shop.test", false, 30, "a1b2c3d4e5f6", 3 * s, WebSnapshot.BANNER,
+                trackerEntity = "Google Analytics", trackerBasis = WebCookieBasis.DOCUMENTED_NAME),
+            accept, AuditPlan.ACCEPT,
+        )
+        CheckId.W2 -> webSession(
+            WebCookie("_ga", listOf("shop.test"), "shop.test", false, 30, "a1b2c3d4e5f6", 7 * s, WebSnapshot.END, absentSinceNanos = 5 * s,
+                trackerEntity = "Google Analytics", trackerBasis = WebCookieBasis.DOCUMENTED_NAME),
+            reject, AuditPlan.REJECT,
+        )
     }
+
+    /** A website plan (TraceVeil's browser) with two first-party requests and one cookie. */
+    private fun webSession(cookie: WebCookie, consent: List<ConsentEvent>, plan: AuditPlan) = AuditSession(
+        id = plan.name, targetPackage = "web:shop.test", targetLabel = "https://shop.test", plan = plan, endedAtNanos = 40 * s,
+        netEvents = listOf(NetEvent(1 * s, "shop.test"), NetEvent(2 * s, "cdn.shop.test")), consentEvents = consent, freshState = true,
+        web = WebEvidence(
+            url = "https://shop.test/", pageHost = "shop.test",
+            requests = listOf(
+                WebRequest(1 * s, "https://shop.test/", "shop.test", type = WebResourceType.DOCUMENT, mainFrame = true),
+                WebRequest(2 * s, "https://cdn.shop.test/app.js", "cdn.shop.test", type = WebResourceType.SCRIPT),
+            ),
+            cookies = listOf(cookie),
+        ),
+    )
 
     private val Variant.observed get() = evidence == com.dpdpxray.core.model.EvidenceType.OBSERVED
 
@@ -123,7 +153,7 @@ class CheckVariantWitnessTest {
     @Test
     fun `the table covers every check the engine knows`() {
         assertEquals(CheckId.entries.toSet(), CheckVariants.table.keys)
-        assertEquals(29, CheckVariants.all.size)
+        assertEquals(31, CheckVariants.all.size)
         assertEquals(
             listOf(CheckId.C1, CheckId.NC, CheckId.C2, CheckId.C3, CheckId.C4, CheckId.C5, CheckId.C6, CheckId.C7, CheckId.C8, CheckId.C9, CheckId.C10, CheckId.C13, CheckId.C14),
             CheckVariants.scored,

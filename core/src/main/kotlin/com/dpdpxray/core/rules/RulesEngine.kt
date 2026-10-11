@@ -18,6 +18,8 @@ import com.dpdpxray.core.model.Severity
 import com.dpdpxray.core.trackers.AppOwner
 import com.dpdpxray.core.trackers.AppOwners
 import com.dpdpxray.core.trackers.TrackerCatalog
+import com.dpdpxray.core.web.WebAudit
+import com.dpdpxray.core.web.WebRules
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -44,7 +46,11 @@ class RulesEngine(
         val historyUnknown: Boolean get() = session.appDataKept && !session.consentScreenSeen
     }
 
+    /** A website check (every session has web evidence) is judged by [WebRules]: same checks and score, web wording. */
+    private val web by lazy { WebRules(catalog) { screen, plans -> screenChecks(screen, plans) } }
+
     fun evaluate(sessions: List<AuditSession>): AuditResult {
+        if (WebAudit.isWeb(sessions)) return web.evaluate(sessions)
         val ctx = sessions.map { s -> Ctx(s, classifier.classify(s), classifier.ownerOf(s)) }
         val findings = mutableListOf<Finding>()
 
@@ -131,7 +137,7 @@ class RulesEngine(
         )
     }
 
-    private fun screenChecks(a: ScreenAudit, plans: List<AuditPlan>): List<Finding> {
+    internal fun screenChecks(a: ScreenAudit, plans: List<AuditPlan>): List<Finding> {
         val out = mutableListOf<Finding>()
         fun ev(field: String) = if (field in a.observedFields) EvidenceType.OBSERVED else EvidenceType.INFERRED
         fun add(id: CheckId, sev: Severity, field: String, explanation: String, evidence: String, refs: List<String>) {
