@@ -6,8 +6,11 @@ import java.util.Locale
 
 /** The result of checking a typed website address. */
 sealed interface WebUrlCheck {
-    /** [url] is the normalised address TraceVeil opens; [https] is false for plain http (not encrypted). */
-    data class Valid(val url: String, val host: String, val https: Boolean) : WebUrlCheck
+    /**
+     * [url] is the normalised https address TraceVeil opens. [upgradedFromHttp] is true when the person typed http://:
+     * TraceVeil's browser, like the rest of the app, does not open unencrypted http, so the same address is checked over https.
+     */
+    data class Valid(val url: String, val host: String, val upgradedFromHttp: Boolean = false) : WebUrlCheck
 
     /** [reason] is one plain sentence to show under the field. */
     data class Invalid(val reason: String) : WebUrlCheck
@@ -15,8 +18,9 @@ sealed interface WebUrlCheck {
 
 /**
  * Checks and normalises the address a person types for a website check. Pure text work: nothing is resolved or fetched.
- * A bare name opens over https. Only public http and https sites are accepted: other schemes, user names or passwords in
- * the address, local names and private or loopback addresses are refused.
+ * A bare name opens over https, and http:// is checked as https:// (TraceVeil never allows unencrypted http). Only public
+ * http and https sites are accepted: other schemes, user names or passwords in the address, local names and private or
+ * loopback addresses are refused.
  */
 object WebUrl {
     const val MAX_LENGTH = 2048
@@ -52,9 +56,9 @@ object WebUrl {
         val port = if (uri.port in 1..65535) ":${uri.port}" else if (uri.port == -1) "" else return invalid("That port number is not valid.")
         val path = uri.rawPath?.takeIf { it.isNotEmpty() } ?: "/"
         val query = uri.rawQuery?.let { "?$it" }.orEmpty()
-        val url = "${if (https) "https" else "http"}://$host$port$path$query"
+        val url = "https://$host$port$path$query"
         if (url.length > MAX_LENGTH) return invalid("That address is too long to check.")
-        return WebUrlCheck.Valid(url, host, https)
+        return WebUrlCheck.Valid(url, host, upgradedFromHttp = !https)
     }
 
     /** The address as a report label: the URL without a lone trailing "/". */

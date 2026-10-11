@@ -244,7 +244,9 @@ object WebAudit {
             "when Android reports them.",
         "The request type is read from the page's own Resource Timing entry when it has one, otherwise inferred from headers and " +
             "the file extension.",
-        "Cookie expiry is known only for first-party cookies the page can read; Android's cookie store does not report it.",
+        "Cookie expiry is known only for first-party cookies the page can read; Android's cookie store does not report it. " +
+            "Cookies scoped to a path below the site's root are not read.",
+        "Plain http pages are not opened: TraceVeil uses only encrypted connections, so an http address is checked as https.",
         "Pages behind a sign-in are checked only if you sign in during the check. TraceVeil clears its browser before each " +
             "plan and after the check, so the sign-in does not stay.",
     )

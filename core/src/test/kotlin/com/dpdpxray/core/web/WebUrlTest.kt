@@ -14,7 +14,7 @@ class WebUrlTest {
         val v = valid("example.com")
         assertEquals("https://example.com/", v.url)
         assertEquals("example.com", v.host)
-        assertTrue(v.https)
+        assertFalse(v.upgradedFromHttp)
     }
 
     @Test
@@ -25,10 +25,10 @@ class WebUrlTest {
     }
 
     @Test
-    fun `http is accepted but marked as not encrypted`() {
+    fun `http is accepted and checked over https, and says so`() {
         val v = valid("http://example.org")
-        assertEquals("http://example.org/", v.url)
-        assertFalse(v.https)
+        assertEquals("https://example.org/", v.url)
+        assertTrue(v.upgradedFromHttp)
     }
 
     @Test
