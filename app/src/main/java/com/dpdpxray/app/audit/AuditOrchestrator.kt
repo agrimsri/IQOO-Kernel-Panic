@@ -54,6 +54,11 @@ data class AuditConfig(
     /** Explicit developer-test approval; never inferred from Shizuku being available. */
     val resetAppData: Boolean = false,
     val fastPreview: Boolean = false,
+    /**
+     * What to do when restarting the app would switch something off (its accessibility service, VPN, keyboard...).
+     * AUTO, the default, leaves such an app running; only the person's "Restart anyway" (ALWAYS) stops it.
+     */
+    val restart: RestartPolicy = RestartPolicy.AUTO,
 ) {
     init {
         require(!fastPreview || plans == listOf(AuditPlan.ACCEPT)) {
@@ -153,12 +158,17 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             // C13: allow-listed SDK facts from the installed manifest, read once (read-only; null when unreadable).
             val manifest = withContext(Dispatchers.IO) { runCatching { ManifestFactsReader.read(context, config.targetPackage) }.getOrNull() }
             val facts = DeviceChecks.appFacts(context, config.targetPackage)
+            // What stopping the app would switch off (its accessibility service, VPN, keyboard...), read once before the
+            // first plan, while it is all still on. null = could not be read.
+            val sideEffects = withContext(Dispatchers.IO) {
+                runCatching { RestartSideEffects.detect(config.targetPackage, AndroidSideEffectProbe(context)) }.getOrNull()
+            }
             val done = mutableListOf<CapturedPlan>()
             var stopNote: String? = null
             for ((i, plan) in config.plans.withIndex()) {
                 try {
                     done += ConsentPlanRetry.capture(plan, config.targetPackage, { config.resetAppData && ShizukuBridge.hasPermission() }, { it.session }) { attempt ->
-                        runPlan(config, plan, i, auditId, dir, attempt, manifest, facts)
+                        runPlan(config, plan, i, auditId, dir, attempt, manifest, facts, sideEffects)
                     }.let { attempts ->
                         if (attempts.size == 1) attempts else attempts.mapIndexed { attempt, captured ->
                             val note = if (attempt == 0) "Consent screen missed; first attempt retained and one fresh-state demo retry requested."
@@ -212,6 +222,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
     private suspend fun runPlan(
         config: AuditConfig, plan: AuditPlan, index: Int, auditId: String, dir: File, attempt: Int = 0, manifest: AppManifestFacts? = null,
         facts: DeviceChecks.AppFacts? = null,
+        sideEffects: List<FoundSideEffect>? = null,
     ): CapturedPlan = coroutineScope {
         val t = AuditTimingPolicy.forAudit(config)
         val pkg = config.targetPackage
@@ -238,13 +249,19 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
 
         val privateDnsAtStart = DeviceChecks.privateDnsActive(context)
         val networkAtStart = DeviceChecks.networkOnline(context)
+        // Only a phone that can stop the app needs the decision: without Shizuku nothing is stopped anyway.
+        val decision = sideEffects?.takeIf { ShizukuBridge.hasPermission() }
+            ?.let { RestartDecision.decide(config.restart, it, config.resetAppData, config.targetLabel) }
+        val keepRunning = decision?.takeIf { !it.stop }?.reason
         step(when {
             config.resetAppData -> "Resetting authorised test app ${config.targetLabel}"
+            keepRunning != null -> "Opening ${config.targetLabel} without a restart (${keepRunning.removePrefix("restarting it ")})"
             ShizukuBridge.hasPermission() -> "Restarting ${config.targetLabel} (your data stays)"
             else -> "Keeping ${config.targetLabel}'s current data"
         })
-        val started = appStart.prepare(pkg, config.resetAppData)
+        val started = appStart.prepare(pkg, config.resetAppData, keepRunning)
         notes += started.notes
+        decision?.note?.let { notes += it }
         if (index == 0 && attempt == 0 && facts?.system == true) notes += AuditTargets.systemNote(config.targetLabel)
         val freshState = started.freshState // true only when an approved reset actually cleared the app's data
         val trafficStart = AppTrafficReader.mark(facts?.uid)
@@ -412,6 +429,8 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
             systemApp = facts?.system,
             blocker = blockedStep,
             consentShownAgain = returns.takeIf { it > 0 },
+            restartSideEffects = sideEffects?.map { it.kind.name },
+            restartChoice = decision?.choice,
         )
         ConsentBus.disarm()
         step("Finishing AI review of the consent screen", t0)

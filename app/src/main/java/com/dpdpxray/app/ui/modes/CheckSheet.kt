@@ -1,6 +1,8 @@
 package com.dpdpxray.app.ui.modes
 
 import com.dpdpxray.app.audit.AuditConfig
+import com.dpdpxray.app.audit.FoundSideEffect
+import com.dpdpxray.app.audit.RestartPolicy
 import com.dpdpxray.app.data.Audience
 import com.dpdpxray.core.model.AuditPlan
 
@@ -46,6 +48,17 @@ object CheckSheet {
         else -> listOf(AuditPlan.ACCEPT)
     }
 
+    /**
+     * The sheet's restart choice. Until the phone has been read ([effects] null), or when nothing would be switched off,
+     * the orchestrator decides (AUTO: it reads again and leaves such an app running). Otherwise the person's choice:
+     * "Check without restarting" (the default) or "Restart anyway".
+     */
+    fun restartPolicy(effects: List<FoundSideEffect>?, restartAnyway: Boolean): RestartPolicy = when {
+        effects.isNullOrEmpty() -> RestartPolicy.AUTO
+        restartAnyway -> RestartPolicy.ALWAYS
+        else -> RestartPolicy.SKIP
+    }
+
     /** App data is cleared only when the person approved it and Shizuku can do it. */
     fun config(
         audience: Audience,
@@ -57,6 +70,7 @@ object CheckSheet {
         agentTaps: Boolean,
         childFacing: Boolean,
         includeGms: Boolean,
+        restart: RestartPolicy = RestartPolicy.AUTO,
     ): AuditConfig {
         val freshReset = allowReset && shizukuReady
         return AuditConfig(
@@ -64,6 +78,7 @@ object CheckSheet {
             plans = plans(audience, choice, freshReset),
             childFacing = childFacing, includeGms = includeGms, autoDrive = agentTaps, resetAppData = freshReset,
             fastPreview = choice == CheckChoice.PREVIEW,
+            restart = restart,
         )
     }
 }

@@ -73,6 +73,8 @@ internal fun EverydayCheckSetup(
     shizukuHelp: ShizukuHelp,
     onQuarantine: () -> Unit,
     onStart: (AuditConfig) -> Unit,
+    /** What restarting the app would switch off (null while it is being read, or unreadable). */
+    effects: List<com.dpdpxray.app.audit.FoundSideEffect>? = null,
 ) {
     val lang = guideLang()
     val c = EverydaySheetCopy
@@ -83,6 +85,9 @@ internal fun EverydayCheckSetup(
     var child by remember { mutableStateOf(false) }
     var gms by remember { mutableStateOf(false) }
     val freshReset = allowReset && shizukuReady
+    // The safe option is the default: an app a restart would disturb is checked without restarting it.
+    var restartAnyway by remember { mutableStateOf(false) }
+    val leftRunning = shizukuReady && !freshReset && !effects.isNullOrEmpty() && !restartAnyway
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CheckSheetTitle(c.title(app.label).pick(lang))
@@ -92,7 +97,7 @@ internal fun EverydayCheckSetup(
         Text(step.body.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim)
         Column(Modifier.padding(top = 4.dp).reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             PlanOption(
-                c.quickTitle.pick(lang), (if (freshReset) c.quickDetailFresh else if (shizukuReady) c.quickDetailRestart else c.quickDetail).pick(lang),
+                c.quickTitle.pick(lang), (if (freshReset) c.quickDetailFresh else if (shizukuReady && !leftRunning) c.quickDetailRestart else c.quickDetail).pick(lang),
                 selected = choice == CheckChoice.QUICK, enabled = true, lang = lang,
             ) { choice = CheckChoice.QUICK }
             SwitchRow(c.agentTitle.pick(lang), c.agentDetail.pick(lang), agent, { agent = it })
@@ -118,8 +123,11 @@ internal fun EverydayCheckSetup(
             FoldText(c.quarantineNote.pick(lang), moreLabel = lang.moreLabel, lessLabel = lang.lessLabel)
         }
 
+        RestartWarning(app.label, effects, canStop = shizukuReady, reset = freshReset, restartAnyway = restartAnyway, onChange = { restartAnyway = it }, lang = lang)
+
         GradientAction(c.start.pick(lang), {
-            onStart(CheckSheet.config(Audience.USER, app.packageName, app.label, choice, allowReset, shizukuReady, agent, child, gms))
+            onStart(CheckSheet.config(Audience.USER, app.packageName, app.label, choice, allowReset, shizukuReady, agent, child, gms,
+                CheckSheet.restartPolicy(effects.takeIf { shizukuReady }, restartAnyway)))
         }, Modifier.padding(top = 12.dp).reveal(3), glyph = Glyph.PLAY, sweep = true)
     }
 }

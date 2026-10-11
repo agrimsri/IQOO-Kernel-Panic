@@ -177,12 +177,15 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
      * and needs the Shizuku helper (without it the person is asked to turn it on, and the check starts once it is). A
      * reset clears the data and is only ever started for an app [resetEligible] allows, after the person confirmed it.
      */
-    fun checkAgain(bundle: com.dpdpxray.app.data.AuditBundle, mode: com.dpdpxray.app.audit.CheckAgain.Mode, onStarted: () -> Unit) {
+    fun checkAgain(
+        bundle: com.dpdpxray.app.data.AuditBundle, mode: com.dpdpxray.app.audit.CheckAgain.Mode, onStarted: () -> Unit,
+        restart: com.dpdpxray.app.audit.RestartPolicy = com.dpdpxray.app.audit.RestartPolicy.AUTO,
+    ) {
         if (mode == com.dpdpxray.app.audit.CheckAgain.Mode.RESET && !resetEligible(bundle.meta.targetPackage)) {
             _toast.value = "A reset is only offered for an app you develop. Check again with a restart instead."
             return
         }
-        val config = com.dpdpxray.app.audit.CheckAgain.config(bundle.meta, bundle.sessions, mode)
+        val config = com.dpdpxray.app.audit.CheckAgain.config(bundle.meta, bundle.sessions, mode, restart)
         val begin = { if (startAudit(config, onStarted)) onStarted() }
         if (!ShizukuBridge.hasPermission()) {
             refreshPreflight()
@@ -200,6 +203,14 @@ class XrayViewModel(app: Application) : AndroidViewModel(app) {
         val facts = DeviceChecks.appFacts(ctx, pkg) ?: return false
         val allowlisted = runCatching { pkg in com.dpdpxray.app.automation.AutomationStore.get(ctx).settings.value.resetAllowlist }.getOrDefault(false)
         return com.dpdpxray.app.audit.CheckAgain.resetAllowed(facts.debuggable, pkg in com.dpdpxray.app.audit.CheckAgain.CONTROLLED_DEMOS, allowlisted, facts.system)
+    }
+
+    /**
+     * What restarting [pkg] would switch off right now (its accessibility service, VPN, keyboard, ...), read without
+     * changing anything; null when it could not be read. The check sheet warns with it before Start.
+     */
+    suspend fun restartSideEffects(pkg: String): List<com.dpdpxray.app.audit.FoundSideEffect>? = withContext(Dispatchers.IO) {
+        runCatching { com.dpdpxray.app.audit.RestartSideEffects.detect(pkg, com.dpdpxray.app.audit.AndroidSideEffectProbe(ctx)) }.getOrNull()
     }
 
     /** A check that was stopped by a missing permission, started again once it is on. */

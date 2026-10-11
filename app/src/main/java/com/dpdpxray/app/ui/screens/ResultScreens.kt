@@ -222,6 +222,13 @@ fun ResultsScreen(
                 val standalone = r.band == ScoreBand.READY || r.band == ScoreBand.INCONCLUSIVE
                 Column(Modifier.padding(top = 12.dp).reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (b.meta.sample) Notice(ResultCopy.sample.pick(lang), kind = NoticeKind.CAUTION)
+                    // "Restart anyway" switched something off (its accessibility service...): say so, with the screen to turn it on.
+                    val ctx = androidx.compose.ui.platform.LocalContext.current
+                    com.dpdpxray.app.audit.RestartReminder.toTurnBackOn(b.sessions).firstOrNull()?.let { k ->
+                        val c = com.dpdpxray.app.audit.RestartSafeguardCopy
+                        Notice(c.reminder(b.meta.targetLabel, k).pick(lang), kind = NoticeKind.CAUTION,
+                            action = c.settingsLabel(k)?.let { it.pick(lang) to { com.dpdpxray.app.control.DeviceChecks.openTurnBackOn(ctx, k, b.meta.targetPackage) } })
+                    }
                     // Update Watch: this check is of a different version than the previous one; the full diff is in Before / after.
                     beforeAfter?.update?.let { u -> Notice(UpdateDiffWording.banner(u, beforeAfter?.comparison), kind = NoticeKind.INFO) }
                     // For a quiet or inconclusive result the first meaning line is itself a caveat (not a certificate; unknown stays unknown).
