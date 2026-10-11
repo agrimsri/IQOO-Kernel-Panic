@@ -1,5 +1,6 @@
 package com.dpdpxray.cli
 
+import com.dpdpxray.core.web.WebAudit
 import com.dpdpxray.core.law.LawRelation
 import com.dpdpxray.core.law.LensView
 import com.dpdpxray.core.model.AuditResult
@@ -22,6 +23,12 @@ object Wording {
     const val LOOKUP_CAVEAT = "A DNS lookup is an attempt to contact a host, not proof that personal data was sent."
     const val SCOPE_CAVEAT = "Findings come from DNS lookups and consent-screen review on one phone during one run. " +
         "This is an automated technical check, not legal advice or a compliance certificate."
+
+    /** Added when a bundle is a website check (target.kind "web"): its evidence is requests, not DNS lookups. */
+    const val WEB_CAVEAT = "Website checks: findings come from the requests a page made in TraceVeil's own browser on the phone " +
+        "(full addresses) and from its consent banner; a request is an attempt to contact a host, not proof of what data was sent."
+
+    fun anyWeb(checks: List<BundleCheck>): Boolean = checks.any { WebAudit.isWeb(it.source.bundle.sessions) }
 
     fun score(r: AuditResult): String =
         if (r.band == ScoreBand.INCONCLUSIVE || r.score == null) "Inconclusive (score not established)" else "${r.score}/100 · ${band(r.band, r.score)}"
@@ -112,6 +119,7 @@ object CheckText {
         else appendLine("Overall: FAIL ($failed of ${plural(checks.size, "bundle")} violated the policy, ${plural(violations, "violation")}; exit 1)")
         appendLine(Wording.LOOKUP_CAVEAT)
         appendLine(Wording.SCOPE_CAVEAT)
+        if (Wording.anyWeb(checks)) appendLine(Wording.WEB_CAVEAT)
         if (policy.failOn.isEmpty() && policy.minScore == null && policy.maxHigh == null) {
             appendLine("Note: this policy fails on no finding and sets no score threshold.")
         }
@@ -188,7 +196,7 @@ object CheckJson {
         put("exitCode", if (checks.all { it.passed }) Exit.PASS else Exit.VIOLATION)
         put("violations", checks.sumOf { it.violations.size })
         put("bundles", JsonArray(checks.map(::bundle)))
-        put("caveat", "${Wording.LOOKUP_CAVEAT} ${Wording.SCOPE_CAVEAT}")
+        put("caveat", "${Wording.LOOKUP_CAVEAT} ${Wording.SCOPE_CAVEAT}" + if (Wording.anyWeb(checks)) " ${Wording.WEB_CAVEAT}" else "")
     }
 
     private fun bundle(c: BundleCheck): JsonObject = buildJsonObject {
