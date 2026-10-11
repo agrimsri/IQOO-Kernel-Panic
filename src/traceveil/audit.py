@@ -126,6 +126,32 @@ def _names(entities: list, style: Style) -> str:
     return shown + (style.dim(f" (+{len(entities) - MAX_NAMES} more)") if len(entities) > MAX_NAMES else "")
 
 
+def network_lines(net: dict, style: Style = PLAIN) -> list[str]:
+    """Connection-level capture: risk, findings, traffic per consent phase, and the connections seen."""
+    if net.get("depth") != "full-relay":
+        return ["  Network (connections)  not captured: this audit ran DNS-only"]
+    lines = [f"  Network (connections)  risk {net.get('level', '?')}  "
+             f"{net.get('connectionCount', 0)} connections, {net.get('httpRequestCount', 0)} plain-HTTP requests read"]
+    for f in net.get("findings", []):
+        lines.append(f"    {style.severity(str(f.get('severity', '?')), 8)} {f.get('title', '')}: {f.get('destination', '')} "
+                     f"[{str(f.get('phase', '')).lower()}, confidence {str(f.get('confidence', '')).lower()}]")
+        for e in f.get("evidence", [])[:2]:
+            lines.append(f"       {style.dim(e)}")
+    for t in net.get("traffic", []):
+        lines.append(f"    {t.get('phase', '?'):<16} {t.get('connections', 0)} conn, {t.get('bytesUp', 0)} B up, {t.get('bytesDown', 0)} B down")
+    shown = net.get("connections", [])[:10]
+    for c in shown:
+        reqs = c.get("http") or []
+        tail = f"  {len(reqs)} HTTP request(s): " + "; ".join(f"{r.get('method')} {r.get('host')}{r.get('target')}" for r in reqs[:2]) if reqs else ""
+        lines.append(f"      {c.get('protocol', '?'):<4} {(c.get('host') or c.get('ip', '')):<34} :{c.get('port')} {c.get('tls', ''):<10} "
+                     f"{c.get('phase', '').lower():<14} {c.get('bytesUp', 0)}/{c.get('bytesDown', 0)} B{tail}")
+    if len(net.get("connections", [])) > len(shown):
+        lines.append(f"      ... {len(net['connections']) - len(shown)} more in the saved JSON")
+    for lim in net.get("limitations", [])[:3]:
+        lines.append(f"    {style.dim('limit: ' + lim)}")
+    return lines
+
+
 def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) -> str:
     t = rep["target"]
     lines = [f"Traceveil audit  {style.bold(t.get('label', '?'))} ({t.get('package', '?')})  "
@@ -136,6 +162,8 @@ def summary(rep: dict, reasons: list[str], saved: Path, style: Style = PLAIN) ->
         lines.append(f"  {f.get('check', '?'):<4} {style.severity(sev, 8)} {f.get('title', '')}{tag}")
         if f.get("entities"):
             lines.append(f"       {style.dim('trackers:')} {_names(f['entities'], style)}")
+    if rep.get("network") is not None:
+        lines += network_lines(rep["network"], style)
     if rep.get("dataAccess") is not None:
         lines += access.lines(rep["dataAccess"], style)
     if rep.get("lenses"):

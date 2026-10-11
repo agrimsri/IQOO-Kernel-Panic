@@ -1,5 +1,6 @@
 package com.dpdpxray.app.cli
 
+import com.dpdpxray.app.ai.NetIntelligence
 import com.dpdpxray.app.data.AuditBundle
 import com.dpdpxray.core.audit.PhaseAssigner
 import com.dpdpxray.core.model.Category
@@ -66,6 +67,7 @@ object CliAuditReport {
                 }
             }))
             if (catalog != null) put("observedTrackers", observedTrackers(bundle, catalog, anchor))
+            if (catalog != null) put("network", network(bundle, catalog))
         }
         return pretty.encodeToString(JsonObject.serializer(), obj)
     }
@@ -89,6 +91,53 @@ object CliAuditReport {
                 }))
             }
         })
+    }
+
+    private const val MAX_CONNECTIONS = 200
+
+    /**
+     * What the connection-level capture saw: findings (rules only, no model), traffic per consent phase, and the
+     * connections themselves with their redacted HTTP request lines. `depth` says whether the audit ran DNS-only, in
+     * which case no connection was observed (empty lists mean "not captured", never "none").
+     */
+    private fun network(bundle: AuditBundle, catalog: TrackerCatalog): JsonObject {
+        val a = NetIntelligence.rules(bundle.sessions, catalog)
+        val flows = bundle.sessions.flatMap { it.flows }
+        val depth = if (bundle.sessions.any { it.captureDepth == "full-relay" }) "full-relay" else "dns-only"
+        return buildJsonObject {
+            put("depth", depth)
+            put("level", a.level.name)
+            put("findings", JsonArray(a.findings.map { f ->
+                buildJsonObject {
+                    put("id", f.id); put("kind", f.kind.name); put("severity", f.severity.name); put("confidence", f.confidence.name)
+                    put("title", f.title); put("destination", f.destination); f.entity?.let { put("entity", it) }
+                    put("phase", f.phase.name); put("bytesUp", f.bytesUp); put("bytesDown", f.bytesDown)
+                    put("whatHappened", f.whatHappened); put("whyItMatters", f.whyItMatters)
+                    put("evidence", strings(f.evidence)); put("limitation", f.limitation); put("action", f.action.name)
+                }
+            }))
+            put("traffic", JsonArray(a.traffic.map { t ->
+                buildJsonObject { put("phase", t.phase.name); put("connections", t.connections); put("bytesUp", t.bytesUp); put("bytesDown", t.bytesDown) }
+            }))
+            put("limitations", strings(a.limitations))
+            put("connectionCount", flows.size)
+            put("httpRequestCount", flows.sumOf { it.http.size })
+            put("connections", JsonArray(flows.sortedBy { it.startNanos }.take(MAX_CONNECTIONS).map { f ->
+                buildJsonObject {
+                    put("protocol", f.protocol.name); put("host", f.host ?: ""); put("ip", f.dstIp); put("port", f.dstPort)
+                    put("tls", f.tls.name); put("phase", f.phase.name); put("bytesUp", f.bytesUp); put("bytesDown", f.bytesDown)
+                    put("noLookup", f.noLookup); put("failed", f.failed)
+                    if (f.alpn.isNotEmpty()) put("alpn", strings(f.alpn))
+                    if (f.http.isNotEmpty()) put("http", JsonArray(f.http.map { h ->
+                        buildJsonObject {
+                            put("method", h.method); put("host", h.host ?: ""); put("target", h.target)
+                            h.status?.let { put("status", it) }; put("phase", h.phase.name)
+                            if (h.sensitive.isNotEmpty()) put("sensitive", strings(h.sensitive.map { it.name }))
+                        }
+                    }))
+                }
+            }))
+        }
     }
 
     private data class Hit(val entity: String, val category: Category, val phase: Phase, val tNanos: Long)
