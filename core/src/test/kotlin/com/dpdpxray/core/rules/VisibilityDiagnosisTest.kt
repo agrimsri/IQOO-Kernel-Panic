@@ -162,6 +162,12 @@ class VisibilityDiagnosisTest {
         assertFalse("a personal app is never told to clear its data", v0.explanation.contains("clear its data"))
     }
 
+    @Test fun `every cause and action has a short phrase for the command-line tools`() {
+        Cause.entries.forEach { assertTrue(it.name, VisibilityDiagnosis.phrase(it).isNotBlank()) }
+        Action.entries.forEach { assertTrue(it.name, VisibilityDiagnosis.hint(it).isNotBlank()) }
+        assertEquals("check again with a restart (the app keeps its data)", VisibilityDiagnosis.hint(Action.CHECK_AGAIN_WITH_RESTART))
+    }
+
     @Test fun `enough lookups means no diagnosis at all`() {
         val r = engine.evaluate(listOf(plan(lookups = 6, freshState = true)))
         assertFalse(r.findings.any { it.checkId == CheckId.V0 })

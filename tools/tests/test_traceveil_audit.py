@@ -185,6 +185,26 @@ class AuditCommandTests(unittest.TestCase):
         phone = FakePhone(files={"REQ/status.json": [status("done")], "REQ/report.json": [json.dumps(rep)]})
         self.assertEqual(EXIT_INCONCLUSIVE, self.run_audit(phone)[0])
 
+    def test_inconclusive_report_prints_why_and_what_to_try(self):
+        diagnosis = [{"cause": "ALREADY_RUNNING", "action": "CHECK_AGAIN_WITH_RESTART",
+                      "phrase": "the app was already running (not restarted)",
+                      "hint": "check again with a restart (the app keeps its data)",
+                      "sentence": "The app was already running and TraceVeil could not restart it.", "evidence": ["Plan B: not restarted"]},
+                     {"cause": "PRIVATE_DNS", "action": "TURN_OFF_PRIVATE_DNS", "phrase": "Private DNS was on",
+                      "hint": "turn Private DNS off, then check again", "sentence": "Private DNS was on.", "evidence": ["x"]}]
+        rep = {**REPORT, "score": None, "band": "INCONCLUSIVE", "findings": [], "findingCount": 0, "diagnosis": diagnosis}
+        phone = FakePhone(files={"REQ/status.json": [status("done")], "REQ/report.json": [json.dumps(rep)]})
+        code, i = self.run_audit(phone)
+        self.assertEqual(EXIT_INCONCLUSIVE, code)
+        out = i.out.getvalue()
+        self.assertIn("why no score: The app was already running and TraceVeil could not restart it.", out)
+        self.assertIn("also: Private DNS was on", out)
+        self.assertIn("try: check again with a restart (the app keeps its data)", out)
+
+    def test_a_report_without_diagnosis_prints_no_diagnosis(self):
+        code, i = self.run_audit(FakePhone(files=self.good_files()), fail_on_override="off")
+        self.assertNotIn("why no score", i.out.getvalue())
+
     def test_disconnect_non_interactive_waits_then_resumes_to_completion(self):
         files = self.good_files()
         phone = FakePhone(files=files, gone_at=(1, 2))

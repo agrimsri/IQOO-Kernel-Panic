@@ -156,6 +156,33 @@ object VisibilityDiagnosis {
         return out
     }
 
+    /** A short phrase for a cause, for one-line outputs such as the command-line tools ("likely cause: ..."). */
+    fun phrase(c: Cause): String = when (c) {
+        Cause.OTHER_VPN -> "another VPN was on"
+        Cause.CAPTURE_STOPPED -> "the capture stopped during the check"
+        Cause.NO_NETWORK -> "the phone had no working internet"
+        Cause.PRIVATE_DNS -> "Private DNS was on"
+        Cause.PHONE_LOCKED -> "the phone was locked during the check"
+        Cause.APP_CRASHED -> "the app stopped with an error"
+        Cause.NO_INTERNET_PERMISSION -> "the app does not ask for internet access"
+        Cause.ALREADY_RUNNING -> "the app was already running (not restarted)"
+        Cause.OWN_DNS -> "the app may use its own DNS or fixed addresses"
+        Cause.APP_QUIET -> "the app did not use the network"
+        Cause.WINDOW_TOO_SHORT -> "the watch was too short"
+        Cause.UNEXPLAINED -> "not known from what was recorded"
+    }
+
+    /** What to do about an [Action], in a few words, for one-line outputs. */
+    fun hint(a: Action): String = when (a) {
+        Action.CHECK_AGAIN_WITH_RESTART -> "check again with a restart (the app keeps its data)"
+        Action.TURN_OFF_PRIVATE_DNS -> "turn Private DNS off, then check again"
+        Action.TURN_OFF_OTHER_VPN -> "turn the other VPN off, then check again"
+        Action.CONNECT_TO_INTERNET -> "connect to the internet, then check again"
+        Action.CHECK_AGAIN -> "check again"
+        Action.RUN_WITH_INTERNET_CUT_OFF -> "run it with the internet cut off to list the addresses it tries"
+        Action.NONE -> "nothing on the phone would change this result"
+    }
+
     /** One sentence per cause, for the V0 explanation in reports. */
     fun explanation(items: List<Item>): String = items.joinToString(" ") { it.sentence }
 
