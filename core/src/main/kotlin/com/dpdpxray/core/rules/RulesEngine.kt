@@ -4,6 +4,7 @@ import com.dpdpxray.core.manifest.SdkManifestCatalog
 import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
+import com.dpdpxray.core.model.BackgroundWatches
 import com.dpdpxray.core.model.Category
 import com.dpdpxray.core.model.CheckId
 import com.dpdpxray.core.model.ConsentHistory
@@ -395,16 +396,20 @@ class RulesEngine(
 
     /**
      * V0 names its likely causes from what the phone recorded ([VisibilityDiagnosis]) instead of generic advice; it never
-     * tells anyone to clear a personal app's data. The result stays inconclusive: unknown stays unknown.
+     * tells anyone to clear a personal app's data. The result stays inconclusive: unknown stays unknown. After a background
+     * watch it says what the watch observed: almost no network use in its whole length.
      */
     private fun lowVisibility(sessions: List<AuditSession>): Finding {
         val diagnosis = VisibilityDiagnosis.diagnose(sessions, connections)
+        val watch = BackgroundWatches.of(sessions)?.takeIf { BackgroundWatches.isWatch(sessions) }
         return Finding(
             checkId = CheckId.V0, severity = Severity.INFO, evidenceType = EvidenceType.OBSERVED,
             title = CheckId.V0.title,
-            explanation = "Almost no DNS lookups were captured, so this audit cannot call the app clean and gives no score. " +
+            explanation = (if (watch != null) "In ${BackgroundWatches.length(watch)} of watching ${sessions.first().targetLabel} in the " +
+                "background, TraceVeil saw almost no network use, so this check cannot call the app clean and gives no score. "
+            else "Almost no DNS lookups were captured, so this audit cannot call the app clean and gives no score. ") +
                 "Likely cause: ${VisibilityDiagnosis.explanation(diagnosis)}",
-            evidence = (sessions.map { "${it.plan.label}: ${it.netEvents.size} lookups" } + diagnosis.flatMap { it.evidence })
+            evidence = (sessions.map { "${BackgroundWatches.label(it)}: ${it.netEvents.size} lookups" } + diagnosis.flatMap { it.evidence })
                 .distinct().take(MAX_EVIDENCE),
             plans = sessions.map { it.plan }.distinct(),
             dpdpRefs = emptyList(),
@@ -426,9 +431,10 @@ class RulesEngine(
         val who = e.entity?.let { " ($it)" } ?: ""
         val via = e.viaPackage?.let { " via $it" } ?: ""
         val match = e.entity?.let { " — catalogue match: ${e.category.name.lowercase().replace('_', ' ')}" } ?: ""
-        val seen = if (e.fromConnection) "connected $sinceLaunch s after launch (server name read from the connection; no lookup seen)"
-            else "looked up $sinceLaunch s after launch"
-        return "${e.hostname}$who$via${alias(e)}$match — $seen, $rel [${c.session.plan.label}]"
+        val since = BackgroundWatches.since(c.session)
+        val seen = if (e.fromConnection) "connected $sinceLaunch s $since (server name read from the connection; no lookup seen)"
+            else "looked up $sinceLaunch s $since"
+        return "${e.hostname}$who$via${alias(e)}$match — $seen, $rel [${BackgroundWatches.label(c.session)}]"
     }
 
     /** How long the plan was watched ("35.3 s"), so consent claims stay inside the capture window; null if unrecorded. */
@@ -440,7 +446,7 @@ class RulesEngine(
         val who = e.entity?.let { " ($it)" } ?: ""
         val via = e.viaPackage?.let { " via $it" } ?: ""
         return "${e.hostname}$who$via${alias(e)} — $label; catalogued as $purpose — " +
-            "${secs(e.tNanos - c.session.startedAtNanos)} s after launch [${c.session.plan.label}]"
+            "${secs(e.tNanos - c.session.startedAtNanos)} s ${BackgroundWatches.since(c.session)} [${BackgroundWatches.label(c.session)}]"
     }
 
     /** " — alias observed: a → b → tracker" up to the alias that decided the classification, or "" if none did. */

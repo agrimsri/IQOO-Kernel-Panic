@@ -102,7 +102,8 @@ object HtmlReport {
             val n = attempts.getValue(s.plan).size
             val k = (seen[s.plan] ?: 0) + 1
             seen[s.plan] = k
-            Lane(s, timeline(s, catalog), if (n > 1) "${s.plan.label} · attempt $k of $n" else s.plan.label, i)
+            val name = com.dpdpxray.core.model.BackgroundWatches.label(s)
+            Lane(s, timeline(s, catalog), if (n > 1) "$name · attempt $k of $n" else name, i)
         }
         val first = sessions.firstOrNull()
         val label = first?.targetLabel ?: "Unknown app"
@@ -181,7 +182,11 @@ object HtmlReport {
             meta("Audited", date(first.startedAtEpochMs, zone))
             if (first.deviceModel.isNotBlank()) meta("Device", "${first.deviceModel} · Android ${first.androidVersion}")
         }
-        meta("Plans", sessions.joinToString { it.plan.label }.ifEmpty { "None recorded" })
+        meta("Plans", sessions.joinToString { com.dpdpxray.core.model.BackgroundWatches.label(it) }.ifEmpty { "None recorded" })
+        // A background watch says what it checked, so it never reads as a test of the consent popup.
+        com.dpdpxray.core.model.BackgroundWatches.of(sessions)?.let { w ->
+            meta("What was checked", com.dpdpxray.core.model.BackgroundWatches.whatWasChecked(first?.targetLabel ?: "the app", w).first.removePrefix("What was checked: ").replaceFirstChar { it.uppercase() })
+        }
         meta("Lookups", "$lookups DNS ${if (lookups == 1) "lookup" else "lookups"} across ${sessions.size} ${if (sessions.size == 1) "session" else "sessions"}")
         meta("Legal lens", "${view.profile.title} (${view.id.name})")
         append("</dl><div class=\"sevstrip\" aria-label=\"Findings by severity\">")

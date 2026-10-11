@@ -6,6 +6,7 @@ import com.dpdpxray.core.manifest.ManifestFlag
 import com.dpdpxray.core.manifest.SdkCollectionStatus
 import com.dpdpxray.core.manifest.SdkManifestCatalog
 import com.dpdpxray.core.model.AuditSession
+import com.dpdpxray.core.model.BackgroundWatches
 import com.dpdpxray.core.model.CaptureHealth
 import com.dpdpxray.core.model.CheckId
 import com.dpdpxray.core.model.ConsentEvent
@@ -91,34 +92,48 @@ internal class ExtendedChecks(
 
     // --- C12 -------------------------------------------------------------------------------------------------------
 
-    /** Tracker lookups after the app was confirmed off screen by the background step. */
+    /**
+     * Tracker lookups after the app was confirmed off screen: by the background step, or for a background watch from the
+     * moment it was seen off screen, leaving out the stretches when it was (or may have been) on screen.
+     */
     private fun backgroundLookups(plans: List<PlanEvidence>): Finding? {
         val hits = plans.flatMap { p ->
-            val bg = p.session.backgroundStartedNanos ?: return@flatMap emptyList()
-            p.events.filter { it.category.isTracking && it.tNanos >= bg }.map { p to it }
+            if (p.session.backgroundStartedNanos == null) return@flatMap emptyList()
+            p.events.filter { it.category.isTracking && BackgroundWatches.inBackground(p.session, it.tNanos) }.map { p to it }
         }
         if (hits.isEmpty()) return null
         val entities = hits.mapNotNull { it.second.entity }.distinct()
-        val windows = hits.map { it.first }.distinctBy { it.session.id }.mapNotNull { p ->
-            val bg = p.session.backgroundStartedNanos ?: return@mapNotNull null
-            (p.session.endedAtNanos - bg).takeIf { it > 0 }?.let { "${p.session.plan.label}: watched ${secs(it)} s in the background" }
-        }
+        val windows = hits.map { it.first }.distinctBy { it.session.id }.mapNotNull { p -> backgroundWindow(p.session) }
+        val watched = hits.all { it.first.session.watch != null }
         return Finding(
             checkId = CheckId.C12, severity = Severity.INFO, evidenceType = EvidenceType.OBSERVED, title = CheckId.C12.title,
-            explanation = "After the plan's observation window TraceVeil pressed Home, confirmed the app had left the screen, " +
-                "and kept capturing. While the app was in the background it looked up hosts the tracker catalogue lists for " +
+            explanation = (if (watched) "During a background watch TraceVeil did not open, restart or tap the app; it confirmed the app " +
+                "was not on screen and kept capturing, leaving out any time the app was on screen. "
+            else "After the plan's observation window TraceVeil pressed Home, confirmed the app had left the screen, " +
+                "and kept capturing. ") + "While the app was in the background it looked up hosts the tracker catalogue lists for " +
                 "${entities.joinToString()}. Background work can be legitimate (for example syncing or delivering " +
                 "notifications), and TraceVeil cannot see what was sent. Lookups made before consent or after Reject are " +
                 "already counted under C1 or C2, so this note does not change the score. ${RulesEngine.CATALOGUE_MATCH}",
             evidence = (hits.map { (p, e) ->
                 val bg = p.session.backgroundStartedNanos ?: e.tNanos
-                lookupLine(p.session, e, "${secs(e.tNanos - bg)} s after the app went to the background, ${consentRelation(p.session, e)}")
+                val where = if (p.session.watch != null) "app not on screen" else "${secs(e.tNanos - bg)} s after the app went to the background"
+                lookupLine(p.session, e, "$where, ${consentRelation(p.session, e)}")
             }.distinct().take(RulesEngine.MAX_EVIDENCE - windows.size) + windows),
             plans = hits.map { it.first.session.plan }.distinct(),
             dpdpRefs = emptyList(),
             penaltyBand = PenaltyBand.NONE,
             entities = entities,
         )
+    }
+
+    /** "Plan B · Reject: watched 10.0 s in the background", or a watch's length with the time the app was on screen. */
+    private fun backgroundWindow(s: AuditSession): String? {
+        val bg = s.backgroundStartedNanos ?: return null
+        val length = (s.endedAtNanos - bg).takeIf { it > 0 } ?: return null
+        val w = s.watch ?: return "${s.plan.label}: watched ${secs(length)} s in the background"
+        val onScreen = w.onScreen.sumOf { (minOf(it.toNanos, s.endedAtNanos) - maxOf(it.fromNanos, bg)).coerceAtLeast(0) }
+        return "${BackgroundWatches.LABEL}: watched ${secs(length)} s from when the app was first seen off screen" +
+            (if (onScreen > 0) "; about ${secs(onScreen)} s of it with the app on screen, or the screen unreadable, left out" else "")
     }
 
     // --- C13 -------------------------------------------------------------------------------------------------------
@@ -352,7 +367,7 @@ internal class ExtendedChecks(
             evidence = hits.map { h ->
                 val s = h.p.session
                 "${h.method} ${h.host}${h.target} — fields: ${CleartextPersonalData.describe(h.fields)} — " +
-                    "${secs(h.t - s.startedAtNanos)} s after launch, ${relationAt(s, h.t)} [${s.plan.label}]"
+                    "${secs(h.t - s.startedAtNanos)} s ${BackgroundWatches.since(s)}, ${relationAt(s, h.t)} [${BackgroundWatches.label(s)}]"
             }.distinct().take(RulesEngine.MAX_EVIDENCE),
             plans = hits.map { it.p.session.plan }.distinct(),
             dpdpRefs = listOf("s8(5)"),
