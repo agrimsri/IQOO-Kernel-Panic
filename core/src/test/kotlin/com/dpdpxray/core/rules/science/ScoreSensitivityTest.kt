@@ -10,7 +10,7 @@ import java.util.Locale
 import kotlin.random.Random
 
 /**
- * Sensitivity analysis on the 209,952 scored assignments of ScoreSpace (every combination of the checks that carry points,
+ * Sensitivity analysis on the 629,856 scored assignments of ScoreSpace (every combination of the checks that carry points,
  * each in every variant the engine can give it). Nothing here changes a weight, threshold or band rule: it measures them.
  *
  * 1. Thresholds: for Ready threshold R in 75..95 and Needs-work threshold N in 50..70 (gate unchanged), how many

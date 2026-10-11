@@ -7,6 +7,16 @@ could move a result) and reports a sensitivity analysis of the thresholds and of
 Nothing on this page changed a weight, threshold or band rule. Every number below comes from a test in
 `core/src/test/kotlin/com/dpdpxray/core/rules/science/`, which writes its results to `core/build/reports/score-science/`.
 
+> **Update, 11 October 2026: C16 joins the scored checks.** C16 (personal data in an unencrypted HTTP request, High,
+> observed or inferred; see [NETWORK_CAPTURE.md](NETWORK_CAPTURE.md)) is a 14th check that can carry points. The same
+> tests, unchanged in method, now enumerate 2³ × 3⁷ × 2² × 3 (C14) × 3 (C16) = **629,856** assignments (120,932,352 finding
+> sets with the 192 zero-weight combinations) and pass: 7,243,344 lattice edges; 8,188,128 zero-weight sets in the
+> factored run; 5,038,848 lens views; all 31 check variants produced by the real engine. Bands: Ready 643, Needs work
+> 24,452, At risk 604,761. The gate now moves exactly **10** assignments: an observed C1, NC, C3, C4 or C16 as the only
+> finding with points, with or without C14 Info. No weight, threshold or band rule changed. The tables and figures below
+> are the 10 October measurements of the 13-check space, kept as recorded; the new counts are written to
+> `core/build/reports/score-science/` on every run.
+
 ## 1. Summary
 
 | What | Result |

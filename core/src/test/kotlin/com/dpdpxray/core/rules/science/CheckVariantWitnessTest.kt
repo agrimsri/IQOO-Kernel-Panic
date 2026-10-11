@@ -13,6 +13,11 @@ import com.dpdpxray.core.model.Finding
 import com.dpdpxray.core.model.NetEvent
 import com.dpdpxray.core.model.RejectOption
 import com.dpdpxray.core.model.ScreenAudit
+import com.dpdpxray.core.netcapture.FlowProtocol
+import com.dpdpxray.core.netcapture.FlowRecord
+import com.dpdpxray.core.netcapture.HttpExchange
+import com.dpdpxray.core.netcapture.Redaction
+import com.dpdpxray.core.netcapture.TlsStatus
 import com.dpdpxray.core.rules.RulesEngine
 import com.dpdpxray.core.rules.ScoreCalculator
 import com.dpdpxray.core.screen.Fixtures
@@ -75,11 +80,20 @@ class CheckVariantWitnessTest {
         dialogsWatched: Boolean? = null,
         facts: AppManifestFacts? = null,
         plan: AuditPlan = AuditPlan.ACCEPT,
+        flows: List<FlowRecord> = emptyList(),
     ) = AuditSession(
         id = plan.name, targetPackage = pkg, targetLabel = "ShopNow", plan = plan, childFacing = childFacing, endedAtNanos = 40 * s,
         netEvents = events, consentEvents = consent, screenAudit = screen, freshState = fresh, privateDnsActive = privateDns,
         backgroundStartedNanos = background, permissionDialogsWatched = dialogsWatched, manifestFacts = facts,
+        flows = flows, captureDepth = if (flows.isEmpty()) null else "full-relay",
     )
+
+    /** A full-relay plain-HTTP request to api.shop.app whose query is redacted before it is stored, as the tracker does. */
+    private fun cleartext(target: String): List<FlowRecord> {
+        val r = Redaction.target(target)
+        val get = HttpExchange(6 * s, "GET", "api.shop.app", r.text, sensitive = r.found)
+        return listOf(FlowRecord(1, FlowProtocol.TCP, "203.0.113.20", 80, 6 * s, sni = "api.shop.app", tls = TlsStatus.CLEARTEXT, http = listOf(get)))
+    }
 
     /** The clean screen with one field changed; [observed] says whether that field was confirmed from the tree. */
     private fun screen(field: String, observed: Boolean, change: ScreenAudit.() -> ScreenAudit) =
@@ -113,6 +127,7 @@ class CheckVariantWitnessTest {
         CheckId.C12 -> session(events = firstParty + net(25.0, "graph.facebook.com"), background = 20 * s)
         CheckId.C15 -> session(consent = listOf(shown.copy(tree = Fixtures.leakyDialog), ConsentEvent(5 * s, ConsentKind.ACCEPT)))
         CheckId.V1 -> session(privateDns = true)
+        CheckId.C16 -> session(flows = cleartext(if (v.observed) "/u?email=asha@example.in" else "/u?first_name=Asha"))
     }
 
     private val Variant.observed get() = evidence == com.dpdpxray.core.model.EvidenceType.OBSERVED
@@ -123,9 +138,9 @@ class CheckVariantWitnessTest {
     @Test
     fun `the table covers every check the engine knows`() {
         assertEquals(CheckId.entries.toSet(), CheckVariants.table.keys)
-        assertEquals(29, CheckVariants.all.size)
+        assertEquals(31, CheckVariants.all.size)
         assertEquals(
-            listOf(CheckId.C1, CheckId.NC, CheckId.C2, CheckId.C3, CheckId.C4, CheckId.C5, CheckId.C6, CheckId.C7, CheckId.C8, CheckId.C9, CheckId.C10, CheckId.C13, CheckId.C14),
+            listOf(CheckId.C1, CheckId.NC, CheckId.C2, CheckId.C3, CheckId.C4, CheckId.C5, CheckId.C6, CheckId.C7, CheckId.C8, CheckId.C9, CheckId.C10, CheckId.C13, CheckId.C14, CheckId.C16),
             CheckVariants.scored,
         )
     }

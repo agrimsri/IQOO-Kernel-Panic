@@ -35,6 +35,8 @@ data class Variant(val check: CheckId, val severity: Severity, val evidence: Evi
  * - C9 (Critical) is OBSERVED when the app was declared child-facing, INFERRED when only the screen review signalled it.
  * - C10 (Medium) is always INFERRED (vendor documentation). C13 (Low) is always INFERRED (vendor documentation).
  * - C14 is OBSERVED, Low when a permission that can reach personal data was asked first, Info for notifications only.
+ * - C16 (High) is OBSERVED when a cleartext request value had a personal-data shape, INFERRED when only field names
+ *   matched.
  * - V0, U1, C11, C12, C15, V1 are OBSERVED Info; S1 is INFERRED Info. U1 makes a result inconclusive only when it names
  *   tracker entities, so it has two variants.
  *
@@ -63,9 +65,10 @@ object CheckVariants {
         CheckId.C12 to listOf(Variant(CheckId.C12, INFO, OBSERVED)),
         CheckId.C15 to listOf(Variant(CheckId.C15, INFO, OBSERVED)),
         CheckId.V1 to listOf(Variant(CheckId.V1, INFO, OBSERVED)),
+        CheckId.C16 to both(CheckId.C16, HIGH),
     )
 
-    /** Checks with at least one variant that carries points (C14 is here because its Low variant does). */
+    /** Checks with at least one variant that carries points (C14 is here because its Low variant does), in table order. */
     val scored: List<CheckId> = table.filterValues { vs -> vs.any { it.severity.weight > 0 } }.keys.toList()
 
     /** Zero-weight notes that never make a result inconclusive. */

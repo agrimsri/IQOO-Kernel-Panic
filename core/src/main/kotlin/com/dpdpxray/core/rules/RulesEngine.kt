@@ -62,7 +62,7 @@ class RulesEngine(
         c10AdIds(ctx)?.let { findings += it }
         consentHistoryUnknown(ctx)?.let { findings += it }
         sameCompany(ctx)?.let { findings += it }
-        // C11–C15 and V1 (ExtendedChecks): only from evidence the session recorded; silent when it was not recorded.
+        // C11–C16 and V1 (ExtendedChecks): only from evidence the session recorded; silent when it was not recorded.
         findings += extended.evaluate(ctx.map { PlanEvidence(it.session, it.events, it.owner, it.historyUnknown) })
 
         val (score, band) = ScoreCalculator.compute(findings)
