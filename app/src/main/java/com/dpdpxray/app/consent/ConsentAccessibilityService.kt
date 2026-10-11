@@ -9,9 +9,9 @@ import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
-import com.dpdpxray.app.control.ShizukuBridge
 import com.dpdpxray.app.quarantine.QuarantineBus
 import com.dpdpxray.app.quarantine.QuarantineUiWatcher
+import com.dpdpxray.core.consent.BlockerAgent
 import com.dpdpxray.core.consent.BlockerKind
 import com.dpdpxray.core.consent.BlockerLexicon
 import com.dpdpxray.core.consent.ConsentLexicon
@@ -51,6 +51,7 @@ class ConsentAccessibilityService : AccessibilityService() {
 
     /** The glow along the top edge and the "fill this in" card, drawn over the audited app. */
     private val overlay = InspectionOverlay(this)
+    private val driver = ScreenDriver(this)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onServiceConnected() {
@@ -317,75 +318,77 @@ class ConsentAccessibilityService : AccessibilityService() {
     suspend fun fillFormAndContinue(): String? {
         check(Looper.myLooper() == Looper.getMainLooper())
         val (tree, live) = NodeMapper.mapWithNodes(targetRoot()) ?: return null
-        val kind = BlockerLexicon.detect(tree)
-        if (kind != BlockerKind.FORM) return null
+        if (BlockerLexicon.detect(tree) != BlockerKind.FORM) return null
         // A date-of-birth field opens a picker; the date typed in (or the picker's own default) is confirmed with OK.
         FormFill.pickerConfirmIndex(tree)?.let { ok ->
-            var node: AccessibilityNodeInfo? = live[ok]
-            while (node != null && !node.isClickable) node = node.parent
-            return if (node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) "OK (confirmed the date picker)" else null
+            return if (driver.press(live[ok])) "OK (confirmed the date picker)" else null
         }
         val plan = FormFill.plan(tree)
-        val forward = plan.forwardIndex ?: return null
-        val clipboard = getSystemService(android.content.ClipboardManager::class.java)
-        val keyboard = ShizukuBridge.hasPermission()
+        if (plan.forwardIndex == null) return null
         val typed = mutableListOf<FormFill.Fill>()
         for (f in plan.fills) {
-            val node = live[f.index]
-            var node2: AccessibilityNodeInfo? = node
-            while (node2 != null && !node2.isClickable) node2 = node2.parent
-            // A tap focuses the field (and opens a date picker for a date field, which is confirmed on the next pass).
-            val tapped = (node2 ?: node).performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            if (f.value == FormFill.TEST_BIRTH) { if (tapped) typed += f; continue }
-            kotlinx.coroutines.delay(300)
-            // Some apps only register what arrives like real typing, so the keyboard path comes first: the shell's own
-            // `input text` when Shizuku is allowed, else a paste through the field's input connection, else set-text.
-            val ok = (keyboard && ShizukuBridge.exec("input", "text", f.value.replace(" ", "%s")).isSuccess) ||
-                runCatching {
-                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("TraceVeil test value", f.value))
-                    node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
-                }.getOrDefault(false) ||
-                node.performAction(
-                    AccessibilityNodeInfo.ACTION_SET_TEXT,
-                    android.os.Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, f.value) },
-                )
-            if (ok) typed += f
+            // A date field is only tapped: it opens a picker, which is confirmed on the next pass.
+            val done = if (f.value == FormFill.TEST_BIRTH) driver.press(live[f.index]) else driver.type(live[f.index], f.value)
+            if (done) typed += f
         }
-        // Put the keyboard away so the button underneath can be reached, but only when one is actually showing.
-        if (windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }) performGlobalAction(GLOBAL_ACTION_BACK)
+        driver.hideKeyboard()
         // Read the screen again: continue only if the typing took and nothing identifying is left to fill.
         kotlinx.coroutines.delay(400)
-        // The test values must not linger on the clipboard (cleared only after the app has read them).
-        runCatching { clipboard.clearPrimaryClip() }
+        driver.releaseClipboard()
         val (after, afterLive) = NodeMapper.mapWithNodes(targetRoot()) ?: return null
         val left = FormFill.plan(after)
         if (left.fills.isNotEmpty() || left.manual.isNotEmpty()) return null
         val button = afterLive.getOrNull(left.forwardIndex ?: return null) ?: return null
-        var node: AccessibilityNodeInfo? = button
-        while (node != null && !node.isClickable) node = node.parent
         val label = NodeMapper.labelOf(button) ?: "Continue"
-        // A real touch first: some apps only act on the form when the button is pressed like a finger would.
-        val r = android.graphics.Rect().also { (node ?: button).getBoundsInScreen(it) }
-        val pressed = tapGesture(r.exactCenterX(), r.exactCenterY()) || node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
-        if (!pressed) return null
-        val names = typed.map { it.label }.joinToString().ifEmpty { "no fields" }
-        return "$label (after typing test values into $names)"
+        if (!driver.press(button)) return null
+        return "$label (after typing test values into ${typed.joinToString { it.label }.ifEmpty { "no fields" }})"
     }
 
-    /** A short touch at ([x], [y]) on screen, the way a finger taps. True once the system has completed it. */
-    private suspend fun tapGesture(x: Float, y: Float): Boolean = suspendCancellableCoroutine { cont ->
-        val path = android.graphics.Path().apply { moveTo(x, y) }
-        val gesture = android.accessibilityservice.GestureDescription.Builder()
-            .addStroke(android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 60)).build()
-        val sent = dispatchGesture(
-            gesture,
-            object : GestureResultCallback() {
-                override fun onCompleted(g: android.accessibilityservice.GestureDescription?) { if (cont.isActive) cont.resume(true) }
-                override fun onCancelled(g: android.accessibilityservice.GestureDescription?) { if (cont.isActive) cont.resume(false) }
-            },
-            null,
-        )
-        if (!sent && cont.isActive) cont.resume(false)
+    /**
+     * Saves a screenshot of the screen to [file] (JPEG), without the inspection glow in it. False when it could not be
+     * taken (for example on Android 10, where accessibility screenshots do not exist). Main thread.
+     */
+    suspend fun screenshotTo(file: File): Boolean = suspendCancellableCoroutine { cont -> capture(file) { ok -> if (cont.isActive) cont.resume(ok) } }
+
+    /** The audited app's screen as the pure model plus its live nodes (same order), or null. Main thread. */
+    fun readScreen(): Pair<UiNode, List<AccessibilityNodeInfo>>? {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        return NodeMapper.mapWithNodes(targetRoot())
+    }
+
+    /**
+     * Carries out one step the on-device model chose and [BlockerAgent] approved, on the screen it was planned from
+     * ([planned]). The screen is read again first, because the model takes seconds: if the control it picked is no longer
+     * there, nothing is done. Returns a description for the audit notes, or null when nothing was done. Main thread.
+     */
+    suspend fun executeAgentStep(step: BlockerAgent.Step, planned: UiNode): String? {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        val index = when (step) { is BlockerAgent.Step.Tap -> step.index; is BlockerAgent.Step.Type -> step.index; else -> return null }
+        val (now, live) = NodeMapper.mapWithNodes(targetRoot()) ?: return null
+        val was = planned.flatten()[index]
+        val nowNodes = now.flatten()
+        fun same(a: UiNode) = a.className == was.className && a.label == was.label && a.hint == was.hint
+        val at = (if (index < nowNodes.size && same(nowNodes[index])) index else nowNodes.indexOfFirst(::same)).takeIf { it >= 0 } ?: return null
+        return when (step) {
+            is BlockerAgent.Step.Tap -> if (driver.press(live[at])) "Tapped “${step.label}”" else null
+            is BlockerAgent.Step.Type -> {
+                var done = false
+                if (step.kind == BlockerAgent.FieldKind.BIRTH_DATE) {
+                    // A date field usually opens a picker, which the model then confirms; if none opens, type the date.
+                    done = driver.press(live[at])
+                    kotlinx.coroutines.delay(500)
+                    val picker = NodeMapper.map(targetRoot())?.let { FormFill.pickerConfirmIndex(it) != null } == true
+                    if (!picker) done = driver.type(live[at], step.value) || done
+                } else {
+                    done = driver.type(live[at], step.value)
+                }
+                driver.hideKeyboard()
+                kotlinx.coroutines.delay(300)
+                driver.releaseClipboard()
+                if (done) "Typed a test value into “${step.label}”" else null
+            }
+            else -> null
+        }
     }
 
     private fun findSkip(n: AccessibilityNodeInfo): AccessibilityNodeInfo? {
