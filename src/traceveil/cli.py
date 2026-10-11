@@ -252,6 +252,10 @@ def from_app_export(bundle: dict) -> dict:
     if isinstance(result.get("historyBounds"), dict):
         # Consent history unknown: the range the app bounded the result by (and the person's answer, if given).
         rep["historyBounds"] = result["historyBounds"]
+    watch = audit.background_watch(rep["sessions"])
+    if watch is not None:
+        # A background watch: its length, and that no consent screen was driven (see audit.watch_lines).
+        rep["backgroundWatch"] = watch
     if observed:
         rep["observedTrackers"] = observed
     return rep

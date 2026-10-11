@@ -6,9 +6,13 @@ import com.dpdpxray.app.audit.RestartPolicy
 import com.dpdpxray.app.data.Audience
 import com.dpdpxray.app.ui.guide.Bi
 import com.dpdpxray.core.model.AuditPlan
+import com.dpdpxray.core.model.BackgroundWatches
 
-/** The ways the check sheet can run an app. */
-enum class CheckChoice { FULL, QUICK, PREVIEW }
+/**
+ * The ways the check sheet can run an app. WATCH: a background watch, one long capture of the app running in the
+ * background with no launch, restart, tap or clearing.
+ */
+enum class CheckChoice { FULL, QUICK, PREVIEW, WATCH }
 
 /** What the check sheet shows selected when it opens. */
 data class CheckSheetSetup(val choice: CheckChoice, val allowReset: Boolean, val agentTaps: Boolean)
@@ -37,14 +41,15 @@ object CheckSheet {
 
     /** Choices the sheet lists, in order. Fast Preview (an Accept-only run) stays a developer tool. */
     fun offered(audience: Audience): List<CheckChoice> = when (audience) {
-        Audience.USER -> listOf(CheckChoice.QUICK, CheckChoice.FULL)
-        Audience.DEVELOPER -> listOf(CheckChoice.FULL, CheckChoice.QUICK, CheckChoice.PREVIEW)
+        Audience.USER -> listOf(CheckChoice.QUICK, CheckChoice.FULL, CheckChoice.WATCH)
+        Audience.DEVELOPER -> listOf(CheckChoice.FULL, CheckChoice.QUICK, CheckChoice.PREVIEW, CheckChoice.WATCH)
     }
 
     /** Full needs an approved fresh start; without one it falls back to the mode's single run. */
     fun plans(audience: Audience, choice: CheckChoice, freshReset: Boolean): List<AuditPlan> = when {
         choice == CheckChoice.FULL && freshReset -> listOf(AuditPlan.SILENT, AuditPlan.REJECT, AuditPlan.ACCEPT)
         choice == CheckChoice.PREVIEW -> listOf(AuditPlan.ACCEPT)
+        choice == CheckChoice.WATCH -> listOf(AuditPlan.SILENT)
         audience == Audience.USER -> listOf(AuditPlan.REJECT)
         else -> listOf(AuditPlan.ACCEPT)
     }
@@ -83,7 +88,23 @@ object CheckSheet {
         cancel = Bi("Keep its data", "डेटा रखें"),
     )
 
-    /** App data is cleared only for a Full check, when the person approved it and Shizuku can do it; Quick and Preview never clear. */
+    /**
+     * A background watch of [minutes]: one no-interaction plan, the app's data kept, no tap. It never restarts the app (the
+     * orchestrator does not stop it for a watch), so it needs neither Shizuku nor the restart safeguard.
+     */
+    fun watchConfig(
+        targetPackage: String, targetLabel: String, minutes: Int = BackgroundWatches.DEFAULT_MINUTES, includeGms: Boolean = false,
+        childFacing: Boolean = false,
+    ): AuditConfig {
+        require(minutes > 0)
+        return AuditConfig(
+            targetPackage = targetPackage, targetLabel = targetLabel, plans = listOf(AuditPlan.SILENT),
+            childFacing = childFacing, includeGms = includeGms, autoDrive = false, resetAppData = false,
+            watchMs = minutes * 60_000L,
+        )
+    }
+
+    /** App data is cleared only for a Full check, when the person approved it and Shizuku can do it; Quick, Preview and a watch never clear. */
     fun config(
         audience: Audience,
         targetPackage: String,
@@ -95,7 +116,9 @@ object CheckSheet {
         childFacing: Boolean,
         includeGms: Boolean,
         restart: RestartPolicy = RestartPolicy.AUTO,
+        watchMinutes: Int = BackgroundWatches.DEFAULT_MINUTES,
     ): AuditConfig {
+        if (choice == CheckChoice.WATCH) return watchConfig(targetPackage, targetLabel, watchMinutes, includeGms, childFacing)
         val freshReset = allowReset && shizukuReady
         return AuditConfig(
             targetPackage = targetPackage, targetLabel = targetLabel,

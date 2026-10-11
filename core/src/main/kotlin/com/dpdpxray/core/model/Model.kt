@@ -266,6 +266,13 @@ data class AuditSession(
      */
     @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
     val web: WebEvidence? = null,
+    /**
+     * Set when this plan was a background watch ([BackgroundWatch]): a long capture of the app running in the background,
+     * with no launch, restart or tap. null for every other plan, and never written for them, so their files and exports
+     * stay exactly as before.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val watch: BackgroundWatch? = null,
 ) {
     val consentChoice: ConsentEvent?
         get() = consentEvents.firstOrNull { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }

@@ -11,6 +11,7 @@ import com.dpdpxray.core.law.LensText
 import com.dpdpxray.core.law.PassageKind
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
+import com.dpdpxray.core.model.BackgroundWatches
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.EvidenceType
 import com.dpdpxray.core.model.ConsentHistory
@@ -78,7 +79,9 @@ object MarkdownReport {
         appendLine("- Legal lens: ${p.title} (`${profile.name}`). ${p.status}")
         appendLine("- ${view.scoreLine}. ${view.scoreNote}")
         if (first != null) {
-            appendLine("- Audited: ${date(first.startedAtEpochMs)} · ${sessions.joinToString { it.plan.label }}")
+            appendLine("- Audited: ${date(first.startedAtEpochMs)} · ${sessions.joinToString { BackgroundWatches.label(it) }}")
+            // A background watch never reads as a test of the consent popup: it says what it checked, and for how long.
+            BackgroundWatches.of(sessions)?.let { appendLine("- ${BackgroundWatches.whatWasChecked(first.targetLabel, it).first}") }
             if (first.deviceModel.isNotBlank()) appendLine("- Device: ${first.deviceModel} · Android ${first.androidVersion}")
         }
         appendLine("- ${if (web) WEB_PRIVACY_LINE else PRIVACY_LINE}")
@@ -166,9 +169,11 @@ object MarkdownReport {
         appendLine("## Network timeline")
         for (s in sessions) {
             val bg = s.backgroundStartedNanos
+            val w = s.watch
             appendLine()
-            appendLine("**${s.plan.label}** — ${s.netEvents.size} lookups${s.consentChoice?.let { c -> ", user chose ${c.kind.name.lowercase()} at ${secs(c.tNanos - s.startedAtNanos)} s" } ?: ""}" +
-                (bg?.let { ", app in the background from ${secs(it - s.startedAtNanos)} s" } ?: ""))
+            appendLine("**${BackgroundWatches.label(s)}** — ${s.netEvents.size} lookups${s.consentChoice?.let { c -> ", user chose ${c.kind.name.lowercase()} at ${secs(c.tNanos - s.startedAtNanos)} s" } ?: ""}" +
+                (if (w != null) ", watched ${BackgroundWatches.length(w)}; the app was not opened or tapped" else "") +
+                (bg?.let { if (w != null) ", first seen off screen at ${secs(it - s.startedAtNanos)} s" else ", app in the background from ${secs(it - s.startedAtNanos)} s" } ?: ""))
             s.consentEvents.filter { it.kind == ConsentKind.PERMISSION_DIALOG }.forEach {
                 appendLine()
                 appendLine("- Android permission dialog at ${secs(it.tNanos - s.startedAtNanos)} s: \"${it.nodeText.orEmpty()}\"")
@@ -177,7 +182,7 @@ object MarkdownReport {
             appendLine("| t (s) | Host |")
             appendLine("|---|---|")
             s.netEvents.sortedBy { it.tNanos }.take(60).forEach {
-                appendLine("| ${secs(it.tNanos - s.startedAtNanos)} | ${it.hostname}${if (bg != null && it.tNanos >= bg) " (app in background)" else ""} |")
+                appendLine("| ${secs(it.tNanos - s.startedAtNanos)} | ${it.hostname}${if (BackgroundWatches.inBackground(s, it.tNanos)) " (app in background)" else ""} |")
             }
         }
 
@@ -185,6 +190,7 @@ object MarkdownReport {
         appendLine("## Method and limitations")
         appendLine("- Network evidence is DNS lookups made by the audited app (captured by a local, per-app VPN). A lookup shows the app tried to contact a server; payloads are not decrypted.")
         appendLine("- *Observed* findings come from captured traffic or the screen's accessibility tree. *Inferred* findings come from SDK documentation or the on-device AI's reading of the screen, and count half in the score.")
+        if (BackgroundWatches.of(sessions) != null) appendLine("- ${BackgroundWatches.LIMIT}")
         appendLine("- $LENS_METHOD")
         p.limitations.forEach { appendLine("- $it") }
         appendLine()

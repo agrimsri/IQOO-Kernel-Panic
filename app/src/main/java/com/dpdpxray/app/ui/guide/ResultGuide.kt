@@ -20,6 +20,8 @@ data class ResultFacts(
     val bounds: com.dpdpxray.core.model.HistoryBounds? = null,
     /** A website check: its evidence is the requests the page made in TraceVeil's own browser, not DNS lookups. */
     val web: Boolean = false,
+    /** A background watch of this many minutes: what the app sends in the background, its consent screen not reached. */
+    val watchMinutes: Int? = null,
 )
 
 enum class NextAction { SEE_EVIDENCE, HOW_TO_FIX, CHECK_AGAIN, CHECK_REAL_APP, ASK, REPORT }
@@ -51,9 +53,13 @@ object ResultGuide {
                 when (f.band) {
                     ScoreBand.READY -> Bi(
                         "No problems were found in the evidence TraceVeil captured. This is not a safety or compliance certificate: it covers only " +
-                            (if (f.web) "the requests this site made during this short check." else "this short window of DNS lookups."),
+                            (if (f.web) "the requests this site made during this short check."
+                            else if (f.watchMinutes != null) "what the app did in this ${f.watchMinutes}-minute background watch."
+                            else "this short window of DNS lookups."),
                         "TraceVeil के दर्ज सबूतों में कोई समस्या नहीं मिली। यह सुरक्षा या अनुपालन का प्रमाणपत्र नहीं है: यह सिर्फ़ " +
-                            (if (f.web) "इस छोटी जाँच में साइट की रिक्वेस्ट को दिखाता है।" else "DNS लुकअप की इस छोटी अवधि को दिखाता है।"),
+                            (if (f.web) "इस छोटी जाँच में साइट की रिक्वेस्ट को दिखाता है।"
+                            else if (f.watchMinutes != null) "${f.watchMinutes} मिनट की इस बैकग्राउंड निगरानी में ऐप के काम को दिखाता है।"
+                            else "DNS लुकअप की इस छोटी अवधि को दिखाता है।"),
                     )
                     ScoreBand.NEEDS_WORK -> Bi(
                         "TraceVeil recorded ${findings(f.findingCount)} in the captured evidence. The consent flow needs work; each finding below shows its evidence.",
@@ -67,6 +73,9 @@ object ResultGuide {
                     else if (f.inconclusiveReason == com.dpdpxray.core.rules.Inconclusive.Reason.CONSENT_HISTORY_UNKNOWN) Bi(
                         "No score: the lookups were captured, but this app kept its data, so whether you agreed to tracking earlier can't be seen. Unknown stays unknown: this is not a pass.",
                         "कोई स्कोर नहीं: लुकअप दर्ज हुए, लेकिन ऐप ने अपना डेटा रखा, इसलिए आपने पहले ट्रैकिंग की सहमति दी थी या नहीं, यह नहीं दिखता। अज्ञात, अज्ञात ही रहता है: इसे पास न समझें।",
+                    ) else if (f.watchMinutes != null) Bi(
+                        "The app made almost no connections in ${f.watchMinutes} minutes of watching, so there is nothing to score. Unknown stays unknown: this is not a pass.",
+                        "${f.watchMinutes} मिनट की निगरानी में ऐप ने लगभग कोई कनेक्शन नहीं बनाया, इसलिए स्कोर देने को कुछ नहीं है। अज्ञात, अज्ञात ही रहता है: इसे पास न समझें।",
                     ) else Bi(
                         "Too little was captured to give a score. Unknown stays unknown: this is not a pass.",
                         "स्कोर देने के लिए बहुत कम जानकारी दर्ज हुई। अज्ञात, अज्ञात ही रहता है: इसे पास न समझें।",
@@ -78,7 +87,11 @@ object ResultGuide {
                 "Part of the planned check didn't finish, so the score covers only what was recorded.",
                 "जाँच का कुछ तय हिस्सा पूरा नहीं हुआ, इसलिए स्कोर सिर्फ़ दर्ज हिस्से पर आधारित है।",
             ))
-            if (f.fastPreview) add(Bi(
+            if (f.watchMinutes != null) add(Bi(
+                "This was a ${f.watchMinutes}-minute background watch: it shows what the app sends while it runs in the background. Its consent screen was not reached, so the popup itself was not tested.",
+                "यह ${f.watchMinutes} मिनट की बैकग्राउंड निगरानी थी: यह दिखाती है कि ऐप बैकग्राउंड में चलते हुए क्या भेजता है। इसकी सहमति स्क्रीन तक नहीं पहुँचा गया, इसलिए पॉपअप की जाँच नहीं हुई।",
+            ))
+            else if (f.fastPreview) add(Bi(
                 "This was a Fast Preview: one short Accept run. Don't-touch and Reject runs weren't tested.",
                 "यह Fast Preview था: Accept का एक छोटा रन। बिना छुए और Reject वाले रन की जाँच नहीं हुई।",
             ))
@@ -150,12 +163,16 @@ object ResultGuide {
         val scoreEn = if (b != null) {
             if (b.bandSettled) "${b.lowBand.label} either way, ${b.lowScore} to ${b.highScore}, depending on whether you agreed to tracking earlier."
             else "At best ${b.bestBand.label}, ${b.lowScore} to ${b.highScore}: one answer about your consent history decides it."
-        } else if (f.band == ScoreBand.INCONCLUSIVE || f.score == null) (f.inconclusiveReason?.en ?: "Inconclusive: too little was captured to score.")
+        } else if ((f.band == ScoreBand.INCONCLUSIVE || f.score == null) && f.watchMinutes != null && f.inconclusiveReason == com.dpdpxray.core.rules.Inconclusive.Reason.LOW_VISIBILITY)
+            "Inconclusive: the app made almost no connections in ${f.watchMinutes} minutes of watching."
+        else if (f.band == ScoreBand.INCONCLUSIVE || f.score == null) (f.inconclusiveReason?.en ?: "Inconclusive: too little was captured to score.")
             else "Score ${f.score} out of 100: ${f.band.label}."
         val scoreHi = if (b != null) {
             if (b.bandSettled) "दोनों हाल में ${bandHi(b.lowBand)}, ${b.lowScore} से ${b.highScore}, इस पर निर्भर कि आपने पहले ट्रैकिंग की सहमति दी थी या नहीं।"
             else "ज़्यादा से ज़्यादा ${bandHi(b.bestBand)}, ${b.lowScore} से ${b.highScore}: सहमति के इतिहास के बारे में एक जवाब इसे तय करता है।"
-        } else if (f.band == ScoreBand.INCONCLUSIVE || f.score == null) (f.inconclusiveReason?.hi ?: "अनिर्णायक: स्कोर के लिए बहुत कम जानकारी दर्ज हुई।")
+        } else if ((f.band == ScoreBand.INCONCLUSIVE || f.score == null) && f.watchMinutes != null && f.inconclusiveReason == com.dpdpxray.core.rules.Inconclusive.Reason.LOW_VISIBILITY)
+            "अनिर्णायक: ${f.watchMinutes} मिनट की निगरानी में ऐप ने लगभग कोई कनेक्शन नहीं बनाया।"
+        else if (f.band == ScoreBand.INCONCLUSIVE || f.score == null) (f.inconclusiveReason?.hi ?: "अनिर्णायक: स्कोर के लिए बहुत कम जानकारी दर्ज हुई।")
             else "स्कोर 100 में से ${f.score}: ${bandHi(f.band)}।"
         val extraEn = buildString {
             if (f.findingCount > 0 || f.band != ScoreBand.INCONCLUSIVE) append(" ${findings(f.findingCount)}.")

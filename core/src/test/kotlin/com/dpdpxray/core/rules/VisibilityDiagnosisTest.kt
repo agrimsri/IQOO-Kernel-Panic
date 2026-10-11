@@ -48,24 +48,24 @@ class VisibilityDiagnosisTest {
 
     private fun causes(vararg sessions: AuditSession) = VisibilityDiagnosis.diagnose(sessions.toList()).map { it.cause }
 
-    @Test fun `the live HackTracker case - kept data, no restart, already running - names the restart as the fix`() {
+    @Test fun `the live HackTracker case - kept data, no restart, already running - offers a background watch, no restart needed`() {
         // As captured on the phone before this change: no Shizuku restart, the app was already open.
         val live = plan(PlanConditions(startMode = StartMode.NOT_RESTARTED, restartProblem = "Shizuku is not available",
             runningBeforeStart = true, privateDnsAtStart = false, privateDnsAtEnd = false, otherVpnAtEnd = false,
             networkAtStart = true, networkAtEnd = true))
         val d = VisibilityDiagnosis.diagnose(listOf(live))
         assertEquals(Cause.ALREADY_RUNNING, d.first().cause)
-        assertEquals(Action.CHECK_AGAIN_WITH_RESTART, VisibilityDiagnosis.primaryAction(d))
+        assertEquals(Action.WATCH_LONGER, VisibilityDiagnosis.primaryAction(d))
         assertTrue(d.first().sentence, d.first().sentence.contains("already running"))
         assertTrue(d.first().evidence.single(), d.first().evidence.single().contains("Shizuku is not available"))
     }
 
-    @Test fun `an older audit with no recorded conditions and kept data still points at a restart, worded as a possibility`() {
+    @Test fun `an older audit with no recorded conditions and kept data names a possible earlier run, and offers a watch`() {
         val old = plan(conditions = null, notes = listOf("App data was not cleared (reset not approved or Shizuku not authorised) — results reflect the app's current state."), freshState = null)
         val d = VisibilityDiagnosis.diagnose(listOf(old)).first()
         assertEquals(Cause.ALREADY_RUNNING, d.cause)
         assertTrue(d.sentence, d.sentence.contains("may"))
-        assertEquals(Action.CHECK_AGAIN_WITH_RESTART, d.action)
+        assertEquals(Action.WATCH_LONGER, d.action)
     }
 
     @Test fun `a restarted app that was not running and had nothing else in the way is not blamed on the restart`() {
@@ -115,7 +115,7 @@ class VisibilityDiagnosisTest {
     @Test fun `a fresh restart with no network use reads as a quiet app, and unknown use stays unknown`() {
         val quiet = VisibilityDiagnosis.diagnose(listOf(plan(PlanConditions(startMode = StartMode.RESTARTED, appTraffic = AppTraffic(openConnections = 0))))).first()
         assertEquals(Cause.APP_QUIET, quiet.cause)
-        assertEquals(Action.NONE, quiet.action)
+        assertEquals("an app that stayed offline may go online only in the background", Action.WATCH_LONGER, quiet.action)
         val unknown = VisibilityDiagnosis.diagnose(listOf(plan())).first()
         assertEquals(Cause.UNEXPLAINED, unknown.cause)
         assertTrue(unknown.sentence, unknown.sentence.contains("unknown"))

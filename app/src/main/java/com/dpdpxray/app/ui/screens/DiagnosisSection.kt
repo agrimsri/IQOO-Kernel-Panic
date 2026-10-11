@@ -59,16 +59,21 @@ internal object NoScoreHelp {
     /**
      * The text-link actions under the filled one: every other cause's action, plus a restart (the way to check again
      * after fixing a setting). "Check again" and "Check again with a restart" do the same thing, so only one shows.
-     * Nothing for a consent-history-only section: a restart keeps the data, so it cannot change that result.
+     * Nothing for a consent-history-only section: a restart keeps the data, so it cannot change that result. After a
+     * background watch ([watch]) no restart is added: a watch is repeated as a watch.
      */
-    fun otherActions(items: List<VisibilityDiagnosis.Item>): List<Action> {
+    fun otherActions(items: List<VisibilityDiagnosis.Item>, watch: Boolean = false): List<Action> {
         if (items.isEmpty()) return emptyList()
         val primary = VisibilityDiagnosis.primaryAction(items)
         val restartLike = setOf(Action.CHECK_AGAIN, Action.CHECK_AGAIN_WITH_RESTART)
-        return (items.map { it.action } + Action.CHECK_AGAIN_WITH_RESTART).distinct()
+        return (items.map { it.action } + if (watch) emptyList() else listOf(Action.CHECK_AGAIN_WITH_RESTART)).distinct()
             .filter { it != Action.NONE && it != primary && it != Action.CHECK_AGAIN }
             .filterNot { it == Action.CHECK_AGAIN_WITH_RESTART && primary in restartLike }
     }
+
+    /** The length the result's "Watch in the background" starts: 10 minutes, or the next longer one after a watch. */
+    fun watchMinutes(b: AuditBundle): Int = com.dpdpxray.core.model.BackgroundWatches.nextMinutes(b.sessions)
+        ?: com.dpdpxray.core.model.BackgroundWatches.MINUTES.last()
 
     val historyTitle = Bi("Consent history unknown", "सहमति का इतिहास अज्ञात")
     val historyBody = Bi(
@@ -103,13 +108,18 @@ internal fun NoScoreSection(vm: XrayViewModel, b: AuditBundle, lang: GuideLang, 
     val disturbed = remember(b.meta.id) { com.dpdpxray.app.audit.RestartReminder.recorded(b.sessions) }
     var confirmRestart by remember { mutableStateOf(false) }
     val restart: () -> Unit = { if (disturbed.isEmpty()) vm.checkAgain(b, CheckAgain.Mode.RESTART, onLive) else confirmRestart = true }
+    val watch = remember(b.meta.id) { com.dpdpxray.core.model.BackgroundWatches.isWatch(b.sessions) }
+    val minutes = remember(b.meta.id) { NoScoreHelp.watchMinutes(b) }
     fun run(a: Action) = when (a) {
         Action.CHECK_AGAIN_WITH_RESTART, Action.CHECK_AGAIN, Action.NONE -> restart()
         Action.TURN_OFF_PRIVATE_DNS -> DeviceChecks.openPrivateDnsSettings(ctx)
         Action.TURN_OFF_OTHER_VPN -> DeviceChecks.openVpnSettings(ctx)
         Action.CONNECT_TO_INTERNET -> DeviceChecks.openInternetSettings(ctx)
         Action.RUN_WITH_INTERNET_CUT_OFF -> onQuarantine(pkg)
+        // No restart, no launch, no tap and no clearing: the app is only watched, so no confirmation is needed.
+        Action.WATCH_LONGER -> vm.startWatch(pkg, b.meta.targetLabel, minutes, b.meta.includeGms ?: false, onLive)
     }
+    fun label(a: Action) = DiagnosisCopy.action(a, b.meta.targetLabel, minutes)!!.pick(lang)
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Group(title = DiagnosisCopy.heading.pick(lang)) {
@@ -128,18 +138,24 @@ internal fun NoScoreSection(vm: XrayViewModel, b: AuditBundle, lang: GuideLang, 
         val primary = VisibilityDiagnosis.primaryAction(items)
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             if (primary != Action.NONE) {
-                PrimaryButton(DiagnosisCopy.action(primary)!!.pick(lang), { run(primary) })
-                if (primary == Action.CHECK_AGAIN_WITH_RESTART || primary == Action.CHECK_AGAIN) {
+                PrimaryButton(label(primary), { run(primary) })
+                val note = when (primary) {
+                    Action.CHECK_AGAIN_WITH_RESTART, Action.CHECK_AGAIN -> DiagnosisCopy.restartNote
+                    Action.WATCH_LONGER -> com.dpdpxray.app.audit.WatchCopy.actionNote
+                    else -> null
+                }
+                if (note != null) {
                     Text(
-                        DiagnosisCopy.restartNote.pick(lang), style = MaterialTheme.typography.bodySmall, color = Film.boneDim, textAlign = TextAlign.Center,
+                        note.pick(lang), style = MaterialTheme.typography.bodySmall, color = Film.boneDim, textAlign = TextAlign.Center,
                         modifier = Modifier.padding(top = 6.dp, start = 8.dp, end = 8.dp),
                     )
                 }
             }
-            NoScoreHelp.otherActions(items).forEach { a -> TextAction(DiagnosisCopy.action(a)!!.pick(lang), { run(a) }) }
-            if (resetOk) TextAction(DiagnosisCopy.reset.pick(lang), { confirmReset = true })
+            NoScoreHelp.otherActions(items, watch).forEach { a -> TextAction(label(a), { run(a) }) }
+            // A watch is repeated as a watch: it never clears data or restarts the app.
+            if (resetOk && !watch) TextAction(DiagnosisCopy.reset.pick(lang), { confirmReset = true })
         }
-        if (!pf.shizukuGranted) Notice(NoScoreHelp.noShizuku.pick(lang), kind = NoticeKind.INFO, action = NoScoreHelp.openAppInfo.pick(lang) to { DeviceChecks.openAppInfo(ctx, pkg) })
+        if (!pf.shizukuGranted && !watch) Notice(NoScoreHelp.noShizuku.pick(lang), kind = NoticeKind.INFO, action = NoScoreHelp.openAppInfo.pick(lang) to { DeviceChecks.openAppInfo(ctx, pkg) })
     }
 
     if (confirmRestart) {

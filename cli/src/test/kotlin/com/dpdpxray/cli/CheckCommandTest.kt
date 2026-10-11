@@ -181,7 +181,7 @@ class CheckCommandTest {
         val r = run(dir, "check", "quiet2.json")
         assertEquals(r.toString(), Exit.VIOLATION, r.exit)
         assertTrue(r.out, r.out.contains("likely cause: the app was already running (not restarted)"))
-        assertTrue(r.out, r.out.contains("check again with a restart"))
+        assertTrue(r.out, r.out.contains("watch it in the background for 10 minutes or longer"))
     }
 
     @Test

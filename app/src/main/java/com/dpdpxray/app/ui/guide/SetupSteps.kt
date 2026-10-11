@@ -55,8 +55,11 @@ object RecentChecks {
         meta.historyBounds?.answer?.declared == true -> "Score based on your answer"
         meta.band == ScoreBand.INCONCLUSIVE ->
             if (meta.inconclusiveReason == "CONSENT_HISTORY_UNKNOWN") "Inconclusive: app kept its data, consent history unknown"
+            else if (meta.timingProfile == AuditTimingPolicy.BACKGROUND_WATCH) "Background watch: almost no connections seen"
             else "Inconclusive: too little was captured"
         meta.timingProfile == AuditTimingPolicy.FAST_PREVIEW -> "Fast Preview: limited evidence"
+        // A watch drives no consent screen at all, so "Reject not tested" would undersell what was not tested.
+        meta.timingProfile == AuditTimingPolicy.BACKGROUND_WATCH -> "Background watch: consent screen not tested"
         AuditPlan.REJECT.label !in meta.plans -> "Single run: Reject not tested"
         meta.timingProfile == null -> "Timing not recorded"
         else -> null

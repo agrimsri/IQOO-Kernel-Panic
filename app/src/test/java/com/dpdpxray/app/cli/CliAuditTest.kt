@@ -100,9 +100,9 @@ class CliAuditTest {
         assertEquals("diagnosis", obj.keys.last())
         val d = obj["diagnosis"]!!.jsonArray.first().jsonObject
         assertEquals("ALREADY_RUNNING", d["cause"]!!.jsonPrimitive.content)
-        assertEquals("CHECK_AGAIN_WITH_RESTART", d["action"]!!.jsonPrimitive.content)
+        assertEquals("WATCH_LONGER", d["action"]!!.jsonPrimitive.content)
         assertTrue(d["sentence"]!!.jsonPrimitive.content.contains("restart"))
-        assertEquals("check again with a restart (the app keeps its data)", d["hint"]!!.jsonPrimitive.content)
+        assertEquals("watch it in the background for 10 minutes or longer (TraceVeil does not open, restart or tap it; its data stays)", d["hint"]!!.jsonPrimitive.content)
         assertEquals("the app was already running (not restarted)", d["phrase"]!!.jsonPrimitive.content)
         assertTrue(d["evidence"]!!.jsonArray.isNotEmpty())
         assertEquals("NOT_RESTARTED", obj["sessions"]!!.jsonArray.single().jsonObject["startMode"]!!.jsonPrimitive.content)

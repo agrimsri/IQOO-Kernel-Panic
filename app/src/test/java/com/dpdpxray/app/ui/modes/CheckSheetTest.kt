@@ -49,9 +49,9 @@ class CheckSheetTest {
         }
     }
 
-    @Test fun `everyday sheet offers Quick and Full only`() {
-        assertEquals(listOf(CheckChoice.QUICK, CheckChoice.FULL), CheckSheet.offered(Audience.USER))
-        assertEquals(listOf(CheckChoice.FULL, CheckChoice.QUICK, CheckChoice.PREVIEW), CheckSheet.offered(Audience.DEVELOPER))
+    @Test fun `everyday sheet offers Quick, Full and a background watch, and Fast Preview stays a developer tool`() {
+        assertEquals(listOf(CheckChoice.QUICK, CheckChoice.FULL, CheckChoice.WATCH), CheckSheet.offered(Audience.USER))
+        assertEquals(listOf(CheckChoice.FULL, CheckChoice.QUICK, CheckChoice.PREVIEW, CheckChoice.WATCH), CheckSheet.offered(Audience.DEVELOPER))
     }
 
     @Test fun `only a Full check clears data, never Quick or Preview, whatever the switch says`() {
@@ -85,7 +85,9 @@ class CheckSheetTest {
                     val c = CheckSheet.config(a, "com.example.shop", "Shop", choice, reset, shizuku, agent, childFacing = true, includeGms = false)
                     assertEquals(reset && shizuku && choice == CheckChoice.FULL, c.resetAppData)
                     assertEquals(choice == CheckChoice.PREVIEW, c.fastPreview)
-                    assertEquals(agent, c.autoDrive)
+                    // A background watch taps nothing, whatever the switch says.
+                    assertEquals(agent && choice != CheckChoice.WATCH, c.autoDrive)
+                    assertEquals(choice == CheckChoice.WATCH, c.isWatch)
                     assertTrue(c.childFacing)
                     assertEquals(CheckSheet.plans(a, choice, reset && shizuku), c.plans)
                 }

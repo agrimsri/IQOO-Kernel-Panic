@@ -294,19 +294,22 @@ private fun AuditSetup(
     val freshReset = allowReset && shizukuReady
     var full by remember { mutableStateOf(initial.choice == CheckChoice.FULL) }
     var preview by remember { mutableStateOf(initial.choice == CheckChoice.PREVIEW) }
+    // A background watch: no launch, restart, tap or clearing; only its length is chosen.
+    var watch by remember { mutableStateOf(false) }
+    var watchMinutes by remember { mutableStateOf(com.dpdpxray.core.model.BackgroundWatches.DEFAULT_MINUTES) }
     var agent by remember { mutableStateOf(initial.agentTaps) }
     var child by remember { mutableStateOf(false) }
     var gms by remember { mutableStateOf(false) }
     // The safe option is the default: an app a restart would disturb is checked without restarting it.
     var restartAnyway by remember { mutableStateOf(false) }
-    // Only a Full check clears data; Quick and Preview keep it even with the switch on.
-    val clears = freshReset && full
+    // Only a Full check clears data; Quick, Preview and a watch keep it even with the switch on.
+    val clears = freshReset && full && !watch
     val leftRunning = shizukuReady && !clears && !effects.isNullOrEmpty() && !restartAnyway
     // Clearing any app other than the demo apps is confirmed first; choosing Full never turns it on by itself.
     val confirmFirst = CheckSheet.resetNeedsConfirmation(app.packageName)
     var askReset by remember { mutableStateOf(false) }
     if (askReset) com.dpdpxray.app.ui.modes.ResetConfirmDialog(app.label, com.dpdpxray.app.ui.guide.guideLang(),
-        onConfirm = { askReset = false; allowReset = true; full = true; preview = false },
+        onConfirm = { askReset = false; allowReset = true; full = true; preview = false; watch = false },
         onDismiss = { askReset = false; if (!allowReset) full = false })
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -324,17 +327,23 @@ private fun AuditSetup(
             PlanOption(
                 "Full audit · normal timing",
                 "Three fresh-state runs: Silent, Reject, Accept. Observes Silent for 25 seconds and each choice for 15 seconds; launch, consent and AI review add time.",
-                full, enabled = shizukuReady,
+                full && !watch, enabled = shizukuReady,
             ) {
-                full = true; preview = false
+                full = true; preview = false; watch = false
                 if (!confirmFirst) allowReset = true else if (!allowReset) askReset = true
             }
             if (!shizukuReady) ShizukuAccessNotice(shizukuHelp.running, shizukuHelp.onAllow, shizukuHelp.onOpenShizuku)
-            PlanOption("Quick audit · normal timing", "One Accept-plan run with 15 seconds of observation. No Silent or Reject comparison.", !full && !preview, enabled = true) { full = false; preview = false }
-            PlanOption("Fast Preview · limited evidence", "One Accept-plan run with 8 seconds of observation and a shorter consent-screen wait. Delayed traffic may be missed; not a Full audit.", preview, enabled = true) { full = false; preview = true }
+            PlanOption("Quick audit · normal timing", "One Accept-plan run with 15 seconds of observation. No Silent or Reject comparison.", !full && !preview && !watch, enabled = true) { full = false; preview = false; watch = false }
+            PlanOption("Fast Preview · limited evidence", "One Accept-plan run with 8 seconds of observation and a shorter consent-screen wait. Delayed traffic may be missed; not a Full audit.", preview && !watch, enabled = true) { full = false; preview = true; watch = false }
+            val lang = com.dpdpxray.app.ui.guide.guideLang()
+            PlanOption(com.dpdpxray.app.audit.WatchCopy.optionTitle.pick(lang), com.dpdpxray.app.audit.WatchCopy.optionDetail(watchMinutes).pick(lang), watch, enabled = true, lang = lang) {
+                full = false; preview = false; watch = true
+            }
+            if (watch) com.dpdpxray.app.ui.modes.WatchLengthChips(watchMinutes, { watchMinutes = it }, lang)
             // The caveat's first sentence stays in view; the rest folds behind More.
             val (lead, rest) = leadAndRest(
-                if (leftRunning) "Quick opens the app as it is, without restarting it, so what it runs stays on; it may reuse launch-time lookups it made before. An app that was used before may keep its consent choice and not ask again. A missing dialog or quiet run is not a privacy pass."
+                if (watch) com.dpdpxray.app.audit.WatchCopy.caveat.pick(lang)
+                else if (leftRunning) "Quick opens the app as it is, without restarting it, so what it runs stays on; it may reuse launch-time lookups it made before. An app that was used before may keep its consent choice and not ask again. A missing dialog or quiet run is not a privacy pass."
                 else if (!clears && shizukuReady) "Quick restarts the app first (it keeps its data), so its launch-time lookups are made again. An app that was used before may keep its consent choice and not ask again. A missing dialog or quiet run is not a privacy pass."
                 else if (!clears) "Quick keeps the app's data and cannot restart it without Shizuku. An already-opened app may keep its consent choice and not repeat launch-time DNS lookups. A missing dialog or quiet run is not a privacy pass."
                 else "Starting an audit clears this selected app's local data before each plan. Use a test app or a backed-up development build; do not use a personal app with data you need.",
@@ -354,13 +363,14 @@ private fun AuditSetup(
             Toggle("Include Google Play services lookups", "Some SDKs upload through Play services. Those lookups may include other apps' traffic.", gms) { gms = it }
         }
 
-        RestartWarning(app.label, effects, canStop = shizukuReady, reset = clears, restartAnyway = restartAnyway, onChange = { restartAnyway = it },
+        // A watch never restarts the app, so there is nothing a restart would switch off.
+        if (!watch) RestartWarning(app.label, effects, canStop = shizukuReady, reset = clears, restartAnyway = restartAnyway, onChange = { restartAnyway = it },
             lang = com.dpdpxray.app.ui.guide.guideLang())
 
-        GradientAction("Start check", {
-            val choice = when { full -> CheckChoice.FULL; preview -> CheckChoice.PREVIEW; else -> CheckChoice.QUICK }
+        GradientAction(if (watch) com.dpdpxray.app.audit.WatchCopy.start.pick(com.dpdpxray.app.ui.guide.guideLang()) else "Start check", {
+            val choice = when { watch -> CheckChoice.WATCH; full -> CheckChoice.FULL; preview -> CheckChoice.PREVIEW; else -> CheckChoice.QUICK }
             onStart(CheckSheet.config(Audience.DEVELOPER, app.packageName, app.label, choice, allowReset, shizukuReady, agent, child, gms,
-                CheckSheet.restartPolicy(effects.takeIf { shizukuReady }, restartAnyway)))
+                CheckSheet.restartPolicy(effects.takeIf { shizukuReady }, restartAnyway), watchMinutes))
         }, Modifier.padding(top = 8.dp).reveal(3), glyph = Glyph.PLAY, sweep = true)
         // Quarantine run (separate feature): opens its own explainer; nothing starts until Start is tapped there.
         OutlineAction("Run in quarantine (network blocked)", onQuarantine, Modifier.reveal(3), glyph = Glyph.LOCK)

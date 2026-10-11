@@ -7,7 +7,10 @@ import com.dpdpxray.core.model.AuditPlan
 /** The orchestrator's progress text, recognised by its stable prefix. Unknown text is still shown, just not read aloud. */
 enum class LivePhase {
     STARTING, LOADING_AI, RESETTING, KEEPING_DATA, LAUNCHING, WAITING_SCREEN, AGENT_CHOOSING, YOUR_TURN,
-    OBSERVING_CHOICE, OBSERVING_NO_CHOICE, OBSERVING_SILENT, REVIEWING, EVALUATING, RESTARTING, OTHER;
+    OBSERVING_CHOICE, OBSERVING_NO_CHOICE, OBSERVING_SILENT, REVIEWING, EVALUATING, RESTARTING, OTHER,
+
+    /** A background watch is running (its line carries the minutes left). */
+    WATCHING;
 
     companion object {
         fun of(step: String): LivePhase = when {
@@ -25,6 +28,7 @@ enum class LivePhase {
             step.startsWith("Observing without touching") -> OBSERVING_SILENT
             step.startsWith("Finishing AI review") -> REVIEWING
             step.startsWith("Evaluating") -> EVALUATING
+            step.startsWith(com.dpdpxray.app.audit.WatchCopy.STEP_PREFIX) -> WATCHING
             else -> OTHER
         }
     }
@@ -222,6 +226,14 @@ object GuideFlow {
                 Bi("Checking the captured lookups against TraceVeil's rules. The result opens next.",
                     "दर्ज लुकअप को TraceVeil के नियमों से जाँचा जा रहा है। इसके बाद नतीजा खुलेगा।"),
                 Bi("Working out the result.", "नतीजा तैयार हो रहा है।"),
+            )
+            // One key for the whole watch: the minutes left change the line on screen, not what is read aloud.
+            LivePhase.WATCHING -> live(
+                "live.watch", GuideTone.WAIT,
+                Bi("Watching in the background", "बैकग्राउंड में देखा जा रहा है"),
+                com.dpdpxray.app.audit.WatchCopy.liveNote(app),
+                Bi("Watching in the background. You can use your phone as usual or lock it.",
+                    "बैकग्राउंड में देखा जा रहा है। आप फ़ोन हमेशा की तरह इस्तेमाल कर सकते हैं या लॉक कर सकते हैं।"),
             )
             // Unrecognised orchestrator text may contain names; it is shown as-is but never read aloud.
             LivePhase.OTHER -> live("live.$i.other.${p.step.hashCode()}", GuideTone.WAIT, Bi(p.step, p.step), Bi("", ""), Bi("", ""))
