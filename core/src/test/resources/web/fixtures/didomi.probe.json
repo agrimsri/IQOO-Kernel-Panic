@@ -1,0 +1,77 @@
+{
+  "v": 1,
+  "url": "https://fixture.example/didomi.html",
+  "banner": {
+    "cmp": "Didomi",
+    "how": "cmp",
+    "texts": [
+      "Continue without agreeing",
+      "Welcome",
+      "With your agreement, we and our partners use cookies to store and access personal data on your device, for personalised advertising and audience measurement. See our privacy policy.",
+      "Agree and close",
+      "Learn more"
+    ],
+    "controls": [
+      {
+        "i": 0,
+        "text": "Continue without agreeing",
+        "role": "reject",
+        "btn": false,
+        "vis": true,
+        "l2": false,
+        "x": 257,
+        "y": 641,
+        "w": 139,
+        "h": 14
+      },
+      {
+        "i": 1,
+        "text": "privacy policy",
+        "role": null,
+        "btn": false,
+        "vis": true,
+        "l2": false,
+        "x": 183,
+        "y": 763,
+        "w": 95,
+        "h": 17
+      },
+      {
+        "i": 2,
+        "text": "Agree and close",
+        "role": "accept",
+        "btn": true,
+        "vis": true,
+        "l2": false,
+        "x": 16,
+        "y": 797,
+        "w": 380,
+        "h": 47
+      },
+      {
+        "i": 3,
+        "text": "Learn more",
+        "role": "settings",
+        "btn": true,
+        "vis": true,
+        "l2": false,
+        "x": 16,
+        "y": 852,
+        "w": 380,
+        "h": 47
+      }
+    ],
+    "boxes": []
+  },
+  "frames": [],
+  "vp": {
+    "w": 412,
+    "h": 915,
+    "dpr": 2.625
+  },
+  "ls": [],
+  "ss": [],
+  "fpc": [],
+  "res": [],
+  "clicks": []
+}

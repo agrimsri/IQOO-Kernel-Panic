@@ -1,0 +1,62 @@
+{
+  "v": 1,
+  "url": "https://fixture.example/usercentrics-shadow.html",
+  "banner": {
+    "cmp": "Usercentrics",
+    "how": "cmp",
+    "texts": [
+      "We use cookies and similar technologies. Privacy settings: you can change your consent at any time.",
+      "SettingsDenyAccept All"
+    ],
+    "controls": [
+      {
+        "i": 0,
+        "text": "Settings",
+        "role": "settings",
+        "btn": true,
+        "vis": true,
+        "l2": false,
+        "x": 16,
+        "y": 878,
+        "w": 64,
+        "h": 21
+      },
+      {
+        "i": 1,
+        "text": "Deny",
+        "role": "reject",
+        "btn": true,
+        "vis": true,
+        "l2": false,
+        "x": 80,
+        "y": 878,
+        "w": 47,
+        "h": 21
+      },
+      {
+        "i": 2,
+        "text": "Accept All",
+        "role": "accept",
+        "btn": true,
+        "vis": true,
+        "l2": false,
+        "x": 127,
+        "y": 878,
+        "w": 75,
+        "h": 21
+      }
+    ],
+    "boxes": []
+  },
+  "frames": [],
+  "vp": {
+    "w": 412,
+    "h": 915,
+    "dpr": 2.625
+  },
+  "ls": [],
+  "ss": [],
+  "fpc": [],
+  "res": [],
+  "clicks": []
+}

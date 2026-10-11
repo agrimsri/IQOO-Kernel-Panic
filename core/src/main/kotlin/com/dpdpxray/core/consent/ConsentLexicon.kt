@@ -14,17 +14,22 @@ object ConsentLexicon {
         "reject", "reject all", "decline", "deny", "dont allow", "do not allow", "disagree", "no thanks",
         "not now", "refuse", "only necessary", "necessary only", "essential only", "only essential",
         "continue without accepting", "use necessary cookies only",
-        "अस्वीकार", "अस्वीकार करें", "मना करें", "नहीं", "ತಿರಸ್ಕರಿಸಿ",
+        // Website consent tools: refusals that start with accept, allow or continue words.
+        "continue without agreeing", "do not consent", "i do not accept", "i do not agree", "do not agree",
+        "necessary cookies only", "essential cookies only", "accept necessary", "accept only necessary", "accept essential",
+        "accept only essential", "allow necessary", "allow only necessary", "allow essential", "allow only essential",
+        "अस्वीकार", "अस्वीकार करें", "सभी अस्वीकार करें", "मना करें", "नहीं", "ತಿರಸ್ಕರಿಸಿ",
     )
     private val SETTINGS = listOf(
         "manage", "manage options", "manage preferences", "settings", "customize", "customise",
-        "preferences", "more options", "प्राथमिकताएँ", "सेटिंग्स",
+        "preferences", "more options", "cookie settings", "cookies settings", "cookie preferences", "privacy settings",
+        "प्राथमिकताएँ", "सेटिंग्स",
     )
     private val ACCEPT = listOf(
         "accept", "accept all", "i accept", "agree", "i agree", "agree and continue", "agree continue",
         "accept and continue", "accept continue", "allow", "allow all", "ok", "okay", "got it", "continue",
         "yes", "consent", "i consent", "yes i agree",
-        "सहमत", "सहमत हूँ", "मैं सहमत हूँ", "स्वीकार", "स्वीकार करें", "अनुमति दें", "ठीक है",
+        "सहमत", "सहमत हूँ", "मैं सहमत हूँ", "स्वीकार", "स्वीकार करें", "सभी स्वीकार करें", "अनुमति दें", "ठीक है",
         "ಒಪ್ಪುತ್ತೇನೆ", "ಸ್ವೀಕರಿಸಿ",
     )
     private val SCREEN_CUES = listOf(

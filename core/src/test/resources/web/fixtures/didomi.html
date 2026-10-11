@@ -1,0 +1,20 @@
+<!doctype html>
+<!-- Test fixture: a Didomi-style notice whose refusal is a "Continue without agreeing" link. Synthetic. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fixture: Didomi notice</title>
+<style>
+  body { font-family: sans-serif; margin: 0; }
+  #didomi-notice { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 16px; }
+  #didomi-notice button { display: block; width: 100%; padding: 14px; margin-top: 8px; }
+  .didomi-continue-without-agreeing { float: right; font-size: 12px; }
+</style></head>
+<body>
+<main><h1>Magazine</h1></main>
+<div id="didomi-host"><div id="didomi-notice" role="dialog">
+  <a href="#" class="didomi-continue-without-agreeing">Continue without agreeing</a>
+  <h2>Welcome</h2>
+  <p>With your agreement, we and our partners use cookies to store and access personal data on your device, for personalised advertising and audience measurement. See our <a href="https://mag.example/privacy-policy">privacy policy</a>.</p>
+  <button id="didomi-notice-agree-button">Agree and close</button>
+  <button id="didomi-notice-learn-more-button">Learn more</button>
+</div></div>
+</body></html>

@@ -1,5 +1,8 @@
 package com.dpdpxray.core.model
 
+import com.dpdpxray.core.web.WebEvidence
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /**
@@ -236,6 +239,12 @@ data class AuditSession(
     val permissionDialogsWatched: Boolean? = null,
     /** Allow-listed facts read from the audited app's installed manifest at audit start. null = not read. */
     val manifestFacts: AppManifestFacts? = null,
+    /**
+     * Website check evidence (requests with full URLs, cookies, storage keys, the consent banner). null for app audits,
+     * and never written for them, so app audit files and exports stay exactly as before.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val web: WebEvidence? = null,
 ) {
     val consentChoice: ConsentEvent?
         get() = consentEvents.firstOrNull { it.kind == ConsentKind.ACCEPT || it.kind == ConsentKind.REJECT }
@@ -320,6 +329,21 @@ enum class CheckId(val code: String, val title: String) {
      * lookups). INFO, no score impact: unknown stays unknown. Legal note: none; it qualifies every other finding.
      */
     V1("V1", "Some lookups may be hidden from TraceVeil"),
+
+    /**
+     * Website checks only: cookies of a catalogued tracker (kept for a tracker host, or named as the vendor documents for
+     * its tracking script) were already in TraceVeil's browser before any consent choice. INFO: the requests that set them
+     * are already scored under C1 (one tracker activity is scored once). Legal note: DPDP s.6(1) (consent before
+     * processing) is context; rules on storing information on a person's device (such as the EU ePrivacy rules) fit more
+     * closely.
+     */
+    W1("W1", "Tracking cookies stored before consent"),
+
+    /**
+     * Website checks only: tracking cookies were written, or written again, after the user chose Reject. INFO: the
+     * requests are scored under C2. Legal note: as W1.
+     */
+    W2("W2", "Tracking cookies stored after the user refused"),
 }
 
 @Serializable
