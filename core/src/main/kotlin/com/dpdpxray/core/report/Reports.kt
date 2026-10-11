@@ -13,6 +13,8 @@ import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.EvidenceType
+import com.dpdpxray.core.model.ConsentHistory
+import com.dpdpxray.core.model.HistoryBounds
 import com.dpdpxray.core.model.ScoreBand
 import kotlinx.serialization.json.Json
 import java.time.Instant
@@ -58,10 +60,17 @@ object MarkdownReport {
         val p = view.profile
         appendLine("# TraceVeil report — ${first?.targetLabel ?: "Unknown app"} (`${first?.targetPackage ?: "?"}`)")
         appendLine()
-        val score = if (result.band == ScoreBand.INCONCLUSIVE) "Inconclusive" else "Score: ${result.score}/100 · ${result.band.label}"
+        val bounds = result.historyBounds
+        val score = when {
+            bounds != null && result.score != null -> "Score: ${result.score}/100 · ${result.band.label} · based on your answer about consent history"
+            bounds != null -> "Consent history unknown · ${bounds.verdict()}"
+            result.band == ScoreBand.INCONCLUSIVE -> "Inconclusive"
+            else -> "Score: ${result.score}/100 · ${result.band.label}"
+        }
         appendLine("**$score**")
         appendLine()
         appendLine("- $SCORE_STANDARD")
+        if (bounds != null) appendLine("- ${historyLine(bounds)}")
         appendLine("- Legal lens: ${p.title} (`${profile.name}`). ${p.status}")
         appendLine("- ${view.scoreLine}. ${view.scoreNote}")
         if (first != null) {
@@ -160,6 +169,19 @@ object MarkdownReport {
         appendLine()
         appendLine("---")
         appendLine("*$DISCLAIMER*")
+    }
+
+    /**
+     * The consent-history line of a bounded result: why it is a range (or whose answer picked the score) and both ends.
+     * Shared by the reports so they say it the same way.
+     */
+    fun historyLine(b: HistoryBounds): String {
+        val why = when (b.answer) {
+            ConsentHistory.DECLARED_NEVER, ConsentHistory.DECLARED_AGREED -> "${b.answer?.line()}, which TraceVeil cannot check."
+            else -> "Consent history unknown: the app kept its data and showed no consent screen, so whether the person agreed to " +
+                "tracking earlier cannot be seen" + (if (b.answer == ConsentHistory.NOT_SURE) " (asked; the person is not sure)." else ".")
+        }
+        return "$why ${b.ends()}"
     }
 
     /** Dark-pattern signals (India CCPA 2023): their own section, apart from the scored findings. */
