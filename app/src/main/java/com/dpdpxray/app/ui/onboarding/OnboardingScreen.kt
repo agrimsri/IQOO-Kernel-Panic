@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import com.dpdpxray.app.ui.components.LearnMore
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -62,7 +63,10 @@ import com.dpdpxray.app.ui.theme.LocalReduceMotion
 import com.dpdpxray.app.ui.theme.Motion
 import kotlinx.coroutines.launch
 
-/** The three pages that are shown, in order. The other pages in [OnboardingCopy] are kept for the copy tests. */
+/**
+ * The three pages that are shown, in order. The other two pages' words stay on screen inside them: "How a check works"
+ * folds under the promise, and "Try it safely" (with its first steps) closes the last page.
+ */
 private val SHOWN = listOf("promise", "needs", "audience")
 
 /**
@@ -71,10 +75,9 @@ private val SHOWN = listOf("promise", "needs", "audience")
  * and the privacy line stay on the page; they are not folded away.
  *
  * [audience] is the mode already chosen (a replay shows it); on a first run "I use apps" is preselected. Both Skip and
- * "Go to Home" save the selected mode. [onSample] is the "See a sample" link on the last page. [onDemo] and [onApk]
- * are kept so callers compile; those first steps now live on Home.
+ * "Go to Home" save the selected mode. [onSample], [onDemo] and [onApk] are the first steps offered on the last page
+ * (the APK one only when this build can open a file).
  */
-@Suppress("UNUSED_PARAMETER")
 @Composable
 fun OnboardingScreen(
     onDone: () -> Unit,
@@ -127,10 +130,30 @@ fun OnboardingScreen(
                 )
                 Text(p.body.pick(lang), style = MaterialTheme.typography.bodyLarge, color = Film.boneDim, modifier = Modifier.padding(top = 12.dp).reveal(1))
                 when (p.key) {
+                    // How a check works (three runs, compared), folded under the promise with the lookup caveat.
+                    "promise" -> all.firstOrNull { it.key == "how" }?.let { how ->
+                        LearnMore(Modifier.padding(top = 16.dp), label = how.title.pick(lang), openLabel = how.title.pick(lang)) {
+                            Text(how.body.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.bone)
+                            Text(OnboardingCopy.exampleCaption.pick(lang), style = MaterialTheme.typography.bodySmall, color = Film.boneDim)
+                        }
+                    }
                     "needs" -> Needs(lang, OnboardingCopy.needsFor(picked))
                     "audience" -> {
                         AudienceChoices(lang, picked) { a -> picked = a }
-                        TextAction(OnboardingCopy.sample.title.pick(lang), { onAudience(picked); onSample() }, Modifier.padding(top = 8.dp))
+                        // "Try it safely": which apps to avoid, then the first steps for the chosen mode.
+                        all.firstOrNull { it.key == "try" }?.let { tryPage ->
+                            Text(tryPage.title.pick(lang), style = MaterialTheme.typography.titleMedium, color = Film.bone, modifier = Modifier.padding(top = 24.dp).semantics { heading() })
+                            Text(tryPage.body.pick(lang), style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, modifier = Modifier.padding(top = 4.dp))
+                        }
+                        OnboardingCopy.choicesFor(picked).forEach { c ->
+                            val go: (() -> Unit)? = when (c.key) {
+                                "sample" -> onSample
+                                "demo" -> onDemo
+                                "apk" -> onApk
+                                else -> null
+                            }
+                            if (go != null) TextAction(c.title.pick(lang), { onAudience(picked); go() }, Modifier.padding(top = 4.dp))
+                        }
                     }
                 }
                 Spacer(Modifier.height(24.dp))
