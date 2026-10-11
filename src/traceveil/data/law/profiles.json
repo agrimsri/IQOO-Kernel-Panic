@@ -1,0 +1,261 @@
+{
+  "schema": "traceveil.law.v1",
+  "about": "Legal lenses. The observed findings are the same under every lens; a lens changes which legal text is shown and how each check relates to that law. REQUIRED: the law sets a rule this check tests. CONTEXT: relevant, but the law does not strictly require what the check tests (or only in some cases). NOT_APPLICABLE: the law does not speak to what this check tests. Relations are TraceVeil's reading for review, not a legal verdict. Checks without an entry use the profile's fallback. Passage ids refer to law/passages.json, except INDIA, whose passages come from the DPDP corpus (dpdp/passages.json) through each finding's own references.",
+  "profiles": [
+    {
+      "id": "INDIA",
+      "name": "India",
+      "laws": "Digital Personal Data Protection Act 2023 and DPDP Rules 2025",
+      "kind": "LAW",
+      "status": "The Act's main provisions commence on 13 May 2027, so findings describe readiness.",
+      "scope": "Applies to processing of digital personal data in India, and outside India when it is connected with offering goods or services to people in India.",
+      "regions": ["IN"],
+      "passageSource": "DPDP_CORPUS",
+      "penaltyFigures": true,
+      "limitations": [
+        "Some processing may rely on a legitimate use (DPDP s.7) rather than consent; review findings in that light.",
+        "Penalty ceilings are statutory maximums from the DPDP Act Schedule, not predicted fines."
+      ],
+      "fallback": {"relation": "CONTEXT", "note": "Not yet mapped to the DPDP Act; read it as consent-first good practice."},
+      "checks": {
+        "C1": {"relation": "REQUIRED", "note": "Consent-based processing needs a clear affirmative action before it starts (s.4(1), s.6(1)). A legitimate use (s.7) may apply instead."},
+        "C2": {"relation": "REQUIRED", "note": "A refused consent gives no consent basis for processing (s.4(1), s.6(1)); a legitimate use (s.7) would have to apply instead."},
+        "C3": {"relation": "REQUIRED", "note": "Consent must be a clear affirmative action (s.6(1)); an option switched on in advance is not one."},
+        "C4": {"relation": "REQUIRED", "note": "Consent must be free (s.6(1)), and withdrawing it must be as easy as giving it (s.6(4))."},
+        "C5": {"relation": "REQUIRED", "note": "Consent must be specific to each specified purpose (s.6(1)); the notice must describe the purposes (Rule 3(b))."},
+        "C6": {"relation": "REQUIRED", "note": "The notice must itemise the personal data and state the specified purpose (s.5(1), Rule 3(b))."},
+        "C7": {"relation": "REQUIRED", "note": "The notice must say how to withdraw consent, exercise rights and complain to the Data Protection Board (s.5(1), s.6(4), Rule 3(c))."},
+        "C8": {"relation": "REQUIRED", "note": "People must be able to read the notice and the consent request in English or any Eighth Schedule language (s.5(3), s.6(3))."},
+        "C9": {"relation": "REQUIRED", "note": "Tracking, behavioural monitoring and targeted advertising directed at children are barred, and a parent's verifiable consent is needed (s.9(1), s.9(3)). A child is under 18."},
+        "C10": {"relation": "REQUIRED", "note": "Identifiers read before a consent choice would be processed without the consent s.6(1) describes. Inferred from SDK documentation."},
+        "NC": {"relation": "REQUIRED", "note": "A notice (s.5) and valid consent (s.6) must come before consent-based processing, and the Data Fiduciary must be able to prove both (s.6(10)). This covers only the captured window."},
+        "U1": {"relation": "CONTEXT", "note": "Consent may have been given before the audit; the Data Fiduciary must be able to prove it (s.6(10)). Not scored."},
+        "S1": {"relation": "CONTEXT", "note": "The Act has no first-party exception to its consent rules; TraceVeil shows same-company lookups but does not score them."},
+        "V0": {"relation": "CONTEXT", "note": "Not a legal finding: too little was captured to judge the app under any law."}
+      }
+    },
+    {
+      "id": "EU",
+      "name": "EU / EEA",
+      "laws": "GDPR (Regulation (EU) 2016/679) and ePrivacy Directive 2002/58/EC, Article 5(3)",
+      "kind": "LAW",
+      "status": "In force. Article 5(3) is applied through each Member State's national law.",
+      "scope": "Applies to apps offered to people in the EU. The GDPR also applies in Iceland, Liechtenstein and Norway through the EEA Agreement.",
+      "regions": ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO"],
+      "passageSource": "LENS",
+      "penaltyFigures": false,
+      "limitations": [
+        "Storage or access that is strictly necessary for a service the person asked for needs no consent (ePrivacy Art. 5(3)); other processing may rely on another GDPR lawful basis.",
+        "Article 5(3) reaches the app through national laws, which can differ in detail."
+      ],
+      "fallback": {"relation": "CONTEXT", "note": "Not yet mapped to the GDPR or the ePrivacy Directive; read it as consent-first good practice."},
+      "checks": {
+        "C1": {"relation": "REQUIRED", "note": "Storing or reading information on the device needs prior consent unless it is strictly necessary for the service the person asked for (ePrivacy Art. 5(3)). A tracker SDK that runs usually does this; the lookup alone does not prove it.", "refs": ["eu.eprivacy-5(3)", "eu.gdpr-4(11)", "eu.gdpr-recital-32"]},
+        "C2": {"relation": "REQUIRED", "note": "After a refusal there is no consent, so non-essential storage or access on the device is not allowed (ePrivacy Art. 5(3)).", "refs": ["eu.eprivacy-5(3)", "eu.gdpr-4(11)", "eu.gdpr-recital-42"]},
+        "C3": {"relation": "REQUIRED", "note": "Consent needs a clear affirmative action (Art. 4(11)); pre-ticked boxes do not count (Recital 32).", "refs": ["eu.gdpr-4(11)", "eu.gdpr-recital-32"]},
+        "C4": {"relation": "REQUIRED", "note": "Consent must be freely given: people must be able to refuse without detriment (Recital 42), and withdrawing must be as easy as giving (Art. 7(3)).", "refs": ["eu.gdpr-4(11)", "eu.gdpr-recital-42", "eu.gdpr-7(3)"]},
+        "C5": {"relation": "REQUIRED", "note": "Consent must be specific; one choice for separate operations is presumed not freely given where separate consent is appropriate (Recital 43).", "refs": ["eu.gdpr-4(11)", "eu.gdpr-recital-43", "eu.edpb-consent-60"]},
+        "C6": {"relation": "REQUIRED", "note": "People must get clear and comprehensive information about the purposes (ePrivacy Art. 5(3), GDPR Art. 13(1)(c)); EDPB guidance also lists the type of data among the minimum information for informed consent.", "refs": ["eu.gdpr-13(1)(c)", "eu.edpb-consent-64", "eu.eprivacy-5(3)"]},
+        "C7": {"relation": "REQUIRED", "note": "People must be told before consenting that they can withdraw at any time, and withdrawing must be as easy as consenting (Art. 7(3), Art. 13(2)(c)).", "refs": ["eu.gdpr-7(3)", "eu.gdpr-13(2)(c)"]},
+        "C8": {"relation": "CONTEXT", "note": "The GDPR names no language, but information must be intelligible and in clear and plain language (Art. 12(1)); an English-only notice may not be intelligible to people who do not read English.", "refs": ["eu.gdpr-12(1)"]},
+        "C9": {"relation": "REQUIRED", "note": "Where consent is the basis for an online service offered directly to a child under 16 (Member States may set 13 to 15), a parent must give or authorise it (Art. 8(1)). Children's data used for marketing or profiles merits specific protection (Recital 38). TraceVeil cannot see whether a parent consented.", "refs": ["eu.gdpr-8(1)", "eu.gdpr-recital-38", "eu.eprivacy-5(3)"]},
+        "C10": {"relation": "REQUIRED", "note": "Reading a device or advertising identifier is gaining access to information stored on the device, which needs prior consent unless strictly necessary (ePrivacy Art. 5(3)). Inferred from SDK documentation.", "refs": ["eu.eprivacy-5(3)"]},
+        "NC": {"relation": "REQUIRED", "note": "Non-essential storage or access on the device needs prior, informed consent (ePrivacy Art. 5(3)); no consent request was seen in the captured window. The app may ask elsewhere.", "refs": ["eu.eprivacy-5(3)", "eu.gdpr-7(1)"]},
+        "U1": {"relation": "CONTEXT", "note": "Earlier consent cannot be checked from this capture; the controller must be able to demonstrate consent (Art. 7(1)). Not scored.", "refs": ["eu.gdpr-7(1)"]},
+        "S1": {"relation": "CONTEXT", "note": "Article 5(3) covers the app's own storage or access on the device as well as third parties'. TraceVeil shows same-company lookups but does not score them.", "refs": ["eu.eprivacy-5(3)"]},
+        "V0": {"relation": "CONTEXT", "note": "Not a legal finding: too little was captured to judge the app under any law."}
+      }
+    },
+    {
+      "id": "UK",
+      "name": "United Kingdom",
+      "laws": "UK GDPR and the Privacy and Electronic Communications Regulations 2003 (PECR), regulation 6, as amended by the Data (Use and Access) Act 2025",
+      "kind": "LAW",
+      "status": "In force; the ICO reports that the Data (Use and Access) Act's data protection and PECR provisions have commenced. Quoted text comes from ICO guidance.",
+      "scope": "Applies to apps offered to people in the UK. The ICO is the regulator.",
+      "regions": ["GB"],
+      "passageSource": "LENS",
+      "penaltyFigures": false,
+      "limitations": [
+        "Since the Data (Use and Access) Act 2025, analytics used only for aggregate statistics to improve the service can rely on an exception with clear information and an easy way to object; TraceVeil cannot tell how an SDK uses what it collects.",
+        "Legal text is quoted from ICO guidance; legislation.gov.uk was not reachable when these passages were collected."
+      ],
+      "fallback": {"relation": "CONTEXT", "note": "Not yet mapped to the UK GDPR or PECR; read it as consent-first good practice."},
+      "checks": {
+        "C1": {"relation": "REQUIRED", "note": "PECR reg. 6 bars storing or reading information on the device without consent unless a Schedule A1 exception applies, and it covers SDKs in apps. Analytics used only for aggregate statistics can rely on an exception; advertising and attribution cannot.", "refs": ["uk.ico-pecr-reg6", "uk.ico-consent-before", "uk.ico-apps-sdks", "uk.ico-statistical-exception"]},
+        "C2": {"relation": "REQUIRED", "note": "After a refusal, non-exempt storage or access on the device has no consent behind it.", "refs": ["uk.ico-pecr-reg6", "uk.ico-consent-before"]},
+        "C3": {"relation": "REQUIRED", "note": "Consent needs a clear and positive action; the ICO says a pre-ticked box is not valid consent.", "refs": ["uk.ico-positive-action", "uk.ico-ukgdpr-consent"]},
+        "C4": {"relation": "REQUIRED", "note": "People must be able to refuse non-exempt technologies as easily as they accept them (ICO).", "refs": ["uk.ico-refuse-easily"]},
+        "C5": {"relation": "REQUIRED", "note": "Consent requests must be specific to the purpose, with granular options per purpose (ICO).", "refs": ["uk.ico-specific-purpose"]},
+        "C6": {"relation": "REQUIRED", "note": "People must be told what the technologies are, their purposes, any third parties and how long they last (ICO guidance on reg. 6).", "refs": ["uk.ico-information", "uk.ico-pecr-reg6"]},
+        "C7": {"relation": "REQUIRED", "note": "People must be able to withdraw consent at any time as easily as they gave it, and be told how (ICO).", "refs": ["uk.ico-withdraw"]},
+        "C8": {"relation": "NOT_APPLICABLE", "note": "The UK GDPR names no language for notices; an English-only notice does not test a UK requirement."},
+        "C9": {"relation": "REQUIRED", "note": "Where an online service relies on consent, a child under 13 needs a parent's consent (UK GDPR Art. 8); the ICO Children's code expects profiling to be off by default for children. TraceVeil cannot see whether a parent consented.", "refs": ["uk.ico-children-art8", "uk.ico-childrens-code-12"]},
+        "C10": {"relation": "REQUIRED", "note": "Reading device or advertising identifiers is accessing information stored on the device; it needs consent unless an exception applies (reg. 6). Inferred from SDK documentation.", "refs": ["uk.ico-pecr-reg6", "uk.ico-consent-before"]},
+        "NC": {"relation": "REQUIRED", "note": "Non-exempt technologies need prior information and consent; no consent request was seen in the captured window. The app may ask elsewhere.", "refs": ["uk.ico-pecr-reg6", "uk.ico-information"]},
+        "U1": {"relation": "CONTEXT", "note": "Earlier consent cannot be checked from this capture; organisations must be able to demonstrate valid consent. Not scored.", "refs": ["uk.ico-demonstrate"]},
+        "S1": {"relation": "CONTEXT", "note": "Reg. 6 applies to the app's own storage or access on the device as well as third parties'. TraceVeil shows same-company lookups but does not score them.", "refs": ["uk.ico-pecr-reg6"]},
+        "V0": {"relation": "CONTEXT", "note": "Not a legal finding: too little was captured to judge the app under any law."}
+      }
+    },
+    {
+      "id": "US_CALIFORNIA",
+      "name": "California (US)",
+      "laws": "California Consumer Privacy Act as amended by the CPRA (Cal. Civ. Code §1798.100 et seq.) and the CCPA Regulations",
+      "kind": "LAW",
+      "status": "In force (statute and regulations effective 1 January 2026). An opt-out model for adults; opt-in for selling or sharing a minor's data.",
+      "scope": "Applies to for-profit businesses that meet the CCPA's thresholds (§1798.140(d)) and handle California residents' personal information.",
+      "regions": [],
+      "passageSource": "LENS",
+      "penaltyFigures": false,
+      "limitations": [
+        "California does not generally require consent before collecting adults' data; it requires notice at collection, a right to opt out of sale or sharing, and honouring opt-out preference signals such as Global Privacy Control.",
+        "A DNS lookup cannot show whether data was sold or shared; those terms depend on what the business does with it."
+      ],
+      "fallback": {"relation": "CONTEXT", "note": "Not yet mapped to the CCPA; read it as consent-first good practice."},
+      "checks": {
+        "C1": {"relation": "CONTEXT", "note": "Opt-out model: no prior consent is generally needed to collect adults' data, but the business must give notice at or before collection, let people opt out of sale or sharing at any time, and honour opt-out preference signals such as Global Privacy Control. Under-16s differ (see C9).", "refs": ["ca.1798.100(a)(1)", "ca.1798.120(a)", "ca.reg-7025"]},
+        "C2": {"relation": "REQUIRED", "note": "If the refusal was the way offered to opt out of sale or sharing, the business must stop selling or sharing after it (§1798.120). A cookie-style banner alone is not an acceptable opt-out method (regs §7026(a)(4)). A lookup after refusal does not prove a sale or share.", "refs": ["ca.1798.120(a)", "ca.1798.120(d)", "ca.reg-7026(a)(4)"]},
+        "C3": {"relation": "CONTEXT", "note": "Consent is required only in some cases (for example opting a 13 to 15-year-old in, or opting back in). There, silence or failure to act is not consent, and agreement obtained through dark patterns is not consent.", "refs": ["ca.reg-7004(a)(3)", "ca.1798.140(h)"]},
+        "C4": {"relation": "CONTEXT", "note": "Where a banner seeks consent, the more privacy-protective choice must be no harder than the other: only \"Accept All\" and \"Preferences\" is not symmetrical (regs §7004(a)(2)).", "refs": ["ca.reg-7004(a)(2)"]},
+        "C5": {"relation": "CONTEXT", "note": "Where consent is required it must be for a narrowly defined particular purpose; accepting broad terms is not consent (§1798.140(h)).", "refs": ["ca.1798.140(h)"]},
+        "C6": {"relation": "CONTEXT", "note": "A notice at or before collection must list the categories of personal information, the purposes and whether it is sold or shared (§1798.100(a)(1)). An app may give it through a link on its download page and in its settings, so the consent screen need not carry it.", "refs": ["ca.1798.100(a)(1)", "ca.reg-7012(c)(3)"]},
+        "C7": {"relation": "CONTEXT", "note": "California's counterpart is the right to opt out of sale or sharing at any time, through a clear \"Do Not Sell or Share My Personal Information\" link or an opt-out preference signal; it need not be on the consent screen.", "refs": ["ca.1798.120(a)", "ca.1798.135(a)(1)"]},
+        "C8": {"relation": "CONTEXT", "note": "Notices must be available in the languages the business ordinarily uses with California consumers; English alone can be enough.", "refs": ["ca.reg-7003(b)(2)"]},
+        "C9": {"relation": "REQUIRED", "note": "A business must not sell or share personal information of a consumer it knows is under 16 without opt-in: from the consumer if 13 to 15, from a parent if under 13; wilful disregard of age counts as knowledge (§1798.120(c)). A tracker lookup alone does not prove a sale or share.", "refs": ["ca.1798.120(c)"]},
+        "C10": {"relation": "CONTEXT", "note": "Device and advertising identifiers are personal information; disclosing them for cross-context behavioural advertising is sharing, which adults can opt out of. Prior consent is not generally required for adults.", "refs": ["ca.1798.140(aj)", "ca.1798.140(ah)"]},
+        "NC": {"relation": "CONTEXT", "note": "No consent screen is required for adults; a notice at collection is, and an app may provide it through its download page and settings.", "refs": ["ca.1798.100(a)(1)", "ca.reg-7012(c)(3)"]},
+        "U1": {"relation": "CONTEXT", "note": "Earlier choices cannot be checked from this capture; an earlier opt-out, if any, must still be honoured. Not scored.", "refs": ["ca.1798.120(d)"]},
+        "S1": {"relation": "CONTEXT", "note": "Collection by the business itself is not a sale or share; notice at collection still applies. Not scored.", "refs": ["ca.1798.100(a)(1)"]},
+        "V0": {"relation": "CONTEXT", "note": "Not a legal finding: too little was captured to judge the app under any law."}
+      }
+    },
+    {
+      "id": "US_CHILDREN",
+      "name": "US children (COPPA)",
+      "laws": "Children's Online Privacy Protection Rule, 16 CFR Part 312 (as amended in 2025)",
+      "kind": "LAW",
+      "status": "In force. Applies only to services directed to children under 13, or operators with actual knowledge that they collect from a child under 13.",
+      "scope": "Applies to operators of websites and online services, including apps, directed to children under 13, or with actual knowledge of collecting from such a child.",
+      "regions": [],
+      "passageSource": "LENS",
+      "penaltyFigures": false,
+      "limitations": [
+        "TraceVeil cannot tell whether an app is directed to children or whether a parent gave verifiable consent; declare child-facing apps in the audit setup.",
+        "Persistent identifiers used only to support internal operations are exempt from prior parental consent; behavioural advertising and profiling are not."
+      ],
+      "fallback": {"relation": "CONTEXT", "note": "Not yet mapped to COPPA; read it as consent-first good practice."},
+      "checks": {
+        "C1": {"relation": "CONTEXT", "note": "COPPA applies only if the app is directed to children under 13 or the operator knows it collects from such a child. Then persistent identifiers are personal information and need verifiable parental consent first, unless used only for internal operations (see C9).", "refs": ["coppa.312.3", "coppa.312.5(a)", "coppa.312.2-identifier"]},
+        "C2": {"relation": "CONTEXT", "note": "Under COPPA the choice belongs to a parent, who may refuse further collection at any time (§312.6(a)(2)); a tap on Reject in the app is not the COPPA mechanism.", "refs": ["coppa.312.6(a)(2)"]},
+        "C3": {"relation": "NOT_APPLICABLE", "note": "COPPA consent comes from a parent through a verifiable method, not from a consent banner; banner design is not what COPPA tests."},
+        "C4": {"relation": "NOT_APPLICABLE", "note": "COPPA consent comes from a parent through a verifiable method, not from a consent banner; banner design is not what COPPA tests."},
+        "C5": {"relation": "CONTEXT", "note": "Parents must be able to consent to collection without consenting to disclosure to third parties, unless disclosure is integral to the service (§312.5(a)(2)).", "refs": ["coppa.312.5(a)"]},
+        "C6": {"relation": "CONTEXT", "note": "Operators must give notice of what they collect from children, how they use it and their disclosure practices (§312.3(a), §312.4); the in-app consent screen is not the only place for it.", "refs": ["coppa.312.3"]},
+        "C7": {"relation": "CONTEXT", "note": "Parents can refuse further use or collection at any time and ask for deletion (§312.6(a)(2)).", "refs": ["coppa.312.6(a)(2)"]},
+        "C8": {"relation": "NOT_APPLICABLE", "note": "COPPA sets no language requirement that this check tests."},
+        "C9": {"relation": "REQUIRED", "note": "A child-directed app needs verifiable parental consent before collecting personal information from a child under 13, including persistent identifiers; identifiers used only for internal operations are exempt, but not for behavioural advertising or profiling. TraceVeil cannot see parental consent.", "refs": ["coppa.312.5(a)", "coppa.312.2-child", "coppa.312.2-identifier", "coppa.312.5(c)(7)", "coppa.312.2-internal-ops", "coppa.312.2-directed"]},
+        "C10": {"relation": "CONTEXT", "note": "Device identifiers are personal information under COPPA; this matters for child-directed apps or actual knowledge of a child under 13 (see C9).", "refs": ["coppa.312.2-identifier", "coppa.312.5(c)(7)"]},
+        "NC": {"relation": "CONTEXT", "note": "For a child-directed app the consent needed is a parent's, obtained before collection; a missing in-app consent screen is not itself the COPPA test.", "refs": ["coppa.312.5(a)"]},
+        "U1": {"relation": "CONTEXT", "note": "Parental consent given earlier cannot be checked from this capture. Not scored."},
+        "S1": {"relation": "CONTEXT", "note": "The operator's own collection from a child also needs parental consent unless it is only for internal operations. Not scored.", "refs": ["coppa.312.2-internal-ops"]},
+        "V0": {"relation": "CONTEXT", "note": "Not a legal finding: too little was captured to judge the app under any law."}
+      }
+    },
+    {
+      "id": "BRAZIL",
+      "name": "Brazil",
+      "laws": "Lei Geral de Proteção de Dados Pessoais (LGPD, Lei nº 13.709/2018) and the Estatuto Digital da Criança e do Adolescente (Lei nº 15.211/2025)",
+      "kind": "LAW",
+      "status": "In force; the ECA Digital has applied since 17 March 2026. Quotes are the official Portuguese text; English lines are summaries, not official translations.",
+      "scope": "Applies to processing carried out in Brazil, of data collected in Brazil, or aimed at offering goods or services to people in Brazil.",
+      "regions": ["BR"],
+      "passageSource": "LENS",
+      "penaltyFigures": false,
+      "limitations": [
+        "Consent is one of several legal bases under the LGPD (Art. 7); legitimate interest can apply to some processing.",
+        "The LGPD has no device-storage rule like the EU's ePrivacy Directive."
+      ],
+      "fallback": {"relation": "CONTEXT", "note": "Not yet mapped to the LGPD; read it as consent-first good practice."},
+      "checks": {
+        "C1": {"relation": "CONTEXT", "note": "Consent is one of several legal bases, and legitimate interest can apply (Art. 7, IX). Where the app relies on consent, it must come first and be free, informed and unequivocal (Art. 5, XII).", "refs": ["br.lgpd-7", "br.lgpd-5-xii"]},
+        "C2": {"relation": "REQUIRED", "note": "Where consent is the legal basis, a refusal leaves none (Art. 7, I); any other basis claimed must be one of Art. 7's and respect the person's rights.", "refs": ["br.lgpd-7", "br.lgpd-5-xii"]},
+        "C3": {"relation": "REQUIRED", "note": "Where consent is the basis, it must be given by a means that shows the person's will (Art. 8) and be unequivocal (Art. 5, XII); an option switched on in advance does not show it.", "refs": ["br.lgpd-8", "br.lgpd-5-xii"]},
+        "C4": {"relation": "CONTEXT", "note": "Consent must be free (Art. 5, XII); the LGPD does not spell out how a refusal option must look.", "refs": ["br.lgpd-5-xii"]},
+        "C5": {"relation": "REQUIRED", "note": "Consent must refer to specific purposes; generic authorisations are void (Art. 8, §4).", "refs": ["br.lgpd-8-4"]},
+        "C6": {"relation": "REQUIRED", "note": "People are entitled to clear, adequate and prominent information on the specific purpose (Art. 9, I), and consent is void if this was not presented beforehand clearly (Art. 9, §1). The LGPD does not require a list of data items here.", "refs": ["br.lgpd-9", "br.lgpd-9-1"]},
+        "C7": {"relation": "REQUIRED", "note": "Consent can be revoked at any time through a free and easy procedure (Art. 8, §5), and information must mention the person's rights (Art. 9, VII).", "refs": ["br.lgpd-8-5", "br.lgpd-9"]},
+        "C8": {"relation": "CONTEXT", "note": "The LGPD names no language; information must be clear and adequate for the person (Art. 9).", "refs": ["br.lgpd-9"]},
+        "C9": {"relation": "REQUIRED", "note": "Children's data needs specific, highlighted consent from a parent (LGPD Art. 14, §1), and the ECA Digital bars profiling to target commercial advertising at children and adolescents (Art. 22). TraceVeil cannot see parental consent.", "refs": ["br.lgpd-14-1", "br.eca-22", "br.eca-1"]},
+        "C10": {"relation": "CONTEXT", "note": "Identifiers linked to a person are personal data; the LGPD needs a legal basis for them, not necessarily consent (Art. 7).", "refs": ["br.lgpd-7"]},
+        "NC": {"relation": "CONTEXT", "note": "Consent is not the only basis, but information about the processing must be clear and easy to reach (Art. 9). The app may inform elsewhere.", "refs": ["br.lgpd-9"]},
+        "U1": {"relation": "CONTEXT", "note": "Earlier consent cannot be checked from this capture; the controller must prove consent (Art. 8, §2). Not scored.", "refs": ["br.lgpd-8-2"]},
+        "S1": {"relation": "CONTEXT", "note": "The app's own processing also needs a legal basis under the LGPD. Not scored.", "refs": ["br.lgpd-7"]},
+        "V0": {"relation": "CONTEXT", "note": "Not a legal finding: too little was captured to judge the app under any law."}
+      }
+    },
+    {
+      "id": "SINGAPORE",
+      "name": "Singapore",
+      "laws": "Personal Data Protection Act 2012 (PDPA)",
+      "kind": "LAW",
+      "status": "In force (current version as at 10 October 2026).",
+      "scope": "Applies to organisations collecting, using or disclosing personal data in Singapore.",
+      "regions": ["SG"],
+      "passageSource": "LENS",
+      "penaltyFigures": false,
+      "limitations": [
+        "Besides consent, the PDPA allows deemed consent (s.15, s.15A) and exceptions in its First and Second Schedules (s.17), so a prior opt-in is not always required.",
+        "The PDPA has no children's section; the PDPC's advisory guidelines on children's data are not binding law."
+      ],
+      "fallback": {"relation": "CONTEXT", "note": "Not yet mapped to the PDPA; read it as consent-first good practice."},
+      "checks": {
+        "C1": {"relation": "CONTEXT", "note": "Collection needs consent, deemed consent or an exception (s.13). Deemed consent by notification (s.15A) and the Act's exceptions can apply without an opt-in, so a prior opt-in is not always required.", "refs": ["sg.pdpa-13", "sg.pdpa-15A(2)"]},
+        "C2": {"relation": "REQUIRED", "note": "A refusal means no consent was given, and deemed consent by notification does not hold once the person says they do not consent (s.15A(2)(b)); collection would need an exception (s.13).", "refs": ["sg.pdpa-13", "sg.pdpa-15A(2)"]},
+        "C3": {"relation": "CONTEXT", "note": "The PDPA does not mention pre-ticked options; consent obtained through deceptive or misleading practices is not validly given (s.14(2)-(3)).", "refs": ["sg.pdpa-14(2)"]},
+        "C4": {"relation": "CONTEXT", "note": "The PDPA sets no rule on the refusal option; consent must not be obtained through deceptive or misleading practices (s.14(2)(b)).", "refs": ["sg.pdpa-14(2)"]},
+        "C5": {"relation": "CONTEXT", "note": "Consent cannot be required as a condition beyond what is reasonable to provide the service (s.14(2)(a)); the Act does not otherwise require one choice per purpose.", "refs": ["sg.pdpa-14(2)"]},
+        "C6": {"relation": "REQUIRED", "note": "Consent counts only if the person was told the purposes on or before collection (s.14(1), s.20(1)(a)). The Act does not require a list of data items.", "refs": ["sg.pdpa-14(1)", "sg.pdpa-20(1)(a)"]},
+        "C7": {"relation": "CONTEXT", "note": "People may withdraw consent at any time on reasonable notice, and the organisation must then stop (s.16); the Act does not require the consent screen itself to explain withdrawal.", "refs": ["sg.pdpa-16"]},
+        "C8": {"relation": "NOT_APPLICABLE", "note": "The PDPA names no language for notices; an English-only notice does not test a PDPA requirement."},
+        "C9": {"relation": "CONTEXT", "note": "The PDPA has no children's section; the PDPC's advisory guidelines say a parent's or guardian's consent must be obtained for a child below 13.", "refs": ["sg.pdpc-children-4.5"]},
+        "C10": {"relation": "CONTEXT", "note": "Identifiers linked to a person are personal data; collecting them needs consent, deemed consent or an exception (s.13).", "refs": ["sg.pdpa-13"]},
+        "NC": {"relation": "CONTEXT", "note": "Purposes must be notified on or before collection unless deemed consent or an exception applies (s.20); the app may notify elsewhere.", "refs": ["sg.pdpa-20(1)(a)"]},
+        "U1": {"relation": "CONTEXT", "note": "Earlier consent cannot be checked from this capture. Not scored."},
+        "S1": {"relation": "CONTEXT", "note": "The consent obligation applies to the organisation's own collection too (s.13). Not scored.", "refs": ["sg.pdpa-13"]},
+        "V0": {"relation": "CONTEXT", "note": "Not a legal finding: too little was captured to judge the app under any law."}
+      }
+    },
+    {
+      "id": "GLOBAL_BASELINE",
+      "name": "Global baseline",
+      "laws": "Consent-first privacy-by-design good practice (not a law)",
+      "kind": "GOOD_PRACTICE",
+      "status": "Good practice, not law. Used when no legal lens is chosen and the region has no profile.",
+      "scope": "Applies as a design standard anywhere. Laws differ by country; pick a legal lens in Settings when one applies.",
+      "regions": [],
+      "passageSource": "LENS",
+      "penaltyFigures": false,
+      "limitations": [
+        "This lens describes good practice, not what any particular law requires."
+      ],
+      "fallback": {"relation": "CONTEXT", "note": "No baseline note for this check yet."},
+      "checks": {
+        "C1": {"relation": "REQUIRED", "note": "Consent-first good practice: start tracking only after an opt-in.", "refs": ["gb.wait-for-consent"]},
+        "C2": {"relation": "REQUIRED", "note": "Good practice: a refusal keeps tracking off.", "refs": ["gb.refusal-sticks"]},
+        "C3": {"relation": "REQUIRED", "note": "Good practice: optional choices start switched off.", "refs": ["gb.no-preticked"]},
+        "C4": {"relation": "REQUIRED", "note": "Good practice: refusing is as easy and as visible as accepting.", "refs": ["gb.equal-choice"]},
+        "C5": {"relation": "REQUIRED", "note": "Good practice: one choice per purpose.", "refs": ["gb.per-purpose"]},
+        "C6": {"relation": "REQUIRED", "note": "Good practice: say which data, for which purposes and who receives it, before collecting.", "refs": ["gb.clear-notice"]},
+        "C7": {"relation": "REQUIRED", "note": "Good practice: tell people how to change or withdraw their choice.", "refs": ["gb.withdraw"]},
+        "C8": {"relation": "CONTEXT", "note": "Good practice where your audience reads other languages; an English-only notice suits an English-reading audience.", "refs": ["gb.languages"]},
+        "C9": {"relation": "REQUIRED", "note": "Good practice: no tracking or behavioural advertising in apps for children; involve a parent where consent is needed.", "refs": ["gb.children"]},
+        "C10": {"relation": "REQUIRED", "note": "Good practice: identifiers wait for an opt-in too.", "refs": ["gb.identifiers"]},
+        "NC": {"relation": "REQUIRED", "note": "Good practice: ask before tracking, with a clear notice. The app may ask elsewhere; this covers only the captured window.", "refs": ["gb.clear-notice", "gb.wait-for-consent"]},
+        "U1": {"relation": "CONTEXT", "note": "Earlier consent cannot be checked from this capture. Not scored."},
+        "S1": {"relation": "CONTEXT", "note": "First-party collection is shown for review but not scored."},
+        "V0": {"relation": "CONTEXT", "note": "Too little was captured to judge the app."}
+      }
+    }
+  ]
+}

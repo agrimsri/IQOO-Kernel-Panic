@@ -48,6 +48,7 @@ import com.dpdpxray.app.ui.components.cardSurface
 import com.dpdpxray.app.ui.components.gradientSweep
 import com.dpdpxray.app.ui.components.pressClickable
 import com.dpdpxray.app.ui.theme.Brand
+import com.dpdpxray.app.ui.theme.Radii
 import com.dpdpxray.app.ui.theme.Film
 import com.dpdpxray.app.ui.theme.FilmExtra
 
@@ -198,40 +199,38 @@ fun DrawScope.drawGlyph(g: Glyph, tint: Color) {
 }
 
 /**
- * The one action that matters most on a screen. Brand gradient, dark text, 58dp tall, a soft brand glow beneath it,
- * and (when [sweep] is on) a very slow, faint light band drifting across. Shrinks slightly while pressed.
+ * The one action that matters most on a screen: solid accent, accent-contrast label, 54dp tall. No glow, no sweep.
+ * [sweep] is accepted so older call sites compile. Shrinks slightly while pressed.
  */
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun GradientAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, glyph: Glyph? = null, sweep: Boolean = false) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(Radii.button)
     Row(
-        modifier.fillMaxWidth().heightIn(min = 58.dp)
-            .then(if (enabled) Modifier.shadow(10.dp, shape, ambientColor = Brand.coral.copy(alpha = 0.4f), spotColor = Brand.coral.copy(alpha = 0.6f)) else Modifier)
+        modifier.fillMaxWidth().heightIn(min = 54.dp)
             .pressClickable(enabled = enabled, shape = shape, onClick = onClick)
-            .background(if (enabled) Brand.horizontal else SolidColor(Film.line), shape)
-            .then(if (enabled && sweep) Modifier.gradientSweep(alpha = 0.22f) else Modifier)
+            .background(if (enabled) Film.scan else Film.fill, shape)
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         if (glyph != null) {
-            GlyphIcon(glyph, if (enabled) Film.base else Film.boneDim, size = 20.dp)
+            GlyphIcon(glyph, if (enabled) Film.onAccent else Film.tertiary, size = 20.dp)
             Spacer(Modifier.width(10.dp))
         }
-        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = if (enabled) Film.base else Film.boneDim)
+        Text(text, style = MaterialTheme.typography.titleMedium, color = if (enabled) Film.onAccent else Film.tertiary)
     }
 }
 
-/** A secondary action under a [GradientAction]: same shape and height, outlined, light text, no brand colour. */
+/** A secondary action under a [GradientAction]: same shape, a quiet filled button with primary-colour text. */
 @Composable
 fun OutlineAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, glyph: Glyph? = null) {
-    val shape = RoundedCornerShape(16.dp)
-    val tint = if (enabled) Film.bone else Film.boneDim
+    val shape = RoundedCornerShape(Radii.button)
+    val tint = if (enabled) Film.bone else Film.tertiary
     Row(
-        modifier.fillMaxWidth().heightIn(min = 52.dp)
+        modifier.fillMaxWidth().heightIn(min = 50.dp)
             .pressClickable(enabled = enabled, shape = shape, onClick = onClick)
-            .background(Film.bone.copy(alpha = 0.04f))
-            .border(1.dp, Film.boneDim.copy(alpha = 0.55f), shape)
+            .background(Film.fill, shape)
             .padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -247,12 +246,12 @@ fun OutlineAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
 /** A secondary destination with a glyph, a name and one line saying what it is for. */
 @Composable
 fun ActionTile(title: String, detail: String, glyph: Glyph, onClick: () -> Unit, modifier: Modifier = Modifier, accent: Color = Film.scan) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(Radii.tile)
     Column(
         modifier.heightIn(min = 104.dp)
             .pressClickable(shape = shape, onClick = onClick)
-            .cardSurface(16.dp)
-            .padding(14.dp),
+            .cardSurface(Radii.tile)
+            .padding(16.dp),
     ) {
         IconBadge(glyph, accent, size = 36.dp)
         Spacer(Modifier.size(10.dp))
@@ -273,14 +272,12 @@ fun LinkAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
     }
 }
 
-/** Score in a tinted square; "?" when the result is inconclusive. Colour follows the score band. */
+/** Score on a quiet square; "?" when the result is inconclusive. The number carries the band colour. */
 @Composable
-fun ScoreChip(text: String, color: Color, modifier: Modifier = Modifier, size: Dp = 56.dp) {
+fun ScoreChip(text: String, color: Color, modifier: Modifier = Modifier, size: Dp = 52.dp) {
     val shape = RoundedCornerShape(14.dp)
     Box(
-        modifier.size(size).clip(shape)
-            .background(Brush.linearGradient(listOf(color.copy(alpha = 0.26f), color.copy(alpha = 0.07f))))
-            .border(1.5.dp, color.copy(alpha = 0.7f), shape),
+        modifier.size(size).clip(shape).background(Film.fill, shape),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, style = MaterialTheme.typography.titleLarge, color = color, maxLines = 1)
@@ -293,23 +290,12 @@ fun Panel(modifier: Modifier = Modifier, glow: Color? = null, content: @Composab
     Column(modifier.fillMaxWidth().cardSurface(glow = glow).padding(16.dp), content = content)
 }
 
-/** Empty states point to the next action: a film frame with a dashed consent line, a title, one line, a button. */
+/** Empty states are one title, one line and an optional action. No illustration. */
 @Composable
 fun EmptyState(title: String, body: String, modifier: Modifier = Modifier, action: Pair<String, () -> Unit>? = null) {
-    Column(modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Canvas(Modifier.size(width = 132.dp, height = 76.dp)) {
-            val r = 10.dp.toPx()
-            drawRoundRect(Brush.verticalGradient(listOf(Film.scan.copy(alpha = 0.10f), Color.Transparent)), cornerRadius = CornerRadius(r))
-            drawRoundRect(Film.line, cornerRadius = CornerRadius(r), style = Stroke(1.5.dp.toPx()))
-            val step = size.width / 7f
-            (1..6).forEach { i -> drawCircle(Film.line, 2.dp.toPx(), Offset(step * i, 9.dp.toPx())); drawCircle(Film.line, 2.dp.toPx(), Offset(step * i, size.height - 9.dp.toPx())) }
-            drawLine(
-                Film.scan.copy(alpha = 0.8f), Offset(16.dp.toPx(), size.height / 2), Offset(size.width - 16.dp.toPx(), size.height / 2),
-                2.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx())),
-            )
-        }
-        Text(title, style = MaterialTheme.typography.titleMedium, color = Film.bone, modifier = Modifier.padding(top = 12.dp))
-        Text(body, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp, start = 12.dp, end = 12.dp))
+    Column(modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(title, style = MaterialTheme.typography.titleMedium, color = Film.bone)
+        Text(body, style = MaterialTheme.typography.bodyMedium, color = Film.boneDim, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp, start = 12.dp, end = 12.dp))
         if (action != null) LinkAction(action.first, action.second, Modifier.padding(top = 4.dp))
     }
 }

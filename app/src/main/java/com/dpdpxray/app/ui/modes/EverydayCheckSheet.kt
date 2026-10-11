@@ -44,7 +44,7 @@ import com.dpdpxray.app.ui.components.reveal
 import com.dpdpxray.app.ui.guide.Glyph
 import com.dpdpxray.app.ui.guide.GlyphIcon
 import com.dpdpxray.app.ui.guide.GradientAction
-import com.dpdpxray.app.ui.guide.GuideBanner
+import com.dpdpxray.app.ui.guide.SpeakStep
 import com.dpdpxray.app.ui.guide.GuideLang
 import com.dpdpxray.app.ui.guide.OutlineAction
 import com.dpdpxray.app.ui.guide.guideLang
@@ -83,7 +83,7 @@ internal fun EverydayCheckSetup(
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         CheckSheetTitle(c.title(app.label).pick(lang))
-        GuideBanner(c.guide(app.label), Modifier.reveal(0))
+        SpeakStep(c.guide(app.label))
         Column(Modifier.padding(top = 4.dp).reveal(1), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             PlanOption(
                 c.quickTitle.pick(lang), (if (freshReset) c.quickDetailFresh else c.quickDetail).pick(lang),

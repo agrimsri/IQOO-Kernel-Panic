@@ -1,6 +1,10 @@
 package com.dpdpxray.app.ui.components
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import com.dpdpxray.app.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
@@ -54,51 +58,23 @@ internal object BrandMarkGeometry {
     val all = listOf(LENS, ARC_INNER, ARC_OUTER, LOOKUP, VEIL, SHADE, LINING)
 }
 
-/** Parsed once per process; drawing only reads them. */
-private object MarkPaths {
-    private fun parse(d: String): Path = PathParser().parsePathString(d).toPath()
-    val lens = parse(BrandMarkGeometry.LENS)
-    val arcInner = parse(BrandMarkGeometry.ARC_INNER)
-    val arcOuter = parse(BrandMarkGeometry.ARC_OUTER)
-    val lookup = parse(BrandMarkGeometry.LOOKUP)
-    val veil = parse(BrandMarkGeometry.VEIL)
-    val shade = parse(BrandMarkGeometry.SHADE)
-    val lining = parse(BrandMarkGeometry.LINING)
-}
-
-private val VeilLining = Color(0xFFFFF1E8)
-private val VeilShade = Color(0xFF8E3F5C)
-
 /**
- * The TraceVeil brand mark, drawn with vector paths and gradients (no bitmap), so it stays sharp at any [size].
- * [lens] fills the disc behind the scan arcs; the default matches the app background, a darker tone makes it a visible
- * well. Pass `contentDescription = null` when a visible "TraceVeil" label sits next to it.
+ * The TraceVeil logo: assets/logo.png, cropped to the mark and bundled as drawable/logo_mark. It is shown as a rounded
+ * tile (like an app icon), so it looks the same on light and dark screens. Pass `contentDescription = null` when a visible
+ * "TraceVeil" label sits next to it. [lens] is unused and kept so older call sites compile.
  */
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun BrandMark(
     size: Dp,
     modifier: Modifier = Modifier,
-    lens: Color = Film.base,
+    lens: Color = Color.Unspecified,
     contentDescription: String? = "TraceVeil",
 ) {
-    val described = contentDescription?.let { label -> modifier.semantics { this.contentDescription = label } } ?: modifier
-    Canvas(described.size(size)) {
-        val k = this.size.minDimension / 100f
-        scale(k, k, pivot = Offset.Zero) { drawMark(lens) }
-    }
-}
-
-private fun DrawScope.drawMark(lens: Color) {
-    val g = BrandMarkGeometry
-    drawPath(MarkPaths.lens, lens)
-    drawPath(MarkPaths.arcInner, Film.scan, style = Stroke(width = g.ARC_WIDTH))
-    drawPath(MarkPaths.arcOuter, Film.scan, alpha = g.OUTER_ARC_ALPHA, style = Stroke(width = g.ARC_WIDTH))
-    drawPath(MarkPaths.lookup, Film.leak)
-    drawPath(MarkPaths.veil, Brush.linearGradient(Brand.stops, start = Offset(19f, 19f), end = g.foldMid))
-    drawPath(MarkPaths.shade, VeilShade, alpha = g.SHADE_ALPHA)
-    drawPath(
-        MarkPaths.lining,
-        Brush.linearGradient(listOf(VeilLining, Brand.peach), start = g.foldMid - Offset(30f, 30f), end = g.foldMid),
+    Image(
+        painter = painterResource(R.drawable.logo_mark),
+        contentDescription = contentDescription,
+        modifier = modifier.size(size).clip(RoundedCornerShape(size * 0.22f)),
     )
 }
 
@@ -111,7 +87,7 @@ private fun DrawScope.drawMark(lens: Color) {
 fun BrandWordmark(modifier: Modifier = Modifier, markSize: Dp = 32.dp) {
     val fontSize = with(LocalDensity.current) { (markSize * 0.554f).toSp() }
     // "Veil" starts at about 60% of the word's width; the span brush spans the whole line, so the gradient starts there.
-    val veilBrush = Brush.horizontalGradient(0.6f to Brand.peach, 0.8f to Brand.coral, 1f to Brand.rose)
+    val veilBrush = Brush.horizontalGradient(0.6f to Film.scan, 1f to Film.scan)
     Row(
         modifier.clearAndSetSemantics { contentDescription = "TraceVeil" },
         verticalAlignment = Alignment.CenterVertically,

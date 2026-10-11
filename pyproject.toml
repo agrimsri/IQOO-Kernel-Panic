@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "traceveil"
+dynamic = ["version"]
+description = "Developer CLI that runs Traceveil privacy/consent audits on an Android phone over adb and saves JSON reports."
+readme = "tools/README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Traceveil contributors" }]
+keywords = ["android", "adb", "privacy", "consent", "dpdp", "audit"]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Security",
+  "Topic :: Software Development :: Testing",
+]
+dependencies = []   # standard library only; needs Android platform-tools (adb) on PATH or via --adb
+
+[project.urls]
+Repository = "https://github.com/agrimsri/IQOO-Kernel-Panic"
+
+[project.scripts]
+traceveil = "traceveil.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "traceveil.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+traceveil = ["data/*.json", "data/law/*.json"]

@@ -1,0 +1,24 @@
+# Traceveil CLI configuration. Command-line flags override these values.
+[device]
+serial = ""   # leave empty when one phone is attached
+adb = ""      # leave empty to auto-detect (WSL: Windows adb.exe)
+
+[target]
+package = ""
+apk_glob = "app/build/outputs/apk/debug/*.apk"
+
+[audit]
+plans = ["silent", "reject", "accept"]
+min_score = 0
+fail_on = "high"
+
+[network]
+check_vpn = "warn"       # off | warn | fail
+online_ip = false        # true makes one cached lookup to `endpoint`; that service sees the public IP of the phone (or laptop with --egress-from host)
+endpoint = "https://ipapi.co/json/"  # https URL returning JSON with a 2-letter "country"/"country_code" (and optionally "ip"), e.g. https://ipapi.co/json/
+cache_ttl_hours = 24
+redact_ip = true
+
+[output]
+dir = ".traceveil/reports"
+formats = ["json", "summary"]

@@ -61,7 +61,6 @@ import com.dpdpxray.app.ui.guide.GuideViewModel
 import com.dpdpxray.app.ui.guide.LocalGuide
 import com.dpdpxray.app.ui.guide.OnboardingGate
 import com.dpdpxray.app.ui.onboarding.OnboardingScreen
-import com.dpdpxray.app.ui.modes.EverydayHomeScreen
 import com.dpdpxray.app.ui.modes.ModeRoutes
 import com.dpdpxray.app.voice.VoiceCopilotScreen
 import com.dpdpxray.app.voice.wake.AssistantEntry
@@ -148,7 +147,7 @@ class MainActivity : ComponentActivity() {
                     vm.updateSettings { it.copy(guideLanguage = lang.code) }
                 },
             )
-            XrayTheme(stageMode = settings.stageMode) {
+            XrayTheme(stageMode = settings.stageMode, themeMode = settings.themeMode) {
                 CompositionLocalProvider(LocalGuide provides guide) {
                 val nav = rememberNavController()
                 val entry by nav.currentBackStackEntryAsState()
@@ -157,8 +156,11 @@ class MainActivity : ComponentActivity() {
                 val tab = AppTabs.tabOf(route)
                 val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
                 val selectTab: (AppTab) -> Unit = { target ->
-                    // Same gate as Home's "Check an app": without the VPN and watcher, Home shows what is missing.
-                    if (target == AppTab.CHECK && !vm.prepareAudit()) nav.openTab(AppTab.HOME) else nav.openTab(target)
+                    // Check opens the live check when the VPN and consent watcher are ready; otherwise it opens APK Guard,
+                    // which needs neither, and its Live check segment sends the person Home to finish setup.
+                    if (target == AppTab.CHECK && !(vm.preflight.value.canAudit && vm.prepareAudit())) {
+                        if (tab != AppTab.CHECK) nav.navigate(ApkGuardRoutes.HUB) { popUpTo(AppTab.HOME.route); launchSingleTop = true }
+                    } else nav.openTab(target)
                 }
                 val reduceMotion = LocalReduceMotion.current
                 Scaffold(
@@ -206,22 +208,9 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("home") {
-                            // Everyday mode gets its own front door; both doors open the same screens and engine.
-                            if (settings.audience == Audience.USER) {
-                                val routeIfPresent: (String) -> (() -> Unit)? = { r -> if (nav.graph.findNode(r) != null) { { nav.navigate(r) } } else null }
-                                EverydayHomeScreen(
-                                    vm,
-                                    onCheckApp = { nav.navigate("pick") },
-                                    onApkFile = { nav.navigate(ApkGuardRoutes.file(it)) },
-                                    onAlerts = { nav.openTab(AppTab.APK) },
-                                    onOpen = { nav.navigate("results/$it") },
-                                    onAllReports = { nav.openTab(AppTab.REPORTS) },
-                                    onLive = { nav.navigate("live") },
-                                    onSettings = { nav.navigate("settings") },
-                                    onCheckup = routeIfPresent(ModeRoutes.CHECKUP),
-                                    onTrust = routeIfPresent(ModeRoutes.TRUST),
-                                )
-                            } else HomeScreen(
+                            // One Home for both modes; developer mode adds a few rows. Everything opens the same screens and engine.
+                            val routeIfPresent: (String) -> (() -> Unit)? = { r -> if (nav.graph.findNode(r) != null) { { nav.navigate(r) } } else null }
+                            HomeScreen(
                                 vm,
                                 onAudit = { nav.navigate("pick") },
                                 onOpen = { nav.navigate("results/$it") },
@@ -229,8 +218,8 @@ class MainActivity : ComponentActivity() {
                                 onCamera = { nav.navigate("camera") },
                                 onSettings = { nav.navigate("settings") },
                                 onVoice = { nav.navigate(AuditRoutes.voice(it)) },
-                                onApk = apkCheck(),
-                                onHowItWorks = { nav.navigate(OnboardingGate.ONBOARDING) },
+                                onApkFile = { nav.navigate(ApkGuardRoutes.file(it)) },
+                                onCheckup = routeIfPresent(ModeRoutes.CHECKUP),
                                 onLive = { nav.navigate("live") },
                                 onAllReports = { nav.openTab(AppTab.REPORTS) },
                                 onAutomation = { nav.navigate("settings") },
@@ -257,6 +246,7 @@ class MainActivity : ComponentActivity() {
                                 vm, onBack = { nav.popBackStack() }, onStarted = { nav.navigate("live") { popUpTo("home") } },
                                 initialQuery = e.arguments?.getString("q").orEmpty(),
                                 onQuarantine = { nav.navigateToQuarantine(it) },
+                                onSwitchToApk = { nav.navigate(ApkGuardRoutes.HUB) { popUpTo(AppTab.HOME.route); launchSingleTop = true } },
                             )
                         }
                         composable(QuarantineRoutes.ROUTE) { e ->
@@ -300,6 +290,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenApp = { nav.navigate(ApkGuardRoutes.app(it)) },
                                 onOpenFile = { nav.navigate(ApkGuardRoutes.file(it)) },
                                 onCheckup = { nav.navigate(AutoGuardRoutes.CHECKUP) },
+                                onSwitchToLive = { if (vm.preflight.value.canAudit && vm.prepareAudit()) nav.navigate("pick") { popUpTo(AppTab.HOME.route); launchSingleTop = true } else nav.openTab(AppTab.HOME) },
                             )
                         }
                         // Auto-guard "My phone checkup"; also opened by its weekly notification.

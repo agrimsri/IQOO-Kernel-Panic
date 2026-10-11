@@ -18,7 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,79 +44,82 @@ import com.dpdpxray.app.ui.theme.Mono
 import com.dpdpxray.app.ui.theme.Radii
 
 /**
- * The app bar every inner screen shares: 64dp tall, a 48dp back button when there is somewhere to go back to, and the
- * title as a heading for TalkBack. Tab screens pass `onBack = null`, so their title lines up with the content.
+ * The app bar every screen shares. A tab root (no back button) shows a large title; a screen you pushed shows a back
+ * chevron and an inline title. The title is a heading for TalkBack either way.
  */
 @Composable
 fun TopBar(title: String, onBack: (() -> Unit)?, trailing: @Composable () -> Unit = {}) {
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(start = 4.dp, end = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (onBack != null) {
-            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Film.bone)
-            }
-            Spacer(Modifier.width(4.dp))
-        } else {
-            Spacer(Modifier.width(16.dp))
+    if (onBack == null) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                title, style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).semantics { heading() },
+            )
+            trailing()
         }
-        Text(
-            title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).semantics { heading() },
-        )
-        trailing()
+    } else {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 4.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Back", tint = Film.scan, modifier = Modifier.size(30.dp))
+            }
+            Text(
+                title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(start = 2.dp).semantics { heading() },
+            )
+            trailing()
+        }
     }
 }
 
-/** A heading inside a screen, with a thin brand rule under it. */
+/** A heading inside a screen. */
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
-    Column(modifier.padding(top = 24.dp, bottom = 10.dp)) {
-        Text(text, style = MaterialTheme.typography.titleMedium, color = Film.bone, modifier = Modifier.semantics { heading() })
-        GradientRule(Modifier.padding(top = 6.dp), width = 22.dp)
-    }
+    Text(
+        text, style = MaterialTheme.typography.titleMedium, color = Film.bone,
+        modifier = modifier.padding(top = 24.dp, bottom = 10.dp).semantics { heading() },
+    )
 }
 
 /**
- * A row with a coloured rule on its left edge: the rule colour is the meaning (severity, category, status). A faint
- * wash of the same colour runs in from the rule. Tappable rows shrink slightly while pressed.
+ * A row whose meaning colour is a small dot at its leading edge (severity, category, status), on the standard card
+ * surface. Tappable rows shrink slightly while pressed.
  */
 @Composable
 fun RuleRow(color: Color, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable () -> Unit) {
     val shape = RoundedCornerShape(Radii.row)
-    val wash = remember(color) { Brush.horizontalGradient(0f to color.copy(alpha = 0.10f), 0.35f to Color.Transparent) }
-    // The left rule is drawn, not measured: IntrinsicSize.Min under-counts wrapped chip rows (FlowRow) and clipped cards.
     Row(
         modifier
             .fillMaxWidth()
             .let { if (onClick != null) it.pressClickable(shape = shape, onClick = onClick) else it }
             .clip(shape)
-            .background(FilmExtra.card)
-            .background(wash)
-            .drawBehind { drawRect(color, size = androidx.compose.ui.geometry.Size(4.dp.toPx(), size.height)) }
-            .border(1.dp, FilmExtra.cardEdge, shape),
+            .background(Film.raised),
     ) {
-        Column(Modifier.padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 14.dp).weight(1f)) { content() }
+        Box(Modifier.padding(start = 16.dp, top = 21.dp).size(8.dp).clip(CircleShape).background(color))
+        Column(Modifier.padding(start = 12.dp, end = 16.dp, top = 14.dp, bottom = 14.dp).weight(1f)) { content() }
     }
 }
 
 @Composable
 fun StatusDot(ok: Boolean?, modifier: Modifier = Modifier) {
     val c = when (ok) { true -> Film.clear; false -> Film.leak; null -> Film.warn }
-    Box(modifier.size(10.dp).clip(CircleShape).background(c))
+    Box(modifier.size(8.dp).clip(CircleShape).background(c))
 }
 
-/** A small label chip: tinted fill, soft outline, text in the meaning colour. */
+/** A small label: quiet fill, text in the meaning colour, no outline. */
 @Composable
 fun Tag(text: String, color: Color, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(8.dp)
     Text(
         text,
         style = MaterialTheme.typography.labelMedium,
         color = color,
-        modifier = modifier.clip(shape).background(color.copy(alpha = 0.14f)).border(1.dp, color.copy(alpha = 0.40f), shape)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+        modifier = modifier.clip(shape).background(Film.fill).padding(horizontal = 8.dp, vertical = 3.dp),
     )
 }
 
@@ -129,62 +132,53 @@ fun HostText(host: String, color: Color = Film.bone) {
 fun CodeBlock(code: String, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(Radii.small)
     Box(
-        modifier.fillMaxWidth().clip(shape).background(Color(0xFF0B1722))
-            .border(1.dp, Film.line, shape).horizontalScroll(rememberScrollState()).padding(12.dp),
+        modifier.fillMaxWidth().clip(shape).background(Film.fill, shape).horizontalScroll(rememberScrollState()).padding(12.dp),
     ) {
         Text(code, fontFamily = Mono, fontSize = 12.5.sp, lineHeight = 18.sp, color = Film.bone)
     }
 }
 
-/** Filled scan colour, lit from the top, for the main action of a section. */
-private val ScanFill = Brush.verticalGradient(listOf(Color(0xFF9FE2F0), Film.scan))
-
 /**
- * The main action of a section: filled scan gradient, dark text, at least 56dp tall (text may wrap, never clips).
+ * The main action of a section: solid accent, accent-contrast text, at least 52dp tall (text may wrap, never clips).
  * Shrinks slightly while pressed.
  */
 @Composable
 fun PrimaryAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val shape = RoundedCornerShape(Radii.button)
     Box(
-        modifier.fillMaxWidth().heightIn(min = 56.dp)
+        modifier.fillMaxWidth().heightIn(min = 52.dp)
             .pressClickable(enabled = enabled, shape = shape, onClick = onClick)
-            .background(if (enabled) ScanFill else SolidColor(Film.line))
+            .background(if (enabled) Film.scan else Film.fill)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, color = if (enabled) Film.base else Film.boneDim)
+        Text(text, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, color = if (enabled) Film.onAccent else Film.tertiary)
     }
 }
 
-/** A secondary action: outlined, light text, same corner radius as [PrimaryAction], at least 52dp tall. */
+/** A secondary action: a quiet filled button, same radius as [PrimaryAction], at least 48dp tall. */
 @Composable
 fun SecondaryAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val shape = RoundedCornerShape(Radii.button)
     Box(
-        modifier.heightIn(min = 52.dp)
+        modifier.heightIn(min = 48.dp)
             .pressClickable(enabled = enabled, shape = shape, onClick = onClick)
-            .background(if (enabled) Film.bone.copy(alpha = 0.04f) else Color.Transparent)
-            .border(1.dp, if (enabled) Film.boneDim.copy(alpha = 0.55f) else Film.line, shape)
+            .background(Film.fill)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, color = if (enabled) Film.bone else Film.boneDim)
+        Text(text, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, color = if (enabled) Film.bone else Film.tertiary)
     }
 }
 
 /**
- * The Consent Line: the signature element. A glowing horizontal rule marking the moment the user chose.
- * Everything above it on the timeline happened before consent.
+ * The moment the user chose, drawn as a thin rule in the phase colour. Everything above it on the timeline happened
+ * before consent.
  */
 @Composable
 fun ConsentLine(label: String, color: Color) {
     Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-        Box(
-            Modifier.fillMaxWidth().height(3.dp).background(
-                Brush.horizontalGradient(listOf(color.copy(alpha = 0f), color, color, color.copy(alpha = 0f))),
-            ),
-        )
+        Box(Modifier.fillMaxWidth().height(2.dp).clip(CircleShape).background(color))
         Text(label, style = MaterialTheme.typography.labelMedium, color = color, modifier = Modifier.padding(top = 4.dp))
     }
 }

@@ -26,6 +26,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Install the Traceveil CLI (editable)
+        run: python3 -m pip install -e .
+
       - name: Test commit-date checker against disposable histories
         run: python3 -m unittest discover -s tools/tests -v
 

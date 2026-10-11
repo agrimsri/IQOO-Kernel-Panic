@@ -31,8 +31,17 @@ class BrandMarkTest {
         assertTrue(manifest.contains("android:roundIcon=\"@mipmap/ic_launcher_round\""))
     }
 
-    @Test fun `launcher foreground and monochrome stay inside the 66 dp safe zone`() {
-        for (name in listOf("ic_launcher_foreground", "ic_launcher_monochrome")) {
+    @Test fun `launcher foreground is the logo image inset into the 66 dp safe zone`() {
+        val xml = File(res, "drawable/ic_launcher_foreground.xml").readText()
+        assertTrue("foreground uses the logo image", xml.contains("@drawable/logo_mark"))
+        val inset = Regex("android:inset=\"([0-9.]+)%\"").find(xml)?.groupValues?.get(1)?.toDouble() ?: 0.0
+        // The mark fills about 88% of the image; a 17% inset on each side keeps it inside the 61% safe zone.
+        assertTrue("inset is $inset%", inset >= 17.0)
+        assertTrue("logo image is bundled", File(res, "drawable-nodpi/logo_mark.png").length() > 10_000)
+    }
+
+    @Test fun `launcher monochrome stays inside the 66 dp safe zone`() {
+        for (name in listOf("ic_launcher_monochrome")) {
             val xml = File(res, "drawable/$name.xml").readText()
             val paths = Regex("android:pathData=\"([^\"]+)\"").findAll(xml).map { it.groupValues[1] }.toList()
             assertTrue("$name has the mark's shapes", paths.size >= 5)

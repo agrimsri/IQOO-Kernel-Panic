@@ -41,6 +41,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.appsflyer.AppsFlyerLib
+import com.mixpanel.android.mpmetrics.MixpanelAPI
+import com.onesignal.OneSignal
 import java.net.InetAddress
 import kotlin.concurrent.thread
 
@@ -49,6 +52,8 @@ import kotlin.concurrent.thread
  * It does NOT contain real tracker SDKs and sends no data: it performs the same DNS lookups those SDKs make when they
  * initialise, which is exactly the evidence TraceVeil captures. The `leaky` flavor behaves like a typical non-compliant app;
  * the `fixed` flavor shows the DPDP-compliant pattern.
+ * A few lookups go through demo stand-ins that borrow real SDK package names (com.appsflyer, com.mixpanel, com.onesignal,
+ * io.sentry) so `traceveil sdks` can show "SDK found in APK" next to "tracker observed live"; the rest are plain app code.
  */
 object SdkSimulator {
     const val FIREBASE_ANALYTICS = "app-measurement.com"
@@ -57,6 +62,11 @@ object SdkSimulator {
     const val APPSFLYER = "launches.appsflyersdk.com"
     const val ADS = "googleads.g.doubleclick.net"
     const val CLEVERTAP = "in1.clevertap-prod.com"
+    const val MIXPANEL = "api.mixpanel.com"
+    const val AMPLITUDE = "api2.amplitude.com"
+    const val CLARITY = "www.clarity.ms"
+    const val ONESIGNAL = "api.onesignal.com"
+    const val SENTRY = "o0.ingest.sentry.io"
     const val OWN_API = "api.leakyshop.example"
 
     /** Resolve each host on a background thread, like an SDK warming up its endpoint. No payload is ever sent. */
@@ -77,9 +87,12 @@ class ShopApp : Application() {
         SdkSimulator.touch(SdkSimulator.OWN_API)
         if (!BuildConfig.COMPLIANT) {
             // The classic mistake: SDKs auto-initialise in Application.onCreate, before any consent.
-            SdkSimulator.touch(SdkSimulator.FIREBASE_ANALYTICS, SdkSimulator.FACEBOOK, SdkSimulator.CRASHLYTICS, SdkSimulator.APPSFLYER)
+            SdkSimulator.touch(SdkSimulator.FIREBASE_ANALYTICS, SdkSimulator.FACEBOOK, SdkSimulator.CRASHLYTICS, SdkSimulator.AMPLITUDE, SdkSimulator.CLARITY)
+            AppsFlyerLib.start()
+            MixpanelAPI.track()
         } else if (Consent.accepted(this)) {
             SdkSimulator.touch(SdkSimulator.FIREBASE_ANALYTICS, SdkSimulator.FACEBOOK)
+            MixpanelAPI.track()
         }
     }
 }
@@ -120,6 +133,7 @@ class ShopActivity : ComponentActivity() {
                     Button(onClick = {
                         Consent.save(this, true)
                         SdkSimulator.touch(SdkSimulator.ADS, SdkSimulator.CLEVERTAP)
+                        OneSignal.initWithContext()
                         onDone()
                     }) { Text("Accept & Continue") }
                 },
@@ -134,7 +148,9 @@ class ShopActivity : ComponentActivity() {
                     TextButton(onClick = {
                         Consent.save(this, false)
                         // The bug TraceVeil catches: refusal is stored but the SDKs keep running.
-                        SdkSimulator.touch(SdkSimulator.FACEBOOK, SdkSimulator.FIREBASE_ANALYTICS, SdkSimulator.APPSFLYER)
+                        SdkSimulator.touch(SdkSimulator.FACEBOOK, SdkSimulator.FIREBASE_ANALYTICS)
+                        AppsFlyerLib.start()
+                        MixpanelAPI.track()
                         onDone()
                     }) { Text("Reject all", fontSize = 12.sp) }
                 },
@@ -196,8 +212,8 @@ class ShopActivity : ComponentActivity() {
             confirmButton = {
                 Button(onClick = {
                     Consent.save(this, true)
-                    if (analytics) SdkSimulator.touch(SdkSimulator.FIREBASE_ANALYTICS)
-                    if (offers) SdkSimulator.touch(SdkSimulator.FACEBOOK)
+                    if (analytics) { SdkSimulator.touch(SdkSimulator.FIREBASE_ANALYTICS); MixpanelAPI.track() }
+                    if (offers) { SdkSimulator.touch(SdkSimulator.FACEBOOK); OneSignal.initWithContext() }
                     onDone()
                 }) { Text(if (hindi) "स्वीकार करें" else "Accept") }
             },

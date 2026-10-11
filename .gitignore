@@ -31,3 +31,10 @@ __pycache__/
 
 # ConsentLens-1 ships in the APK (about 146 KB, trained by ml/consentlens/train_consentlens.py).
 !/app/src/main/assets/consentlens/*.tflite
+
+# Traceveil CLI: local reports and Python packaging output.
+.traceveil/
+
+/dist/
+*.egg-info/
+/.venv/
