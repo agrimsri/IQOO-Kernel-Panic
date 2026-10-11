@@ -111,6 +111,20 @@ class ApkCodeScannerTest {
     }
 
     @Test
+    fun `a split APK is read as one app - code in the base and in a feature split, none in config splits`() {
+        // Play installs a split app as base.apk plus config splits (native libraries, densities) and feature splits.
+        val base = apk("base.apk", mapOf("classes.dex" to dex(listOf("Lcom/facebook/appevents/AppEventsLogger;"))))
+        val abi = apk("split_config.arm64_v8a.apk", mapOf("lib/arm64-v8a/libapp.so" to ByteArray(16)))
+        val density = apk("split_config.xxhdpi.apk", mapOf("res/drawable-xxhdpi/a.png" to ByteArray(8)))
+        val feature = apk("split_feature_shop.apk", mapOf("classes.dex" to dex(listOf("Lcom/appsflyer/AppsFlyerLib;"))))
+        val r = ApkCodeScanner.scan(listOf(base, abi, density, feature), signatures)
+        assertEquals(setOf("Meta (Facebook SDK)", "AppsFlyer"), r.found.keys)
+        assertEquals(2, r.dexFilesRead)
+        assertEquals(0, r.apksUnreadable)
+        assertTrue("config splits without code do not make the scan incomplete", r.complete)
+    }
+
+    @Test
     fun `size limits skip a DEX instead of reading it, and the result says it is incomplete`() {
         val apk = apk("big.apk", mapOf("classes.dex" to dex(listOf("Lcom/facebook/appevents/AppEventsLogger;"))))
         val r = ApkCodeScanner.scan(listOf(apk), signatures, CodeScanLimits(maxDexBytes = 64))
