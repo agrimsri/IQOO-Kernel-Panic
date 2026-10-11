@@ -41,6 +41,14 @@ data class AuditMeta(
     val targetVersionName: String? = null,
     @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
     val targetVersionCode: Long? = null,
+    /**
+     * The check's own options, kept so "Check again" can repeat it in one tap: whether the agent tapped the consent choice
+     * and whether Google Play services lookups were included. null = not recorded (older audits); written only when set.
+     */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val autoDrive: Boolean? = null,
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val includeGms: Boolean? = null,
 )
 
 data class AuditBundle(

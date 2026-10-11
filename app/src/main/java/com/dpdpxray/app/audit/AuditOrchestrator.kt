@@ -231,7 +231,7 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
                     val svc = ConsentAccessibilityService.instance
                     val found = svc?.blockerFields().orEmpty()
                     svc?.showBlockerPrompt(
-                        BlockerCopy.promptTitle(kind, found, hindi), BlockerCopy.promptBody(hindi),
+                        BlockerCopy.promptTitle(kind, found, hindi), BlockerCopy.promptBody(kind, hindi),
                         BlockerCopy.promptStop(hindi), BlockerCopy.promptHide(hindi),
                     ) { this@AuditOrchestrator.cancel() }
                     found

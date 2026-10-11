@@ -2,8 +2,12 @@ package com.dpdpxray.core.consent
 
 import com.dpdpxray.core.model.UiNode
 
-/** The kinds of screen that stand between an app's launch and its consent screen: nothing to do with consent itself. */
-enum class BlockerKind { SIGN_IN, OTP, CAPTCHA, BIOMETRIC, FORM }
+/**
+ * The kinds of screen that stand between an app's launch and its consent screen: nothing to do with consent itself.
+ * [PERMISSION] is Android's own permission dialog over the app; it is recognised from the window's package (never from
+ * the app's text, so [BlockerLexicon.detect] never returns it), and TraceVeil never answers it.
+ */
+enum class BlockerKind { SIGN_IN, OTP, CAPTCHA, BIOMETRIC, FORM, PERMISSION }
 
 /**
  * Recognises sign-in, verification-code, CAPTCHA and biometric/PIN screens from the accessibility tree, and the few

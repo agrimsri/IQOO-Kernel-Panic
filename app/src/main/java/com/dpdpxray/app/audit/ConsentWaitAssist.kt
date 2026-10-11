@@ -15,6 +15,8 @@ import com.dpdpxray.core.model.ConsentEvent
  *    blocker is gone again.
  * 3. Time spent behind a blocker does not count against [await]'s timeout, up to `assistTimeoutMs` in total, so the
  *    usual consent wait only starts once the app is past it. Capture keeps running throughout.
+ * 4. Android's own permission dialog ([BlockerKind.PERMISSION]) is never tapped: the person is asked at once, and the
+ *    wait pauses the same way. The person can also tap Continue on the card when they are through.
  */
 internal class ConsentWaitAssist(
     private val probe: suspend () -> ConsentEvent?,
@@ -29,6 +31,11 @@ internal class ConsentWaitAssist(
     private val maxSkips: Int = 3,
     /** False for the Silent plan, which never touches the app: a blocker is then only noted, never skipped or handed over. */
     private val interactive: Boolean = true,
+    /**
+     * The person tapped Continue on the hand-off card: the step they were asked to do is done, even if the screen still
+     * reads like it (a profile page that keeps a "Phone number" label). That kind of blocker is then no longer waited on.
+     */
+    private val userContinued: () -> Boolean = { false },
 ) {
     data class Outcome(
         val consent: ConsentEvent?,
@@ -54,25 +61,41 @@ internal class ConsentWaitAssist(
         var lastSkipFailed = false
         var handedOff = false
         var showingHandoff = false
+        var handoffKind: BlockerKind? = null
+        val done = mutableSetOf<BlockerKind>()
         fun outcome(consent: ConsentEvent?) = Outcome(consent, first, skipped.toList(), handedOff, blockedMs)
 
         while (true) {
             probe()?.let { return outcome(it) }
             val now = clockMs()
-            val blocker = detectBlocker()
+            val seen = detectBlocker()
+            if (showingHandoff && userContinued()) {
+                handoffKind?.let { done += it }
+                seen?.let { done += it }
+                showingHandoff = false
+                onResume()
+            }
+            val blocker = seen?.takeUnless { it in done }
             if (blocker != null) {
                 if (first == null) first = blocker
                 if (interactive) blockedMs = minOf(assistTimeoutMs, blockedMs + (now - last))
-                if (interactive && skips < maxSkips && now - lastSkipAt >= skipGapMs) {
+                // Android's permission dialog is never answered or skipped: only the person decides it.
+                val skippable = blocker != BlockerKind.PERMISSION
+                if (interactive && skippable && skips < maxSkips && now - lastSkipAt >= skipGapMs) {
                     lastSkipAt = now
                     skips++
                     val label = trySkip()
                     lastSkipFailed = label == null
                     if (label != null) skipped += label
                 }
-                if (interactive && !showingHandoff && (skips >= maxSkips || (skips >= 2 && lastSkipFailed))) {
+                if (interactive && !showingHandoff && (!skippable || skips >= maxSkips || (skips >= 2 && lastSkipFailed))) {
                     showingHandoff = true
                     handedOff = true
+                    handoffKind = blocker
+                    onHandoff(blocker)
+                } else if (interactive && showingHandoff && blocker != handoffKind) {
+                    // A different step now (the permission was answered and a sign-in shows): the card says the new one.
+                    handoffKind = blocker
                     onHandoff(blocker)
                 }
             } else if (showingHandoff) {
