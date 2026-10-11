@@ -103,7 +103,9 @@
             "freshState": true,
             "backgroundStartedNanos": null,
             "permissionDialogsWatched": null,
-            "manifestFacts": null
+            "manifestFacts": null,
+            "flows": [],
+            "captureDepth": null
         },
         {
             "id": "sample-fixed-b",
@@ -199,7 +201,9 @@
             "freshState": true,
             "backgroundStartedNanos": null,
             "permissionDialogsWatched": null,
-            "manifestFacts": null
+            "manifestFacts": null,
+            "flows": [],
+            "captureDepth": null
         },
         {
             "id": "sample-fixed-a",
@@ -288,7 +292,9 @@
             "freshState": true,
             "backgroundStartedNanos": null,
             "permissionDialogsWatched": null,
-            "manifestFacts": null
+            "manifestFacts": null,
+            "flows": [],
+            "captureDepth": null
         }
     ],
     "result": {
