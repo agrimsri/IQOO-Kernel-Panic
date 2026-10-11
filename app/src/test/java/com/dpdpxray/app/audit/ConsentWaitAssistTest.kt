@@ -23,10 +23,10 @@ class ConsentWaitAssistTest {
         val skipClears get() = skipWorks && skipTaps > 0
     }
 
-    private fun assist(s: Script, interactive: Boolean = true, event: ConsentEvent = consent) = ConsentWaitAssist(
+    private fun assist(s: Script, interactive: Boolean = true, event: ConsentEvent = consent, skip: (() -> String?)? = null) = ConsentWaitAssist(
         probe = { event.takeIf { s.consentAtMs != null && s.now >= s.consentAtMs && !(blockedNow(s)) } },
         detectBlocker = { s.blocker.takeIf { blockedNow(s) } },
-        trySkip = { if (s.skipWorks) { s.skipTaps++; "Skip" } else { s.skipTaps++; null } },
+        trySkip = { skip?.invoke()?.also { s.skipTaps++ } ?: if (skip != null) { s.skipTaps++; null } else if (s.skipWorks) { s.skipTaps++; "Skip" } else { s.skipTaps++; null } },
         onHandoff = { s.handoffs++ },
         onResume = { s.resumes++ },
         clockMs = { s.now },
@@ -127,5 +127,15 @@ class ConsentWaitAssistTest {
             assertTrue(AccessCopy.reason(n).en.isNotBlank() && AccessCopy.reason(n).hi.isNotBlank())
             assertTrue(AccessCopy.button(n).en.isNotBlank() && AccessCopy.title(n).hi.isNotBlank())
         }
+    }
+
+    @Test fun `one unsuccessful try does not hand over when the next one works`() = runBlocking {
+        // A form: the first pass types and opens a date picker (nothing to report yet), the second confirms it.
+        val s = Script(blockerUntilMs = 2_500, consentAtMs = 3_000)
+        var tries = 0
+        val o = assist(s, skip = { tries++; if (tries == 1) null else "OK" }).await(20_000)
+        assertNotNull(o.consent)
+        assertFalse(o.handedOff)
+        assertEquals(0, s.handoffs)
     }
 }

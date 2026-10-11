@@ -7,8 +7,9 @@ import com.dpdpxray.core.model.ConsentEvent
  * Waits for the audited app's consent screen the way [ConsentScreenWaiter] does, but copes with a sign-in, code,
  * CAPTCHA or biometric screen standing in the way:
  *
- * 1. When a blocker shows, it taps a harmless skip button ("Skip", "Not now", "Continue as guest") up to [maxSkips]
- *    times. It never types and never taps a sign-in button.
+ * 1. When a blocker shows, it taps a harmless skip button ("Skip", "Not now", "Continue as guest") or completes a profile form
+ *    with test values, up to [maxSkips]
+ *    times. It never types a password, code or identifying detail and never taps a sign-in button.
  * 2. If nothing can be skipped, it hands over to the person ([onHandoff], once): they sign in or pass the check
  *    themselves, and TraceVeil keeps watching and carries on when the consent screen shows. [onResume] fires when the
  *    blocker is gone again.
@@ -69,7 +70,7 @@ internal class ConsentWaitAssist(
                     lastSkipFailed = label == null
                     if (label != null) skipped += label
                 }
-                if (interactive && !showingHandoff && (skips >= maxSkips || (skips >= 1 && lastSkipFailed))) {
+                if (interactive && !showingHandoff && (skips >= maxSkips || (skips >= 2 && lastSkipFailed))) {
                     showingHandoff = true
                     handedOff = true
                     onHandoff(blocker)

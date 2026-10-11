@@ -12,6 +12,7 @@ internal object BlockerCopy {
         BlockerKind.OTP -> "verification-code screen"
         BlockerKind.CAPTCHA -> "CAPTCHA"
         BlockerKind.BIOMETRIC -> "fingerprint or PIN prompt"
+        BlockerKind.FORM -> "details form"
     }
 
     fun kindHi(k: BlockerKind): String = when (k) {
@@ -19,6 +20,7 @@ internal object BlockerCopy {
         BlockerKind.OTP -> "वेरिफ़िकेशन कोड स्क्रीन"
         BlockerKind.CAPTCHA -> "कैप्चा"
         BlockerKind.BIOMETRIC -> "फ़िंगरप्रिंट या PIN"
+        BlockerKind.FORM -> "जानकारी फ़ॉर्म"
     }
 
     /** The live "step" line while the person is asked to act. */
@@ -44,6 +46,7 @@ internal object BlockerCopy {
             BlockerKind.OTP -> if (hindi) "वेरिफ़िकेशन कोड डालें" else "Enter the verification code"
             BlockerKind.CAPTCHA -> if (hindi) "कैप्चा हल करें" else "Solve the CAPTCHA"
             BlockerKind.BIOMETRIC -> if (hindi) "फ़िंगरप्रिंट या PIN इस्तेमाल करें" else "Use your fingerprint or PIN"
+            BlockerKind.FORM -> if (hindi) "फ़ॉर्म भरें" else "Fill in the form"
         }
     }
 

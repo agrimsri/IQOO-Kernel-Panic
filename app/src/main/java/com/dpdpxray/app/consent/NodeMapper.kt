@@ -12,11 +12,19 @@ object NodeMapper {
     private const val MAX_DEPTH = UiTreeLimits.MAX_DEPTH
     private const val MAX_NODES = UiTreeLimits.MAX_NODES
 
-    fun map(root: AccessibilityNodeInfo?): UiNode? {
+    fun map(root: AccessibilityNodeInfo?): UiNode? = mapWithNodes(root)?.first
+
+    /**
+     * The mapped tree and the live nodes behind it, in the same order as [UiNode.flatten], so a position planned on the
+     * copy can be acted on in the real screen.
+     */
+    fun mapWithNodes(root: AccessibilityNodeInfo?): Pair<UiNode, List<AccessibilityNodeInfo>>? {
         root ?: return null
         var budget = MAX_NODES
+        val live = mutableListOf<AccessibilityNodeInfo>()
         fun walk(n: AccessibilityNodeInfo, depth: Int): UiNode {
             budget--
+            live += n
             val r = Rect().also { n.getBoundsInScreen(it) }
             val kids = if (depth >= MAX_DEPTH) emptyList() else (0 until n.childCount).mapNotNull { i ->
                 if (budget <= 0) null else n.getChild(i)?.let { walk(it, depth + 1) }
@@ -35,7 +43,8 @@ object NodeMapper {
                 children = kids,
             )
         }
-        return walk(root, 0)
+        val tree = walk(root, 0)
+        return tree to live
     }
 
     /** Text a user would read for a clicked node: its own label, else its children's. */

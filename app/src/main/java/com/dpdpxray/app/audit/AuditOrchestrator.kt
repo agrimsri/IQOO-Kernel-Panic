@@ -218,7 +218,8 @@ class AuditOrchestrator(private val context: Context, private val graph: AppGrap
                 ConsentBus.events.value.firstOrNull { it.kind == ConsentKind.SCREEN_APPEARED || it.kind == ConsentKind.MANUAL_MARK }
             },
             detectBlocker = { withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.blockerNow() } },
-            trySkip = { withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.trySkipBlocker() } },
+            // A skip button first; failing that, a profile form is completed with test values (never identifying fields).
+            trySkip = { withContext(Dispatchers.Main.immediate) { ConsentAccessibilityService.instance?.let { it.trySkipBlocker() ?: it.fillFormAndContinue() } } },
             onHandoff = { kind ->
                 // Say which field to fill in, using the app's own label for it, on screen and in the notification.
                 val hindi = graph.settings.settings.value.guideLanguage == "hi"

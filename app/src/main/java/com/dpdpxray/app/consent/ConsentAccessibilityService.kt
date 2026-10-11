@@ -9,11 +9,13 @@ import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import com.dpdpxray.app.control.ShizukuBridge
 import com.dpdpxray.app.quarantine.QuarantineBus
 import com.dpdpxray.app.quarantine.QuarantineUiWatcher
 import com.dpdpxray.core.consent.BlockerKind
 import com.dpdpxray.core.consent.BlockerLexicon
 import com.dpdpxray.core.consent.ConsentLexicon
+import com.dpdpxray.core.consent.FormFill
 import com.dpdpxray.core.model.ConsentEvent
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.UiNode
@@ -78,7 +80,9 @@ class ConsentAccessibilityService : AccessibilityService() {
         val pkg = event.packageName?.toString()
         // The glow marks the inspected app: it steps aside while TraceVeil itself is in front and returns with the app.
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            if (pkg == armed) overlay.showGlow() else if (pkg == packageName) overlay.hideAll()
+            // Our own overlay windows also report events from this package, so only a real activity counts as "in front".
+            if (pkg == armed) overlay.showGlow()
+            else if (pkg == packageName && event.className?.toString()?.endsWith("Activity") == true) overlay.hideAll()
         }
         if (pkg != armed) {
             // Android's permission dialog over the audited app is recorded (C14), never treated as its consent screen.
@@ -298,6 +302,86 @@ class ConsentAccessibilityService : AccessibilityService() {
         var node: AccessibilityNodeInfo? = target
         while (node != null && !node.isClickable) node = node.parent
         return label.takeIf { node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true }
+    }
+
+    /**
+     * For a profile form (Name, Date of Birth, CONTINUE): types obvious test values into the harmless fields, and taps the
+     * Continue button only when every field then holds something. Never touches a password, phone, email, code or other
+     * identifying field, and never types the person's own details. Returns a short description for the audit notes, or
+     * null when the form could not be completed this way (the person is then asked for what is left). Main thread.
+     */
+    suspend fun fillFormAndContinue(): String? {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        val (tree, live) = NodeMapper.mapWithNodes(targetRoot()) ?: return null
+        val kind = BlockerLexicon.detect(tree)
+        if (kind != BlockerKind.FORM) return null
+        // A date-of-birth field opens a picker; the date typed in (or the picker's own default) is confirmed with OK.
+        FormFill.pickerConfirmIndex(tree)?.let { ok ->
+            var node: AccessibilityNodeInfo? = live[ok]
+            while (node != null && !node.isClickable) node = node.parent
+            return if (node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) "OK (confirmed the date picker)" else null
+        }
+        val plan = FormFill.plan(tree)
+        val forward = plan.forwardIndex ?: return null
+        val clipboard = getSystemService(android.content.ClipboardManager::class.java)
+        val keyboard = ShizukuBridge.hasPermission()
+        val typed = mutableListOf<FormFill.Fill>()
+        for (f in plan.fills) {
+            val node = live[f.index]
+            var node2: AccessibilityNodeInfo? = node
+            while (node2 != null && !node2.isClickable) node2 = node2.parent
+            // A tap focuses the field (and opens a date picker for a date field, which is confirmed on the next pass).
+            val tapped = (node2 ?: node).performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            if (f.value == FormFill.TEST_BIRTH) { if (tapped) typed += f; continue }
+            kotlinx.coroutines.delay(300)
+            // Some apps only register what arrives like real typing, so the keyboard path comes first: the shell's own
+            // `input text` when Shizuku is allowed, else a paste through the field's input connection, else set-text.
+            val ok = (keyboard && ShizukuBridge.exec("input", "text", f.value.replace(" ", "%s")).isSuccess) ||
+                runCatching {
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("TraceVeil test value", f.value))
+                    node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+                }.getOrDefault(false) ||
+                node.performAction(
+                    AccessibilityNodeInfo.ACTION_SET_TEXT,
+                    android.os.Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, f.value) },
+                )
+            if (ok) typed += f
+        }
+        // Put the keyboard away so the button underneath can be reached, but only when one is actually showing.
+        if (windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }) performGlobalAction(GLOBAL_ACTION_BACK)
+        // Read the screen again: continue only if the typing took and nothing identifying is left to fill.
+        kotlinx.coroutines.delay(400)
+        // The test values must not linger on the clipboard (cleared only after the app has read them).
+        runCatching { clipboard.clearPrimaryClip() }
+        val (after, afterLive) = NodeMapper.mapWithNodes(targetRoot()) ?: return null
+        val left = FormFill.plan(after)
+        if (left.fills.isNotEmpty() || left.manual.isNotEmpty()) return null
+        val button = afterLive.getOrNull(left.forwardIndex ?: return null) ?: return null
+        var node: AccessibilityNodeInfo? = button
+        while (node != null && !node.isClickable) node = node.parent
+        val label = NodeMapper.labelOf(button) ?: "Continue"
+        // A real touch first: some apps only act on the form when the button is pressed like a finger would.
+        val r = android.graphics.Rect().also { (node ?: button).getBoundsInScreen(it) }
+        val pressed = tapGesture(r.exactCenterX(), r.exactCenterY()) || node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+        if (!pressed) return null
+        val names = typed.map { it.label }.joinToString().ifEmpty { "no fields" }
+        return "$label (after typing test values into $names)"
+    }
+
+    /** A short touch at ([x], [y]) on screen, the way a finger taps. True once the system has completed it. */
+    private suspend fun tapGesture(x: Float, y: Float): Boolean = suspendCancellableCoroutine { cont ->
+        val path = android.graphics.Path().apply { moveTo(x, y) }
+        val gesture = android.accessibilityservice.GestureDescription.Builder()
+            .addStroke(android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 60)).build()
+        val sent = dispatchGesture(
+            gesture,
+            object : GestureResultCallback() {
+                override fun onCompleted(g: android.accessibilityservice.GestureDescription?) { if (cont.isActive) cont.resume(true) }
+                override fun onCancelled(g: android.accessibilityservice.GestureDescription?) { if (cont.isActive) cont.resume(false) }
+            },
+            null,
+        )
+        if (!sent && cont.isActive) cont.resume(false)
     }
 
     private fun findSkip(n: AccessibilityNodeInfo): AccessibilityNodeInfo? {

@@ -45,11 +45,13 @@ internal class InspectionOverlay(private val service: AccessibilityService) {
 
     fun showGlow() {
         if (glow != null) return
-        // Dusty Lavender reads on light and dark apps alike; it fades to nothing over about 80 dp.
-        val top = ColorUtils.setAlphaComponent(DUSTY_LAVENDER, 0x8C)
-        val mid = ColorUtils.setAlphaComponent(DUSTY_LAVENDER, 0x33)
+        // Icy Aqua at full strength along the edge so it reads on dark apps, easing through Lavender Grey (which holds up on
+        // light apps) to nothing over about 110 dp.
         val view = View(service).apply {
-            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(top, mid, Color.TRANSPARENT))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(ICY_AQUA, ColorUtils.setAlphaComponent(ICY_AQUA, 0xB0), ColorUtils.setAlphaComponent(LAVENDER_GREY, 0x70), ColorUtils.setAlphaComponent(LAVENDER_GREY, 0x28), Color.TRANSPARENT),
+            )
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         val params = WindowManager.LayoutParams(
@@ -59,10 +61,11 @@ internal class InspectionOverlay(private val service: AccessibilityService) {
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.TOP or Gravity.START }
-        if (runCatching { wm.addView(view, params) }.isFailure) return
+        val added = runCatching { wm.addView(view, params) }
+        if (added.isFailure) return
         glow = view
         if (ValueAnimator.areAnimatorsEnabled()) {
-            pulse = ValueAnimator.ofFloat(0.55f, 1f).apply {
+            pulse = ValueAnimator.ofFloat(0.8f, 1f).apply {
                 duration = 2_400
                 repeatMode = ValueAnimator.REVERSE
                 repeatCount = ValueAnimator.INFINITE
@@ -141,9 +144,10 @@ internal class InspectionOverlay(private val service: AccessibilityService) {
     }
 
     companion object {
-        private const val GLOW_DP = 88f
+        private const val GLOW_DP = 120f
         private const val TOP_MARGIN_DP = 72f
-        /** Dusty Lavender #8B687F, one of the five scheme colours. */
-        private val DUSTY_LAVENDER = Color.parseColor("#8B687F")
+        /** Icy Aqua #BCF8EC and Lavender Grey #9FA0C3, two of the five scheme colours. */
+        private val ICY_AQUA = Color.parseColor("#BCF8EC")
+        private val LAVENDER_GREY = Color.parseColor("#9FA0C3")
     }
 }
