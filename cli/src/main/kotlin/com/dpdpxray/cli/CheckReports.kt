@@ -3,9 +3,11 @@ package com.dpdpxray.cli
 import com.dpdpxray.core.law.LawRelation
 import com.dpdpxray.core.law.LensView
 import com.dpdpxray.core.model.AuditResult
+import com.dpdpxray.core.model.ConsentHistory
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.EvidenceType
 import com.dpdpxray.core.model.Finding
+import com.dpdpxray.core.model.HistoryBounds
 import com.dpdpxray.core.model.ScoreBand
 import com.dpdpxray.core.netcapture.ConnectionSummary
 import com.dpdpxray.core.rules.ScoreCalculator
@@ -24,16 +26,39 @@ object Wording {
     const val SCOPE_CAVEAT = "Findings come from DNS lookups and consent-screen review on one phone during one run. " +
         "This is an automated technical check, not legal advice or a compliance certificate."
 
-    fun score(r: AuditResult): String =
-        if (r.band == ScoreBand.INCONCLUSIVE || r.score == null) "Inconclusive (score not established)" else "${r.score}/100 · ${band(r.band, r.score)}"
+    fun score(r: AuditResult): String {
+        val b = r.historyBounds
+        val score = r.score
+        val answered = b?.answer?.declared == true
+        return when {
+            b != null && score == null -> range(b)
+            r.band == ScoreBand.INCONCLUSIVE || score == null -> "Inconclusive (score not established)"
+            else -> "$score/100 · ${band(r.band, score, answered)}" +
+                if (answered && !(r.band == ScoreBand.NEEDS_WORK && score >= 85)) " · based on the person's answer about consent history" else ""
+        }
+    }
+
+    /** A consent-history range: "65–99 depending on consent history · 60–84 band either way". */
+    fun range(b: HistoryBounds): String = "${b.range} depending on consent history · " +
+        if (b.bandSettled) "${band(b.lowBand, b.lowScore)} either way" else "at best the ${band(b.bestBand)}"
+
+    /** What the range rests on and both ends, or the person's answer that picked one. */
+    fun history(b: HistoryBounds): String = when (b.answer) {
+        ConsentHistory.DECLARED_NEVER, ConsentHistory.DECLARED_AGREED -> "${b.answer?.line()} (TraceVeil cannot check it)"
+        ConsentHistory.NOT_SURE -> "consent history unknown: the app kept its data and showed no consent screen; asked, the person is not sure"
+        else -> "consent history unknown: the app kept its data and showed no consent screen"
+    } + "; never agreed → ${b.lowScore} (${band(b.lowBand, b.lowScore)}), agreed earlier → ${b.highScore} (${band(b.bestBand, b.highScore, answered = b.bestBand != b.highBand)})"
 
     /**
      * The score band as a plain range; never a readiness or compliance label. Thresholds as in the core rules engine,
      * where an observed High or Critical finding keeps even 85+ points out of the top band.
      */
-    fun band(b: ScoreBand, score: Int? = null): String = when (b) {
+    fun band(b: ScoreBand, score: Int? = null, answered: Boolean = false): String = when (b) {
         ScoreBand.READY -> "85–100 band"
-        ScoreBand.NEEDS_WORK -> if (score != null && score >= 85) "below the 85–100 band: a High or Critical finding was observed" else "60–84 band"
+        ScoreBand.NEEDS_WORK -> if (score != null && score >= 85) {
+            if (answered) "below the 85–100 band: it rests on the person's unchecked answer about consent history"
+            else "below the 85–100 band: a High or Critical finding was observed"
+        } else "60–84 band"
         ScoreBand.AT_RISK -> "below 60"
         ScoreBand.INCONCLUSIVE -> "inconclusive"
     }
@@ -159,6 +184,7 @@ object CheckText {
         } else {
             appendLine("Score:    ${Wording.score(c.current)} (re-evaluated; same as stored in the bundle)")
         }
+        c.current.historyBounds?.let { appendLine("History:  ${Wording.history(it)}") }
         appendLine("Range:    ${Wording.robustness(c.current)}")
         lens(c)
         appendLine()
@@ -189,7 +215,8 @@ object CheckText {
         }
         appendLine("CHECK  SEVERITY  EVIDENCE  FINDING")
         for (f in findings) {
-            appendLine("${f.checkId.code.padEnd(5)}  ${f.severity.label.padEnd(8)}  ${Wording.evidence(f.evidenceType).padEnd(8)}  ${f.title}")
+            appendLine("${f.checkId.code.padEnd(5)}  ${f.severity.label.padEnd(8)}  ${Wording.evidence(f.evidenceType).padEnd(8)}  ${f.title}" +
+                if (f.declared) " [based on the person's answer]" else "")
             appendLine("${" ".repeat(27)}first evidence: ${Wording.firstEvidence(f)}")
         }
     }
@@ -306,8 +333,21 @@ object CheckJson {
     private fun result(r: AuditResult) = buildJsonObject {
         put("score", r.score)
         put("band", r.band.name)
-        put("bandText", Wording.band(r.band, r.score))
+        put("bandText", Wording.band(r.band, r.score, answered = r.historyBounds?.answer?.declared == true))
         put("checks", JsonArray(r.findings.map { JsonPrimitive(it.checkId.code) }))
+        r.historyBounds?.let { b ->
+            put("historyBounds", buildJsonObject {
+                put("lowScore", b.lowScore)
+                put("lowBand", b.lowBand.name)
+                put("highScore", b.highScore)
+                put("highBand", b.highBand.name)
+                put("bestBand", b.bestBand.name)
+                put("bandSettled", b.bandSettled)
+                put("answer", (b.answer ?: ConsentHistory.UNKNOWN).name)
+                put("consentHistory", (b.answer ?: ConsentHistory.UNKNOWN).line())
+                put("text", Wording.history(b))
+            })
+        }
     }
 
     fun finding(f: Finding) = buildJsonObject {
@@ -321,5 +361,6 @@ object CheckJson {
         put("entities", JsonArray(f.entities.map(::JsonPrimitive)))
         put("dpdpRefs", JsonArray(f.dpdpRefs.map(::JsonPrimitive)))
         put("explanation", f.explanation)
+        if (f.declared) put("basedOnPersonsAnswer", true)
     }
 }

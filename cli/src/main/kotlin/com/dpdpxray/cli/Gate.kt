@@ -12,6 +12,7 @@ import com.dpdpxray.core.model.AuditPlan
 import com.dpdpxray.core.model.AuditResult
 import com.dpdpxray.core.model.AuditSession
 import com.dpdpxray.core.model.CheckId
+import com.dpdpxray.core.model.ConsentHistory
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.Finding
 import com.dpdpxray.core.model.ScoreBand
@@ -79,15 +80,22 @@ object Coverage {
     /** The consent-screen review the rules engine uses (the first plan's screen that was judged a consent screen). */
     fun reviewedScreen(sessions: List<AuditSession>): ScreenAudit? = sessions.mapNotNull { it.screenAudit }.firstOrNull { it.isConsentScreen }
 
-    /** Why the captured plans could not show [id] at all, or null when they could. Unknown stays unknown. */
-    fun untested(id: CheckId, sessions: List<AuditSession>): String? {
+    /**
+     * Why the captured plans could not show [id] at all, or null when they could. Unknown stays unknown. [history] is the
+     * person's answer stored with the result: "never agreed" lets the kept plans be judged for C1, C10 and NC (marked
+     * as resting on that answer); any other answer leaves them untested.
+     */
+    fun untested(id: CheckId, sessions: List<AuditSession>, history: ConsentHistory? = null): String? {
         if (sessions.isEmpty()) return "no plans were captured"
-        val historyUnknown = sessions.all { it.appDataKept && !it.consentScreenSeen }
+        val historyUnknown = sessions.all { it.appDataKept && !it.consentScreenSeen } && history != ConsentHistory.DECLARED_NEVER
         return when (id) {
             CheckId.C2 -> "no Reject choice was recorded, so behaviour after refusal was not observed"
                 .takeIf { sessions.none { it.consentChoice?.kind == ConsentKind.REJECT } }
-            CheckId.C1, CheckId.C10, CheckId.NC -> "every plan ran on the app's kept data without a consent screen (consent history unknown)"
-                .takeIf { historyUnknown }
+            CheckId.C1, CheckId.C10, CheckId.NC -> (
+                if (history == ConsentHistory.DECLARED_AGREED) "every plan ran on the app's kept data without a consent screen, and the person " +
+                    "declared they agreed earlier (not checkable), so its lookups count as after consent"
+                else "every plan ran on the app's kept data without a consent screen (consent history unknown)"
+                ).takeIf { historyUnknown }
             CheckId.C3, CheckId.C4, CheckId.C5, CheckId.C6, CheckId.C7, CheckId.C8 -> "no consent screen was reviewed"
                 .takeIf { sessions.none { it.screenAudit?.isConsentScreen == true } }
             CheckId.C9 -> "the app was not declared child-facing in this capture and no consent screen was reviewed for child-audience signals"
@@ -108,6 +116,28 @@ object Coverage {
             CheckId.C16 -> "connections were not captured (a DNS-only check or an older build), so plain-HTTP requests were not seen"
                 .takeIf { sessions.none { it.captureDepth == "full-relay" } }
             else -> null
+        }
+    }
+}
+
+/**
+ * The requireReady rule: the top (85–100) band. A consent-history range passes only when its worst end is in it; a range
+ * whose best band is lower fails. Pure, so the rule is tested without a bundle.
+ */
+object ReadyGate {
+    fun outcome(r: AuditResult, p: Policy): RuleOutcome {
+        val rule = "requireReady"
+        if (!p.requireReady) return RuleOutcome(rule, RuleStatus.OFF, "not required")
+        val b = r.historyBounds
+        val score = r.score
+        return when {
+            score != null && r.band == ScoreBand.READY -> RuleOutcome(rule, RuleStatus.PASS, "$score/100 is in the ${Wording.band(r.band)}")
+            score != null -> RuleOutcome(rule, RuleStatus.FAIL, "${Wording.score(r)}: not in the 85–100 band")
+            b != null && b.lowBand == ScoreBand.READY && b.bestBand == ScoreBand.READY ->
+                RuleOutcome(rule, RuleStatus.PASS, "both ends of the consent-history range ${b.range} are in the 85–100 band")
+            b != null -> RuleOutcome(rule, RuleStatus.FAIL, "at best the ${Wording.band(b.bestBand)} (${b.range} depending on consent history); " +
+                "a range is in the 85–100 band only when both ends are")
+            else -> RuleOutcome(rule, RuleStatus.FAIL, "score not established (inconclusive result)")
         }
     }
 }
@@ -155,7 +185,9 @@ class Gate(
     private val legal: LegalLens = LegalLens.default,
 ) {
 
-    fun reevaluate(bundle: AuditBundleV1): AuditResult = engine.evaluate(bundle.sessions)
+    /** Today's rules over the bundle's sessions, with the person's consent-history answer if the bundle stores one. */
+    fun reevaluate(bundle: AuditBundleV1): AuditResult =
+        engine.evaluate(bundle.sessions, bundle.result.historyBounds?.answer ?: ConsentHistory.UNKNOWN)
 
     /**
      * [profile] (from --profile) wins; else the bundle's legalProfile; else the global baseline. [signature] is the
@@ -179,6 +211,7 @@ class Gate(
             add(freshState(coverage, policy))
             add(requirePlans(coverage, policy))
             add(requireSignature(signature, policy))
+            add(ReadyGate.outcome(current, policy))
         }
         val warnings = warnings(source) + listOfNotNull(
             b.legalProfile?.takeIf { named == null }?.let { "the bundle names legal lens \"$it\", which this version does not know; using ${lensId.name}" },
@@ -189,6 +222,9 @@ class Gate(
     /** Names the likely cause and the fix from the capture's own records (core VisibilityDiagnosis), never a guess. */
     private fun inconclusive(r: AuditResult, sessions: List<AuditSession>, p: Policy): RuleOutcome {
         if (r.band != ScoreBand.INCONCLUSIVE) return RuleOutcome("allowInconclusive", RuleStatus.PASS, "result is conclusive")
+        r.historyBounds?.let { b ->
+            return RuleOutcome("allowInconclusive", RuleStatus.PASS, "result is bounded by consent history, not inconclusive: ${Wording.range(b)}")
+        }
         val d = VisibilityDiagnosis.forResult(r, sessions)
         val why = when {
             d.isNotEmpty() -> "V0: almost no lookups were captured; likely cause: ${VisibilityDiagnosis.phrase(d.first().cause)}"
@@ -206,9 +242,10 @@ class Gate(
     private fun failOn(id: CheckId, r: AuditResult, sessions: List<AuditSession>, p: Policy): RuleOutcome {
         val rule = "failOn ${id.code}"
         r.findings.firstOrNull { it.checkId == id }?.let { f ->
-            return RuleOutcome(rule, RuleStatus.FAIL, "${id.code} ${f.title} (${f.severity.label}, ${f.evidenceType.name} evidence)")
+            val answer = if (f.declared) ", based on the person's answer about consent history" else ""
+            return RuleOutcome(rule, RuleStatus.FAIL, "${id.code} ${f.title} (${f.severity.label}, ${f.evidenceType.name} evidence$answer)")
         }
-        Coverage.untested(id, sessions)?.let { why ->
+        Coverage.untested(id, sessions, r.historyBounds?.answer)?.let { why ->
             val text = "${id.code} NOT ESTABLISHED: $why"
             return if (p.allowNotEstablished) RuleOutcome(rule, RuleStatus.NOT_ESTABLISHED, "$text (reported, not failed: allowNotEstablished is true)")
             else RuleOutcome(rule, RuleStatus.FAIL, "$text; a failOn check that could not be tested fails unless allowNotEstablished is true")
@@ -222,6 +259,12 @@ class Gate(
 
     private fun minScore(r: AuditResult, p: Policy): RuleOutcome {
         val min = p.minScore ?: return RuleOutcome("minScore", RuleStatus.OFF, "not set")
+        val b = r.historyBounds
+        if (r.score == null && b != null) return when {
+            b.lowScore >= min -> RuleOutcome("minScore", RuleStatus.PASS, "even if the person never agreed, ${b.lowScore} is at least $min")
+            b.highScore < min -> RuleOutcome("minScore", RuleStatus.FAIL, "even if the person agreed earlier, ${b.highScore} is below the minimum $min")
+            else -> RuleOutcome("minScore", RuleStatus.FAIL, "the range ${b.range} reaches $min only if the person agreed earlier; consent history is unknown")
+        }
         val score = r.score ?: return RuleOutcome("minScore", RuleStatus.NOT_ESTABLISHED, "score not established (inconclusive result)")
         return if (score >= min) RuleOutcome("minScore", RuleStatus.PASS, "score $score is at least $min")
         else RuleOutcome("minScore", RuleStatus.FAIL, "score $score is below the minimum $min")

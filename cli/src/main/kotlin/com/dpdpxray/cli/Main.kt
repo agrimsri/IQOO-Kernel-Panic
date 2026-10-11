@@ -318,12 +318,15 @@ class TraceVeilCi(
             |Policy keys (all optional; defaults in brackets):
             |  failOn            ["C2", "C9"]   fail when the re-evaluated result has any of these checks
             |  allowNotEstablished [false]      a failOn check the plans could not test fails unless true
-            |  minScore          [none]         fail when the score is below this (0-100)
+            |  minScore          [none]         fail when the score is below this (0-100); a consent-history range
+            |                                   passes only when its never-agreed end meets it
             |  maxHigh           [none]         fail when more findings than this are High or Critical
             |  requireFreshState [true]         every plan must have started from an approved fresh reset
             |  allowInconclusive [false]        an inconclusive result (low network visibility) fails unless true
             |  requirePlans      ["ACCEPT", "REJECT", "SILENT"]  plans that must be captured with their choice recorded
             |  requireSignature  [false]        fail unless the bundle's hardware signature verifies (see verify)
+            |  requireReady      [false]        fail unless the result is in the 85-100 band; a consent-history range
+            |                                   passes only when both of its ends are
             |
             |--profile reads the findings under a legal lens: INDIA, EU, UK, US_CALIFORNIA, US_CHILDREN, BRAZIL,
             |       SINGAPORE or GLOBAL_BASELINE (case and - or _ do not matter). Default: the bundle's legalProfile, else
