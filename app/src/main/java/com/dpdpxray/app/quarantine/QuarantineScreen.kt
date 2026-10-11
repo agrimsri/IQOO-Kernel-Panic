@@ -496,9 +496,9 @@ private fun ReportView(report: QuarantineReport, saved: Boolean, path: String?, 
                 val o = report.observations
                 CollapsibleCard(
                     "Capture details", Modifier.padding(top = 8.dp),
-                    summary = "${o.dnsQueries} lookups · ${o.blockedPackets} packets dropped", glyph = Glyph.SEARCH,
+                    summary = "${o.dnsQueries} lookups · ${o.blockedPackets} packets blocked", glyph = Glyph.SEARCH,
                 ) {
-                    Note("${o.dnsQueries} lookups (all answered \"does not exist\" on this phone), ${o.blockedPackets} packets dropped.")
+                    Note("${o.dnsQueries} lookups (all answered \"does not exist\" on this phone), ${o.blockedPackets} packets blocked (none forwarded; connections TraceVeil answered count their first packet here).")
                     if (o.connectionsRead == true) {
                         Note("${QuarantineText.plural(o.connections.size, "connection")} answered on the phone by TraceVeil and closed after the first message; nothing was forwarded.")
                     }
@@ -632,7 +632,8 @@ private fun LazyListScope.observationItems(o: QuarantineObservations, catalog: T
     val resolver = o.blocked.filter { it.role == DestinationRole.PHONE_RESOLVER }
     if (app.isNotEmpty()) {
         item(key = "h-b") { SectionTitle("Connections blocked (${app.map { it.address to it.port }.distinct().size})") }
-        items(app, key = { "b-" + it.protocol + it.endpoint }) { BlockedRow(it, liveItemModifier()) }
+        val answered = o.connections.map { it.dstIp to it.dstPort }.toSet()
+        items(app, key = { "b-" + it.protocol + it.endpoint }) { BlockedRow(it, liveItemModifier(), answered = (it.address to it.port) in answered) }
     }
     if (resolver.isNotEmpty()) {
         item(key = "h-r") {
@@ -671,14 +672,16 @@ private fun ConnectionRow(f: FlowRecord, catalog: TrackerCatalog, modifier: Modi
 }
 
 @Composable
-private fun BlockedRow(b: BlockedAttempt, modifier: Modifier = Modifier) {
+private fun BlockedRow(b: BlockedAttempt, modifier: Modifier = Modifier, answered: Boolean = false) {
     RuleRow(if (b.role == DestinationRole.PHONE_RESOLVER) Film.warn else Film.leak, modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { HostText(b.endpoint) }
             Tag(b.protocol.label, Film.boneDim)
         }
         val scope = QuarantineText.scopeNote(b.scope)
-        Note(QuarantineText.plural(b.packets.toInt(), "packet") + " dropped" + if (scope != null) " · $scope" else "")
+        // An answered connection's SYN was replied to on the phone, not dropped; either way nothing was forwarded.
+        val fate = if (answered) " · answered on the phone, nothing forwarded" else " dropped"
+        Note(QuarantineText.plural(b.packets.toInt(), "packet") + fate + if (scope != null) " · $scope" else "")
     }
 }
 

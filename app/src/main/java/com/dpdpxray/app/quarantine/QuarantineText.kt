@@ -89,7 +89,7 @@ object QuarantineText {
             f.protocol == FlowProtocol.QUIC && f.sni != null -> "name read from the QUIC hello"
             f.protocol == FlowProtocol.QUIC -> "QUIC, name not read"
             f.sni != null -> "name read from the TLS hello" + if (f.alpn.isEmpty()) "" else " · ${f.alpn.joinToString()}"
-            f.bytesUp > 0 -> "${f.bytesUp} bytes that are not TLS or HTTP"
+            f.bytesUp > 0 -> "sent ${f.bytesUp} bytes with no server name and no plain-HTTP request in them (for example HTTPS to an IP address)"
             else -> "nothing sent before it was closed"
         }
         return listOfNotNull("${f.dstIp}:${f.dstPort}", what, tracker?.let { "catalogued as $it" }).joinToString(" · ")

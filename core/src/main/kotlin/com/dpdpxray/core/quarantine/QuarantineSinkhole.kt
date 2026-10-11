@@ -103,7 +103,7 @@ internal object QuarantineConnections {
             }
             f.protocol == FlowProtocol.QUIC && f.sni != null -> "Sent a QUIC (HTTP/3) hello for ${f.sni} to $endpoint. Not answered; nothing was forwarded."
             f.sni != null -> "Opened HTTPS to ${f.sni} ($endpoint); only the server name in the TLS hello was read. $answered"
-            f.protocol == FlowProtocol.TCP && f.bytesUp > 0 -> "Opened a connection to $endpoint and sent ${f.bytesUp} bytes that are not TLS or HTTP. $answered"
+            f.protocol == FlowProtocol.TCP && f.bytesUp > 0 -> "Opened a connection to $endpoint and sent ${f.bytesUp} bytes with no server name and no plain-HTTP request in them. $answered"
             else -> null
         }
     }
