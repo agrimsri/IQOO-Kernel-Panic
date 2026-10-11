@@ -4,6 +4,8 @@ import com.dpdpxray.core.web.WebAudit
 import com.dpdpxray.core.law.LawRelation
 import com.dpdpxray.core.law.LensView
 import com.dpdpxray.core.model.AuditResult
+import com.dpdpxray.core.model.AuditSession
+import com.dpdpxray.core.model.BackgroundWatches
 import com.dpdpxray.core.model.ConsentHistory
 import com.dpdpxray.core.model.ConsentKind
 import com.dpdpxray.core.model.EvidenceType
@@ -135,6 +137,16 @@ object Wording {
         return parts.joinToString(" · ")
     }
 
+    /**
+     * A background watch in one line: its length and that no consent screen was driven, so the result is never read as a
+     * test of the consent popup. null when the bundle is not a watch.
+     */
+    fun watch(sessions: List<AuditSession>): String? {
+        val w = BackgroundWatches.of(sessions) ?: return null
+        return "background watch of ${BackgroundWatches.length(w)}: what the app sends while it runs in the background; " +
+            "the app was not opened, restarted or tapped, so its consent screen was not tested"
+    }
+
     fun fresh(c: List<PlanCoverage>): String {
         if (c.isEmpty()) return "NOT ESTABLISHED (no plans)"
         val byState = c.groupBy { it.fresh }
@@ -182,6 +194,7 @@ object CheckText {
         }
         c.warnings.forEach { appendLine("Warning:  $it") }
         appendLine("Plans:    " + if (c.coverage.isEmpty()) "none" else c.coverage.joinToString(" | ") { "${it.plan.label}: ${Wording.choice(it)}" })
+        Wording.watch(b.sessions)?.let { appendLine("Watch:    $it") }
         appendLine("Fresh:    ${Wording.fresh(c.coverage)}")
         Wording.network(ConnectionSummary.of(b.sessions))?.let { appendLine("Network:  $it") }
         if (c.resultChanged) {
@@ -272,6 +285,16 @@ object CheckJson {
             }
         })
         put("findings", JsonArray(c.current.findings.map(::finding)))
+        // Only for a background watch, so the output of every other bundle stays as it was.
+        BackgroundWatches.of(b.sessions)?.let { w ->
+            put("backgroundWatch", buildJsonObject {
+                put("plannedMinutes", w.plannedMinutes)
+                put("watchedMs", w.watchedMs)
+                put("stoppedEarly", w.stoppedEarly)
+                put("consentScreenDriven", false)
+                put("text", Wording.watch(b.sessions))
+            })
+        }
         ConnectionSummary.of(b.sessions)?.let { n -> put("network", network(n)) }
         put("rules", buildJsonArray {
             c.outcomes.forEach { o -> add(buildJsonObject { put("rule", o.rule); put("status", o.status.name); put("message", o.message) }) }

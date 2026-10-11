@@ -226,11 +226,14 @@ class Gate(
             return RuleOutcome("allowInconclusive", RuleStatus.PASS, "result is bounded by consent history, not inconclusive: ${Wording.range(b)}")
         }
         val d = VisibilityDiagnosis.forResult(r, sessions)
+        val watch = com.dpdpxray.core.model.BackgroundWatches.of(sessions)
         val why = when {
+            d.isNotEmpty() && watch != null -> "V0: almost no network use in a background watch of " +
+                "${com.dpdpxray.core.model.BackgroundWatches.length(watch)}; likely cause: ${VisibilityDiagnosis.phrase(d.first().cause)}"
             d.isNotEmpty() -> "V0: almost no lookups were captured; likely cause: ${VisibilityDiagnosis.phrase(d.first().cause)}"
             else -> "U1: the app kept its data, so whether consent came before its tracker lookups is unknown"
         }
-        val fix = if (d.isNotEmpty()) VisibilityDiagnosis.hint(VisibilityDiagnosis.primaryAction(d)) else "check a fresh install of a test build"
+        val fix = if (d.isNotEmpty()) VisibilityDiagnosis.hint(VisibilityDiagnosis.primaryAction(d), sessions) else "check a fresh install of a test build"
         return if (p.allowInconclusive) RuleOutcome("allowInconclusive", RuleStatus.PASS, "result is inconclusive ($why); the policy accepts that")
         else RuleOutcome("allowInconclusive", RuleStatus.FAIL, "result is inconclusive ($why), so this capture cannot pass; $fix")
     }
